@@ -10,6 +10,8 @@ interface PropertyPageProps {
   }>;
 }
 
+const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://casa-real-estate-mocha.vercel.app';
+
 export async function generateMetadata({
   params,
 }: PropertyPageProps): Promise<Metadata> {
@@ -23,27 +25,56 @@ export async function generateMetadata({
     };
   }
 
-  const title = `${property.title.en} — ${formatPrice(
+  const localizedTitle =
+    typeof property.title === 'string'
+      ? property.title
+      : property.title.en || 'Verified Real Estate Listing';
+
+  const formattedPrice = formatPrice(
     property.price.amount,
     property.price.currency,
-  )} | CASA`;
+  );
+
+  const title = `${localizedTitle} — ${formattedPrice} | CASA`;
 
   const description =
-    property.description.en ||
-    `${property.category} for ${property.listingType.toLowerCase()} in ${property.location.locality}, ${property.location.city}.`;
+    (typeof property.description === 'string'
+      ? property.description
+      : property.description?.en) ||
+    `${property.category} for ${property.listingType.toLowerCase()} in ${property.location.locality}, ${property.location.city}. Verified by CASA.`;
+
+  const canonicalUrl = `${BASE_URL}/property/${property.slug}`;
+  const imageUrl = property.media.thumbnailUrl || `${BASE_URL}/og-image.jpg`;
 
   return {
     title,
     description,
+    alternates: {
+      canonical: canonicalUrl,
+    },
+    robots: {
+      index: property.status === 'PUBLISHED',
+      follow: true,
+      googleBot: {
+        index: property.status === 'PUBLISHED',
+        follow: true,
+        'max-video-preview': -1,
+        'max-image-preview': 'large',
+        'max-snippet': -1,
+      },
+    },
     openGraph: {
       title,
       description,
+      url: canonicalUrl,
+      type: 'website',
+      siteName: 'CASA Real Estate Marketplace',
       images: [
         {
-          url: property.media.thumbnailUrl,
+          url: imageUrl,
           width: 1200,
           height: 630,
-          alt: property.title.en,
+          alt: localizedTitle,
         },
       ],
     },
@@ -51,7 +82,7 @@ export async function generateMetadata({
       card: 'summary_large_image',
       title,
       description,
-      images: [property.media.thumbnailUrl],
+      images: [imageUrl],
     },
   };
 }
@@ -69,11 +100,86 @@ export default async function PropertyDetailPage({ params }: PropertyPageProps) 
     property.slug,
   );
 
+  const localizedTitle =
+    typeof property.title === 'string'
+      ? property.title
+      : property.title.en || 'Real Estate Property';
+
+  const localizedDescription =
+    typeof property.description === 'string'
+      ? property.description
+      : property.description?.en || '';
+
+  // JSON-LD Structured Data Schema
+  const jsonLd = {
+    '@context': 'https://schema.org',
+    '@graph': [
+      {
+        '@type': 'BreadcrumbList',
+        itemListElement: [
+          {
+            '@type': 'ListItem',
+            position: 1,
+            name: 'Home',
+            item: BASE_URL,
+          },
+          {
+            '@type': 'ListItem',
+            position: 2,
+            name: property.location?.city || 'Properties',
+            item: `${BASE_URL}/locations/${(property.location?.city || 'india').toLowerCase()}`,
+          },
+          {
+            '@type': 'ListItem',
+            position: 3,
+            name: localizedTitle,
+            item: `${BASE_URL}/property/${property.slug}`,
+          },
+        ],
+      },
+      {
+        '@type': 'RealEstateListing',
+        name: localizedTitle,
+        description: localizedDescription,
+        url: `${BASE_URL}/property/${property.slug}`,
+        image: property.media.images || [property.media.thumbnailUrl],
+        offers: {
+          '@type': 'Offer',
+          price: property.price.amount,
+          priceCurrency: property.price.currency || 'INR',
+          availability: 'https://schema.org/InStock',
+        },
+        address: {
+          '@type': 'PostalAddress',
+          streetAddress: property.location.locality,
+          addressLocality: property.location.city,
+          addressRegion: property.location.state,
+          addressCountry: 'IN',
+        },
+        numberOfBedrooms: property.specs?.bedrooms,
+        numberOfBathroomsTotal: property.specs?.bathrooms,
+        floorSize: property.specs?.carpetAreaSqFt
+          ? {
+              '@type': 'QuantitativeValue',
+              value: property.specs.carpetAreaSqFt,
+              unitCode: 'FTK',
+            }
+          : undefined,
+      },
+    ],
+  };
+
   return (
-    <PropertyDetailView
-      property={property}
-      similarProperties={similarProperties}
-      source={source}
-    />
+    <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
+      <PropertyDetailView
+        property={property}
+        similarProperties={similarProperties}
+        source={source}
+      />
+    </>
   );
 }

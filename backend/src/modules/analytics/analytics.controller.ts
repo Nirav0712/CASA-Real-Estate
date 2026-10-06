@@ -1,0 +1,98 @@
+import {
+  Controller,
+  Post,
+  Get,
+  Patch,
+  Body,
+  Param,
+  Query,
+  Req,
+  UseGuards,
+  Ip,
+} from '@nestjs/common';
+import { AnalyticsService } from './analytics.service';
+import { TrackEventDto, ResolveRiskFlagDto, AnalyticsQueryDto } from './dto/analytics.dto';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
+import { UserRole } from '../auth/enums/auth.enums';
+
+@Controller('analytics')
+export class AnalyticsController {
+  constructor(private readonly analyticsService: AnalyticsService) {}
+
+  // 16.5 Ingest first-party marketplace analytics event
+  @Post('events')
+  async trackEvent(
+    @Body() dto: TrackEventDto,
+    @Req() req: any,
+    @Ip() ip: string,
+  ) {
+    const userId = req.user?.id || req.user?._id;
+    return this.analyticsService.trackEvent(dto, userId, ip);
+  }
+
+  // 16.6 Admin Business Intelligence Dashboard
+  @Get('admin/bi')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
+  async getAdminBI(@Query() query: AnalyticsQueryDto) {
+    const data = await this.analyticsService.getAdminMarketplaceBI(query);
+    return { success: true, data };
+  }
+
+  // 16.7 Agent Performance & Transparent Ranking
+  @Get('agent/:agentId/performance')
+  async getAgentPerformance(@Param('agentId') agentId: string) {
+    const data = await this.analyticsService.getAgentRankingAndPerformance(agentId);
+    return { success: true, data };
+  }
+
+  // 16.9 Fraud & Abuse Detection Scan
+  @Post('admin/risk-scan')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
+  async runRiskScan(@Body('propertyId') propertyId?: string) {
+    const result = await this.analyticsService.runFraudAndAbuseScan(propertyId);
+    return { success: true, data: result };
+  }
+
+  // Risk Flags List
+  @Get('admin/risk-flags')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
+  async getRiskFlags(
+    @Query('status') status?: string,
+    @Query('level') level?: string,
+    @Query('page') page = '1',
+    @Query('limit') limit = '50',
+  ) {
+    const data = await this.analyticsService.getRiskFlags(
+      status,
+      level,
+      parseInt(page, 10),
+      parseInt(limit, 10),
+    );
+    return { success: true, data };
+  }
+
+  // Risk Flag Status Resolution
+  @Patch('admin/risk-flags/:id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
+  async resolveRiskFlag(
+    @Param('id') id: string,
+    @Body() dto: ResolveRiskFlagDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    const updated = await this.analyticsService.resolveRiskFlag(
+      id,
+      dto.status,
+      dto.actionTaken,
+      user.id,
+    );
+    return { success: true, data: updated };
+  }
+}

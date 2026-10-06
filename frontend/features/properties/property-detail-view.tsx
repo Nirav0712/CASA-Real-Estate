@@ -19,6 +19,7 @@ import { useComparison } from '@/contexts/comparison-context';
 import { recordRecentlyViewed } from '@/services/purchaser-service';
 import { createLead } from '@/services/lead-service';
 import { EngagementService, Review } from '@/services/engagement-service';
+import { trackMarketplaceEvent } from '@/lib/analytics';
 import {
   MapPin,
   Bed,
@@ -70,6 +71,20 @@ export function PropertyDetailView({
   const propertyId = property.id || (property as any)._id;
   const saved = isSaved(propertyId);
   const compared = isCompared(propertyId);
+
+  // Track property view on mount
+  React.useEffect(() => {
+    if (propertyId) {
+      trackMarketplaceEvent('PROPERTY_VIEW', {
+        propertyId,
+        location: {
+          city: property.location?.city,
+          locality: property.location?.locality,
+          state: property.location?.state,
+        },
+      });
+    }
+  }, [propertyId, property.location]);
 
   // Modals state
   const [showSiteVisitModal, setShowSiteVisitModal] = React.useState(false);

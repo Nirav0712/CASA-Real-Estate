@@ -12,6 +12,7 @@ import { PurchaserModule } from './modules/purchaser/purchaser.module';
 import { LocationsModule } from './modules/locations/locations.module';
 import { PaymentsModule } from './modules/payments/payments.module';
 import { EngagementModule } from './modules/engagement/engagement.module';
+import { AnalyticsModule } from './modules/analytics/analytics.module';
 
 @Module({
   imports: [
@@ -31,6 +32,7 @@ import { EngagementModule } from './modules/engagement/engagement.module';
     LocationsModule,
     PaymentsModule,
     EngagementModule,
+    AnalyticsModule,
   ],
 })
 export class AppModule {}

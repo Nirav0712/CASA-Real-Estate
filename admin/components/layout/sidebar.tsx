@@ -9,6 +9,7 @@ import {
   LucideIcon,
   Building2,
   LayoutDashboard,
+  BarChart3,
   Home,
   CheckSquare,
   Layers,
@@ -25,6 +26,7 @@ import {
   Bell,
   Settings,
   ShieldAlert,
+  AlertTriangle,
   Sun,
   Moon,
   LogOut,
@@ -51,6 +53,7 @@ export function AdminSidebar() {
       label: 'OVERVIEW',
       items: [
         { label: 'Dashboard', href: '/', icon: LayoutDashboard, active: pathname === '/' },
+        { label: 'BI Analytics', href: '/analytics', icon: BarChart3, active: pathname === '/analytics' },
       ],
     },
     {
@@ -92,6 +95,7 @@ export function AdminSidebar() {
       label: 'SYSTEM & AUDIT',
       items: [
         { label: 'Notifications', href: '/notifications', icon: Bell },
+        { label: 'Fraud & Risk Flags', href: '/risk', icon: AlertTriangle, active: pathname === '/risk' },
         { label: 'Settings', href: '/settings', icon: Settings },
         { label: 'Audit Logs', href: '/audit-logs', icon: ShieldAlert },
       ],
