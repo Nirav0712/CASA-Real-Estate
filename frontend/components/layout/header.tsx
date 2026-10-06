@@ -35,6 +35,8 @@ import {
   SlidersHorizontal,
 } from 'lucide-react';
 
+const ADMIN_PORTAL_URL = process.env.NEXT_PUBLIC_ADMIN_URL || 'http://localhost:3001';
+
 export function Header() {
   const { locale, setLocale, t, isRtl } = useLanguage();
   const { theme, resolvedTheme, setTheme } = useTheme();
@@ -88,7 +90,7 @@ export function Header() {
                 {t('categories')}
               </Link>
               <a
-                href="http://localhost:3001"
+                href={ADMIN_PORTAL_URL}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-casa-brand hover:text-casa-brand-hover font-semibold transition-colors flex items-center gap-1"
@@ -367,7 +369,7 @@ export function Header() {
               <span>{t('categories')}</span>
             </Link>
             <a
-              href="http://localhost:3001"
+              href={ADMIN_PORTAL_URL}
               target="_blank"
               rel="noopener noreferrer"
               className="px-3 py-2.5 rounded-xl bg-casa-brand-subtle text-casa-brand text-sm font-bold flex items-center justify-between mt-2"
