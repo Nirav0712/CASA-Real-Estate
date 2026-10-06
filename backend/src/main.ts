@@ -34,11 +34,36 @@ async function bootstrap() {
   app.use(cookieParser());
 
   // Cross-Origin Resource Sharing (CORS)
+  const allowedOrigins = Array.from(
+    new Set(
+      [
+        frontendUrl,
+        frontendUrl.replace(/\/+$/, ''),
+        adminUrl,
+        adminUrl.replace(/\/+$/, ''),
+        'http://localhost:3000',
+        'http://localhost:3001',
+        'https://casa-real-estate-mocha.vercel.app',
+        'https://casa-real-estate-ocih.vercel.app',
+      ].filter(Boolean),
+    ),
+  );
+
   app.enableCors({
-    origin: [frontendUrl, adminUrl, 'http://localhost:3000', 'http://localhost:3001'],
+    origin: (requestOrigin, callback) => {
+      if (!requestOrigin) return callback(null, true);
+      if (
+        allowedOrigins.includes(requestOrigin) ||
+        requestOrigin.endsWith('.vercel.app') ||
+        requestOrigin.includes('localhost')
+      ) {
+        return callback(null, true);
+      }
+      callback(null, true);
+    },
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     credentials: true,
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'x-razorpay-signature'],
   });
 
   // Global Exception Handling & Interceptors
