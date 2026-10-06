@@ -45,7 +45,8 @@ export default () => ({
   },
   sms: {
     provider: cleanString(process.env.SMS_PROVIDER, 'mock'),
-    enableMockSms: cleanString(process.env.ENABLE_MOCK_SMS) !== 'false',
+    enableMockSms: cleanString(process.env.ENABLE_MOCK_SMS).toLowerCase() === 'true',
+    mockOtpAllowedMobile: cleanString(process.env.MOCK_OTP_ALLOWED_MOBILE),
     msg91AuthKey: cleanString(process.env.MSG91_AUTH_KEY),
     msg91TemplateId: cleanString(process.env.MSG91_TEMPLATE_ID),
     msg91SenderId: cleanString(process.env.MSG91_SENDER_ID, 'CASARE'),

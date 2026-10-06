@@ -268,8 +268,8 @@ export class AuthService {
       expiresInSeconds: expiresInMinutes * 60,
       cooldownSeconds,
       provider: provider.name,
-      isMock: dispatchResult.isMock || true,
-      ...(isDevelopment ? { devMockOtp: otp } : {}),
+      isMock: Boolean(dispatchResult.isMock),
+      ...(isDevelopment || dispatchResult.isMock ? { devMockOtp: otp } : {}),
     };
   }
 
