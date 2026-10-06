@@ -165,7 +165,7 @@ export function AdminSidebar() {
       {/* Public Marketplace Quick Link */}
       <div className="p-4 border-t border-casa-border-light bg-casa-canvas/50">
         <a
-          href="http://localhost:3000"
+          href={process.env.NEXT_PUBLIC_FRONTEND_URL || 'http://localhost:3000'}
           target="_blank"
           rel="noopener noreferrer"
           className="flex items-center justify-between text-xs text-casa-brand hover:underline font-semibold"

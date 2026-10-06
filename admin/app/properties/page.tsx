@@ -44,6 +44,11 @@ const API_BASE =
   process.env.NEXT_PUBLIC_API_URL ||
   'http://localhost:5000/api/v1';
 
+const FRONTEND_URL =
+  process.env.NEXT_PUBLIC_FRONTEND_URL ||
+  process.env.NEXT_PUBLIC_MARKETPLACE_URL ||
+  'http://localhost:3000';
+
 export default function AdminPropertiesPage() {
   const toast = useToast();
   const [properties, setProperties] = React.useState<AdminPropertyItem[]>([]);
@@ -378,7 +383,7 @@ export default function AdminPropertiesPage() {
           </Button>
 
           <a
-            href="http://localhost:3000"
+            href={FRONTEND_URL}
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-casa-brand bg-casa-brand-subtle hover:bg-casa-brand/15 rounded-xl transition-colors"
@@ -655,7 +660,7 @@ export default function AdminPropertiesPage() {
                                 <EyeOff className="w-4 h-4" />
                               </button>
                               <Link
-                                href={`http://localhost:3000/property/${item.slug}`}
+                                href={`${FRONTEND_URL}/property/${item.slug}`}
                                 target="_blank"
                                 title="View on Public Marketplace"
                                 className="p-1.5 text-casa-brand hover:bg-casa-brand-subtle rounded-lg transition-colors"
