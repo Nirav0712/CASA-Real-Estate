@@ -18,12 +18,14 @@ import { Roles } from '../auth/decorators/roles.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
 import { UserRole } from '../auth/enums/auth.enums';
+import { RateLimit } from '../../common/guards/rate-limit.guard';
 
 @Controller('analytics')
 export class AnalyticsController {
   constructor(private readonly analyticsService: AnalyticsService) {}
 
-  // 16.5 Ingest first-party marketplace analytics event
+  // 16.5 Ingest first-party marketplace analytics event (Rate limited to 60 events/min per IP)
+  @RateLimit({ limit: 60, windowMs: 60000, keyPrefix: 'analytics_ingest' })
   @Post('events')
   async trackEvent(
     @Body() dto: TrackEventDto,

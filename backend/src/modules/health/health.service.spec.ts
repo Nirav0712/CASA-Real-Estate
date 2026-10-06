@@ -30,8 +30,8 @@ describe('HealthService', () => {
     expect(service).toBeDefined();
   });
 
-  it('should return system health info without secrets', () => {
-    const health = service.getHealth();
+  it('should return system health info without secrets', async () => {
+    const health = await service.getHealth();
     expect(health.status).toBe('ok');
     expect(health.version).toBe('1.0.0');
     expect(health.database.connected).toBe(true);

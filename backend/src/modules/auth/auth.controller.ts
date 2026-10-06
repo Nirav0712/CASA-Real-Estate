@@ -20,6 +20,7 @@ import { Public } from './decorators/public.decorator';
 import { CurrentUser } from './decorators/current-user.decorator';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { AuthenticatedUser } from './interfaces/jwt-payload.interface';
+import { RateLimit } from '../../common/guards/rate-limit.guard';
 
 @ApiTags('Auth')
 @Controller('auth')
@@ -88,11 +89,13 @@ export class AuthController {
   }
 
   @Public()
+  @RateLimit({ limit: 5, windowMs: 60000, keyPrefix: 'auth_otp_req' })
   @Post('otp/request')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Request 6-digit OTP challenge for mobile authentication' })
   @ApiResponse({ status: 200, description: 'OTP challenge generated and dispatched' })
   @ApiResponse({ status: 400, description: 'Invalid mobile number or cooldown active' })
+  @ApiResponse({ status: 429, description: 'Rate limit exceeded' })
   async requestOtp(@Body() dto: RequestOtpDto, @Req() req: Request) {
     const ipAddress = req.ip || (req.headers['x-forwarded-for'] as string);
     const userAgent = req.headers['user-agent'];
@@ -100,11 +103,13 @@ export class AuthController {
   }
 
   @Public()
+  @RateLimit({ limit: 10, windowMs: 60000, keyPrefix: 'auth_otp_ver' })
   @Post('otp/verify')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Verify OTP challenge and obtain authentication credentials' })
   @ApiResponse({ status: 200, description: 'User verified and authenticated successfully' })
   @ApiResponse({ status: 400, description: 'Incorrect or expired OTP' })
+  @ApiResponse({ status: 429, description: 'Rate limit exceeded' })
   async verifyOtp(
     @Body() dto: VerifyOtpDto,
     @Req() req: Request,
@@ -131,11 +136,13 @@ export class AuthController {
   }
 
   @Public()
+  @RateLimit({ limit: 30, windowMs: 60000, keyPrefix: 'auth_refresh' })
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Rotate and refresh access token using refresh token' })
   @ApiResponse({ status: 200, description: 'New access token issued' })
   @ApiResponse({ status: 401, description: 'Invalid or revoked refresh token' })
+  @ApiResponse({ status: 429, description: 'Rate limit exceeded' })
   async refresh(
     @Body() dto: RefreshTokenDto,
     @Req() req: Request,

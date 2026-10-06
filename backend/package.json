@@ -11,7 +11,8 @@
     "start:prod": "node dist/main",
     "lint": "eslint \"{src,test}/**/*.ts\"",
     "typecheck": "tsc --noEmit",
-    "test": "jest"
+    "test": "jest",
+    "test:load": "node test/load/load-test.js"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.11",

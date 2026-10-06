@@ -13,7 +13,7 @@ export class HealthController {
     status: 200,
     description: 'System health status retrieved successfully',
   })
-  getHealth() {
+  async getHealth() {
     return this.healthService.getHealth();
   }
 
@@ -23,7 +23,7 @@ export class HealthController {
     status: 200,
     description: 'System health status retrieved successfully',
   })
-  getApiHealth() {
+  async getApiHealth() {
     return this.healthService.getHealth();
   }
 }
