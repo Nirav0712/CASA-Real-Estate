@@ -58,6 +58,7 @@ export function AdminSidebar() {
       items: [
         { label: 'All Properties', href: '/properties', icon: Home },
         { label: 'Pending Approvals', href: '/moderation', icon: CheckSquare, badge: '3' },
+        { label: 'Property Reports', href: '/reports', icon: ShieldAlert },
         { label: 'Categories', href: '/categories', icon: Layers },
         { label: 'Locations', href: '/locations', icon: MapPin },
       ],
@@ -74,6 +75,7 @@ export function AdminSidebar() {
       label: 'BUSINESS MANAGEMENT',
       items: [
         { label: 'Enquiries & Leads', href: '/enquiries', icon: MessageSquare },
+        { label: 'Customer Reviews', href: '/reviews', icon: FileText },
         { label: 'Subscriptions', href: '/subscriptions', icon: CreditCard },
         { label: 'Payments & Invoices', href: '/payments', icon: Receipt },
       ],

@@ -12,6 +12,7 @@ import { getCategoryLabel } from '@/lib/categories';
 import { useLanguage } from '@/contexts/language-context';
 import { useToast } from '@/contexts/toast-context';
 import { useSavedProperties } from '@/contexts/saved-properties-context';
+import { useComparison } from '@/contexts/comparison-context';
 import {
   MapPin,
   Bed,
@@ -23,15 +24,28 @@ import {
   Share2,
   ArrowRight,
   ShieldCheck,
+  Layers,
 } from 'lucide-react';
 
 export function PropertyCard({ property }: { property: Property }) {
   const { locale, t, isRtl } = useLanguage();
   const toast = useToast();
   const { isSaved, toggleSave } = useSavedProperties();
+  const { isCompared, addToCompare, removeFromCompare } = useComparison();
 
   const propertyId = property.id || (property as any)._id;
   const saved = isSaved(propertyId);
+  const compared = isCompared(propertyId);
+
+  const toggleCompare = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (compared) {
+      removeFromCompare(propertyId);
+    } else {
+      addToCompare(propertyId);
+    }
+  };
 
   const toggleFavorite = async (e: React.MouseEvent) => {
     e.preventDefault();
@@ -101,8 +115,19 @@ export function PropertyCard({ property }: { property: Property }) {
           )}
         </div>
 
-        {/* Action icons overlay (Share, Bookmark) */}
+        {/* Action icons overlay (Share, Compare, Bookmark) */}
         <div className="absolute top-3 end-3 flex items-center gap-1.5 z-10">
+          <button
+            type="button"
+            onClick={toggleCompare}
+            title={compared ? 'Remove from compare' : 'Add to compare'}
+            aria-label="Compare property"
+            className={`w-8 h-8 rounded-full bg-casa-surface/90 backdrop-blur-sm flex items-center justify-center transition-colors shadow-subtle cursor-pointer ${
+              compared ? 'text-casa-brand bg-casa-brand/20' : 'text-casa-text-secondary hover:text-casa-brand'
+            }`}
+          >
+            <Layers className="w-3.5 h-3.5" />
+          </button>
           <button
             type="button"
             onClick={handleShare}

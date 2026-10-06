@@ -7,7 +7,9 @@ import { LanguageProvider } from '@/contexts/language-context';
 import { ToastProvider } from '@/contexts/toast-context';
 import { AuthProvider } from '@/contexts/auth-context';
 import { SavedPropertiesProvider } from '@/contexts/saved-properties-context';
+import { ComparisonProvider } from '@/contexts/comparison-context';
 import { AuthModal } from '@/components/auth/auth-modal';
+import { ComparisonBar } from '@/components/property/comparison-bar';
 
 const inter = Inter({
   subsets: ['latin'],
@@ -40,10 +42,13 @@ export default function RootLayout({
             <ToastProvider>
               <AuthProvider>
                 <SavedPropertiesProvider>
-                  <Header />
-                  <main className="flex-1">{children}</main>
-                  <Footer />
-                  <AuthModal />
+                  <ComparisonProvider>
+                    <Header />
+                    <main className="flex-1">{children}</main>
+                    <Footer />
+                    <AuthModal />
+                    <ComparisonBar />
+                  </ComparisonProvider>
                 </SavedPropertiesProvider>
               </AuthProvider>
             </ToastProvider>

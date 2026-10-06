@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useAuth } from '@/contexts/auth-context';
 import { useToast } from '@/contexts/toast-context';
 import { getAgentDashboard } from '@/services/agent-service';
+import { EngagementService, AgentAnalytics } from '@/services/engagement-service';
 import { AgentDashboardData } from '@/types';
 import { formatPrice } from '@/lib/utils';
 import {
@@ -22,6 +23,13 @@ import {
   ChevronRight,
   Sparkles,
   ExternalLink,
+  TrendingUp,
+  BarChart3,
+  CheckCircle,
+  XCircle,
+  MessageSquare,
+  Eye,
+  Filter,
 } from 'lucide-react';
 
 export default function AgentDashboardPage() {
@@ -29,14 +37,24 @@ export default function AgentDashboardPage() {
   const toast = useToast();
 
   const [dashboard, setDashboard] = React.useState<AgentDashboardData | null>(null);
+  const [analytics, setAnalytics] = React.useState<AgentAnalytics | null>(null);
   const [isLoading, setIsLoading] = React.useState(true);
 
   const loadData = React.useCallback(async () => {
     if (!isAuthenticated) return;
     setIsLoading(true);
     try {
-      const data = await getAgentDashboard();
-      setDashboard(data);
+      const [dashData, analyticsData] = await Promise.allSettled([
+        getAgentDashboard(),
+        EngagementService.getAgentAnalytics(),
+      ]);
+
+      if (dashData.status === 'fulfilled') {
+        setDashboard(dashData.value);
+      }
+      if (analyticsData.status === 'fulfilled' && analyticsData.value.success) {
+        setAnalytics(analyticsData.value.data);
+      }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Failed to load agent dashboard.';
       toast.error('Load Error', msg);
@@ -109,7 +127,7 @@ export default function AgentDashboardPage() {
           </div>
           <p className="text-sm text-slate-500">
             {dashboard?.profile?.agencyName ? `${dashboard.profile.agencyName} • ` : ''}
-            Manage your property inventory, buyer leads, and official CASA business profile.
+            Manage your property inventory, buyer leads, conversion funnel, and site visits.
           </p>
         </div>
 
@@ -191,50 +209,162 @@ export default function AgentDashboardPage() {
             </div>
           </div>
           <div className="mt-4">
-            <div className="text-3xl font-bold text-slate-900">{dashboard?.counts?.totalLeads ?? 0}</div>
+            <div className="text-3xl font-bold text-slate-900">{analytics?.overview?.totalLeads ?? dashboard?.counts?.totalLeads ?? 0}</div>
             <div className="text-xs text-slate-500 mt-1">
-              <span className="text-casa-600 font-semibold">{dashboard?.counts?.newLeads ?? 0} New Uncontacted</span>
+              <span className="text-casa-600 font-semibold">{analytics?.overview?.newLeads ?? dashboard?.counts?.newLeads ?? 0} New Uncontacted</span>
             </div>
           </div>
         </div>
 
-        {/* Follow-ups Due */}
+        {/* Site Visits */}
         <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm flex flex-col justify-between">
           <div className="flex items-center justify-between">
-            <span className="text-sm font-medium text-slate-500">Follow-ups Due</span>
-            <div className="p-2 bg-amber-50 text-amber-600 rounded-xl">
+            <span className="text-sm font-medium text-slate-500">Site Visits Booked</span>
+            <div className="p-2 bg-emerald-50 text-emerald-600 rounded-xl">
               <Calendar className="w-5 h-5" />
             </div>
           </div>
           <div className="mt-4">
-            <div className="text-3xl font-bold text-slate-900">{dashboard?.counts?.followUpsDue ?? 0}</div>
+            <div className="text-3xl font-bold text-slate-900">{analytics?.overview?.siteVisits ?? 0}</div>
             <div className="text-xs text-slate-500 mt-1">
-              Scheduled tasks for today
+              <Link href="/dashboard/site-visits" className="text-casa-600 font-semibold hover:underline">
+                Manage Site Visits →
+              </Link>
             </div>
           </div>
         </div>
 
-        {/* Verified Status */}
+        {/* Conversion Rate */}
         <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm flex flex-col justify-between">
           <div className="flex items-center justify-between">
-            <span className="text-sm font-medium text-slate-500">RERA Status</span>
-            <div className={`p-2 rounded-xl ${isVerified ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-50 text-slate-600'}`}>
-              <FileCheck2 className="w-5 h-5" />
+            <span className="text-sm font-medium text-slate-500">Conversion Rate</span>
+            <div className="p-2 bg-amber-50 text-amber-600 rounded-xl">
+              <TrendingUp className="w-5 h-5" />
             </div>
           </div>
           <div className="mt-4">
-            <div className="text-xl font-bold text-slate-900 truncate">
-              {dashboard?.profile?.reraNumber || 'Not Registered'}
+            <div className="text-3xl font-bold text-slate-900">
+              {analytics?.overview?.conversionRate ?? 0}%
             </div>
             <div className="text-xs text-slate-500 mt-1">
-              {isVerified ? 'CASA Verified & Authorized' : 'Pending Verification'}
+              {analytics?.overview?.converted ?? 0} Converted Closures
             </div>
           </div>
         </div>
       </div>
 
+      {/* Conversion Funnel & Analytics Section */}
+      {analytics && (
+        <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-4 border-b border-slate-100">
+            <div>
+              <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                <BarChart3 className="w-5 h-5 text-casa-600" />
+                <span>Buyer Conversion & Funnel Analytics</span>
+              </h2>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Real-time tracking of buyer progression from initial discovery through site visit to deal closure.
+              </p>
+            </div>
+            <span className="text-xs font-semibold px-3 py-1 bg-casa-50 text-casa-700 rounded-full border border-casa-200 self-start sm:self-auto">
+              Phase 15 Conversion Engine
+            </span>
+          </div>
+
+          {/* Funnel Progress Breakdown */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3">
+            <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-100 text-center">
+              <div className="text-xs font-semibold text-slate-500">New Leads</div>
+              <div className="text-xl font-bold text-slate-900 mt-1">{analytics.overview.newLeads}</div>
+              <div className="text-[10px] text-slate-400 mt-0.5">Discovery Stage</div>
+            </div>
+
+            <div className="p-3.5 bg-blue-50/60 rounded-xl border border-blue-100 text-center">
+              <div className="text-xs font-semibold text-blue-700">Contacted</div>
+              <div className="text-xl font-bold text-blue-900 mt-1">{analytics.overview.contacted}</div>
+              <div className="text-[10px] text-blue-600 mt-0.5">Response Sent</div>
+            </div>
+
+            <div className="p-3.5 bg-indigo-50/60 rounded-xl border border-indigo-100 text-center">
+              <div className="text-xs font-semibold text-indigo-700">Qualified</div>
+              <div className="text-xl font-bold text-indigo-900 mt-1">{analytics.overview.qualified}</div>
+              <div className="text-[10px] text-indigo-600 mt-0.5">Budget Verified</div>
+            </div>
+
+            <div className="p-3.5 bg-purple-50/60 rounded-xl border border-purple-100 text-center">
+              <div className="text-xs font-semibold text-purple-700">Site Visits</div>
+              <div className="text-xl font-bold text-purple-900 mt-1">{analytics.overview.siteVisits}</div>
+              <div className="text-[10px] text-purple-600 mt-0.5">Property Toured</div>
+            </div>
+
+            <div className="p-3.5 bg-amber-50/60 rounded-xl border border-amber-100 text-center">
+              <div className="text-xs font-semibold text-amber-700">Negotiation</div>
+              <div className="text-xl font-bold text-amber-900 mt-1">{analytics.overview.negotiations}</div>
+              <div className="text-[10px] text-amber-600 mt-0.5">Price Discussion</div>
+            </div>
+
+            <div className="p-3.5 bg-emerald-50/80 rounded-xl border border-emerald-200 text-center">
+              <div className="text-xs font-semibold text-emerald-700">Converted</div>
+              <div className="text-xl font-bold text-emerald-900 mt-1">{analytics.overview.converted}</div>
+              <div className="text-[10px] text-emerald-600 mt-0.5 font-bold">Deal Closed ✓</div>
+            </div>
+          </div>
+
+          {/* Lead Sources & Top Properties Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
+            {/* Top Properties with Inquiries */}
+            <div className="p-4 bg-slate-50/50 rounded-xl border border-slate-100 space-y-3">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700">
+                Top Performing Listings
+              </h3>
+              {analytics.leadsByProperty.length === 0 ? (
+                <p className="text-xs text-slate-400 py-3 text-center">No property lead distribution data yet.</p>
+              ) : (
+                <div className="space-y-2">
+                  {analytics.leadsByProperty.slice(0, 4).map((item) => (
+                    <div
+                      key={item._id}
+                      className="p-2.5 bg-white rounded-lg border border-slate-200/80 flex items-center justify-between text-xs"
+                    >
+                      <span className="font-semibold text-slate-800 truncate max-w-[200px]">
+                        {item.title}
+                      </span>
+                      <span className="font-bold text-casa-600 px-2 py-0.5 bg-casa-50 rounded">
+                        {item.count} Leads
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Lead Sources Breakdown */}
+            <div className="p-4 bg-slate-50/50 rounded-xl border border-slate-100 space-y-3">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700">
+                Lead Acquisition Sources
+              </h3>
+              {analytics.leadsBySource.length === 0 ? (
+                <p className="text-xs text-slate-400 py-3 text-center">No source attribution recorded yet.</p>
+              ) : (
+                <div className="grid grid-cols-2 gap-2">
+                  {analytics.leadsBySource.map((src) => (
+                    <div
+                      key={src._id}
+                      className="p-2.5 bg-white rounded-lg border border-slate-200/80 flex items-center justify-between text-xs"
+                    >
+                      <span className="text-slate-600 truncate">{src._id}</span>
+                      <span className="font-bold text-slate-900">{src.count}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Quick Navigation Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Link
           href="/dashboard/leads"
           className="p-5 bg-white rounded-2xl border border-slate-100 shadow-sm hover:border-casa-200 hover:shadow-md transition group"
@@ -245,9 +375,41 @@ export default function AgentDashboardPage() {
             </div>
             <ArrowRight className="w-5 h-5 text-slate-400 group-hover:text-casa-600 group-hover:translate-x-1 transition" />
           </div>
-          <h3 className="text-lg font-bold text-slate-900 mt-4">Lead Management CRM</h3>
-          <p className="text-sm text-slate-500 mt-1">
-            Track inquiries, update contact status, log meeting notes, and manage buyer follow-ups.
+          <h3 className="text-base font-bold text-slate-900 mt-4">Lead CRM</h3>
+          <p className="text-xs text-slate-500 mt-1">
+            Track inquiries, update contact status, log notes, and manage follow-ups.
+          </p>
+        </Link>
+
+        <Link
+          href="/dashboard/messages"
+          className="p-5 bg-white rounded-2xl border border-slate-100 shadow-sm hover:border-casa-200 hover:shadow-md transition group"
+        >
+          <div className="flex items-center justify-between">
+            <div className="p-3 bg-indigo-50 text-indigo-600 rounded-xl group-hover:bg-indigo-600 group-hover:text-white transition">
+              <MessageSquare className="w-6 h-6" />
+            </div>
+            <ArrowRight className="w-5 h-5 text-slate-400 group-hover:text-indigo-600 group-hover:translate-x-1 transition" />
+          </div>
+          <h3 className="text-base font-bold text-slate-900 mt-4">Buyer Messages</h3>
+          <p className="text-xs text-slate-500 mt-1">
+            Real-time direct messaging with prospective purchasers and tenants.
+          </p>
+        </Link>
+
+        <Link
+          href="/dashboard/site-visits"
+          className="p-5 bg-white rounded-2xl border border-slate-100 shadow-sm hover:border-casa-200 hover:shadow-md transition group"
+        >
+          <div className="flex items-center justify-between">
+            <div className="p-3 bg-emerald-50 text-emerald-600 rounded-xl group-hover:bg-emerald-600 group-hover:text-white transition">
+              <Calendar className="w-6 h-6" />
+            </div>
+            <ArrowRight className="w-5 h-5 text-slate-400 group-hover:text-emerald-600 group-hover:translate-x-1 transition" />
+          </div>
+          <h3 className="text-base font-bold text-slate-900 mt-4">Site Visits</h3>
+          <p className="text-xs text-slate-500 mt-1">
+            Review, confirm, reschedule, and complete physical property tours.
           </p>
         </Link>
 
@@ -261,25 +423,9 @@ export default function AgentDashboardPage() {
             </div>
             <ArrowRight className="w-5 h-5 text-slate-400 group-hover:text-blue-600 group-hover:translate-x-1 transition" />
           </div>
-          <h3 className="text-lg font-bold text-slate-900 mt-4">Property Inventory</h3>
-          <p className="text-sm text-slate-500 mt-1">
-            Create, edit, submit, and track the status of all your residential and commercial listings.
-          </p>
-        </Link>
-
-        <Link
-          href="/dashboard/agent/profile"
-          className="p-5 bg-white rounded-2xl border border-slate-100 shadow-sm hover:border-casa-200 hover:shadow-md transition group"
-        >
-          <div className="flex items-center justify-between">
-            <div className="p-3 bg-emerald-50 text-emerald-600 rounded-xl group-hover:bg-emerald-600 group-hover:text-white transition">
-              <UserCheck className="w-6 h-6" />
-            </div>
-            <ArrowRight className="w-5 h-5 text-slate-400 group-hover:text-emerald-600 group-hover:translate-x-1 transition" />
-          </div>
-          <h3 className="text-lg font-bold text-slate-900 mt-4">Business Profile & RERA</h3>
-          <p className="text-sm text-slate-500 mt-1">
-            Update agency branding, areas served, languages, and upload RERA compliance certificates.
+          <h3 className="text-base font-bold text-slate-900 mt-4">Property Inventory</h3>
+          <p className="text-xs text-slate-500 mt-1">
+            Create, edit, submit, and track the status of all your listings.
           </p>
         </Link>
       </div>

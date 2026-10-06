@@ -3,6 +3,7 @@
 import * as React from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { Property } from '@/types';
 import { Container, Card, Badge } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -14,8 +15,10 @@ import { useLanguage } from '@/contexts/language-context';
 import { useToast } from '@/contexts/toast-context';
 import { useAuth } from '@/contexts/auth-context';
 import { useSavedProperties } from '@/contexts/saved-properties-context';
+import { useComparison } from '@/contexts/comparison-context';
 import { recordRecentlyViewed } from '@/services/purchaser-service';
 import { createLead } from '@/services/lead-service';
+import { EngagementService, Review } from '@/services/engagement-service';
 import {
   MapPin,
   Bed,
@@ -35,6 +38,14 @@ import {
   Sparkles,
   Info,
   Send,
+  Calendar,
+  Flag,
+  Star,
+  X,
+  MessageCircle,
+  Copy,
+  Check,
+  ExternalLink,
 } from 'lucide-react';
 
 interface PropertyDetailViewProps {
@@ -50,12 +61,41 @@ export function PropertyDetailView({
 }: PropertyDetailViewProps) {
   const { locale, t, isRtl } = useLanguage();
   const toast = useToast();
+  const router = useRouter();
   const { user, isAuthenticated } = useAuth();
   const { isSaved, toggleSave } = useSavedProperties();
+  const { isCompared, addToCompare, removeFromCompare } = useComparison();
   const [selectedImageIndex, setSelectedImageIndex] = React.useState(0);
 
   const propertyId = property.id || (property as any)._id;
   const saved = isSaved(propertyId);
+  const compared = isCompared(propertyId);
+
+  // Modals state
+  const [showSiteVisitModal, setShowSiteVisitModal] = React.useState(false);
+  const [showReportModal, setShowReportModal] = React.useState(false);
+  const [showShareModal, setShowShareModal] = React.useState(false);
+  const [copiedLink, setCopiedLink] = React.useState(false);
+
+  // Site visit form state
+  const [siteVisitDate, setSiteVisitDate] = React.useState('');
+  const [siteVisitTime, setSiteVisitTime] = React.useState('11:00 AM');
+  const [siteVisitMobile, setSiteVisitMobile] = React.useState(user?.mobile || '');
+  const [siteVisitNotes, setSiteVisitNotes] = React.useState('');
+  const [isSubmittingSiteVisit, setIsSubmittingSiteVisit] = React.useState(false);
+
+  // Report form state
+  const [reportReason, setReportReason] = React.useState('INAPPROPRIATE_CONTENT');
+  const [reportDescription, setReportDescription] = React.useState('');
+  const [isSubmittingReport, setIsSubmittingReport] = React.useState(false);
+
+  // Reviews state
+  const [reviews, setReviews] = React.useState<Review[]>([]);
+  const [loadingReviews, setLoadingReviews] = React.useState(true);
+  const [ratingInput, setRatingInput] = React.useState(5);
+  const [reviewComment, setReviewComment] = React.useState('');
+  const [isSubmittingReview, setIsSubmittingReview] = React.useState(false);
+  const [reviewSubmitted, setReviewSubmitted] = React.useState(false);
 
   // Auto-record recently viewed on mount
   React.useEffect(() => {
@@ -63,6 +103,26 @@ export function PropertyDetailView({
       recordRecentlyViewed(propertyId);
     }
   }, [isAuthenticated, propertyId]);
+
+  // Load reviews
+  const fetchReviews = React.useCallback(async () => {
+    if (!propertyId) return;
+    try {
+      setLoadingReviews(true);
+      const res = await EngagementService.getPropertyReviews(propertyId);
+      if (res.success && res.data) {
+        setReviews(res.data);
+      }
+    } catch {
+      // Ignore
+    } finally {
+      setLoadingReviews(false);
+    }
+  }, [propertyId]);
+
+  React.useEffect(() => {
+    fetchReviews();
+  }, [fetchReviews]);
 
   const images =
     property.media.images && property.media.images.length > 0
@@ -101,10 +161,143 @@ export function PropertyDetailView({
     await toggleSave(propertyId, localizedTitle);
   };
 
-  const handleShare = () => {
+  const handleCopyLink = () => {
     if (typeof window !== 'undefined' && navigator.clipboard) {
-      navigator.clipboard.writeText(window.location.href);
-      toast.info('Listing URL copied to clipboard');
+      const url = `${window.location.origin}/property/${property.slug}`;
+      navigator.clipboard.writeText(url);
+      setCopiedLink(true);
+      toast.success('Copied!', 'Property link copied to clipboard.');
+      setTimeout(() => setCopiedLink(false), 2500);
+    }
+  };
+
+  const handleNativeShare = () => {
+    if (typeof window !== 'undefined' && navigator.share) {
+      navigator
+        .share({
+          title: localizedTitle,
+          text: `Check out this property on CASA: ${localizedTitle} for ${formattedPrice}`,
+          url: window.location.href,
+        })
+        .catch(() => {});
+    } else {
+      setShowShareModal(true);
+    }
+  };
+
+  // Chat with Agent
+  const handleStartChat = async () => {
+    if (!isAuthenticated) {
+      toast.warning('Authentication Required', 'Please sign in to start a direct message with the agent.');
+      return;
+    }
+
+    const advertiserId = (property.advertiser as any)?._id || (property.advertiser as any)?.id;
+    if (!advertiserId) {
+      router.push('/dashboard/messages');
+      return;
+    }
+
+    try {
+      const res = await EngagementService.getOrCreateConversation(advertiserId, propertyId);
+      if (res.success && res.data) {
+        router.push(`/dashboard/messages?conversationId=${res.data._id}`);
+      } else {
+        router.push('/dashboard/messages');
+      }
+    } catch {
+      router.push('/dashboard/messages');
+    }
+  };
+
+  // Site Visit Booking Submit
+  const handleSiteVisitSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!isAuthenticated) {
+      toast.warning('Sign in required', 'Please sign in to book a site visit.');
+      return;
+    }
+    if (!siteVisitDate) {
+      toast.error('Date required', 'Please select a preferred visit date.');
+      return;
+    }
+
+    try {
+      setIsSubmittingSiteVisit(true);
+      const res = await EngagementService.requestSiteVisit({
+        propertyId,
+        preferredDate: siteVisitDate,
+        preferredTime: siteVisitTime,
+        buyerPhone: siteVisitMobile || user?.mobile,
+        notes: siteVisitNotes,
+      });
+
+      if (res.success) {
+        setShowSiteVisitModal(false);
+        toast.success('Site Visit Requested', 'The agent will review and confirm your site visit appointment shortly.');
+      }
+    } catch (err: any) {
+      toast.error('Booking failed', err.message || 'Could not schedule site visit.');
+    } finally {
+      setIsSubmittingSiteVisit(false);
+    }
+  };
+
+  // Report Submit
+  const handleReportSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!isAuthenticated) {
+      toast.warning('Sign in required', 'Please sign in to submit a property report.');
+      return;
+    }
+
+    try {
+      setIsSubmittingReport(true);
+      const res = await EngagementService.submitPropertyReport({
+        propertyId,
+        reason: reportReason,
+        description: reportDescription,
+      });
+
+      if (res.success) {
+        setShowReportModal(false);
+        setReportDescription('');
+        toast.success('Report Submitted', 'Our moderation team will review this listing promptly.');
+      }
+    } catch (err: any) {
+      toast.error('Report failed', err.message || 'Could not submit report.');
+    } finally {
+      setIsSubmittingReport(false);
+    }
+  };
+
+  // Review Submit
+  const handleReviewSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!isAuthenticated) {
+      toast.warning('Sign in required', 'Please sign in to write a review.');
+      return;
+    }
+
+    try {
+      setIsSubmittingReview(true);
+      const res = await EngagementService.submitReview({
+        propertyId,
+        agentId: (property.advertiser as any)?._id || (property.advertiser as any)?.id,
+        rating: ratingInput,
+        comment: reviewComment,
+      });
+
+      if (res.success) {
+        setReviewSubmitted(true);
+        setReviewComment('');
+        toast.success('Review Submitted', 'Thank you! Your feedback has been sent for moderation and will appear once approved.');
+        fetchReviews();
+      }
+    } catch (err: any) {
+      toast.error('Review failed', err.message || 'Could not submit review.');
+    } finally {
+      setIsSubmittingReview(false);
     }
   };
 
@@ -124,6 +317,7 @@ export function PropertyDetailView({
         mobile: prev.mobile || user.mobile || '',
         email: prev.email || user.email || '',
       }));
+      setSiteVisitMobile(user.mobile || '');
     }
   }, [user]);
 
@@ -156,6 +350,8 @@ export function PropertyDetailView({
     }
   };
 
+  const shareUrl = typeof window !== 'undefined' ? `${window.location.origin}/property/${property.slug}` : '';
+
   return (
     <div className="py-8 md:py-12 bg-casa-canvas text-start transition-colors duration-200">
       <Container>
@@ -169,7 +365,7 @@ export function PropertyDetailView({
               </span>
             </div>
             <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 bg-blue-200/60 dark:bg-blue-900 rounded">
-              Phase 05 Ready
+              Phase 15 Verified
             </span>
           </div>
         )}
@@ -197,7 +393,7 @@ export function PropertyDetailView({
 
         {/* Main Grid: Gallery & Details on left (2 cols), Sticky Contact Sidebar on right (1 col) */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Left Column: Media Gallery, Overview, Specs, Amenities, Description */}
+          {/* Left Column: Media Gallery, Overview, Specs, Amenities, Description, Reviews */}
           <div className="lg:col-span-2 space-y-8">
             {/* Gallery Card */}
             <Card className="p-0 overflow-hidden border-casa-border-light shadow-subtle">
@@ -238,11 +434,25 @@ export function PropertyDetailView({
                   </span>
                   <button
                     type="button"
-                    onClick={handleShare}
+                    onClick={handleNativeShare}
                     aria-label="Share property link"
                     className="w-8 h-8 rounded-full bg-casa-surface/90 backdrop-blur-md text-casa-text-secondary hover:text-casa-brand flex items-center justify-center transition-colors shadow-subtle cursor-pointer"
                   >
                     <Share2 className="w-4 h-4" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (compared) removeFromCompare(propertyId);
+                      else addToCompare(propertyId);
+                    }}
+                    title={compared ? 'Remove from compare' : 'Add to compare'}
+                    aria-label="Compare property"
+                    className={`w-8 h-8 rounded-full bg-casa-surface/90 backdrop-blur-md flex items-center justify-center transition-colors shadow-subtle cursor-pointer ${
+                      compared ? 'text-casa-brand bg-casa-brand/20' : 'text-casa-text-secondary hover:text-casa-brand'
+                    }`}
+                  >
+                    <Layers className="w-4 h-4" />
                   </button>
                   <button
                     type="button"
@@ -451,9 +661,142 @@ export function PropertyDetailView({
                 </div>
               </Card>
             )}
+
+            {/* Ratings & Reviews Section */}
+            <Card className="p-6 border-casa-border-light space-y-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-casa-border-light">
+                <div>
+                  <h2 className="text-base font-bold text-casa-text-primary flex items-center gap-2">
+                    <Star className="w-5 h-5 text-amber-500 fill-amber-500" />
+                    <span>Customer Reviews & Ratings</span>
+                  </h2>
+                  <p className="text-xs text-casa-text-muted mt-0.5">
+                    Verified feedback from buyers and visitors for this listing and advertiser.
+                  </p>
+                </div>
+              </div>
+
+              {/* Reviews List */}
+              {loadingReviews ? (
+                <div className="space-y-3">
+                  {[1, 2].map((n) => (
+                    <div key={n} className="h-20 bg-casa-canvas rounded-xl animate-pulse" />
+                  ))}
+                </div>
+              ) : reviews.length === 0 ? (
+                <div className="text-center py-6 px-4 bg-casa-canvas/60 rounded-xl border border-dashed border-casa-border-light">
+                  <p className="text-xs text-casa-text-muted">No reviews yet for this listing. Be the first to share your experience!</p>
+                </div>
+              ) : (
+                <div className="space-y-3.5">
+                  {reviews.map((rev) => (
+                    <div
+                      key={rev._id}
+                      className="p-4 rounded-xl bg-casa-canvas border border-casa-border-light space-y-2"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <div className="w-7 h-7 rounded-full bg-casa-brand/10 text-casa-brand font-bold text-xs flex items-center justify-center">
+                            {rev.userId?.name?.charAt(0) || 'U'}
+                          </div>
+                          <div>
+                            <div className="text-xs font-semibold text-casa-text-primary">
+                              {rev.userId?.name || 'Verified User'}
+                            </div>
+                            <div className="text-[10px] text-casa-text-muted">
+                              {new Date(rev.createdAt).toLocaleDateString()}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-0.5">
+                          {[1, 2, 3, 4, 5].map((star) => (
+                            <Star
+                              key={star}
+                              className={`w-3.5 h-3.5 ${
+                                star <= rev.rating
+                                  ? 'text-amber-500 fill-amber-500'
+                                  : 'text-zinc-300 dark:text-zinc-700'
+                              }`}
+                            />
+                          ))}
+                        </div>
+                      </div>
+
+                      {rev.comment && (
+                        <p className="text-xs text-casa-text-secondary leading-relaxed">
+                          {rev.comment}
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Write Review Form */}
+              <div className="pt-4 border-t border-casa-border-light">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-casa-text-primary mb-3">
+                  Write a Review
+                </h3>
+
+                {reviewSubmitted ? (
+                  <div className="p-4 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 rounded-xl text-center space-y-1">
+                    <CheckCircle2 className="w-5 h-5 text-emerald-600 mx-auto" />
+                    <p className="text-xs font-bold text-emerald-900 dark:text-emerald-200">Review Submitted</p>
+                    <p className="text-[11px] text-emerald-700 dark:text-emerald-300">
+                      Your rating is pending admin verification and will be published shortly.
+                    </p>
+                  </div>
+                ) : (
+                  <form onSubmit={handleReviewSubmit} className="space-y-3">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-casa-text-secondary">Your Rating:</span>
+                      <div className="flex items-center gap-1">
+                        {[1, 2, 3, 4, 5].map((star) => (
+                          <button
+                            key={star}
+                            type="button"
+                            onClick={() => setRatingInput(star)}
+                            className="p-1 cursor-pointer focus:outline-hidden"
+                          >
+                            <Star
+                              className={`w-5 h-5 transition-colors ${
+                                star <= ratingInput
+                                  ? 'text-amber-500 fill-amber-500'
+                                  : 'text-zinc-300 dark:text-zinc-700 hover:text-amber-300'
+                              }`}
+                            />
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div>
+                      <textarea
+                        rows={3}
+                        required
+                        value={reviewComment}
+                        onChange={(e) => setReviewComment(e.target.value)}
+                        placeholder="Share your experience regarding property condition, location accuracy, and agent responsiveness..."
+                        className="w-full px-3 py-2 bg-casa-canvas border border-casa-border-light rounded-xl text-xs focus:outline-hidden focus:ring-2 focus:ring-casa-brand"
+                      />
+                    </div>
+
+                    <Button
+                      type="submit"
+                      disabled={isSubmittingReview}
+                      size="sm"
+                      className="bg-casa-brand text-white hover:bg-casa-brand-hover text-xs"
+                    >
+                      {isSubmittingReview ? 'Submitting...' : 'Post Review'}
+                    </Button>
+                  </form>
+                )}
+              </div>
+            </Card>
           </div>
 
-          {/* Right Column: Sticky Advertiser / Inquiry Sidebar */}
+          {/* Right Column: Sticky Advertiser / Inquiry / Site Visit Sidebar */}
           <div className="space-y-6">
             <div className="sticky top-24 space-y-6">
               {/* Advertiser Card */}
@@ -490,8 +833,32 @@ export function PropertyDetailView({
                   </div>
                 </div>
 
-                {/* Primary Action: Direct WhatsApp Inquiry */}
-                <div className="space-y-3">
+                {/* Primary Action Buttons */}
+                <div className="space-y-2.5">
+                  {/* Site Visit Booking Button */}
+                  <Button
+                    onClick={() => setShowSiteVisitModal(true)}
+                    variant="primary"
+                    size="lg"
+                    fullWidth
+                    className="bg-casa-brand hover:bg-casa-brand-hover text-white shadow-subtle text-sm font-bold flex items-center justify-center gap-2"
+                  >
+                    <Calendar className="w-4 h-4" />
+                    <span>Book a Site Visit</span>
+                  </Button>
+
+                  {/* Direct Chat with Agent Button */}
+                  <Button
+                    onClick={handleStartChat}
+                    variant="outline"
+                    size="md"
+                    fullWidth
+                    className="text-xs font-semibold flex items-center justify-center gap-2 hover:bg-casa-brand/5 border-casa-brand/40 text-casa-brand"
+                  >
+                    <MessageCircle className="w-4 h-4" />
+                    <span>Chat with Agent</span>
+                  </Button>
+
                   {whatsappUrl ? (
                     <a
                       href={whatsappUrl}
@@ -501,16 +868,16 @@ export function PropertyDetailView({
                     >
                       <Button
                         variant="success"
-                        size="lg"
+                        size="md"
                         fullWidth
-                        className="shadow-subtle text-sm font-bold"
+                        className="shadow-subtle text-xs font-bold"
                       >
-                        <MessageSquare className="w-5 h-5" />
+                        <MessageSquare className="w-4 h-4" />
                         <span>{t('whatsApp')}</span>
                       </Button>
                     </a>
                   ) : (
-                    <Button variant="outline" size="lg" disabled fullWidth>
+                    <Button variant="outline" size="md" disabled fullWidth>
                       <span>WhatsApp Unavailable</span>
                     </Button>
                   )}
@@ -592,8 +959,28 @@ export function PropertyDetailView({
                   )}
                 </div>
 
+                {/* Report Property Action */}
+                <div className="mt-4 pt-4 border-t border-casa-border-light flex items-center justify-between text-xs">
+                  <button
+                    type="button"
+                    onClick={() => setShowReportModal(true)}
+                    className="text-zinc-500 hover:text-rose-600 flex items-center gap-1.5 transition-colors cursor-pointer"
+                  >
+                    <Flag className="w-3.5 h-3.5" />
+                    <span>Report this listing</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleNativeShare}
+                    className="text-zinc-500 hover:text-casa-brand flex items-center gap-1.5 transition-colors cursor-pointer"
+                  >
+                    <Share2 className="w-3.5 h-3.5" />
+                    <span>Share</span>
+                  </button>
+                </div>
+
                 {/* Trust & Safety Notice */}
-                <div className="mt-6 pt-4 border-t border-casa-border-light text-start">
+                <div className="mt-4 pt-4 border-t border-casa-border-light text-start">
                   <div className="flex items-start gap-2 p-3 rounded-xl bg-amber-50 dark:bg-amber-950/40 text-amber-900 dark:text-amber-200 text-xs">
                     <Info className="w-4 h-4 flex-shrink-0 mt-0.5 text-amber-600" />
                     <div>
@@ -640,6 +1027,255 @@ export function PropertyDetailView({
               ))}
             </div>
           </section>
+        )}
+
+        {/* --- SITE VISIT BOOKING MODAL --- */}
+        {showSiteVisitModal && (
+          <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+            <div className="bg-casa-surface border border-casa-border rounded-2xl max-w-md w-full p-6 shadow-2xl animate-in zoom-in-95">
+              <div className="flex items-center justify-between mb-4 pb-3 border-b border-casa-border">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-lg bg-casa-brand/10 text-casa-brand flex items-center justify-center">
+                    <Calendar className="w-4 h-4" />
+                  </div>
+                  <h3 className="font-bold text-base text-casa-text-primary">Schedule a Site Visit</h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowSiteVisitModal(false)}
+                  className="text-casa-text-muted hover:text-casa-text-primary p-1"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <form onSubmit={handleSiteVisitSubmit} className="space-y-4">
+                <div>
+                  <label className="block text-xs font-semibold text-casa-text-primary mb-1">Preferred Date *</label>
+                  <input
+                    type="date"
+                    required
+                    min={new Date().toISOString().split('T')[0]}
+                    value={siteVisitDate}
+                    onChange={(e) => setSiteVisitDate(e.target.value)}
+                    className="w-full px-3 py-2 bg-casa-canvas border border-casa-border rounded-xl text-xs text-casa-text-primary"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-casa-text-primary mb-1">Preferred Time Slot *</label>
+                  <select
+                    value={siteVisitTime}
+                    onChange={(e) => setSiteVisitTime(e.target.value)}
+                    className="w-full px-3 py-2 bg-casa-canvas border border-casa-border rounded-xl text-xs text-casa-text-primary"
+                  >
+                    <option value="10:00 AM">Morning (10:00 AM)</option>
+                    <option value="11:30 AM">Late Morning (11:30 AM)</option>
+                    <option value="02:00 PM">Afternoon (02:00 PM)</option>
+                    <option value="04:30 PM">Late Afternoon (04:30 PM)</option>
+                    <option value="06:00 PM">Evening (06:00 PM)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-casa-text-primary mb-1">Contact Phone</label>
+                  <input
+                    type="tel"
+                    value={siteVisitMobile}
+                    onChange={(e) => setSiteVisitMobile(e.target.value)}
+                    placeholder="Mobile number for visit coordinator"
+                    className="w-full px-3 py-2 bg-casa-canvas border border-casa-border rounded-xl text-xs text-casa-text-primary"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-casa-text-primary mb-1">Notes / Instructions</label>
+                  <textarea
+                    rows={2}
+                    value={siteVisitNotes}
+                    onChange={(e) => setSiteVisitNotes(e.target.value)}
+                    placeholder="Special requests or questions for the agent..."
+                    className="w-full px-3 py-2 bg-casa-canvas border border-casa-border rounded-xl text-xs text-casa-text-primary"
+                  />
+                </div>
+
+                <div className="flex gap-2 pt-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setShowSiteVisitModal(false)}
+                    className="flex-1 text-xs"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="submit"
+                    disabled={isSubmittingSiteVisit}
+                    className="flex-1 bg-casa-brand text-white hover:bg-casa-brand-hover text-xs"
+                  >
+                    {isSubmittingSiteVisit ? 'Booking...' : 'Confirm Request'}
+                  </Button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* --- REPORT PROPERTY MODAL --- */}
+        {showReportModal && (
+          <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+            <div className="bg-casa-surface border border-casa-border rounded-2xl max-w-md w-full p-6 shadow-2xl animate-in zoom-in-95">
+              <div className="flex items-center justify-between mb-4 pb-3 border-b border-casa-border">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-lg bg-rose-500/10 text-rose-500 flex items-center justify-center">
+                    <Flag className="w-4 h-4" />
+                  </div>
+                  <h3 className="font-bold text-base text-casa-text-primary">Report Property</h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowReportModal(false)}
+                  className="text-casa-text-muted hover:text-casa-text-primary p-1"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <form onSubmit={handleReportSubmit} className="space-y-4">
+                <div>
+                  <label className="block text-xs font-semibold text-casa-text-primary mb-1">Reason for Report *</label>
+                  <select
+                    value={reportReason}
+                    onChange={(e) => setReportReason(e.target.value)}
+                    className="w-full px-3 py-2 bg-casa-canvas border border-casa-border rounded-xl text-xs text-casa-text-primary"
+                  >
+                    <option value="FAKE_PROPERTY">Fake Property / Does not exist</option>
+                    <option value="WRONG_PRICE">Incorrect Price / Unrealistic</option>
+                    <option value="WRONG_LOCATION">Incorrect Map / Location</option>
+                    <option value="DUPLICATE">Duplicate Listing</option>
+                    <option value="FRAUD">Suspected Fraud or Scam</option>
+                    <option value="INAPPROPRIATE_CONTENT">Inappropriate Content / Photos</option>
+                    <option value="PROPERTY_NOT_AVAILABLE">Property Sold / No Longer Available</option>
+                    <option value="OTHER">Other Reason</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-casa-text-primary mb-1">Additional Details</label>
+                  <textarea
+                    rows={3}
+                    required
+                    value={reportDescription}
+                    onChange={(e) => setReportDescription(e.target.value)}
+                    placeholder="Provide specifics to help our moderation team verify the issue..."
+                    className="w-full px-3 py-2 bg-casa-canvas border border-casa-border rounded-xl text-xs text-casa-text-primary"
+                  />
+                </div>
+
+                <div className="flex gap-2 pt-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setShowReportModal(false)}
+                    className="flex-1 text-xs"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="submit"
+                    disabled={isSubmittingReport}
+                    className="flex-1 bg-rose-600 hover:bg-rose-700 text-white text-xs"
+                  >
+                    {isSubmittingReport ? 'Submitting...' : 'Submit Report'}
+                  </Button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* --- SHARE MODAL --- */}
+        {showShareModal && (
+          <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+            <div className="bg-casa-surface border border-casa-border rounded-2xl max-w-sm w-full p-6 shadow-2xl animate-in zoom-in-95">
+              <div className="flex items-center justify-between mb-4 pb-3 border-b border-casa-border">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-lg bg-casa-brand/10 text-casa-brand flex items-center justify-center">
+                    <Share2 className="w-4 h-4" />
+                  </div>
+                  <h3 className="font-bold text-base text-casa-text-primary">Share Listing</h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowShareModal(false)}
+                  className="text-casa-text-muted hover:text-casa-text-primary p-1"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                <div className="flex items-center gap-2 p-2 bg-casa-canvas border border-casa-border rounded-xl">
+                  <input
+                    type="text"
+                    readOnly
+                    value={shareUrl}
+                    className="w-full bg-transparent text-xs text-casa-text-secondary outline-hidden truncate"
+                  />
+                  <Button
+                    size="sm"
+                    onClick={handleCopyLink}
+                    className="text-xs bg-casa-brand hover:bg-casa-brand-hover text-white h-7 px-2.5 flex items-center gap-1"
+                  >
+                    {copiedLink ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                    <span>{copiedLink ? 'Copied' : 'Copy'}</span>
+                  </Button>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 pt-2">
+                  <a
+                    href={`https://api.whatsapp.com/send?text=${encodeURIComponent(`Check out ${localizedTitle} on CASA: ${shareUrl}`)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="p-2.5 rounded-xl border border-casa-border hover:border-emerald-500 hover:bg-emerald-500/5 flex items-center gap-2 text-xs font-medium text-casa-text-primary transition-all"
+                  >
+                    <MessageSquare className="w-4 h-4 text-emerald-600" />
+                    <span>WhatsApp</span>
+                  </a>
+
+                  <a
+                    href={`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="p-2.5 rounded-xl border border-casa-border hover:border-blue-500 hover:bg-blue-500/5 flex items-center gap-2 text-xs font-medium text-casa-text-primary transition-all"
+                  >
+                    <ExternalLink className="w-4 h-4 text-blue-600" />
+                    <span>Facebook</span>
+                  </a>
+
+                  <a
+                    href={`https://twitter.com/intent/tweet?url=${encodeURIComponent(shareUrl)}&text=${encodeURIComponent(`Check out ${localizedTitle} on CASA`)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="p-2.5 rounded-xl border border-casa-border hover:border-sky-500 hover:bg-sky-500/5 flex items-center gap-2 text-xs font-medium text-casa-text-primary transition-all"
+                  >
+                    <ExternalLink className="w-4 h-4 text-sky-500" />
+                    <span>X (Twitter)</span>
+                  </a>
+
+                  <a
+                    href={`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(shareUrl)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="p-2.5 rounded-xl border border-casa-border hover:border-blue-700 hover:bg-blue-700/5 flex items-center gap-2 text-xs font-medium text-casa-text-primary transition-all"
+                  >
+                    <ExternalLink className="w-4 h-4 text-blue-700" />
+                    <span>LinkedIn</span>
+                  </a>
+                </div>
+              </div>
+            </div>
+          </div>
         )}
       </Container>
     </div>

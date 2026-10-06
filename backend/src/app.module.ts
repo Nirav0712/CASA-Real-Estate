@@ -11,6 +11,7 @@ import { LeadsModule } from './modules/leads/leads.module';
 import { PurchaserModule } from './modules/purchaser/purchaser.module';
 import { LocationsModule } from './modules/locations/locations.module';
 import { PaymentsModule } from './modules/payments/payments.module';
+import { EngagementModule } from './modules/engagement/engagement.module';
 
 @Module({
   imports: [
@@ -29,6 +30,7 @@ import { PaymentsModule } from './modules/payments/payments.module';
     PurchaserModule,
     LocationsModule,
     PaymentsModule,
+    EngagementModule,
   ],
 })
 export class AppModule {}
