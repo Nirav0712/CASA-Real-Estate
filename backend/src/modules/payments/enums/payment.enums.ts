@@ -1,0 +1,33 @@
+export enum PaymentStatus {
+  CREATED = 'CREATED',
+  PENDING = 'PENDING',
+  PAID = 'PAID',
+  FAILED = 'FAILED',
+  CANCELLED = 'CANCELLED',
+  REFUNDED = 'REFUNDED',
+  PARTIALLY_REFUNDED = 'PARTIALLY_REFUNDED',
+}
+
+export enum PaymentPurpose {
+  FEATURED_PROPERTY = 'FEATURED_PROPERTY',
+  PROPERTY_LISTING = 'PROPERTY_LISTING',
+  PREMIUM_LISTING = 'PREMIUM_LISTING',
+  SUBSCRIPTION = 'SUBSCRIPTION',
+}
+
+export enum PaymentProviderType {
+  RAZORPAY = 'RAZORPAY',
+  MOCK = 'MOCK',
+}
+
+export enum SubscriptionPlan {
+  FREE = 'FREE',
+  PRO = 'PRO',
+  BUSINESS = 'BUSINESS',
+}
+
+export enum SubscriptionStatus {
+  ACTIVE = 'ACTIVE',
+  EXPIRED = 'EXPIRED',
+  CANCELLED = 'CANCELLED',
+}

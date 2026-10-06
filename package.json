@@ -1,0 +1,30 @@
+{
+  "name": "casa-real-estate",
+  "version": "1.0.0",
+  "private": true,
+  "description": "CASA Real Estate Marketplace - Scalable Multilingual Property Platform",
+  "scripts": {
+    "dev:frontend": "npm --prefix frontend run dev",
+    "dev:admin": "npm --prefix admin run dev",
+    "dev:backend": "npm --prefix backend run dev",
+    "build:frontend": "npm --prefix frontend run build",
+    "build:admin": "npm --prefix admin run build",
+    "build:backend": "npm --prefix backend run build",
+    "typecheck:frontend": "npm --prefix frontend run typecheck",
+    "typecheck:admin": "npm --prefix admin run typecheck",
+    "typecheck:backend": "npm --prefix backend run typecheck",
+    "lint:frontend": "npm --prefix frontend run lint",
+    "lint:admin": "npm --prefix admin run lint",
+    "lint:backend": "npm --prefix backend run lint"
+  },
+  "keywords": [
+    "real-estate",
+    "marketplace",
+    "nextjs",
+    "nestjs",
+    "mongodb",
+    "casa"
+  ],
+  "author": "CASA Engineering Team",
+  "license": "UNLICENSED"
+}

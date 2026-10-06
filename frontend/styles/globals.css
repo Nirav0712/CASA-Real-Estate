@@ -1,0 +1,122 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Surface & Canvas Tokens (Gemini Light Baseline) */
+    --casa-bg-canvas: #FAFAFC;
+    --casa-bg-surface: #FFFFFF;
+    --casa-bg-subtle: #F1F3F9;
+    --casa-bg-muted: #E8ECF4;
+    --casa-bg-overlay: rgba(15, 23, 42, 0.4);
+
+    /* Border & Divider Tokens */
+    --casa-border-light: #E4E7F0;
+    --casa-border-medium: #D1D6E5;
+    --casa-border-focus: #3B82F6;
+
+    /* Typography Neutral Scale */
+    --casa-text-primary: #0F172A;     /* Slate 900 */
+    --casa-text-secondary: #475569;   /* Slate 600 */
+    --casa-text-muted: #94A3B8;       /* Slate 400 */
+    --casa-text-inverted: #FFFFFF;
+
+    /* Brand & Accent Precision */
+    --casa-brand: #2563EB;            /* Royal Blue / Indigo 600 */
+    --casa-brand-hover: #1D4ED8;      /* Indigo 700 */
+    --casa-brand-subtle: #EFF6FF;     /* Indigo 50 */
+    --casa-brand-accent: #6366F1;     /* Gemini Cobalt 500 */
+    --casa-brand-accent-subtle: #EEF2FF;
+
+    /* Semantic Status Tokens */
+    --casa-status-success: #10B981;   /* Emerald 500 */
+    --casa-status-success-bg: #ECFDF5;
+    --casa-status-warning: #F59E0B;   /* Amber 500 */
+    --casa-status-warning-bg: #FFFBEB;
+    --casa-status-danger: #EF4444;    /* Crimson 500 */
+    --casa-status-danger-bg: #FEF2F2;
+    --casa-status-info: #0EA5E9;      /* Sky 500 */
+    --casa-status-info-bg: #F0F9FF;
+
+    /* Shadows (Soft diffuse) */
+    --casa-shadow-subtle: 0 1px 3px rgba(15, 23, 42, 0.04), 0 1px 2px rgba(15, 23, 42, 0.02);
+    --casa-shadow-medium: 0 4px 6px -1px rgba(15, 23, 42, 0.06), 0 2px 4px -2px rgba(15, 23, 42, 0.04);
+    --casa-shadow-elevated: 0 20px 25px -5px rgba(15, 23, 42, 0.08), 0 8px 10px -6px rgba(15, 23, 42, 0.04);
+  }
+
+  /* Dark Theme Tokens (Prepared for system / dark toggle) */
+  .dark {
+    --casa-bg-canvas: #0B0F19;
+    --casa-bg-surface: #111827;
+    --casa-bg-subtle: #1F2937;
+    --casa-bg-muted: #374151;
+    --casa-bg-overlay: rgba(0, 0, 0, 0.7);
+
+    --casa-border-light: #1F2937;
+    --casa-border-medium: #374151;
+    --casa-border-focus: #60A5FA;
+
+    --casa-text-primary: #F9FAFB;
+    --casa-text-secondary: #D1D5DB;
+    --casa-text-muted: #9CA3AF;
+    --casa-text-inverted: #0F172A;
+
+    --casa-brand: #3B82F6;
+    --casa-brand-hover: #60A5FA;
+    --casa-brand-subtle: rgba(59, 130, 246, 0.15);
+    --casa-brand-accent: #818CF8;
+    --casa-brand-accent-subtle: rgba(99, 102, 241, 0.15);
+
+    --casa-status-success: #34D399;
+    --casa-status-success-bg: rgba(16, 185, 129, 0.15);
+    --casa-status-warning: #FBBF24;
+    --casa-status-warning-bg: rgba(245, 158, 11, 0.15);
+    --casa-status-danger: #F87171;
+    --casa-status-danger-bg: rgba(239, 68, 68, 0.15);
+    --casa-status-info: #38BDF8;
+    --casa-status-info-bg: rgba(14, 165, 233, 0.15);
+  }
+}
+
+body {
+  background-color: var(--casa-bg-canvas);
+  color: var(--casa-text-primary);
+  font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--casa-bg-canvas);
+}
+
+::-webkit-scrollbar-thumb {
+  background: #CBD5E1;
+  border-radius: 9999px;
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: #4B5563;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #94A3B8;
+}
+
+/* RTL Layout Directional Mirroring Support */
+[dir="rtl"] {
+  text-align: right;
+}
+
+[dir="rtl"] .rtl-flip {
+  transform: scaleX(-1);
+}
