@@ -35,7 +35,7 @@ import {
   SlidersHorizontal,
 } from 'lucide-react';
 
-const ADMIN_PORTAL_URL = process.env.NEXT_PUBLIC_ADMIN_URL || 'http://localhost:3001';
+const ADMIN_PORTAL_URL = process.env.NEXT_ADMIN_URL || 'http://localhost:3001';
 
 export function Header() {
   const { locale, setLocale, t, isRtl } = useLanguage();
