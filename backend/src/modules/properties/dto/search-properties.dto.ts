@@ -19,6 +19,11 @@ export enum PropertySortOption {
   AREA_HIGH = 'area_high',
   FEATURED = 'featured',
   RELEVANCE = 'relevance',
+  MOST_VIEWED = 'most_viewed',
+  MOST_CONTACTED = 'most_contacted',
+  MOST_SAVED = 'most_saved',
+  BEST_RATED = 'best_rated',
+  VERIFIED_FIRST = 'verified_first',
 }
 
 export enum ListingFreshnessOption {
@@ -182,6 +187,17 @@ export class SearchPropertiesDto {
   @Transform(({ value }) => value === 'true' || value === true || value === '1')
   @IsBoolean()
   featured?: boolean;
+
+  @ApiPropertyOptional({ description: 'Filter only verified advertiser/agent listings' })
+  @IsOptional()
+  @Transform(({ value }) => value === 'true' || value === true || value === '1')
+  @IsBoolean()
+  verifiedOnly?: boolean;
+
+  @ApiPropertyOptional({ description: 'Filter by poster role (AGENT or OWNER)' })
+  @IsOptional()
+  @IsString()
+  postedBy?: string;
 
   @ApiPropertyOptional({ description: 'Latitude for geospatial proximity' })
   @IsOptional()

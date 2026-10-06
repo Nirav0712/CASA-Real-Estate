@@ -54,6 +54,7 @@ export function AdminSidebar() {
       items: [
         { label: 'Dashboard', href: '/', icon: LayoutDashboard, active: pathname === '/' },
         { label: 'BI Analytics', href: '/analytics', icon: BarChart3, active: pathname === '/analytics' },
+        { label: 'Market Intelligence', href: '/intelligence', icon: Layers, active: pathname === '/intelligence' },
       ],
     },
     {
