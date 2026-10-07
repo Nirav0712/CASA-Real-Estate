@@ -1,5 +1,6 @@
-import { IsNotEmpty, IsString, Matches } from 'class-validator';
-import { ApiProperty } from '@nestjs/swagger';
+import { IsNotEmpty, IsString, Matches, IsOptional, IsEnum } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { UserRole } from '../enums/auth.enums';
 
 export class VerifyOtpDto {
   @ApiProperty({
@@ -23,4 +24,45 @@ export class VerifyOtpDto {
     message: 'OTP must be exactly 6 numeric digits',
   })
   otp: string;
+
+  @ApiPropertyOptional({
+    description: 'Full name for user',
+    example: 'Aarav Sharma',
+  })
+  @IsOptional()
+  @IsString()
+  name?: string;
+
+  @ApiPropertyOptional({
+    description: 'Role for user',
+    enum: [
+      UserRole.BUYER,
+      UserRole.TENANT,
+      UserRole.PURCHASER,
+      UserRole.PROPERTY_OWNER,
+      UserRole.AGENT,
+      UserRole.BROKER,
+      UserRole.DEVELOPER,
+    ],
+    example: UserRole.BUYER,
+  })
+  @IsOptional()
+  @IsEnum([
+    UserRole.BUYER,
+    UserRole.TENANT,
+    UserRole.PURCHASER,
+    UserRole.PROPERTY_OWNER,
+    UserRole.AGENT,
+    UserRole.BROKER,
+    UserRole.DEVELOPER,
+  ])
+  role?: UserRole;
+
+  @ApiPropertyOptional({
+    description: 'Agency or company name',
+    example: 'Apex Realty Solutions',
+  })
+  @IsOptional()
+  @IsString()
+  agencyName?: string;
 }

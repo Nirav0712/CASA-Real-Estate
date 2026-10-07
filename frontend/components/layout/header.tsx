@@ -33,6 +33,8 @@ import {
   Clock,
   LayoutDashboard,
   SlidersHorizontal,
+  ExternalLink,
+  Shield,
 } from 'lucide-react';
 
 const ADMIN_PORTAL_URL = process.env.NEXT_PUBLIC_ADMIN_URL || 'http://localhost:3001';
@@ -44,6 +46,19 @@ export function Header() {
   const [isLangModalOpen, setIsLangModalOpen] = React.useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = React.useState(false);
+
+  const isAdmin = Boolean(user && ['SUPER_ADMIN', 'ADMIN', 'MODERATOR'].includes(user.role));
+  const isDeveloper = Boolean(user && user.role === 'DEVELOPER');
+  const isBroker = Boolean(user && user.role === 'BROKER');
+  const isAgent = Boolean(user && (user.role === 'AGENT' || user.role === 'VERIFIED_AGENT'));
+  const isSeller = Boolean(user && user.role === 'PROPERTY_OWNER');
+  const isTenant = Boolean(user && user.role === 'TENANT');
+  const isBuyer = Boolean(
+    user &&
+      (user.role === 'BUYER' ||
+        user.role === 'PURCHASER' ||
+        (!isAdmin && !isDeveloper && !isBroker && !isAgent && !isSeller && !isTenant)),
+  );
 
   const toggleTheme = () => {
     if (theme === 'light') setTheme('dark');
@@ -152,89 +167,249 @@ export function Header() {
                   {/* Dropdown Menu */}
                   {isUserMenuOpen && (
                     <div
-                      className="absolute right-0 mt-2 w-48 bg-casa-surface rounded-2xl shadow-elevated border border-casa-border-light py-2 z-50 animate-in fade-in slide-in-from-top-2 text-start"
+                      className="absolute right-0 mt-2 w-56 bg-casa-surface rounded-2xl shadow-elevated border border-casa-border-light py-2 z-50 animate-in fade-in slide-in-from-top-2 text-start"
                       onClick={() => setIsUserMenuOpen(false)}
                     >
-                      <div className="px-3 py-2 border-b border-casa-border-light">
-                        <span className="text-xs font-bold text-casa-text-primary block">
-                          {user.name}
+                      {/* User Header Profile */}
+                      <div className="px-3.5 py-2.5 border-b border-casa-border-light">
+                        <span className="text-xs font-bold text-casa-text-primary block truncate">
+                          {user.name || 'CASA User'}
                         </span>
-                        <span className="text-[10px] text-casa-text-muted block">
-                          {user.normalizedMobile}
-                        </span>
-                      </div>
-                      {/* Purchaser / Buyer Section */}
-                      <div className="py-1 border-b border-casa-border-light">
-                        <Link
-                          href="/dashboard/purchaser"
-                          className="flex items-center gap-2 px-3 py-2 text-xs text-casa-text-secondary hover:text-casa-text-primary hover:bg-casa-subtle transition-colors"
-                        >
-                          <LayoutDashboard className="w-3.5 h-3.5 text-casa-brand" />
-                          <span>Buyer Dashboard</span>
-                        </Link>
-                        <Link
-                          href="/dashboard/purchaser/saved"
-                          className="flex items-center gap-2 px-3 py-2 text-xs text-casa-text-secondary hover:text-casa-text-primary hover:bg-casa-subtle transition-colors"
-                        >
-                          <Heart className="w-3.5 h-3.5 text-rose-500" />
-                          <span>Saved Properties</span>
-                        </Link>
-                        <Link
-                          href="/dashboard/purchaser/enquiries"
-                          className="flex items-center gap-2 px-3 py-2 text-xs text-casa-text-secondary hover:text-casa-text-primary hover:bg-casa-subtle transition-colors"
-                        >
-                          <MessageSquare className="w-3.5 h-3.5 text-casa-brand" />
-                          <span>My Enquiries</span>
-                        </Link>
-                        <Link
-                          href="/dashboard/purchaser/profile"
-                          className="flex items-center gap-2 px-3 py-2 text-xs text-casa-text-secondary hover:text-casa-text-primary hover:bg-casa-subtle transition-colors"
-                        >
-                          <SlidersHorizontal className="w-3.5 h-3.5 text-casa-brand" />
-                          <span>Buyer Preferences</span>
-                        </Link>
+                        <div className="flex items-center gap-1.5 mt-0.5">
+                          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-casa-brand-subtle text-casa-brand uppercase">
+                            {user.role?.replace('_', ' ')}
+                          </span>
+                          <span className="text-[10px] text-casa-text-muted truncate">
+                            {user.normalizedMobile}
+                          </span>
+                        </div>
                       </div>
 
-                      {['AGENT', 'VERIFIED_AGENT', 'ADMIN', 'SUPER_ADMIN'].includes(user.role) && (
-                        <div className="py-1 border-b border-casa-border-light">
-                          <Link
-                            href="/dashboard/agent"
-                            className="flex items-center gap-2 px-3 py-2 text-xs text-casa-text-secondary hover:text-casa-text-primary hover:bg-casa-subtle transition-colors"
+                      {/* 1. Admin / Super Admin Portal Link */}
+                      {isAdmin && (
+                        <div className="py-1.5 border-b border-casa-border-light bg-purple-500/5">
+                          <a
+                            href={ADMIN_PORTAL_URL}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center justify-between px-3.5 py-2 text-xs font-bold text-purple-700 hover:bg-purple-50 transition-colors"
                           >
-                            <Building className="w-3.5 h-3.5 text-casa-brand" />
-                            <span>Agent Dashboard</span>
+                            <div className="flex items-center gap-2">
+                              <ShieldCheck className="w-3.5 h-3.5" />
+                              <span>Admin Governance Portal</span>
+                            </div>
+                            <ExternalLink className="w-3 h-3" />
+                          </a>
+                          <Link
+                            href="/dashboard"
+                            className="flex items-center gap-2 px-3.5 py-1.5 text-xs text-casa-text-secondary hover:text-casa-text-primary hover:bg-casa-subtle transition-colors"
+                          >
+                            <LayoutDashboard className="w-3.5 h-3.5 text-purple-600" />
+                            <span>Role Command Hub</span>
+                          </Link>
+                        </div>
+                      )}
+
+                      {/* 2. Developer Workspace */}
+                      {isDeveloper && (
+                        <div className="py-1.5 border-b border-casa-border-light">
+                          <Link
+                            href="/dashboard/developer"
+                            className="flex items-center gap-2 px-3.5 py-2 text-xs font-bold text-indigo-600 hover:bg-indigo-50 transition-colors"
+                          >
+                            <Building2 className="w-3.5 h-3.5" />
+                            <span>Developer Console</span>
+                          </Link>
+                          <Link
+                            href="/dashboard/properties/new"
+                            className="flex items-center gap-2 px-3.5 py-1.5 text-xs text-casa-text-secondary hover:text-casa-text-primary hover:bg-casa-subtle transition-colors"
+                          >
+                            <PlusCircle className="w-3.5 h-3.5 text-indigo-500" />
+                            <span>Add Project Phase</span>
+                          </Link>
+                          <Link
+                            href="/dashboard/properties"
+                            className="flex items-center gap-2 px-3.5 py-1.5 text-xs text-casa-text-secondary hover:text-casa-text-primary hover:bg-casa-subtle transition-colors"
+                          >
+                            <Home className="w-3.5 h-3.5 text-casa-text-muted" />
+                            <span>Project Inventory</span>
                           </Link>
                           <Link
                             href="/dashboard/leads"
-                            className="flex items-center gap-2 px-3 py-2 text-xs text-casa-text-secondary hover:text-casa-text-primary hover:bg-casa-subtle transition-colors"
+                            className="flex items-center gap-2 px-3.5 py-1.5 text-xs text-casa-text-secondary hover:text-casa-text-primary hover:bg-casa-subtle transition-colors"
                           >
-                            <Users className="w-3.5 h-3.5 text-casa-brand" />
-                            <span>Buyer Leads</span>
+                            <Users className="w-3.5 h-3.5 text-casa-text-muted" />
+                            <span>Project Inquiries</span>
+                          </Link>
+                        </div>
+                      )}
+
+                      {/* 3. Broker Workspace */}
+                      {isBroker && (
+                        <div className="py-1.5 border-b border-casa-border-light">
+                          <Link
+                            href="/dashboard/broker"
+                            className="flex items-center gap-2 px-3.5 py-2 text-xs font-bold text-amber-600 hover:bg-amber-50 transition-colors"
+                          >
+                            <Building2 className="w-3.5 h-3.5" />
+                            <span>Broker Workspace</span>
+                          </Link>
+                          <Link
+                            href="/dashboard/properties"
+                            className="flex items-center gap-2 px-3.5 py-1.5 text-xs text-casa-text-secondary hover:text-casa-text-primary hover:bg-casa-subtle transition-colors"
+                          >
+                            <Home className="w-3.5 h-3.5 text-casa-text-muted" />
+                            <span>Mandated Listings</span>
+                          </Link>
+                          <Link
+                            href="/dashboard/leads"
+                            className="flex items-center gap-2 px-3.5 py-1.5 text-xs text-casa-text-secondary hover:text-casa-text-primary hover:bg-casa-subtle transition-colors"
+                          >
+                            <Users className="w-3.5 h-3.5 text-casa-text-muted" />
+                            <span>Buyer CRM</span>
                           </Link>
                           <Link
                             href="/dashboard/agent/verification"
-                            className="flex items-center gap-2 px-3 py-2 text-xs text-casa-text-secondary hover:text-casa-text-primary hover:bg-casa-subtle transition-colors"
+                            className="flex items-center gap-2 px-3.5 py-1.5 text-xs text-casa-text-secondary hover:text-casa-text-primary hover:bg-casa-subtle transition-colors"
                           >
-                            <ShieldCheck className="w-3.5 h-3.5 text-casa-brand" />
+                            <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+                            <span>Broker Verification</span>
+                          </Link>
+                        </div>
+                      )}
+
+                      {/* 4. Agent Workspace */}
+                      {isAgent && (
+                        <div className="py-1.5 border-b border-casa-border-light">
+                          <Link
+                            href="/dashboard/agent"
+                            className="flex items-center gap-2 px-3.5 py-2 text-xs font-bold text-casa-brand hover:bg-casa-brand-subtle transition-colors"
+                          >
+                            <Building2 className="w-3.5 h-3.5" />
+                            <span>Agent Command Center</span>
+                          </Link>
+                          <Link
+                            href="/dashboard/leads"
+                            className="flex items-center gap-2 px-3.5 py-1.5 text-xs text-casa-text-secondary hover:text-casa-text-primary hover:bg-casa-subtle transition-colors"
+                          >
+                            <Users className="w-3.5 h-3.5 text-casa-text-muted" />
+                            <span>Buyer Leads & CRM</span>
+                          </Link>
+                          <Link
+                            href="/dashboard/properties"
+                            className="flex items-center gap-2 px-3.5 py-1.5 text-xs text-casa-text-secondary hover:text-casa-text-primary hover:bg-casa-subtle transition-colors"
+                          >
+                            <Home className="w-3.5 h-3.5 text-casa-text-muted" />
+                            <span>My Listed Properties</span>
+                          </Link>
+                          <Link
+                            href="/dashboard/agent/verification"
+                            className="flex items-center gap-2 px-3.5 py-1.5 text-xs text-casa-text-secondary hover:text-casa-text-primary hover:bg-casa-subtle transition-colors"
+                          >
+                            <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
                             <span>RERA Verification</span>
                           </Link>
                         </div>
                       )}
-                      <Link
-                        href="/dashboard/properties"
-                        className="flex items-center gap-2 px-3 py-2 text-xs text-casa-text-secondary hover:text-casa-text-primary hover:bg-casa-subtle transition-colors"
-                      >
-                        <Home className="w-3.5 h-3.5 text-casa-brand" />
-                        <span>My Properties</span>
-                      </Link>
-                      <button
-                        type="button"
-                        onClick={logout}
-                        className="w-full flex items-center gap-2 px-3 py-2 text-xs text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors cursor-pointer"
-                      >
-                        <LogOut className="w-3.5 h-3.5" />
-                        <span>{t('signOut')}</span>
-                      </button>
+
+                      {/* 5. Seller / Property Owner Links */}
+                      {isSeller && (
+                        <div className="py-1.5 border-b border-casa-border-light">
+                          <Link
+                            href="/dashboard/properties"
+                            className="flex items-center gap-2 px-3.5 py-2 text-xs font-bold text-emerald-700 hover:bg-emerald-50 transition-colors"
+                          >
+                            <Home className="w-3.5 h-3.5 text-emerald-600" />
+                            <span>Seller Dashboard</span>
+                          </Link>
+                          <Link
+                            href="/dashboard/properties/new"
+                            className="flex items-center gap-2 px-3.5 py-1.5 text-xs text-casa-text-secondary hover:text-casa-text-primary hover:bg-casa-subtle transition-colors"
+                          >
+                            <PlusCircle className="w-3.5 h-3.5 text-emerald-600" />
+                            <span>Add New Property</span>
+                          </Link>
+                          <Link
+                            href="/dashboard/leads"
+                            className="flex items-center gap-2 px-3.5 py-1.5 text-xs text-casa-text-secondary hover:text-casa-text-primary hover:bg-casa-subtle transition-colors"
+                          >
+                            <MessageSquare className="w-3.5 h-3.5 text-casa-text-muted" />
+                            <span>Buyer Inquiries</span>
+                          </Link>
+                        </div>
+                      )}
+
+                      {/* 6. Tenant Links */}
+                      {isTenant && (
+                        <div className="py-1.5 border-b border-casa-border-light">
+                          <Link
+                            href="/dashboard/tenant"
+                            className="flex items-center gap-2 px-3.5 py-2 text-xs font-bold text-teal-700 hover:bg-teal-50 transition-colors"
+                          >
+                            <LayoutDashboard className="w-3.5 h-3.5 text-teal-600" />
+                            <span>Tenant Portal</span>
+                          </Link>
+                          <Link
+                            href="/dashboard/purchaser/saved"
+                            className="flex items-center gap-2 px-3.5 py-1.5 text-xs text-casa-text-secondary hover:text-casa-text-primary hover:bg-casa-subtle transition-colors"
+                          >
+                            <Heart className="w-3.5 h-3.5 text-rose-500" />
+                            <span>Saved Rentals</span>
+                          </Link>
+                          <Link
+                            href="/dashboard/purchaser/enquiries"
+                            className="flex items-center gap-2 px-3.5 py-1.5 text-xs text-casa-text-secondary hover:text-casa-text-primary hover:bg-casa-subtle transition-colors"
+                          >
+                            <MessageSquare className="w-3.5 h-3.5 text-casa-text-muted" />
+                            <span>My Enquiries</span>
+                          </Link>
+                        </div>
+                      )}
+
+                      {/* 7. Buyer Links */}
+                      {isBuyer && (
+                        <div className="py-1.5 border-b border-casa-border-light">
+                          <Link
+                            href="/dashboard/purchaser"
+                            className="flex items-center gap-2 px-3.5 py-2 text-xs font-bold text-casa-brand hover:bg-casa-brand-subtle transition-colors"
+                          >
+                            <LayoutDashboard className="w-3.5 h-3.5" />
+                            <span>Buyer Dashboard</span>
+                          </Link>
+                          <Link
+                            href="/dashboard/purchaser/saved"
+                            className="flex items-center gap-2 px-3.5 py-1.5 text-xs text-casa-text-secondary hover:text-casa-text-primary hover:bg-casa-subtle transition-colors"
+                          >
+                            <Heart className="w-3.5 h-3.5 text-rose-500" />
+                            <span>Saved Properties</span>
+                          </Link>
+                          <Link
+                            href="/dashboard/purchaser/enquiries"
+                            className="flex items-center gap-2 px-3.5 py-1.5 text-xs text-casa-text-secondary hover:text-casa-text-primary hover:bg-casa-subtle transition-colors"
+                          >
+                            <MessageSquare className="w-3.5 h-3.5 text-casa-text-muted" />
+                            <span>My Enquiries</span>
+                          </Link>
+                          <Link
+                            href="/dashboard/purchaser/profile"
+                            className="flex items-center gap-2 px-3.5 py-1.5 text-xs text-casa-text-secondary hover:text-casa-text-primary hover:bg-casa-subtle transition-colors"
+                          >
+                            <SlidersHorizontal className="w-3.5 h-3.5 text-casa-text-muted" />
+                            <span>Buyer Preferences</span>
+                          </Link>
+                        </div>
+                      )}
+
+                      <div className="pt-1">
+                        <button
+                          type="button"
+                          onClick={logout}
+                          className="w-full flex items-center gap-2 px-3.5 py-2 text-xs text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors cursor-pointer"
+                        >
+                          <LogOut className="w-3.5 h-3.5" />
+                          <span>{t('signOut')}</span>
+                        </button>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -402,48 +577,220 @@ export function Header() {
                   {user?.role}
                 </span>
 
-                {/* Purchaser Workspace Mobile Links */}
+                {/* Role-Specific Workspace Mobile Links */}
                 <div className="space-y-1 mb-3 pt-2 border-t border-casa-border-light">
-                  <Link
-                    href="/dashboard/purchaser"
-                    onClick={() => setIsMobileMenuOpen(false)}
-                    className="flex items-center gap-2 px-2.5 py-1.5 text-xs text-casa-text-secondary hover:text-casa-text-primary rounded-lg hover:bg-casa-surface transition-colors"
-                  >
-                    <LayoutDashboard className="w-3.5 h-3.5 text-casa-brand" />
-                    <span>Buyer Dashboard</span>
-                  </Link>
-                  <Link
-                    href="/dashboard/purchaser/saved"
-                    onClick={() => setIsMobileMenuOpen(false)}
-                    className="flex items-center gap-2 px-2.5 py-1.5 text-xs text-casa-text-secondary hover:text-casa-text-primary rounded-lg hover:bg-casa-surface transition-colors"
-                  >
-                    <Heart className="w-3.5 h-3.5 text-rose-500" />
-                    <span>Saved Properties</span>
-                  </Link>
-                  <Link
-                    href="/dashboard/purchaser/enquiries"
-                    onClick={() => setIsMobileMenuOpen(false)}
-                    className="flex items-center gap-2 px-2.5 py-1.5 text-xs text-casa-text-secondary hover:text-casa-text-primary rounded-lg hover:bg-casa-surface transition-colors"
-                  >
-                    <MessageSquare className="w-3.5 h-3.5 text-casa-brand" />
-                    <span>My Enquiries</span>
-                  </Link>
-                  <Link
-                    href="/dashboard/purchaser/recent"
-                    onClick={() => setIsMobileMenuOpen(false)}
-                    className="flex items-center gap-2 px-2.5 py-1.5 text-xs text-casa-text-secondary hover:text-casa-text-primary rounded-lg hover:bg-casa-surface transition-colors"
-                  >
-                    <Clock className="w-3.5 h-3.5 text-casa-brand" />
-                    <span>Recently Viewed</span>
-                  </Link>
-                  <Link
-                    href="/dashboard/purchaser/profile"
-                    onClick={() => setIsMobileMenuOpen(false)}
-                    className="flex items-center gap-2 px-2.5 py-1.5 text-xs text-casa-text-secondary hover:text-casa-text-primary rounded-lg hover:bg-casa-surface transition-colors"
-                  >
-                    <SlidersHorizontal className="w-3.5 h-3.5 text-casa-brand" />
-                    <span>Buyer Preferences</span>
-                  </Link>
+                  {isDeveloper && (
+                    <>
+                      <Link
+                        href="/dashboard/developer"
+                        onClick={() => setIsMobileMenuOpen(false)}
+                        className="flex items-center gap-2 px-2.5 py-1.5 text-xs text-indigo-600 font-semibold hover:text-indigo-800 rounded-lg hover:bg-casa-surface transition-colors"
+                      >
+                        <Building2 className="w-3.5 h-3.5" />
+                        <span>Developer Console</span>
+                      </Link>
+                      <Link
+                        href="/dashboard/properties/new"
+                        onClick={() => setIsMobileMenuOpen(false)}
+                        className="flex items-center gap-2 px-2.5 py-1.5 text-xs text-casa-text-secondary hover:text-casa-text-primary rounded-lg hover:bg-casa-surface transition-colors"
+                      >
+                        <PlusCircle className="w-3.5 h-3.5 text-indigo-500" />
+                        <span>Add Project Phase</span>
+                      </Link>
+                      <Link
+                        href="/dashboard/properties"
+                        onClick={() => setIsMobileMenuOpen(false)}
+                        className="flex items-center gap-2 px-2.5 py-1.5 text-xs text-casa-text-secondary hover:text-casa-text-primary rounded-lg hover:bg-casa-surface transition-colors"
+                      >
+                        <Home className="w-3.5 h-3.5 text-casa-text-muted" />
+                        <span>Project Inventory</span>
+                      </Link>
+                    </>
+                  )}
+
+                  {isBroker && (
+                    <>
+                      <Link
+                        href="/dashboard/broker"
+                        onClick={() => setIsMobileMenuOpen(false)}
+                        className="flex items-center gap-2 px-2.5 py-1.5 text-xs text-amber-600 font-semibold hover:text-amber-800 rounded-lg hover:bg-casa-surface transition-colors"
+                      >
+                        <Building2 className="w-3.5 h-3.5" />
+                        <span>Broker Workspace</span>
+                      </Link>
+                      <Link
+                        href="/dashboard/properties"
+                        onClick={() => setIsMobileMenuOpen(false)}
+                        className="flex items-center gap-2 px-2.5 py-1.5 text-xs text-casa-text-secondary hover:text-casa-text-primary rounded-lg hover:bg-casa-surface transition-colors"
+                      >
+                        <Home className="w-3.5 h-3.5 text-casa-text-muted" />
+                        <span>Mandated Listings</span>
+                      </Link>
+                      <Link
+                        href="/dashboard/leads"
+                        onClick={() => setIsMobileMenuOpen(false)}
+                        className="flex items-center gap-2 px-2.5 py-1.5 text-xs text-casa-text-secondary hover:text-casa-text-primary rounded-lg hover:bg-casa-surface transition-colors"
+                      >
+                        <Users className="w-3.5 h-3.5 text-casa-text-muted" />
+                        <span>Buyer CRM</span>
+                      </Link>
+                    </>
+                  )}
+
+                  {isAgent && (
+                    <>
+                      <Link
+                        href="/dashboard/agent"
+                        onClick={() => setIsMobileMenuOpen(false)}
+                        className="flex items-center gap-2 px-2.5 py-1.5 text-xs text-casa-text-secondary hover:text-casa-text-primary rounded-lg hover:bg-casa-surface transition-colors"
+                      >
+                        <LayoutDashboard className="w-3.5 h-3.5 text-casa-brand" />
+                        <span className="font-semibold text-casa-brand">Agent Command</span>
+                      </Link>
+                      <Link
+                        href="/dashboard/leads"
+                        onClick={() => setIsMobileMenuOpen(false)}
+                        className="flex items-center gap-2 px-2.5 py-1.5 text-xs text-casa-text-secondary hover:text-casa-text-primary rounded-lg hover:bg-casa-surface transition-colors"
+                      >
+                        <Users className="w-3.5 h-3.5 text-casa-text-muted" />
+                        <span>Client Leads CRM</span>
+                      </Link>
+                      <Link
+                        href="/dashboard/properties"
+                        onClick={() => setIsMobileMenuOpen(false)}
+                        className="flex items-center gap-2 px-2.5 py-1.5 text-xs text-casa-text-secondary hover:text-casa-text-primary rounded-lg hover:bg-casa-surface transition-colors"
+                      >
+                        <Building2 className="w-3.5 h-3.5 text-casa-brand" />
+                        <span>Agent Portfolio</span>
+                      </Link>
+                      <Link
+                        href="/dashboard/agent/verification"
+                        onClick={() => setIsMobileMenuOpen(false)}
+                        className="flex items-center gap-2 px-2.5 py-1.5 text-xs text-casa-text-secondary hover:text-casa-text-primary rounded-lg hover:bg-casa-surface transition-colors"
+                      >
+                        <ShieldCheck className="w-3.5 h-3.5 text-amber-500" />
+                        <span>RERA Verification</span>
+                      </Link>
+                    </>
+                  )}
+
+                  {isSeller && (
+                    <>
+                      <Link
+                        href="/dashboard/properties"
+                        onClick={() => setIsMobileMenuOpen(false)}
+                        className="flex items-center gap-2 px-2.5 py-1.5 text-xs text-casa-text-secondary hover:text-casa-text-primary rounded-lg hover:bg-casa-surface transition-colors"
+                      >
+                        <LayoutDashboard className="w-3.5 h-3.5 text-emerald-600" />
+                        <span className="font-semibold text-emerald-700">Seller Dashboard</span>
+                      </Link>
+                      <Link
+                        href="/dashboard/properties/new"
+                        onClick={() => setIsMobileMenuOpen(false)}
+                        className="flex items-center gap-2 px-2.5 py-1.5 text-xs text-casa-text-secondary hover:text-casa-text-primary rounded-lg hover:bg-casa-surface transition-colors"
+                      >
+                        <PlusCircle className="w-3.5 h-3.5 text-emerald-600" />
+                        <span>List New Property</span>
+                      </Link>
+                      <Link
+                        href="/dashboard/leads"
+                        onClick={() => setIsMobileMenuOpen(false)}
+                        className="flex items-center gap-2 px-2.5 py-1.5 text-xs text-casa-text-secondary hover:text-casa-text-primary rounded-lg hover:bg-casa-surface transition-colors"
+                      >
+                        <MessageSquare className="w-3.5 h-3.5 text-emerald-600" />
+                        <span>Buyer Inquiries</span>
+                      </Link>
+                    </>
+                  )}
+
+                  {isTenant && (
+                    <>
+                      <Link
+                        href="/dashboard/tenant"
+                        onClick={() => setIsMobileMenuOpen(false)}
+                        className="flex items-center gap-2 px-2.5 py-1.5 text-xs text-casa-text-secondary hover:text-casa-text-primary rounded-lg hover:bg-casa-surface transition-colors"
+                      >
+                        <LayoutDashboard className="w-3.5 h-3.5 text-teal-600" />
+                        <span className="font-semibold text-teal-700">Tenant Portal</span>
+                      </Link>
+                      <Link
+                        href="/dashboard/purchaser/saved"
+                        onClick={() => setIsMobileMenuOpen(false)}
+                        className="flex items-center gap-2 px-2.5 py-1.5 text-xs text-casa-text-secondary hover:text-casa-text-primary rounded-lg hover:bg-casa-surface transition-colors"
+                      >
+                        <Heart className="w-3.5 h-3.5 text-rose-500" />
+                        <span>Saved Rentals</span>
+                      </Link>
+                      <Link
+                        href="/dashboard/purchaser/enquiries"
+                        onClick={() => setIsMobileMenuOpen(false)}
+                        className="flex items-center gap-2 px-2.5 py-1.5 text-xs text-casa-text-secondary hover:text-casa-text-primary rounded-lg hover:bg-casa-surface transition-colors"
+                      >
+                        <MessageSquare className="w-3.5 h-3.5 text-teal-600" />
+                        <span>Rental Enquiries</span>
+                      </Link>
+                    </>
+                  )}
+
+                  {isBuyer && (
+                    <>
+                      <Link
+                        href="/dashboard/purchaser"
+                        onClick={() => setIsMobileMenuOpen(false)}
+                        className="flex items-center gap-2 px-2.5 py-1.5 text-xs text-casa-text-secondary hover:text-casa-text-primary rounded-lg hover:bg-casa-surface transition-colors"
+                      >
+                        <LayoutDashboard className="w-3.5 h-3.5 text-casa-brand" />
+                        <span className="font-semibold text-casa-brand">Buyer Dashboard</span>
+                      </Link>
+                      <Link
+                        href="/dashboard/purchaser/saved"
+                        onClick={() => setIsMobileMenuOpen(false)}
+                        className="flex items-center gap-2 px-2.5 py-1.5 text-xs text-casa-text-secondary hover:text-casa-text-primary rounded-lg hover:bg-casa-surface transition-colors"
+                      >
+                        <Heart className="w-3.5 h-3.5 text-rose-500" />
+                        <span>Saved Properties</span>
+                      </Link>
+                      <Link
+                        href="/dashboard/purchaser/enquiries"
+                        onClick={() => setIsMobileMenuOpen(false)}
+                        className="flex items-center gap-2 px-2.5 py-1.5 text-xs text-casa-text-secondary hover:text-casa-text-primary rounded-lg hover:bg-casa-surface transition-colors"
+                      >
+                        <MessageSquare className="w-3.5 h-3.5 text-casa-brand" />
+                        <span>My Enquiries</span>
+                      </Link>
+                      <Link
+                        href="/dashboard/purchaser/recent"
+                        onClick={() => setIsMobileMenuOpen(false)}
+                        className="flex items-center gap-2 px-2.5 py-1.5 text-xs text-casa-text-secondary hover:text-casa-text-primary rounded-lg hover:bg-casa-surface transition-colors"
+                      >
+                        <Clock className="w-3.5 h-3.5 text-casa-brand" />
+                        <span>Recently Viewed</span>
+                      </Link>
+                    </>
+                  )}
+
+                  {isAdmin && (
+                    <>
+                      <Link
+                        href="/dashboard"
+                        onClick={() => setIsMobileMenuOpen(false)}
+                        className="flex items-center gap-2 px-2.5 py-1.5 text-xs text-casa-text-secondary hover:text-casa-text-primary rounded-lg hover:bg-casa-surface transition-colors"
+                      >
+                        <Shield className="w-3.5 h-3.5 text-purple-600" />
+                        <span className="font-semibold text-purple-600">Admin Governance Hub</span>
+                      </Link>
+                      <a
+                        href="http://localhost:3001"
+                        target="_blank"
+                        rel="noreferrer"
+                        onClick={() => setIsMobileMenuOpen(false)}
+                        className="flex items-center gap-2 px-2.5 py-1.5 text-xs text-purple-600 font-semibold hover:text-purple-800 rounded-lg hover:bg-purple-50 transition-colors"
+                      >
+                        <ExternalLink className="w-3.5 h-3.5 text-purple-600" />
+                        <span>Open Admin Portal (:3001)</span>
+                      </a>
+                    </>
+                  )}
                 </div>
                 <Button
                   variant="outline"

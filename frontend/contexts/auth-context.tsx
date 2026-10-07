@@ -13,8 +13,19 @@ interface AuthContextType {
   isAuthModalOpen: boolean;
   openAuthModal: () => void;
   closeAuthModal: () => void;
-  requestOtp: (mobile: string, name?: string) => Promise<OtpRequestResponse>;
-  verifyOtp: (mobile: string, otp: string) => Promise<void>;
+  requestOtp: (
+    mobile: string,
+    name?: string,
+    role?: string,
+    agencyName?: string,
+  ) => Promise<OtpRequestResponse>;
+  verifyOtp: (
+    mobile: string,
+    otp: string,
+    name?: string,
+    role?: string,
+    agencyName?: string,
+  ) => Promise<void>;
   logout: () => Promise<void>;
 }
 
@@ -27,31 +38,55 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isAuthModalOpen, setIsAuthModalOpen] = React.useState<boolean>(false);
   const toast = useToast();
 
-  // Try silent session restoration via refresh cookie on mount
+  // Instantly restore cached session from localStorage on mount, then silently refresh
   React.useEffect(() => {
+    let isMounted = true;
+
+    // Fast sync recovery from localStorage
+    if (typeof window !== 'undefined') {
+      try {
+        const cachedUser = localStorage.getItem('casa_user');
+        const cachedToken = localStorage.getItem('casa_access_token');
+        if (cachedUser && cachedToken) {
+          const parsed = JSON.parse(cachedUser);
+          setUser(parsed);
+          setToken(cachedToken);
+        }
+      } catch {
+        // ignore parse error
+      }
+    }
+
     async function restoreSession() {
       try {
         const authData = await authService.refreshAccessToken();
-        if (authData && authData.user && authData.tokens) {
+        if (isMounted && authData && authData.user && authData.tokens) {
           setUser(authData.user);
           setToken(authData.tokens.accessToken);
-          if (typeof window !== 'undefined' && authData.tokens.accessToken) {
+          if (typeof window !== 'undefined') {
             localStorage.setItem('casa_access_token', authData.tokens.accessToken);
+            localStorage.setItem('casa_user', JSON.stringify(authData.user));
           }
         }
       } catch {
-        // No active session or refresh cookie expired — clean state
-        setUser(null);
-        setToken(null);
-        if (typeof window !== 'undefined') {
-          localStorage.removeItem('casa_access_token');
+        // If refresh failed and we had no valid cached token, clean state
+        if (isMounted) {
+          if (typeof window !== 'undefined' && !localStorage.getItem('casa_access_token')) {
+            setUser(null);
+            setToken(null);
+          }
         }
       } finally {
-        setIsLoading(false);
+        if (isMounted) {
+          setIsLoading(false);
+        }
       }
     }
 
     restoreSession();
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   const openAuthModal = React.useCallback(() => {
@@ -63,9 +98,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const requestOtp = React.useCallback(
-    async (mobile: string, name?: string): Promise<OtpRequestResponse> => {
+    async (
+      mobile: string,
+      name?: string,
+      role?: string,
+      agencyName?: string,
+    ): Promise<OtpRequestResponse> => {
       try {
-        const res = await authService.requestOtp(mobile, name);
+        const res = await authService.requestOtp(mobile, name, role, agencyName);
         return res;
       } catch (err: unknown) {
         const message = err instanceof Error ? err.message : 'Failed to send OTP code.';
@@ -77,18 +117,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   );
 
   const verifyOtp = React.useCallback(
-    async (mobile: string, otp: string): Promise<void> => {
+    async (
+      mobile: string,
+      otp: string,
+      name?: string,
+      role?: string,
+      agencyName?: string,
+    ): Promise<void> => {
       try {
-        const res = await authService.verifyOtp(mobile, otp);
+        const res = await authService.verifyOtp(mobile, otp, name, role, agencyName);
         setUser(res.user);
         setToken(res.tokens.accessToken);
-        if (typeof window !== 'undefined' && res.tokens.accessToken) {
-          localStorage.setItem('casa_access_token', res.tokens.accessToken);
+        if (typeof window !== 'undefined') {
+          if (res.tokens.accessToken) {
+            localStorage.setItem('casa_access_token', res.tokens.accessToken);
+          }
+          if (res.user) {
+            localStorage.setItem('casa_user', JSON.stringify(res.user));
+          }
         }
         setIsAuthModalOpen(false);
+        const roleLabel = res.user.role ? ` (${res.user.role.replace('_', ' ')})` : '';
         toast.success(
           'Welcome to CASA',
-          `Signed in as ${res.user.name || res.user.normalizedMobile}`,
+          `Signed in as ${res.user.name || res.user.normalizedMobile}${roleLabel}`,
         );
       } catch (err: unknown) {
         const message = err instanceof Error ? err.message : 'Invalid or expired OTP.';
@@ -107,6 +159,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setToken(null);
       if (typeof window !== 'undefined') {
         localStorage.removeItem('casa_access_token');
+        localStorage.removeItem('casa_user');
       }
       toast.info('Signed Out', 'You have been safely signed out of your account.');
     }

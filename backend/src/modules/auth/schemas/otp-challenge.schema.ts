@@ -1,6 +1,6 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document } from 'mongoose';
-import { OtpStatus } from '../enums/auth.enums';
+import { OtpStatus, UserRole } from '../enums/auth.enums';
 
 export type OtpChallengeDocument = OtpChallenge & Document;
 
@@ -34,6 +34,15 @@ export class OtpChallenge {
 
   @Prop({ default: Date.now })
   lastSentAt: Date;
+
+  @Prop({ required: false, trim: true })
+  name?: string;
+
+  @Prop({ type: String, enum: Object.values(UserRole), required: false })
+  role?: UserRole;
+
+  @Prop({ required: false, trim: true })
+  agencyName?: string;
 
   @Prop({ required: false })
   ipAddress?: string;

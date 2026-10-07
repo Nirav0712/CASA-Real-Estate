@@ -14,6 +14,9 @@ import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagg
 import { PropertiesService } from './properties.service';
 import { SearchPropertiesDto } from './dto/search-properties.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { UserRole } from '../auth/enums/auth.enums';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
 
@@ -48,6 +51,9 @@ export class PropertiesController {
   }
 
   @Post('categories')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
+  @ApiBearerAuth()
   @ApiOperation({ summary: 'Add a new property category into MongoDB Atlas' })
   @ApiResponse({ status: 201, description: 'Category created' })
   createCategory(@Body() dto: { name: string; code?: string; description?: string }) {
@@ -55,19 +61,25 @@ export class PropertiesController {
   }
 
   @Patch('categories/:id/toggle')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
+  @ApiBearerAuth()
   @ApiOperation({ summary: 'Toggle category active status' })
   toggleCategory(@Param('id') id: string) {
     return this.propertiesService.toggleCategoryStatus(id);
   }
 
   @Delete('categories/:id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
+  @ApiBearerAuth()
   @ApiOperation({ summary: 'Delete a category from MongoDB Atlas' })
   deleteCategory(@Param('id') id: string) {
     return this.propertiesService.deleteCategory(id);
   }
 
   // ==========================================
-  // OWNER / AGENT PROTECTED WORKFLOW
+  // OWNER / AGENT / DEVELOPER PROTECTED WORKFLOW
   // ==========================================
 
   @Get('user/my')
@@ -89,7 +101,16 @@ export class PropertiesController {
   }
 
   @Post(':id/submit')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(
+    UserRole.PROPERTY_OWNER,
+    UserRole.AGENT,
+    UserRole.BROKER,
+    UserRole.DEVELOPER,
+    UserRole.VERIFIED_AGENT,
+    UserRole.ADMIN,
+    UserRole.SUPER_ADMIN,
+  )
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Submit a draft or rejected property listing for CASA moderation' })
   @ApiResponse({ status: 200, description: 'Property submitted for review' })
@@ -112,9 +133,18 @@ export class PropertiesController {
   }
 
   @Post()
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(
+    UserRole.PROPERTY_OWNER,
+    UserRole.AGENT,
+    UserRole.BROKER,
+    UserRole.DEVELOPER,
+    UserRole.VERIFIED_AGENT,
+    UserRole.ADMIN,
+    UserRole.SUPER_ADMIN,
+  )
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Create a new property listing / draft' })
+  @ApiOperation({ summary: 'Create a new property listing / draft (Seller, Agent, Broker, Developer)' })
   @ApiResponse({ status: 201, description: 'Property created' })
   create(@Body() createPropertyDto: any, @CurrentUser() user: AuthenticatedUser) {
     return this.propertiesService.createProperty(createPropertyDto, user);

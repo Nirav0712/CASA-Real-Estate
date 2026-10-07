@@ -1,10 +1,12 @@
-import { UserRole, AccountStatus } from '../enums/auth.enums';
+import { UserRole, AccountType, AccountStatus } from '../enums/auth.enums';
 
 export interface JwtAccessPayload {
   sub: string; // User ID
   mobile: string;
   normalizedMobile: string;
   role: UserRole;
+  accountType?: AccountType;
+  permissions?: string[];
   status: AccountStatus;
   isVerifiedAgent: boolean;
   iat?: number;
@@ -26,8 +28,11 @@ export interface AuthenticatedUser {
   normalizedMobile: string;
   email?: string;
   role: UserRole;
+  accountType?: AccountType;
+  permissions?: string[];
   status: AccountStatus;
   isVerifiedAgent: boolean;
+  agencyName?: string;
   avatar?: string;
 }
 

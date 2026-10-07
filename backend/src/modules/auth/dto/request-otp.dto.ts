@@ -24,12 +24,40 @@ export class RequestOtpDto {
 
   @ApiPropertyOptional({
     description: 'Initial role intent for new user (Admin roles cannot be self-assigned)',
-    enum: [UserRole.PURCHASER, UserRole.PROPERTY_OWNER, UserRole.AGENT],
-    example: UserRole.PURCHASER,
+    enum: [
+      UserRole.BUYER,
+      UserRole.TENANT,
+      UserRole.PURCHASER,
+      UserRole.PROPERTY_OWNER,
+      UserRole.AGENT,
+      UserRole.BROKER,
+      UserRole.DEVELOPER,
+    ],
+    example: UserRole.BUYER,
   })
   @IsOptional()
-  @IsEnum([UserRole.PURCHASER, UserRole.PROPERTY_OWNER, UserRole.AGENT], {
-    message: 'Public registration allows only PURCHASER, PROPERTY_OWNER, or AGENT roles.',
-  })
+  @IsEnum(
+    [
+      UserRole.BUYER,
+      UserRole.TENANT,
+      UserRole.PURCHASER,
+      UserRole.PROPERTY_OWNER,
+      UserRole.AGENT,
+      UserRole.BROKER,
+      UserRole.DEVELOPER,
+    ],
+    {
+      message:
+        'Public registration allows only BUYER, TENANT, PURCHASER, PROPERTY_OWNER, AGENT, BROKER, or DEVELOPER roles.',
+    },
+  )
   role?: UserRole;
+
+  @ApiPropertyOptional({
+    description: 'Agency or company name (if registering as Agent/Broker or Builder)',
+    example: 'Apex Realty Solutions',
+  })
+  @IsOptional()
+  @IsString()
+  agencyName?: string;
 }

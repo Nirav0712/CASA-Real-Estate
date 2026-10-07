@@ -2,10 +2,23 @@ export type UserRole =
   | 'SUPER_ADMIN'
   | 'ADMIN'
   | 'MODERATOR'
-  | 'VERIFIED_AGENT'
+  | 'DEVELOPER'
   | 'AGENT'
+  | 'BROKER'
   | 'PROPERTY_OWNER'
-  | 'PURCHASER';
+  | 'BUYER'
+  | 'TENANT'
+  | 'PURCHASER'
+  | 'VERIFIED_AGENT'
+  | 'GUEST';
+
+export type AccountType =
+  | 'DEVELOPER'
+  | 'AGENT'
+  | 'BROKER'
+  | 'PROPERTY_OWNER'
+  | 'BUYER'
+  | 'TENANT';
 
 export type AccountStatus =
   | 'ACTIVE'
@@ -20,6 +33,8 @@ export interface AdminUser {
   normalizedMobile: string;
   email?: string;
   role: UserRole;
+  accountType?: AccountType;
+  permissions?: string[];
   status: AccountStatus;
   avatar?: string;
 }

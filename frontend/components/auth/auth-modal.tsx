@@ -11,15 +11,29 @@ import {
   ArrowRight,
   RefreshCw,
   Sparkles,
+  UserCheck,
+  Building2,
+  Home,
+  User as UserIcon,
+  Briefcase,
+  Lock,
 } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { UserRole } from '@/types';
+
+type AuthMode = 'REGISTER' | 'SIGN_IN';
 
 export function AuthModal() {
   const { isAuthModalOpen, closeAuthModal, requestOtp, verifyOtp } = useAuth();
+  const router = useRouter();
 
-  const [step, setStep] = React.useState<'PHONE' | 'OTP'>('PHONE');
+  const [mode, setMode] = React.useState<AuthMode>('REGISTER');
+  const [step, setStep] = React.useState<'INPUT' | 'OTP'>('INPUT');
   const [countryCode, setCountryCode] = React.useState('+91');
   const [phone, setPhone] = React.useState('');
   const [fullName, setFullName] = React.useState('');
+  const [selectedRole, setSelectedRole] = React.useState<UserRole>('AGENT');
+  const [agencyName, setAgencyName] = React.useState('');
   const [otp, setOtp] = React.useState('');
   const [loading, setLoading] = React.useState(false);
   const [errorMsg, setErrorMsg] = React.useState('');
@@ -38,8 +52,11 @@ export function AuthModal() {
   // Reset state on modal open/close
   React.useEffect(() => {
     if (!isAuthModalOpen) {
-      setStep('PHONE');
+      setStep('INPUT');
       setPhone('');
+      setFullName('');
+      setSelectedRole('AGENT');
+      setAgencyName('');
       setOtp('');
       setErrorMsg('');
       setDevMockOtp(undefined);
@@ -56,17 +73,29 @@ export function AuthModal() {
       return;
     }
 
+    if (mode === 'REGISTER' && !fullName.trim()) {
+      setErrorMsg('Please enter your Full Name to register.');
+      return;
+    }
+
     setLoading(true);
     try {
       const fullMobile = `${countryCode}${cleanPhone}`;
-      const res = await requestOtp(fullMobile, fullName.trim() || undefined);
+      const isProfessional = ['AGENT', 'BROKER', 'DEVELOPER'].includes(selectedRole);
+      const res = await requestOtp(
+        fullMobile,
+        mode === 'REGISTER' ? fullName.trim() : undefined,
+        mode === 'REGISTER' ? selectedRole : undefined,
+        mode === 'REGISTER' && isProfessional ? agencyName.trim() || undefined : undefined,
+      );
       setStep('OTP');
       setCooldown(res.cooldownSeconds || 60);
       if (res.devMockOtp) {
         setDevMockOtp(res.devMockOtp);
       }
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Failed to send OTP. Please check your network.';
+      const message =
+        err instanceof Error ? err.message : 'Failed to send OTP. Please check your network.';
       setErrorMsg(message);
     } finally {
       setLoading(false);
@@ -86,7 +115,32 @@ export function AuthModal() {
     try {
       const cleanPhone = phone.replace(/[^0-9]/g, '');
       const fullMobile = `${countryCode}${cleanPhone}`;
-      await verifyOtp(fullMobile, otp);
+      const isProfessional = ['AGENT', 'BROKER', 'DEVELOPER'].includes(selectedRole);
+      await verifyOtp(
+        fullMobile,
+        otp,
+        mode === 'REGISTER' ? fullName.trim() : undefined,
+        mode === 'REGISTER' ? selectedRole : undefined,
+        mode === 'REGISTER' && isProfessional ? agencyName.trim() || undefined : undefined,
+      );
+
+      if (mode === 'REGISTER') {
+        if (selectedRole === 'DEVELOPER') {
+          router.push('/dashboard/developer');
+        } else if (selectedRole === 'BROKER') {
+          router.push('/dashboard/broker');
+        } else if (selectedRole === 'AGENT') {
+          router.push('/dashboard/agent');
+        } else if (selectedRole === 'PROPERTY_OWNER') {
+          router.push('/dashboard/properties');
+        } else if (selectedRole === 'TENANT') {
+          router.push('/dashboard/tenant');
+        } else {
+          router.push('/dashboard/purchaser');
+        }
+      } else {
+        router.push('/dashboard');
+      }
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Verification failed. Please try again.';
       setErrorMsg(message);
@@ -101,27 +155,145 @@ export function AuthModal() {
     }
   };
 
+  const roleDescriptions: Record<string, string> = {
+    BUYER: 'Explore verified properties, save favorites, compare homes, and schedule site visits.',
+    TENANT: 'Search verified rental homes, book apartment walk-throughs, and chat directly with owners.',
+    PROPERTY_OWNER: 'List your flat, villa, plot, or commercial space for direct sale or rent.',
+    AGENT: 'List client properties, receive buyer leads, and apply for CASA RERA verification.',
+    BROKER: 'Manage brokerage portfolio, commercial mandates, and verified commission deals.',
+    DEVELOPER: 'Manage builder townships, project phases, digital floor plans, and direct buyer leads.',
+    PURCHASER: 'Explore verified properties, save favorites, and connect directly with certified agents.',
+    SUPER_ADMIN: 'System administration and governance.',
+    ADMIN: 'Administrative operations.',
+    MODERATOR: 'Content and listing moderation.',
+    VERIFIED_AGENT: 'CASA Verified Agent badge holder.',
+  };
+
   return (
     <Modal
       isOpen={isAuthModalOpen}
       onClose={closeAuthModal}
-      title={step === 'PHONE' ? 'Sign In / Register' : 'Verify Mobile OTP'}
-      description={
-        step === 'PHONE'
-          ? 'Enter your mobile number to access verified properties, save favorites, and connect with agents.'
-          : `We sent a 6-digit verification code to ${countryCode} ${phone}.`
+      title={
+        step === 'OTP'
+          ? 'Verify Mobile OTP'
+          : mode === 'REGISTER'
+          ? 'Create Account & Register'
+          : 'Welcome Back — Sign In'
       }
-      size="sm"
+      description={
+        step === 'OTP'
+          ? `We sent a 6-digit verification code to ${countryCode} ${phone}.`
+          : mode === 'REGISTER'
+          ? 'Select your user category and register your account on CASA Marketplace.'
+          : 'Enter your registered mobile number to sign in.'
+      }
+      size="md"
     >
       <div className="space-y-4 pt-1 text-start">
+        {/* Top Mode Selector Tabs (only shown on INPUT step) */}
+        {step === 'INPUT' && (
+          <div className="grid grid-cols-2 gap-1 p-1 bg-casa-subtle rounded-xl border border-casa-border-light text-xs font-semibold">
+            <button
+              type="button"
+              onClick={() => {
+                setMode('REGISTER');
+                setErrorMsg('');
+              }}
+              className={`py-2 px-3 rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                mode === 'REGISTER'
+                  ? 'bg-casa-surface text-casa-brand font-bold shadow-xs border border-casa-border-light'
+                  : 'text-casa-text-muted hover:text-casa-text-primary'
+              }`}
+            >
+              <UserCheck className="w-3.5 h-3.5" />
+              <span>Register (New User)</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setMode('SIGN_IN');
+                setErrorMsg('');
+              }}
+              className={`py-2 px-3 rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                mode === 'SIGN_IN'
+                  ? 'bg-casa-surface text-casa-brand font-bold shadow-xs border border-casa-border-light'
+                  : 'text-casa-text-muted hover:text-casa-text-primary'
+              }`}
+            >
+              <Lock className="w-3.5 h-3.5" />
+              <span>Sign In (Existing)</span>
+            </button>
+          </div>
+        )}
+
         {errorMsg && (
           <div className="p-3 bg-red-50 dark:bg-red-950/60 border border-red-200 dark:border-red-900 rounded-xl text-xs text-red-700 dark:text-red-300 font-medium">
             {errorMsg}
           </div>
         )}
 
-        {step === 'PHONE' ? (
+        {step === 'INPUT' ? (
           <form onSubmit={handleRequestOtp} className="space-y-4">
+            {/* Category / Role Dropdown when Registering */}
+            {mode === 'REGISTER' && (
+              <div className="space-y-3 p-3.5 bg-casa-canvas/60 rounded-2xl border border-casa-border-light">
+                <div>
+                  <label className="text-xs font-bold text-casa-text-primary block mb-1.5">
+                    What are you registering for? (Account Type) <span className="text-red-500">*</span>
+                  </label>
+                  <div className="relative">
+                    <select
+                      value={selectedRole}
+                      onChange={(e) => setSelectedRole(e.target.value as UserRole)}
+                      className="w-full bg-casa-surface border border-casa-border-medium rounded-xl px-3 py-2.5 text-xs font-semibold text-casa-text-primary outline-none focus:ring-2 focus:ring-casa-brand/20 transition-all cursor-pointer"
+                    >
+                      <option value="BUYER">🏠 Property Buyer (Buy Homes, Plots & Commercial)</option>
+                      <option value="TENANT">🔑 Tenant (Rent Flats, Houses & Commercial Spaces)</option>
+                      <option value="PROPERTY_OWNER">🏢 Property Owner / Seller (Sell or Lease My Property)</option>
+                      <option value="AGENT">🤝 Real Estate Agent (Independent Certified Agent)</option>
+                      <option value="BROKER">💼 Real Estate Broker (Brokerage Firm / Mandates)</option>
+                      <option value="DEVELOPER">🏗️ Property Developer / Builder (Townships & Projects)</option>
+                    </select>
+                  </div>
+                  <p className="text-[11px] text-casa-text-muted mt-1.5 leading-relaxed">
+                    {roleDescriptions[selectedRole] || ''}
+                  </p>
+                </div>
+
+                {/* Full Name */}
+                <div>
+                  <label className="text-xs font-semibold text-casa-text-primary block mb-1.5">
+                    Your Full Name <span className="text-red-500">*</span>
+                  </label>
+                  <Input
+                    type="text"
+                    placeholder="e.g. Aarav Sharma"
+                    value={fullName}
+                    onChange={(e) => setFullName(e.target.value)}
+                    required
+                  />
+                </div>
+
+                {/* Optional Agency/Company Name if Professional */}
+                {['AGENT', 'BROKER', 'DEVELOPER'].includes(selectedRole) && (
+                  <div>
+                    <label className="text-xs font-semibold text-casa-text-primary block mb-1.5">
+                      {selectedRole === 'DEVELOPER' ? 'Builder / Company Name' : 'Agency or Brokerage Name'}{' '}
+                      <span className="text-[10px] text-casa-text-muted font-normal">(Optional)</span>
+                    </label>
+                    <Input
+                      type="text"
+                      placeholder={selectedRole === 'DEVELOPER' ? 'e.g. Skyline Infra Developers' : 'e.g. Apex Realty & Consultants'}
+                      value={agencyName}
+                      onChange={(e) => setAgencyName(e.target.value)}
+                      prefixIcon={<Briefcase className="w-3.5 h-3.5 text-casa-text-muted" />}
+                    />
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Mobile Number Field */}
             <div>
               <label className="text-xs font-semibold text-casa-text-primary block mb-1.5">
                 Mobile Number <span className="text-red-500">*</span>
@@ -146,22 +318,10 @@ export function AuthModal() {
                     onChange={(e) => setPhone(e.target.value.replace(/[^0-9]/g, ''))}
                     maxLength={10}
                     prefixIcon={<Phone className="w-3.5 h-3.5 text-casa-text-muted" />}
-                    autoFocus
+                    autoFocus={mode === 'SIGN_IN'}
                   />
                 </div>
               </div>
-            </div>
-
-            <div>
-              <label className="text-xs font-semibold text-casa-text-primary block mb-1.5">
-                Full Name <span className="text-[10px] text-casa-text-muted font-normal">(Optional for new users)</span>
-              </label>
-              <Input
-                type="text"
-                placeholder="e.g. Aarav Sharma"
-                value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
-              />
             </div>
 
             <div className="pt-2">
@@ -171,15 +331,56 @@ export function AuthModal() {
                 type="submit"
                 fullWidth
                 loading={loading}
-                className="shadow-subtle"
+                className="shadow-subtle py-2.5 font-bold"
               >
-                <span>Continue</span>
+                <span>{mode === 'REGISTER' ? 'Register & Send OTP' : 'Sign In with OTP'}</span>
                 <ArrowRight className="w-4 h-4" />
               </Button>
             </div>
 
+            {/* Bottom Toggle Text */}
+            <div className="text-center pt-1 text-xs text-casa-text-muted">
+              {mode === 'REGISTER' ? (
+                <p>
+                  Already have an account?{' '}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMode('SIGN_IN');
+                      setErrorMsg('');
+                    }}
+                    className="text-casa-brand font-bold hover:underline cursor-pointer"
+                  >
+                    Sign In here
+                  </button>
+                </p>
+              ) : (
+                <p>
+                  Don&apos;t have an account yet?{' '}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMode('REGISTER');
+                      setErrorMsg('');
+                    }}
+                    className="text-casa-brand font-bold hover:underline cursor-pointer"
+                  >
+                    Register / Create Account
+                  </button>
+                </p>
+              )}
+            </div>
+
             <p className="text-[11px] text-center text-casa-text-muted leading-relaxed">
-              By proceeding, you agree to CASA&apos;s <a href="#" className="text-casa-brand hover:underline">Terms of Service</a> & <a href="#" className="text-casa-brand hover:underline">Privacy Policy</a>.
+              By proceeding, you agree to CASA&apos;s{' '}
+              <a href="#" className="text-casa-brand hover:underline">
+                Terms of Service
+              </a>{' '}
+              &{' '}
+              <a href="#" className="text-casa-brand hover:underline">
+                Privacy Policy
+              </a>
+              .
             </p>
           </form>
         ) : (
@@ -220,10 +421,10 @@ export function AuthModal() {
             <div className="flex items-center justify-between text-xs pt-1">
               <button
                 type="button"
-                onClick={() => setStep('PHONE')}
+                onClick={() => setStep('INPUT')}
                 className="text-casa-text-secondary hover:text-casa-text-primary font-medium cursor-pointer"
               >
-                ← Change Number
+                ← Change Details
               </button>
 
               <button
@@ -248,10 +449,10 @@ export function AuthModal() {
                 type="submit"
                 fullWidth
                 loading={loading}
-                className="shadow-subtle"
+                className="shadow-subtle py-2.5 font-bold"
               >
                 <ShieldCheck className="w-4 h-4" />
-                <span>Verify & Sign In</span>
+                <span>{mode === 'REGISTER' ? 'Verify & Complete Registration' : 'Verify & Sign In'}</span>
               </Button>
             </div>
           </form>

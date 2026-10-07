@@ -313,12 +313,17 @@ export default function UsersPage() {
                           <Shield className="w-3.5 h-3.5 text-amber-500 fill-amber-500/20" />
                         )}
                       </div>
-                      <div className="text-[11px] text-casa-text-muted flex items-center gap-1 mt-0.5">
-                        <Phone className="w-3 h-3" />
-                        {u.normalizedMobile || u.mobile}
+                      <div className="flex items-center gap-1.5 mt-1">
+                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-casa-brand-subtle text-casa-brand uppercase tracking-wider">
+                          {u.role.replace('_', ' ')}
+                        </span>
+                        <span className="text-[11px] text-casa-text-muted flex items-center gap-1">
+                          <Phone className="w-2.5 h-2.5" />
+                          {u.normalizedMobile || u.mobile}
+                        </span>
                       </div>
                       {u.email && (
-                        <div className="text-[10px] text-casa-text-muted font-mono">{u.email}</div>
+                        <div className="text-[10px] text-casa-text-muted font-mono mt-0.5">{u.email}</div>
                       )}
                     </td>
                     <td className="px-4 py-3.5">

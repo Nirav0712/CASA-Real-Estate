@@ -281,9 +281,14 @@ export default function AgentsPage() {
                       </span>
                     )}
                   </h3>
-                  <div className="text-xs text-casa-text-secondary flex items-center gap-1 mt-0.5">
-                    <Building2 className="w-3 h-3 text-casa-text-muted" />
-                    {ag.agencyName || 'Independent Agent'}
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded bg-casa-brand-subtle text-casa-brand">
+                      {ag.role?.replace('_', ' ') || 'AGENT'}
+                    </span>
+                    <div className="text-xs text-casa-text-secondary flex items-center gap-1">
+                      <Building2 className="w-3 h-3 text-casa-text-muted" />
+                      <span className="truncate max-w-[180px]">{ag.agencyName || 'Independent Agent'}</span>
+                    </div>
                   </div>
                 </div>
 

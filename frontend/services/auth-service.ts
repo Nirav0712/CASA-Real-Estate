@@ -9,6 +9,7 @@ export async function requestOtp(
   mobile: string,
   name?: string,
   role?: string,
+  agencyName?: string,
 ): Promise<OtpRequestResponse> {
   const response = await fetch(`${API_BASE_URL}/auth/otp/request`, {
     method: 'POST',
@@ -16,7 +17,7 @@ export async function requestOtp(
       'Content-Type': 'application/json',
     },
     credentials: 'include',
-    body: JSON.stringify({ mobile, name, role }),
+    body: JSON.stringify({ mobile, name, role, agencyName }),
   });
 
   const json = await response.json();
@@ -29,14 +30,20 @@ export async function requestOtp(
   return json.data || json;
 }
 
-export async function verifyOtp(mobile: string, otp: string): Promise<AuthResponse> {
+export async function verifyOtp(
+  mobile: string,
+  otp: string,
+  name?: string,
+  role?: string,
+  agencyName?: string,
+): Promise<AuthResponse> {
   const response = await fetch(`${API_BASE_URL}/auth/otp/verify`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
     credentials: 'include',
-    body: JSON.stringify({ mobile, otp }),
+    body: JSON.stringify({ mobile, otp, name, role, agencyName }),
   });
 
   const json = await response.json();

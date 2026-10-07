@@ -29,6 +29,8 @@ export class AgentsController {
   @Roles(
     UserRole.AGENT,
     UserRole.VERIFIED_AGENT,
+    UserRole.BROKER,
+    UserRole.DEVELOPER,
     UserRole.PROPERTY_OWNER,
     UserRole.ADMIN,
     UserRole.SUPER_ADMIN,

@@ -56,6 +56,8 @@ export class JwtAuthGuard implements CanActivate {
         mobile: payload.mobile,
         normalizedMobile: payload.normalizedMobile,
         role: payload.role,
+        accountType: payload.accountType,
+        permissions: payload.permissions || [],
         status: payload.status,
         isVerifiedAgent: payload.isVerifiedAgent,
       };

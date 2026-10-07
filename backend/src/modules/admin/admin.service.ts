@@ -24,6 +24,7 @@ import { UpdateUserRoleDto } from './dto/update-user-role.dto';
 import { AdminAuditQueryDto } from './dto/admin-audit-query.dto';
 import { UserRole, AccountStatus } from '../auth/enums/auth.enums';
 import { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
+import { AuthService } from '../auth/auth.service';
 
 const INITIAL_PENDING_FIXTURES = [
   {
@@ -245,6 +246,7 @@ export class AdminService implements OnModuleInit {
     @InjectModel(RefreshSession.name) private readonly refreshSessionModel: Model<RefreshSessionDocument>,
     @InjectModel(AgentProfile.name) private readonly agentProfileModel: Model<AgentProfileDocument>,
     @InjectModel(AgentVerificationDocument.name) private readonly agentDocumentModel: Model<AgentVerificationDocumentDocument>,
+    private readonly authService: AuthService,
   ) {}
 
   async onModuleInit() {
@@ -825,10 +827,52 @@ export class AdminService implements OnModuleInit {
     else if (dto.sort === 'name_asc') sortObj = { name: 1 };
     else if (dto.sort === 'name_desc') sortObj = { name: -1 };
 
-    const [total, users] = await Promise.all([
-      this.userModel.countDocuments(filter),
-      this.userModel.find(filter).sort(sortObj).skip(skip).limit(limit).lean(),
+    const [dbTotal, dbUsers] = await Promise.all([
+      this.userModel.countDocuments(filter).catch(() => 0),
+      this.userModel.find(filter).sort(sortObj).skip(skip).limit(limit).lean().catch(() => []),
     ]);
+
+    let users = [...dbUsers];
+    let total = dbTotal;
+
+    if (users.length === 0) {
+      let memUsers = this.authService.getMemUsers().map((m) => ({
+        _id: m._id,
+        name: m.name,
+        mobile: m.mobile,
+        normalizedMobile: m.normalizedMobile,
+        email: m.email,
+        role: m.role,
+        status: m.status,
+        isVerifiedAgent: m.isVerifiedAgent,
+        agencyName: m.agencyName,
+        createdAt: m.createdAt,
+        updatedAt: m.updatedAt,
+      })) as any[];
+
+      if (dto.role) {
+        memUsers = memUsers.filter((u) => u.role === dto.role);
+      }
+      if (dto.status) {
+        memUsers = memUsers.filter((u) => u.status === dto.status);
+      }
+      if (dto.isVerifiedAgent !== undefined) {
+        memUsers = memUsers.filter((u) => Boolean(u.isVerifiedAgent) === Boolean(dto.isVerifiedAgent));
+      }
+      if (dto.q && dto.q.trim()) {
+        const q = dto.q.trim().toLowerCase();
+        memUsers = memUsers.filter(
+          (u) =>
+            u.name?.toLowerCase().includes(q) ||
+            u.mobile?.includes(q) ||
+            u.normalizedMobile?.includes(q) ||
+            u.agencyName?.toLowerCase().includes(q),
+        );
+      }
+
+      total = memUsers.length;
+      users = memUsers.slice(skip, skip + limit);
+    }
 
     const userIds = users.map((u: any) => u._id.toString());
     const normalizedMobiles = users.map((u: any) => u.normalizedMobile).filter(Boolean);
@@ -1152,10 +1196,52 @@ export class AdminService implements OnModuleInit {
     const limit = Math.min(50, Math.max(1, Number(dto.limit) || 20));
     const skip = (page - 1) * limit;
 
-    const [total, agents] = await Promise.all([
-      this.userModel.countDocuments(filter),
-      this.userModel.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
+    const [dbTotal, dbAgents] = await Promise.all([
+      this.userModel.countDocuments(filter).catch(() => 0),
+      this.userModel.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit).lean().catch(() => []),
     ]);
+
+    let agents = [...dbAgents];
+    let total = dbTotal;
+
+    if (agents.length === 0) {
+      let memAgents = this.authService
+        .getMemUsers()
+        .filter((u) => u.role === UserRole.AGENT || u.role === UserRole.VERIFIED_AGENT)
+        .map((m) => ({
+          _id: m._id,
+          name: m.name,
+          mobile: m.mobile,
+          normalizedMobile: m.normalizedMobile,
+          email: m.email,
+          role: m.role,
+          status: m.status,
+          isVerifiedAgent: m.isVerifiedAgent,
+          agencyName: m.agencyName,
+          createdAt: m.createdAt,
+          updatedAt: m.updatedAt,
+        })) as any[];
+
+      if (dto.status) {
+        memAgents = memAgents.filter((u) => u.status === dto.status);
+      }
+      if (dto.isVerifiedAgent !== undefined) {
+        memAgents = memAgents.filter((u) => Boolean(u.isVerifiedAgent) === Boolean(dto.isVerifiedAgent));
+      }
+      if (dto.q && dto.q.trim()) {
+        const q = dto.q.trim().toLowerCase();
+        memAgents = memAgents.filter(
+          (u) =>
+            u.name?.toLowerCase().includes(q) ||
+            u.mobile?.includes(q) ||
+            u.normalizedMobile?.includes(q) ||
+            u.agencyName?.toLowerCase().includes(q),
+        );
+      }
+
+      total = memAgents.length;
+      agents = memAgents.slice(skip, skip + limit);
+    }
 
     const userIds = agents.map((u: any) => u._id.toString());
     const normalizedMobiles = agents.map((u: any) => u.normalizedMobile).filter(Boolean);

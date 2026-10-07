@@ -35,8 +35,14 @@ export class RolesGuard implements CanActivate {
       return true;
     }
 
-    // Check if user has one of the required roles
-    const hasRole = requiredRoles.includes(user.role);
+    // Check if user has one of the required roles (including backward compatibility aliases)
+    const hasRole = requiredRoles.some((reqRole) => {
+      if (reqRole === user.role) return true;
+      if (reqRole === UserRole.BUYER && user.role === UserRole.PURCHASER) return true;
+      if (reqRole === UserRole.PURCHASER && user.role === UserRole.BUYER) return true;
+      if (reqRole === UserRole.AGENT && user.role === UserRole.VERIFIED_AGENT) return true;
+      return false;
+    });
 
     if (!hasRole) {
       throw new ForbiddenException(

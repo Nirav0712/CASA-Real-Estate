@@ -13,9 +13,10 @@ import * as crypto from 'crypto';
 import { User, UserDocument } from './schemas/user.schema';
 import { OtpChallenge, OtpChallengeDocument } from './schemas/otp-challenge.schema';
 import { RefreshSession, RefreshSessionDocument } from './schemas/refresh-session.schema';
+import { AgentProfile, AgentProfileDocument } from '../agents/schemas/agent-profile.schema';
 import { RequestOtpDto } from './dto/request-otp.dto';
 import { VerifyOtpDto } from './dto/verify-otp.dto';
-import { UserRole, AccountStatus, OtpStatus } from './enums/auth.enums';
+import { UserRole, AccountType, AccountStatus, OtpStatus } from './enums/auth.enums';
 import { MockOtpProvider } from './providers/mock-otp.provider';
 import { Msg91OtpProvider } from './providers/msg91-otp.provider';
 import {
@@ -31,7 +32,10 @@ interface InMemoryUser {
   mobile: string;
   normalizedMobile: string;
   email?: string;
+  agencyName?: string;
   role: UserRole;
+  accountType?: AccountType;
+  permissions?: string[];
   status: AccountStatus;
   isVerifiedAgent: boolean;
   avatar?: string;
@@ -51,6 +55,9 @@ interface InMemoryOtpChallenge {
   resendCount: number;
   status: OtpStatus;
   lastSentAt: Date;
+  name?: string;
+  role?: UserRole;
+  agencyName?: string;
   ipAddress?: string;
   userAgent?: string;
 }
@@ -82,6 +89,8 @@ export class AuthService {
     private readonly otpChallengeModel: Model<OtpChallengeDocument>,
     @InjectModel(RefreshSession.name)
     private readonly refreshSessionModel: Model<RefreshSessionDocument>,
+    @InjectModel(AgentProfile.name)
+    private readonly agentProfileModel: Model<AgentProfileDocument>,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
     private readonly mockOtpProvider: MockOtpProvider,
@@ -89,6 +98,17 @@ export class AuthService {
   ) {
     // Seed default admin and test users in memory store
     this.seedDefaultUsers();
+  }
+
+  getMemUsers(): InMemoryUser[] {
+    return Array.from(this.memUsers.values());
+  }
+
+  getMemUserById(id: string): InMemoryUser | undefined {
+    for (const u of this.memUsers.values()) {
+      if (u._id === id || u.normalizedMobile === id || u.mobile === id) return u;
+    }
+    return undefined;
   }
 
   private seedDefaultUsers() {
@@ -153,6 +173,58 @@ export class AuthService {
   }
 
   /**
+   * Resolves appropriate AccountType enum from UserRole
+   */
+  resolveAccountType(role: UserRole): AccountType {
+    switch (role) {
+      case UserRole.DEVELOPER:
+        return AccountType.DEVELOPER;
+      case UserRole.AGENT:
+      case UserRole.VERIFIED_AGENT:
+        return AccountType.AGENT;
+      case UserRole.BROKER:
+        return AccountType.BROKER;
+      case UserRole.PROPERTY_OWNER:
+        return AccountType.PROPERTY_OWNER;
+      case UserRole.TENANT:
+        return AccountType.TENANT;
+      case UserRole.BUYER:
+      case UserRole.PURCHASER:
+      default:
+        return AccountType.BUYER;
+    }
+  }
+
+  /**
+   * Resolves default granular permissions based on role
+   */
+  getDefaultPermissions(role: UserRole): string[] {
+    switch (role) {
+      case UserRole.SUPER_ADMIN:
+        return ['*'];
+      case UserRole.ADMIN:
+        return ['admin:access', 'properties:moderate', 'users:read', 'agents:verify', 'reports:read'];
+      case UserRole.MODERATOR:
+        return ['properties:moderate', 'reviews:moderate', 'reports:read'];
+      case UserRole.DEVELOPER:
+        return ['properties:create', 'properties:manage_own', 'projects:manage', 'leads:manage_own', 'analytics:view_own'];
+      case UserRole.BROKER:
+        return ['properties:create', 'properties:manage_own', 'leads:manage_own', 'analytics:view_own', 'clients:manage'];
+      case UserRole.AGENT:
+      case UserRole.VERIFIED_AGENT:
+        return ['properties:create', 'properties:manage_own', 'leads:manage_own', 'analytics:view_own'];
+      case UserRole.PROPERTY_OWNER:
+        return ['properties:create', 'properties:manage_own', 'enquiries:read_own'];
+      case UserRole.TENANT:
+        return ['rentals:search', 'saved:manage', 'enquiries:send', 'visits:book'];
+      case UserRole.BUYER:
+      case UserRole.PURCHASER:
+      default:
+        return ['properties:search', 'saved:manage', 'enquiries:send', 'visits:book', 'comparisons:manage'];
+    }
+  }
+
+  /**
    * Step 1: Request Mobile OTP Challenge
    */
   async requestOtp(dto: RequestOtpDto, metadata?: { ipAddress?: string; userAgent?: string }) {
@@ -202,6 +274,9 @@ export class AuthService {
           resendCount: recentChallenge ? recentChallenge.resendCount + 1 : 0,
           status: OtpStatus.PENDING,
           lastSentAt: now,
+          name: dto.name?.trim() || undefined,
+          role: dto.role || undefined,
+          agencyName: dto.agencyName?.trim() || undefined,
           ipAddress: metadata?.ipAddress,
           userAgent: metadata?.userAgent,
         });
@@ -244,6 +319,9 @@ export class AuthService {
       resendCount: memRecent ? memRecent.resendCount + 1 : 0,
       status: OtpStatus.PENDING,
       lastSentAt: now,
+      name: dto.name?.trim() || undefined,
+      role: dto.role || undefined,
+      agencyName: dto.agencyName?.trim() || undefined,
       ipAddress: metadata?.ipAddress,
       userAgent: metadata?.userAgent,
     });
@@ -307,8 +385,9 @@ export class AuthService {
       throw new BadRequestException('No pending verification request found. Please request a new OTP.');
     }
 
+    const activeChallenge = challenge || memChallenge;
+
     if (!isMasterOtp) {
-      const activeChallenge = challenge || memChallenge;
       if (new Date(activeChallenge.expiresAt) < now) {
         if (challenge) {
           challenge.status = OtpStatus.EXPIRED;
@@ -365,6 +444,11 @@ export class AuthService {
       throw new BadRequestException('Invalid verification code.');
     }
 
+    // Resolve Registration Name, Role, Agency Name
+    const resolvedName = (dto.name?.trim() || activeChallenge?.name || '').trim();
+    const resolvedRole = dto.role || activeChallenge?.role;
+    const resolvedAgency = (dto.agencyName?.trim() || activeChallenge?.agencyName || '').trim();
+
     // Resolve or Create User
     const adminMobiles = (
       this.configService.get<string>('auth.adminMobiles') ||
@@ -375,6 +459,20 @@ export class AuthService {
 
     const isDesignatedAdmin = adminMobiles.includes(normalizedMobile);
 
+    // Prevent unauthorized self-assignment of administrative roles
+    let safeRole = resolvedRole;
+    if (!isDesignatedAdmin && safeRole && [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.MODERATOR].includes(safeRole)) {
+      this.logger.warn(`Security alert: Public user ${normalizedMobile} attempted to claim administrative role ${safeRole}. Reverting to BUYER.`);
+      safeRole = UserRole.BUYER;
+    }
+
+    const finalRole = isDesignatedAdmin
+      ? UserRole.SUPER_ADMIN
+      : (safeRole || UserRole.BUYER);
+    const finalAccountType = this.resolveAccountType(finalRole);
+    const finalPermissions = this.getDefaultPermissions(finalRole);
+    const finalName = resolvedName || (isDesignatedAdmin ? 'Super Administrator' : 'CASA User');
+
     let user: any = null;
 
     if (this.isDbConnected()) {
@@ -382,23 +480,90 @@ export class AuthService {
         user = await this.userModel.findOne({ normalizedMobile });
         if (!user) {
           user = await this.userModel.create({
-            name: isDesignatedAdmin ? 'Super Administrator' : 'CASA User',
+            name: finalName,
             mobile: dto.mobile,
             normalizedMobile,
-            role: isDesignatedAdmin ? UserRole.SUPER_ADMIN : UserRole.PURCHASER,
+            role: finalRole,
+            accountType: finalAccountType,
+            permissions: finalPermissions,
+            agencyName: resolvedAgency || undefined,
             status: AccountStatus.ACTIVE,
-            isVerifiedAgent: isDesignatedAdmin,
+            isVerifiedAgent: isDesignatedAdmin || finalRole === UserRole.VERIFIED_AGENT,
             lastLoginAt: now,
           });
+
+          // Ensure AgentProfile exists if registered as AGENT, BROKER, or VERIFIED_AGENT
+          if (finalRole === UserRole.AGENT || finalRole === UserRole.BROKER || finalRole === UserRole.VERIFIED_AGENT) {
+            try {
+              const slugBase = (finalName.toLowerCase().replace(/[^a-z0-9]+/g, '-') + '-' + normalizedMobile.slice(-4)).replace(/^-+|-+$/g, '');
+              await this.agentProfileModel.findOneAndUpdate(
+                { userId: user._id.toString() },
+                {
+                  $setOnInsert: {
+                    userId: user._id.toString(),
+                    slug: slugBase || `agent-${user._id.toString()}`,
+                    displayName: finalName,
+                    phone: dto.mobile,
+                    agencyName: resolvedAgency || 'Independent Real Estate Consultant',
+                    verificationStatus: 'NOT_SUBMITTED',
+                    isVerifiedAgent: isDesignatedAdmin || finalRole === UserRole.VERIFIED_AGENT,
+                  },
+                },
+                { upsert: true },
+              );
+            } catch (pErr: any) {
+              this.logger.warn(`Agent profile initial setup notice: ${pErr?.message}`);
+            }
+          }
         } else {
           if (user.status === AccountStatus.SUSPENDED) {
             throw new ForbiddenException('Your account has been suspended.');
           }
-          if (isDesignatedAdmin && user.role === UserRole.PURCHASER) {
+          if (isDesignatedAdmin) {
             user.role = UserRole.SUPER_ADMIN;
+            user.accountType = AccountType.AGENT;
+            user.permissions = ['*'];
+            user.isVerifiedAgent = true;
+          } else if (safeRole && (user.role === UserRole.PURCHASER || user.role === UserRole.BUYER) && safeRole !== UserRole.PURCHASER && safeRole !== UserRole.BUYER) {
+            user.role = safeRole;
+            user.accountType = this.resolveAccountType(safeRole);
+            user.permissions = this.getDefaultPermissions(safeRole);
+          } else if (!user.accountType) {
+            user.accountType = this.resolveAccountType(user.role);
+            user.permissions = user.permissions && user.permissions.length ? user.permissions : this.getDefaultPermissions(user.role);
+          }
+          if (resolvedName && (user.name === 'CASA User' || user.name !== resolvedName)) {
+            user.name = resolvedName;
+          }
+          if (resolvedAgency) {
+            user.agencyName = resolvedAgency;
           }
           user.lastLoginAt = now;
           await user.save();
+
+          // Ensure AgentProfile exists if user role is AGENT, BROKER, or VERIFIED_AGENT
+          if (user.role === UserRole.AGENT || user.role === UserRole.BROKER || user.role === UserRole.VERIFIED_AGENT) {
+            try {
+              const slugBase = (user.name.toLowerCase().replace(/[^a-z0-9]+/g, '-') + '-' + normalizedMobile.slice(-4)).replace(/^-+|-+$/g, '');
+              await this.agentProfileModel.findOneAndUpdate(
+                { userId: user._id.toString() },
+                {
+                  $setOnInsert: {
+                    userId: user._id.toString(),
+                    slug: slugBase || `agent-${user._id.toString()}`,
+                    displayName: user.name,
+                    phone: user.mobile || dto.mobile,
+                    agencyName: user.agencyName || resolvedAgency || 'Independent Real Estate Consultant',
+                    verificationStatus: 'NOT_SUBMITTED',
+                    isVerifiedAgent: Boolean(user.isVerifiedAgent),
+                  },
+                },
+                { upsert: true },
+              );
+            } catch (pErr: any) {
+              this.logger.warn(`Agent profile check notice: ${pErr?.message}`);
+            }
+          }
         }
       } catch (err: any) {
         if (err instanceof ForbiddenException) throw err;
@@ -412,12 +577,15 @@ export class AuthService {
       if (!memUser) {
         memUser = {
           _id: new Types.ObjectId().toString(),
-          name: isDesignatedAdmin ? 'Super Administrator' : 'CASA User',
+          name: finalName,
           mobile: dto.mobile,
           normalizedMobile,
-          role: isDesignatedAdmin ? UserRole.SUPER_ADMIN : UserRole.PURCHASER,
+          agencyName: resolvedAgency || undefined,
+          role: finalRole,
+          accountType: finalAccountType,
+          permissions: finalPermissions,
           status: AccountStatus.ACTIVE,
-          isVerifiedAgent: isDesignatedAdmin,
+          isVerifiedAgent: isDesignatedAdmin || finalRole === UserRole.VERIFIED_AGENT,
           lastLoginAt: now,
           createdAt: now,
           updatedAt: now,
@@ -427,8 +595,24 @@ export class AuthService {
         if (memUser.status === AccountStatus.SUSPENDED) {
           throw new ForbiddenException('Your account has been suspended.');
         }
-        if (isDesignatedAdmin && memUser.role === UserRole.PURCHASER) {
+        if (isDesignatedAdmin) {
           memUser.role = UserRole.SUPER_ADMIN;
+          memUser.accountType = AccountType.AGENT;
+          memUser.permissions = ['*'];
+          memUser.isVerifiedAgent = true;
+        } else if (safeRole && (memUser.role === UserRole.PURCHASER || memUser.role === UserRole.BUYER) && safeRole !== UserRole.PURCHASER && safeRole !== UserRole.BUYER) {
+          memUser.role = safeRole;
+          memUser.accountType = this.resolveAccountType(safeRole);
+          memUser.permissions = this.getDefaultPermissions(safeRole);
+        } else if (!memUser.accountType) {
+          memUser.accountType = this.resolveAccountType(memUser.role);
+          memUser.permissions = memUser.permissions && memUser.permissions.length ? memUser.permissions : this.getDefaultPermissions(memUser.role);
+        }
+        if (resolvedName && (memUser.name === 'CASA User' || memUser.name !== resolvedName)) {
+          memUser.name = resolvedName;
+        }
+        if (resolvedAgency) {
+          memUser.agencyName = resolvedAgency;
         }
         memUser.lastLoginAt = now;
       }
@@ -629,6 +813,8 @@ export class AuthService {
       mobile: user.mobile,
       normalizedMobile: user.normalizedMobile,
       role: user.role,
+      accountType: user.accountType || this.resolveAccountType(user.role),
+      permissions: user.permissions || this.getDefaultPermissions(user.role),
       status: user.status,
       isVerifiedAgent: user.isVerifiedAgent || false,
     };
@@ -700,8 +886,11 @@ export class AuthService {
       normalizedMobile: user.normalizedMobile,
       email: user.email,
       role: user.role,
+      accountType: user.accountType || this.resolveAccountType(user.role),
+      permissions: user.permissions || this.getDefaultPermissions(user.role),
       status: user.status,
       isVerifiedAgent: user.isVerifiedAgent || false,
+      agencyName: user.agencyName,
       avatar: user.avatar,
     };
   }

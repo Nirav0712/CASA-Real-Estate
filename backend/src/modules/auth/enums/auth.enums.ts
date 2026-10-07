@@ -2,10 +2,24 @@ export enum UserRole {
   SUPER_ADMIN = 'SUPER_ADMIN',
   ADMIN = 'ADMIN',
   MODERATOR = 'MODERATOR',
-  VERIFIED_AGENT = 'VERIFIED_AGENT',
+  DEVELOPER = 'DEVELOPER',
   AGENT = 'AGENT',
+  BROKER = 'BROKER',
   PROPERTY_OWNER = 'PROPERTY_OWNER',
-  PURCHASER = 'PURCHASER',
+  BUYER = 'BUYER',
+  TENANT = 'TENANT',
+  PURCHASER = 'PURCHASER', // Backward compatibility alias for BUYER
+  VERIFIED_AGENT = 'VERIFIED_AGENT', // Backward compatibility alias for AGENT
+  GUEST = 'GUEST',
+}
+
+export enum AccountType {
+  DEVELOPER = 'DEVELOPER',
+  AGENT = 'AGENT',
+  BROKER = 'BROKER',
+  PROPERTY_OWNER = 'PROPERTY_OWNER',
+  BUYER = 'BUYER',
+  TENANT = 'TENANT',
 }
 
 export enum AccountStatus {
