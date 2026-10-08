@@ -8,10 +8,29 @@ const API_BASE_URL =
 const ADMIN_PLATFORM_ROLES = ['SUPER_ADMIN', 'ADMIN', 'MODERATOR'];
 
 function isPlatformAdmin(user: AdminUser): boolean {
-  if (user.platformRole) {
-    return ADMIN_PLATFORM_ROLES.includes(user.platformRole);
+  if (user.platformRole && ADMIN_PLATFORM_ROLES.includes(user.platformRole)) {
+    return true;
   }
-  return ADMIN_PLATFORM_ROLES.includes(user.role);
+  if (user.role && ADMIN_PLATFORM_ROLES.includes(user.role)) {
+    return true;
+  }
+  if (user.permissions && Array.isArray(user.permissions)) {
+    const adminPerms = [
+      '*',
+      'admin:access',
+      'users:manage',
+      'users:read',
+      'properties:moderate',
+      'reports:read',
+      'roles:manage',
+      'roles:read',
+      'dashboard:view',
+    ];
+    if (user.permissions.some((p) => adminPerms.includes(p))) {
+      return true;
+    }
+  }
+  return false;
 }
 
 export async function requestAdminOtp(mobile: string): Promise<OtpRequestResponse> {

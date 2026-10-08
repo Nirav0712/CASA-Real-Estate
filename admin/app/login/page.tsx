@@ -127,6 +127,21 @@ export default function AdminLoginPage() {
 
           {step === 'PHONE' ? (
             <form onSubmit={handleRequestOtp} className="space-y-4">
+              <div
+                onClick={() => setPhone('9876543210')}
+                className="p-3 bg-blue-50 dark:bg-blue-950/60 border border-blue-200 dark:border-blue-900 rounded-xl text-xs flex items-center justify-between cursor-pointer hover:bg-blue-100/70 transition-colors"
+              >
+                <div className="flex items-center gap-2">
+                  <Sparkles className="w-3.5 h-3.5 text-casa-brand flex-shrink-0" />
+                  <span className="text-blue-900 dark:text-blue-200 font-medium">
+                    Demo Operator: <strong className="font-mono tracking-wider">98765 43210</strong>
+                  </span>
+                </div>
+                <span className="text-[10px] text-casa-brand font-bold uppercase underline">
+                  Auto-Fill
+                </span>
+              </div>
+
               <div>
                 <label className="text-xs font-semibold text-casa-text-primary block mb-1.5">
                   Administrator Mobile Number

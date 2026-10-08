@@ -703,6 +703,9 @@ export class AuthService implements OnModuleInit {
             // If already a platform user, preserve platformRole and keep accountType null
             if (user.platformRole === PlatformRole.SUPER_ADMIN || user.platformRole === PlatformRole.ADMIN || user.platformRole === PlatformRole.MODERATOR) {
               user.accountType = null;
+            } else if (user.role === UserRole.ADMIN || user.role === UserRole.MODERATOR || user.role === UserRole.SUPER_ADMIN) {
+              user.platformRole = user.role === UserRole.SUPER_ADMIN ? PlatformRole.SUPER_ADMIN : (user.role === UserRole.ADMIN ? PlatformRole.ADMIN : PlatformRole.MODERATOR);
+              user.accountType = null;
             } else {
               user.platformRole = PlatformRole.USER;
               if (safeRole && (user.role === UserRole.PURCHASER || user.role === UserRole.BUYER) && safeRole !== UserRole.PURCHASER && safeRole !== UserRole.BUYER) {
