@@ -1,4 +1,4 @@
-import { Module, forwardRef } from '@nestjs/common';
+import { Module, Global, forwardRef } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { Role, RoleSchema } from './schemas/role.schema';
 import { Package, PackageSchema } from './schemas/package.schema';
@@ -12,6 +12,7 @@ import { EntitlementsClientController } from './entitlements-client.controller';
 import { PermissionsGuard } from './guards/permissions.guard';
 import { AuthModule } from '../auth/auth.module';
 
+@Global()
 @Module({
   imports: [
     MongooseModule.forFeature([

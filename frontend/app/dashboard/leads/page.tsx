@@ -63,12 +63,18 @@ function formatSafeDateTime(dateValue?: string | Date | null): string {
   }
 }
 
+import { getMyEntitlements, checkPermission } from '@/services/entitlements-service';
+import { AccessDenied } from '@/components/dashboard/access-denied';
+
 export default function LeadsPage() {
   const searchParams = useSearchParams();
   const initialId = searchParams.get('id');
 
   const { isAuthenticated, isLoading: isAuthLoading, openAuthModal } = useAuth();
   const toast = useToast();
+
+  const [hasLeadPermission, setHasLeadPermission] = React.useState<boolean | null>(null);
+  const [permissionChecked, setPermissionChecked] = React.useState(false);
 
   const [leadsData, setLeadsData] = React.useState<PaginatedResponse<Lead>>({
     data: [],
@@ -89,6 +95,29 @@ export default function LeadsPage() {
   const [isActionPending, setIsActionPending] = React.useState(false);
   const [isDrawerLoading, setIsDrawerLoading] = React.useState(false);
 
+  const checkUserLeadPermission = React.useCallback(async () => {
+    if (!isAuthenticated) {
+      setPermissionChecked(true);
+      return false;
+    }
+    try {
+      const entData = await getMyEntitlements();
+      if (!entData) {
+        setHasLeadPermission(true);
+        setPermissionChecked(true);
+        return true;
+      }
+      const canView = checkPermission(entData.entitlements?.permissions, 'lead:view');
+      setHasLeadPermission(canView);
+      setPermissionChecked(true);
+      return canView;
+    } catch {
+      setHasLeadPermission(true);
+      setPermissionChecked(true);
+      return true;
+    }
+  }, [isAuthenticated]);
+
   const loadLeads = React.useCallback(async () => {
     if (!isAuthenticated) return;
     setIsLoading(true);
@@ -101,9 +130,14 @@ export default function LeadsPage() {
         search: searchQuery || undefined,
       });
       setLeadsData(res);
+      setHasLeadPermission(true);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Failed to load leads.';
-      toast.error('Load Error', msg);
+      if (msg.includes('403') || msg.toLowerCase().includes('permission') || msg.toLowerCase().includes('forbidden')) {
+        setHasLeadPermission(false);
+      } else {
+        toast.error('Load Error', msg);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -111,11 +145,18 @@ export default function LeadsPage() {
 
   React.useEffect(() => {
     if (isAuthenticated) {
-      loadLeads();
+      checkUserLeadPermission().then((allowed) => {
+        if (allowed) {
+          loadLeads();
+        } else {
+          setIsLoading(false);
+        }
+      });
     } else if (!isAuthLoading) {
       setIsLoading(false);
+      setPermissionChecked(true);
     }
-  }, [isAuthenticated, isAuthLoading, loadLeads]);
+  }, [isAuthenticated, isAuthLoading, checkUserLeadPermission, loadLeads]);
 
   const openLeadDrawer = React.useCallback(async (leadId: string) => {
     if (!leadId) return;
@@ -291,6 +332,23 @@ export default function LeadsPage() {
           Sign In
         </button>
       </div>
+    );
+  }
+
+  if (hasLeadPermission === false) {
+    return (
+      <AccessDenied
+        title="Lead Management Access Required"
+        moduleName="Buyer Leads & Inquiries"
+        requiredPermission="lead:view"
+        description="Your assigned role currently has Lead Management permissions disabled (lead:view = OFF). You are not authorized to view buyer inquiries, contact details, or CRM pipelines."
+        onRefresh={async () => {
+          const allowed = await checkUserLeadPermission();
+          if (allowed) {
+            loadLeads();
+          }
+        }}
+      />
     );
   }
 

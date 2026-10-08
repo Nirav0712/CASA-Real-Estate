@@ -93,4 +93,6 @@ export class CreateRoleDto {
   isActive?: boolean;
 }
 
-export class UpdateRoleDto extends CreateRoleDto {}
+import { PartialType } from '@nestjs/swagger';
+
+export class UpdateRoleDto extends PartialType(CreateRoleDto) {}

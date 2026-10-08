@@ -14,17 +14,21 @@ import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagg
 import { EngagementService } from './engagement.service';
 import { StartConversationDto, SendMessageDto } from './dto/messaging.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { PermissionsGuard } from '../entitlements/guards/permissions.guard';
+import { RequirePermissions } from '../entitlements/decorators/require-permissions.decorator';
+import { Permission } from '../entitlements/enums/permissions.enum';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
 
 @ApiTags('Buyer-Agent Messaging & Conversations')
 @Controller('conversations')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard)
 @ApiBearerAuth()
 export class ConversationsController {
   constructor(private readonly engagementService: EngagementService) {}
 
   @Post()
+  @RequirePermissions(Permission.CHAT_START)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Initiate or retrieve existing conversation with an agent or buyer' })
   @ApiResponse({ status: 200, description: 'Conversation session' })
@@ -36,6 +40,7 @@ export class ConversationsController {
   }
 
   @Get()
+  @RequirePermissions(Permission.CHAT_VIEW)
   @ApiOperation({ summary: 'Get all active conversations for current authenticated user' })
   @ApiResponse({ status: 200, description: 'List of conversations' })
   getConversations(@CurrentUser() user: AuthenticatedUser): Promise<{ success: boolean; data: any[] }> {
@@ -43,6 +48,7 @@ export class ConversationsController {
   }
 
   @Get(':id/messages')
+  @RequirePermissions(Permission.CHAT_VIEW)
   @ApiOperation({ summary: 'Get paginated message history for a conversation' })
   @ApiResponse({ status: 200, description: 'Messages list' })
   getMessages(
@@ -55,6 +61,7 @@ export class ConversationsController {
   }
 
   @Post(':id/messages')
+  @RequirePermissions(Permission.CHAT_REPLY)
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Send a message in a conversation' })
   @ApiResponse({ status: 201, description: 'Message sent' })
@@ -67,6 +74,7 @@ export class ConversationsController {
   }
 
   @Patch(':id/read')
+  @RequirePermissions(Permission.CHAT_VIEW)
   @ApiOperation({ summary: 'Mark all unread messages in conversation as read' })
   @ApiResponse({ status: 200, description: 'Messages marked read' })
   markRead(

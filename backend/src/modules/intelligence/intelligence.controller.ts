@@ -18,8 +18,9 @@ import {
   PricingIntelligenceQueryDto,
 } from './dto/intelligence.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { RolesGuard } from '../auth/guards/roles.guard';
-import { Roles } from '../auth/decorators/roles.decorator';
+import { PermissionsGuard } from '../entitlements/guards/permissions.guard';
+import { RequirePermissions } from '../entitlements/decorators/require-permissions.decorator';
+import { Permission } from '../entitlements/enums/permissions.enum';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
 import { UserRole } from '../auth/enums/auth.enums';
@@ -60,7 +61,8 @@ export class IntelligenceController {
   }
 
   // 18.6 Create Property Promotion
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @RequirePermissions(Permission.PROMOTION_CREATE)
   @Post('promotions/create')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Promote a published property listing' })
@@ -73,7 +75,8 @@ export class IntelligenceController {
   }
 
   // 18.6 Get User Promotions
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @RequirePermissions(Permission.PROMOTION_VIEW)
   @Get('promotions/my')
   @ApiBearerAuth()
   async getMyPromotions(@CurrentUser() user: AuthenticatedUser) {
@@ -121,8 +124,8 @@ export class IntelligenceController {
   }
 
   // 18.5 Lead Automation Rules
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN, UserRole.AGENT)
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @RequirePermissions(Permission.CRM_VIEW)
   @Get('automation/rules')
   @ApiBearerAuth()
   async getAutomationRules(@CurrentUser() user: AuthenticatedUser) {
@@ -131,8 +134,8 @@ export class IntelligenceController {
     return { success: true, data };
   }
 
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @RequirePermissions(Permission.CRM_EDIT)
   @Post('automation/rules')
   @ApiBearerAuth()
   async createAutomationRule(
@@ -144,8 +147,8 @@ export class IntelligenceController {
   }
 
   // 18.11 Admin Operations Automation Overview
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @RequirePermissions(Permission.ANALYTICS_VIEW)
   @Get('admin/intelligence/operations-overview')
   @ApiBearerAuth()
   async getAdminOperationsOverview() {

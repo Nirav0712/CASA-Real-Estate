@@ -15,11 +15,11 @@ import { EngagementService } from './engagement.service';
 import { CreateReviewDto, ModerateReviewDto } from './dto/review.dto';
 import { ReviewStatus, ReviewTargetType } from './schemas/review.schema';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { RolesGuard } from '../auth/guards/roles.guard';
-import { Roles } from '../auth/decorators/roles.decorator';
+import { PermissionsGuard } from '../entitlements/guards/permissions.guard';
+import { RequirePermissions } from '../entitlements/decorators/require-permissions.decorator';
+import { Permission } from '../entitlements/enums/permissions.enum';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
-import { UserRole } from '../auth/enums/auth.enums';
 
 @ApiTags('Reviews & Ratings')
 @Controller('reviews')
@@ -41,7 +41,8 @@ export class ReviewsController {
   }
 
   @Post()
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @RequirePermissions(Permission.REVIEW_CREATE)
   @ApiBearerAuth()
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Submit a verified review for a property or agent' })
@@ -54,8 +55,8 @@ export class ReviewsController {
   }
 
   @Get('admin')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN, UserRole.MODERATOR)
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @RequirePermissions(Permission.REVIEW_MODERATE)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Admin get all reviews for moderation' })
   @ApiResponse({ status: 200, description: 'Reviews moderation list' })
@@ -68,8 +69,8 @@ export class ReviewsController {
   }
 
   @Patch(':id/moderate')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN, UserRole.MODERATOR)
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @RequirePermissions(Permission.REVIEW_MODERATE)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Admin moderate a review (approve, reject, hide)' })
   @ApiResponse({ status: 200, description: 'Review moderation updated' })

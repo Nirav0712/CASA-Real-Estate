@@ -15,20 +15,21 @@ import { EngagementService } from './engagement.service';
 import { CreateSiteVisitDto, RescheduleSiteVisitDto, CancelSiteVisitDto } from './dto/site-visit.dto';
 import { SiteVisitStatus } from './schemas/site-visit.schema';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { RolesGuard } from '../auth/guards/roles.guard';
-import { Roles } from '../auth/decorators/roles.decorator';
+import { PermissionsGuard } from '../entitlements/guards/permissions.guard';
+import { RequirePermissions } from '../entitlements/decorators/require-permissions.decorator';
+import { Permission } from '../entitlements/enums/permissions.enum';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
-import { UserRole } from '../auth/enums/auth.enums';
 
 @ApiTags('Site Visits & Tour Scheduling')
 @Controller('site-visits')
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard)
 @ApiBearerAuth()
 export class SiteVisitsController {
   constructor(private readonly engagementService: EngagementService) {}
 
   @Post()
+  @RequirePermissions(Permission.SITE_VISIT_CREATE)
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Request a site visit tour for a property' })
   @ApiResponse({ status: 201, description: 'Site visit tour requested' })
@@ -40,6 +41,7 @@ export class SiteVisitsController {
   }
 
   @Get('my')
+  @RequirePermissions(Permission.SITE_VISIT_VIEW)
   @ApiOperation({ summary: 'Get buyer list of requested and confirmed site visits' })
   @ApiResponse({ status: 200, description: 'Buyer site visits' })
   getMySiteVisits(
@@ -50,7 +52,7 @@ export class SiteVisitsController {
   }
 
   @Get('agent')
-  @Roles(UserRole.AGENT, UserRole.VERIFIED_AGENT, UserRole.PROPERTY_OWNER, UserRole.ADMIN, UserRole.SUPER_ADMIN)
+  @RequirePermissions(Permission.SITE_VISIT_VIEW)
   @ApiOperation({ summary: 'Get assigned site visits for agent or owner' })
   @ApiResponse({ status: 200, description: 'Assigned site visits' })
   getAgentSiteVisits(
@@ -61,7 +63,7 @@ export class SiteVisitsController {
   }
 
   @Get('admin')
-  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN, UserRole.MODERATOR)
+  @RequirePermissions(Permission.SITE_VISIT_VIEW)
   @ApiOperation({ summary: 'Get all platform site visits with pagination and status filters' })
   @ApiResponse({ status: 200, description: 'Admin platform site visits' })
   getAdminSiteVisits(
@@ -73,7 +75,7 @@ export class SiteVisitsController {
   }
 
   @Patch(':id/confirm')
-  @Roles(UserRole.AGENT, UserRole.VERIFIED_AGENT, UserRole.PROPERTY_OWNER, UserRole.ADMIN, UserRole.SUPER_ADMIN)
+  @RequirePermissions(Permission.SITE_VISIT_MANAGE)
   @ApiOperation({ summary: 'Agent or Admin confirms a requested site visit' })
   @ApiResponse({ status: 200, description: 'Site visit confirmed' })
   confirmSiteVisit(
@@ -85,6 +87,7 @@ export class SiteVisitsController {
   }
 
   @Patch(':id/reschedule')
+  @RequirePermissions(Permission.SITE_VISIT_MANAGE)
   @ApiOperation({ summary: 'Propose new date/time slot for site visit' })
   @ApiResponse({ status: 200, description: 'Site visit rescheduled' })
   rescheduleSiteVisit(
@@ -96,6 +99,7 @@ export class SiteVisitsController {
   }
 
   @Patch(':id/cancel')
+  @RequirePermissions(Permission.SITE_VISIT_CANCEL)
   @ApiOperation({ summary: 'Cancel a site visit booking' })
   @ApiResponse({ status: 200, description: 'Site visit cancelled' })
   cancelSiteVisit(
@@ -107,7 +111,7 @@ export class SiteVisitsController {
   }
 
   @Patch(':id/complete')
-  @Roles(UserRole.AGENT, UserRole.VERIFIED_AGENT, UserRole.ADMIN, UserRole.SUPER_ADMIN)
+  @RequirePermissions(Permission.SITE_VISIT_MANAGE)
   @ApiOperation({ summary: 'Mark a site visit as completed' })
   @ApiResponse({ status: 200, description: 'Site visit completed' })
   completeSiteVisit(

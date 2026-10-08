@@ -18,6 +18,9 @@ import { SearchPropertiesDto } from './dto/search-properties.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { PermissionsGuard } from '../entitlements/guards/permissions.guard';
+import { RequirePermissions } from '../entitlements/decorators/require-permissions.decorator';
+import { Permission } from '../entitlements/enums/permissions.enum';
 import { UserRole } from '../auth/enums/auth.enums';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
@@ -111,7 +114,8 @@ export class PropertiesController {
   // ==========================================
 
   @Get('user/my')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @RequirePermissions(Permission.PROPERTY_VIEW)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'List all properties owned by currently authenticated user' })
   @ApiResponse({ status: 200, description: 'List of owned properties' })
@@ -120,7 +124,8 @@ export class PropertiesController {
   }
 
   @Get('user/my/:id')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @RequirePermissions(Permission.PROPERTY_VIEW)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get single property owned by currently authenticated user' })
   @ApiResponse({ status: 200, description: 'Property details returned' })
@@ -129,16 +134,8 @@ export class PropertiesController {
   }
 
   @Post(':id/submit')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(
-    UserRole.PROPERTY_OWNER,
-    UserRole.AGENT,
-    UserRole.BROKER,
-    UserRole.DEVELOPER,
-    UserRole.VERIFIED_AGENT,
-    UserRole.ADMIN,
-    UserRole.SUPER_ADMIN,
-  )
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @RequirePermissions(Permission.PROPERTY_CREATE)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Submit a draft or rejected property listing for CASA moderation' })
   @ApiResponse({ status: 200, description: 'Property submitted for review' })
@@ -163,16 +160,8 @@ export class PropertiesController {
   }
 
   @Post()
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(
-    UserRole.PROPERTY_OWNER,
-    UserRole.AGENT,
-    UserRole.BROKER,
-    UserRole.DEVELOPER,
-    UserRole.VERIFIED_AGENT,
-    UserRole.ADMIN,
-    UserRole.SUPER_ADMIN,
-  )
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @RequirePermissions(Permission.PROPERTY_CREATE)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Create a new property listing / draft (Seller, Agent, Broker, Developer)' })
   @ApiResponse({ status: 201, description: 'Property created' })
@@ -182,7 +171,8 @@ export class PropertiesController {
 
   @Put(':id')
   @Patch(':id')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @RequirePermissions(Permission.PROPERTY_EDIT)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Update an existing property with ownership verification' })
   update(
@@ -194,7 +184,8 @@ export class PropertiesController {
   }
 
   @Delete(':id')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @RequirePermissions(Permission.PROPERTY_DELETE)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Delete or archive a property listing' })
   delete(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {

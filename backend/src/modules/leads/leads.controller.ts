@@ -19,11 +19,11 @@ import { CreateLeadFollowUpDto } from './dto/create-lead-follow-up.dto';
 import { SetFollowUpDto } from './dto/set-follow-up.dto';
 import { LeadQueryDto } from './dto/lead-query.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { RolesGuard } from '../auth/guards/roles.guard';
-import { Roles } from '../auth/decorators/roles.decorator';
+import { PermissionsGuard } from '../entitlements/guards/permissions.guard';
+import { RequirePermissions } from '../entitlements/decorators/require-permissions.decorator';
+import { Permission } from '../entitlements/enums/permissions.enum';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
-import { UserRole } from '../auth/enums/auth.enums';
 
 @ApiTags('Leads & CRM')
 @Controller('leads')
@@ -41,14 +41,8 @@ export class LeadsController {
   }
 
   @Get('kpis')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(
-    UserRole.AGENT,
-    UserRole.VERIFIED_AGENT,
-    UserRole.PROPERTY_OWNER,
-    UserRole.ADMIN,
-    UserRole.SUPER_ADMIN,
-  )
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @RequirePermissions(Permission.LEAD_VIEW)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get CRM Dashboard KPIs' })
   @ApiResponse({ status: 200, description: 'CRM KPI metrics returned' })
@@ -57,14 +51,8 @@ export class LeadsController {
   }
 
   @Get('analytics')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(
-    UserRole.AGENT,
-    UserRole.VERIFIED_AGENT,
-    UserRole.PROPERTY_OWNER,
-    UserRole.ADMIN,
-    UserRole.SUPER_ADMIN,
-  )
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @RequirePermissions(Permission.LEAD_VIEW)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get CRM Analytics and Aggregations' })
   @ApiResponse({ status: 200, description: 'CRM analytics data returned' })
@@ -73,14 +61,8 @@ export class LeadsController {
   }
 
   @Get('follow-ups')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(
-    UserRole.AGENT,
-    UserRole.VERIFIED_AGENT,
-    UserRole.PROPERTY_OWNER,
-    UserRole.ADMIN,
-    UserRole.SUPER_ADMIN,
-  )
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @RequirePermissions(Permission.LEAD_VIEW)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get due, upcoming, and overdue follow-ups' })
   @ApiResponse({ status: 200, description: 'Follow-ups queue returned' })
@@ -89,14 +71,8 @@ export class LeadsController {
   }
 
   @Get('my')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(
-    UserRole.AGENT,
-    UserRole.VERIFIED_AGENT,
-    UserRole.PROPERTY_OWNER,
-    UserRole.ADMIN,
-    UserRole.SUPER_ADMIN,
-  )
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @RequirePermissions(Permission.LEAD_VIEW)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'List leads assigned to current Agent / Property Owner (Legacy alias)' })
   @ApiResponse({ status: 200, description: 'Paginated lead list returned' })
@@ -108,14 +84,8 @@ export class LeadsController {
   }
 
   @Get()
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(
-    UserRole.AGENT,
-    UserRole.VERIFIED_AGENT,
-    UserRole.PROPERTY_OWNER,
-    UserRole.ADMIN,
-    UserRole.SUPER_ADMIN,
-  )
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @RequirePermissions(Permission.LEAD_VIEW)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'List leads with RBAC filtering and search' })
   @ApiResponse({ status: 200, description: 'Paginated lead list returned' })
@@ -127,7 +97,8 @@ export class LeadsController {
   }
 
   @Get(':id')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @RequirePermissions(Permission.LEAD_VIEW)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get single lead details and full CRM timeline' })
   @ApiResponse({ status: 200, description: 'Lead details and timeline returned' })
@@ -139,7 +110,8 @@ export class LeadsController {
   }
 
   @Patch(':id/status')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @RequirePermissions(Permission.LEAD_EDIT)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Update lead workflow status' })
   @ApiResponse({ status: 200, description: 'Lead status updated' })
@@ -152,7 +124,8 @@ export class LeadsController {
   }
 
   @Patch(':id/priority')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @RequirePermissions(Permission.LEAD_EDIT)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Update lead priority' })
   @ApiResponse({ status: 200, description: 'Lead priority updated' })
@@ -165,8 +138,8 @@ export class LeadsController {
   }
 
   @Patch(':id/assign')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN, UserRole.PROPERTY_OWNER)
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @RequirePermissions(Permission.LEAD_ASSIGN)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Assign or reassign a lead to an Agent' })
   @ApiResponse({ status: 200, description: 'Lead assigned successfully' })
@@ -179,7 +152,8 @@ export class LeadsController {
   }
 
   @Post(':id/notes')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @RequirePermissions(Permission.LEAD_EDIT)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Add a private internal note to lead timeline' })
   @ApiResponse({ status: 201, description: 'Note added to lead' })
@@ -192,7 +166,8 @@ export class LeadsController {
   }
 
   @Post(':id/activities')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @RequirePermissions(Permission.LEAD_EDIT)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Log a CRM activity (Call, WhatsApp, Site Visit, Email)' })
   @ApiResponse({ status: 201, description: 'Activity logged on lead' })
@@ -205,7 +180,8 @@ export class LeadsController {
   }
 
   @Post(':id/follow-ups')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @RequirePermissions(Permission.LEAD_EDIT)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Schedule a follow-up for lead' })
   @ApiResponse({ status: 201, description: 'Follow-up created' })
@@ -218,7 +194,8 @@ export class LeadsController {
   }
 
   @Post(':id/follow-up')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @RequirePermissions(Permission.LEAD_EDIT)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Schedule a follow-up date for lead (Legacy alias)' })
   @ApiResponse({ status: 201, description: 'Follow-up date scheduled' })
@@ -231,7 +208,8 @@ export class LeadsController {
   }
 
   @Patch(':id/follow-ups/:followUpId/complete')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @RequirePermissions(Permission.LEAD_EDIT)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Mark scheduled follow-up as completed' })
   @ApiResponse({ status: 200, description: 'Follow-up completed' })
@@ -245,7 +223,8 @@ export class LeadsController {
   }
 
   @Patch(':id/follow-ups/:followUpId/cancel')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @RequirePermissions(Permission.LEAD_EDIT)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Cancel scheduled follow-up' })
   @ApiResponse({ status: 200, description: 'Follow-up cancelled' })

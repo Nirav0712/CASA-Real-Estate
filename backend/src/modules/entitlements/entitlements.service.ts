@@ -822,10 +822,36 @@ export class EntitlementsService implements OnModuleInit {
 
     const combined = new Set<string>();
     for (const p of rolePermissions) combined.add(p);
-    for (const p of packagePermissions) combined.add(p);
+
+    // Only inherit supplemental package permissions if user does NOT have an explicit custom role,
+    // and only if package is an upgraded active subscription package (not a default fallback)
+    if (!customRoleId && packageDoc && !packageDoc.isDefault && subscriptionDoc) {
+      for (const p of packagePermissions) combined.add(p);
+    }
+
     for (const p of granted) combined.add(p);
 
     const effectivePermissions = Array.from(combined).filter((p) => !denied.has(p));
+
+    // Dynamic alignment of dashboard navigation with resolved permissions
+    const hasPerm = (p: string) =>
+      effectivePermissions.includes('*') ||
+      effectivePermissions.includes(p) ||
+      (p.includes(':') && effectivePermissions.includes(`${p.split(':')[0]}:*`));
+
+    const finalDashboardConfig = {
+      overview: dashboardConfig.overview !== false,
+      properties: Boolean(dashboardConfig.properties && (hasPerm(Permission.PROPERTY_VIEW) || hasPerm(Permission.PROPERTY_CREATE))),
+      leads: Boolean(dashboardConfig.leads && hasPerm(Permission.LEAD_VIEW)),
+      enquiries: Boolean(dashboardConfig.enquiries && (hasPerm(Permission.ENQUIRY_VIEW) || hasPerm(Permission.ENQUIRY_CREATE) || hasPerm(Permission.ENQUIRY_MANAGE))),
+      chat: Boolean(dashboardConfig.chat && (hasPerm(Permission.CHAT_VIEW) || hasPerm(Permission.CHAT_START) || hasPerm(Permission.CHAT_REPLY))),
+      crm: Boolean(dashboardConfig.crm && hasPerm(Permission.CRM_VIEW)),
+      siteVisits: Boolean(dashboardConfig.siteVisits && hasPerm(Permission.SITE_VISIT_VIEW)),
+      analytics: Boolean(dashboardConfig.analytics && hasPerm(Permission.ANALYTICS_VIEW)),
+      reviews: Boolean(dashboardConfig.reviews && hasPerm(Permission.REVIEW_VIEW)),
+      promotions: Boolean(dashboardConfig.promotions && (hasPerm(Permission.PROMOTION_VIEW) || hasPerm(Permission.PROMOTION_CREATE))),
+      profile: dashboardConfig.profile !== false,
+    };
 
     // 5. Combine Limits with Bonus Credits
     const bonus = user.bonusLimits || {};
@@ -847,7 +873,7 @@ export class EntitlementsService implements OnModuleInit {
       dataScope,
       permissions: effectivePermissions,
       limits: effectiveLimits,
-      dashboardConfig,
+      dashboardConfig: finalDashboardConfig,
       package: packageDoc ? { id: packageDoc._id.toString(), name: packageDoc.name, slug: packageDoc.slug, price: packageDoc.price, billingPeriod: packageDoc.billingPeriod } : null,
       subscription: subscriptionDoc ? { id: subscriptionDoc._id.toString(), status: subscriptionDoc.status, endDate: subscriptionDoc.endDate } : null,
     };

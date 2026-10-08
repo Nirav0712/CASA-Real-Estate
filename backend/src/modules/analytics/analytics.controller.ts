@@ -13,11 +13,11 @@ import {
 import { AnalyticsService } from './analytics.service';
 import { TrackEventDto, ResolveRiskFlagDto, AnalyticsQueryDto } from './dto/analytics.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { RolesGuard } from '../auth/guards/roles.guard';
-import { Roles } from '../auth/decorators/roles.decorator';
+import { PermissionsGuard } from '../entitlements/guards/permissions.guard';
+import { RequirePermissions } from '../entitlements/decorators/require-permissions.decorator';
+import { Permission } from '../entitlements/enums/permissions.enum';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
-import { UserRole } from '../auth/enums/auth.enums';
 import { RateLimit } from '../../common/guards/rate-limit.guard';
 
 @Controller('analytics')
@@ -38,8 +38,8 @@ export class AnalyticsController {
 
   // 16.6 Admin Business Intelligence Dashboard
   @Get('admin/bi')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @RequirePermissions(Permission.ANALYTICS_VIEW)
   async getAdminBI(@Query() query: AnalyticsQueryDto) {
     const data = await this.analyticsService.getAdminMarketplaceBI(query);
     return { success: true, data };
@@ -54,8 +54,8 @@ export class AnalyticsController {
 
   // 16.9 Fraud & Abuse Detection Scan
   @Post('admin/risk-scan')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @RequirePermissions(Permission.AUDIT_VIEW)
   async runRiskScan(@Body('propertyId') propertyId?: string) {
     const result = await this.analyticsService.runFraudAndAbuseScan(propertyId);
     return { success: true, data: result };
@@ -63,8 +63,8 @@ export class AnalyticsController {
 
   // Risk Flags List
   @Get('admin/risk-flags')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @RequirePermissions(Permission.AUDIT_VIEW)
   async getRiskFlags(
     @Query('status') status?: string,
     @Query('level') level?: string,
@@ -82,8 +82,8 @@ export class AnalyticsController {
 
   // Risk Flag Status Resolution
   @Patch('admin/risk-flags/:id')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @RequirePermissions(Permission.REPORT_MANAGE)
   async resolveRiskFlag(
     @Param('id') id: string,
     @Body() dto: ResolveRiskFlagDto,

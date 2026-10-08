@@ -36,12 +36,15 @@ import {
   Lock,
 } from 'lucide-react';
 
+import { AccessDenied } from '@/components/dashboard/access-denied';
+
 export default function MyPropertiesPage() {
   const { user, isAuthenticated, isLoading: isAuthLoading, openAuthModal } = useAuth();
   const toast = useToast();
 
   const [properties, setProperties] = React.useState<Property[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
+  const [hasPermission, setHasPermission] = React.useState<boolean | null>(null);
   const [submittingId, setSubmittingId] = React.useState<string | null>(null);
 
   // Monetization / Feature Modal State
@@ -54,8 +57,14 @@ export default function MyPropertiesPage() {
     try {
       const data = await getMyProperties();
       setProperties(data);
-    } catch {
-      toast.error('Network Error', 'Failed to fetch your properties.');
+      setHasPermission(true);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : '';
+      if (msg.includes('403') || msg.toLowerCase().includes('permission') || msg.toLowerCase().includes('forbidden')) {
+        setHasPermission(false);
+      } else {
+        toast.error('Network Error', 'Failed to fetch your properties.');
+      }
     } finally {
       setIsLoading(false);
     }
@@ -131,6 +140,18 @@ export default function MyPropertiesPage() {
           </button>
         </div>
       </div>
+    );
+  }
+
+  if (hasPermission === false) {
+    return (
+      <AccessDenied
+        title="Property Management Access Required"
+        moduleName="Property Listings"
+        requiredPermission="property:view"
+        description="Your assigned role currently does not have permission to manage property listings."
+        onRefresh={loadProperties}
+      />
     );
   }
 
