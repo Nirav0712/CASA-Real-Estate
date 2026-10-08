@@ -5,6 +5,7 @@ import { PropertiesService } from './properties.service';
 import { Property, PropertySchema } from './schemas/property.schema';
 import { Category, CategorySchema } from './schemas/category.schema';
 import { AuthModule } from '../auth/auth.module';
+import { EntitlementsModule } from '../entitlements/entitlements.module';
 
 @Module({
   imports: [
@@ -13,6 +14,7 @@ import { AuthModule } from '../auth/auth.module';
       { name: Category.name, schema: CategorySchema },
     ]),
     AuthModule,
+    EntitlementsModule,
   ],
   controllers: [PropertiesController],
   providers: [PropertiesService],

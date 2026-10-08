@@ -93,6 +93,15 @@ export function AdminSidebar() {
       ],
     },
     {
+      label: 'ACCESS & ENTITLEMENTS',
+      items: [
+        { label: 'Role Management', href: '/roles', icon: ShieldAlert, active: pathname?.startsWith('/roles') },
+        { label: 'Permissions Catalog', href: '/permissions', icon: CheckSquare, active: pathname === '/permissions' },
+        { label: 'Packages & Limits', href: '/packages', icon: CreditCard, active: pathname?.startsWith('/packages') },
+        { label: 'Entitlement Usage', href: '/usage', icon: BarChart3, active: pathname === '/usage' },
+      ],
+    },
+    {
       label: 'SYSTEM & AUDIT',
       items: [
         { label: 'Notifications', href: '/notifications', icon: Bell },

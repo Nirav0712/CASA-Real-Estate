@@ -57,6 +57,36 @@ export class User {
   @Prop({ default: false, index: true })
   isVerifiedAgent: boolean;
 
+  @Prop({ type: String, default: null, index: true })
+  customRoleId?: string | null;
+
+  @Prop({ type: [String], default: [] })
+  grantedPermissions: string[];
+
+  @Prop({ type: [String], default: [] })
+  deniedPermissions: string[];
+
+  @Prop({ type: Object, default: {} })
+  bonusLimits: {
+    propertyViews?: number;
+    propertyListings?: number;
+    monthlyLeads?: number;
+    enquiries?: number;
+    chats?: number;
+    savedProperties?: number;
+    savedSearches?: number;
+    propertyViewsBonus?: number;
+    propertyListingsBonus?: number;
+    leadsBonus?: number;
+    featuredListingsBonus?: number;
+  };
+
+  @Prop({ type: String, default: null, index: true })
+  activePackageId?: string | null;
+
+  @Prop({ type: String, default: null, index: true })
+  activeSubscriptionId?: string | null;
+
   @Prop({ required: false })
   avatar?: string;
 

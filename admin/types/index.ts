@@ -537,5 +537,122 @@ export interface PaymentAdminResponse {
   metrics: PaymentKPIs;
 }
 
+export type DataScope = 'OWN' | 'TEAM' | 'ORGANIZATION' | 'ALL';
 
+export interface DashboardConfig {
+  canAccessCRM: boolean;
+  canAccessAnalytics: boolean;
+  canAccessSiteVisits: boolean;
+  canAccessLeads: boolean;
+  canAccessTeamManagement: boolean;
+  canAccessMarketing: boolean;
+  canAccessReports: boolean;
+  canAccessBilling: boolean;
+}
 
+export interface RoleRecord {
+  id: string;
+  _id?: string;
+  name: string;
+  slug: string;
+  description?: string;
+  platformRole: PlatformRole;
+  accountType?: AccountType | null;
+  permissions: string[];
+  dataScope: DataScope;
+  dashboardConfig?: DashboardConfig;
+  isSystemRole: boolean;
+  isActive: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export type BillingPeriod = 'MONTHLY' | 'QUARTERLY' | 'ANNUALLY' | 'LIFETIME';
+
+export interface PackageLimits {
+  propertyListingsMax: number;
+  featuredListingsMax: number;
+  propertyViewsMonthly: number;
+  savedItemsMax: number;
+  leadsMonthly: number;
+  enquiriesMonthly: number;
+  chatThreadsMax: number;
+  teamMembersMax: number;
+}
+
+export interface PackageRecord {
+  id: string;
+  _id?: string;
+  name: string;
+  slug: string;
+  description?: string;
+  price: number;
+  currency: string;
+  billingPeriod: BillingPeriod;
+  targetAccountTypes: AccountType[];
+  limits: PackageLimits;
+  permissions: string[];
+  features: string[];
+  isPopular: boolean;
+  isDefault: boolean;
+  isActive: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface PermissionGroup {
+  group: string;
+  label: string;
+  description: string;
+  permissions: {
+    key: string;
+    label: string;
+    description: string;
+  }[];
+}
+
+export interface UserOverrides {
+  grantedPermissions: string[];
+  deniedPermissions: string[];
+  bonusLimits: {
+    propertyListingsBonus?: number;
+    propertyViewsBonus?: number;
+    leadsBonus?: number;
+    featuredListingsBonus?: number;
+  };
+  customRoleId?: string;
+  activePackageId?: string;
+}
+
+export interface UsageMetricRecord {
+  userId: string;
+  userName: string;
+  userMobile: string;
+  userEmail?: string;
+  role: string;
+  accountType?: string;
+  package?: {
+    id: string;
+    name: string;
+    billingPeriod: string;
+  };
+  propertyViews: {
+    used: number;
+    limit: number;
+    bonus: number;
+    remaining: number;
+  };
+  propertyListings: {
+    used: number;
+    limit: number;
+    bonus: number;
+    remaining: number;
+  };
+  leads: {
+    used: number;
+    limit: number;
+    bonus: number;
+    remaining: number;
+  };
+  lastViewedAt?: string;
+}

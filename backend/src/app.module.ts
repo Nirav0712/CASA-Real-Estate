@@ -15,6 +15,7 @@ import { PaymentsModule } from './modules/payments/payments.module';
 import { EngagementModule } from './modules/engagement/engagement.module';
 import { AnalyticsModule } from './modules/analytics/analytics.module';
 import { IntelligenceModule } from './modules/intelligence/intelligence.module';
+import { EntitlementsModule } from './modules/entitlements/entitlements.module';
 import { CorrelationIdMiddleware } from './common/middleware/correlation-id.middleware';
 import { HttpLoggingMiddleware } from './common/middleware/logging.middleware';
 import { RateLimitGuard } from './common/guards/rate-limit.guard';
@@ -39,6 +40,7 @@ import { RateLimitGuard } from './common/guards/rate-limit.guard';
     EngagementModule,
     AnalyticsModule,
     IntelligenceModule,
+    EntitlementsModule,
   ],
   providers: [
     {

@@ -43,6 +43,7 @@ import {
   Flag,
   Star,
   X,
+  Lock,
   MessageCircle,
   Copy,
   Check,
@@ -848,6 +849,28 @@ export function PropertyDetailView({
                   </div>
                 </div>
 
+                {/* Locked Contact Banner when Limits / Entitlements apply */}
+                {(property as any).contactLocked && (
+                  <div className="p-3.5 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-start space-y-2 mb-3">
+                    <div className="flex items-center gap-1.5 text-xs font-bold text-amber-800 dark:text-amber-300">
+                      <Lock className="w-4 h-4 text-amber-600 shrink-0" />
+                      <span>Direct Contact Locked</span>
+                    </div>
+                    <p className="text-[11px] text-amber-700 dark:text-amber-300/90 leading-relaxed">
+                      {(property as any).contactMessage ||
+                        'Sign in or upgrade your subscription package to view verified direct phone and WhatsApp contact.'}
+                    </p>
+                    <div className="pt-1">
+                      <Link
+                        href={isAuthenticated ? '/dashboard/billing' : '/login'}
+                        className="inline-flex items-center justify-center w-full py-1.5 px-3 rounded-lg text-xs font-semibold bg-amber-600 hover:bg-amber-700 text-white shadow-2xs transition-colors"
+                      >
+                        {isAuthenticated ? 'Upgrade Package' : 'Sign In to View Contact'}
+                      </Link>
+                    </div>
+                  </div>
+                )}
+
                 {/* Primary Action Buttons */}
                 <div className="space-y-2.5">
                   {/* Site Visit Booking Button */}
@@ -892,9 +915,11 @@ export function PropertyDetailView({
                       </Button>
                     </a>
                   ) : (
-                    <Button variant="outline" size="md" disabled fullWidth>
-                      <span>WhatsApp Unavailable</span>
-                    </Button>
+                    !(property as any).contactLocked && (
+                      <Button variant="outline" size="md" disabled fullWidth>
+                        <span>WhatsApp Unavailable</span>
+                      </Button>
+                    )
                   )}
 
                   {property.advertiser.phone ? (

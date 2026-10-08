@@ -9,6 +9,8 @@ import {
   Param,
   Query,
   UseGuards,
+  Req,
+  Ip,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { PropertiesService } from './properties.service';
@@ -20,10 +22,36 @@ import { UserRole } from '../auth/enums/auth.enums';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
 
+import { JwtService } from '@nestjs/jwt';
+
 @ApiTags('Properties & Categories')
 @Controller('properties')
 export class PropertiesController {
-  constructor(private readonly propertiesService: PropertiesService) {}
+  constructor(
+    private readonly propertiesService: PropertiesService,
+    private readonly jwtService: JwtService,
+  ) {}
+
+  private extractOptionalUser(req: any): any {
+    if (req.user) return req.user;
+    const authHeader = req.headers?.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      try {
+        const token = authHeader.substring(7).trim();
+        const decoded: any = this.jwtService.decode(token);
+        if (decoded) {
+          return {
+            id: decoded.userId || decoded.sub,
+            role: decoded.role,
+            platformRole: decoded.platformRole,
+            accountType: decoded.accountType,
+            status: decoded.status,
+          };
+        }
+      } catch {}
+    }
+    return null;
+  }
 
   // ==========================================
   // PUBLIC SEARCH & DISCOVERY ENDPOINTS
@@ -121,15 +149,17 @@ export class PropertiesController {
   @Get('id/:id')
   @ApiOperation({ summary: 'Get single property by MongoDB ID or ID string' })
   @ApiResponse({ status: 200, description: 'Property details returned' })
-  findById(@Param('id') id: string) {
-    return this.propertiesService.findById(id);
+  findById(@Param('id') id: string, @Req() req: any, @Ip() ip: string) {
+    const user = this.extractOptionalUser(req);
+    return this.propertiesService.findById(id, user, ip);
   }
 
   @Get(':slug')
   @ApiOperation({ summary: 'Get single property details by slug or ID' })
   @ApiResponse({ status: 200, description: 'Property details returned' })
-  findBySlug(@Param('slug') slug: string) {
-    return this.propertiesService.findBySlug(slug);
+  findBySlug(@Param('slug') slug: string, @Req() req: any, @Ip() ip: string) {
+    const user = this.extractOptionalUser(req);
+    return this.propertiesService.findBySlug(slug, user, ip);
   }
 
   @Post()

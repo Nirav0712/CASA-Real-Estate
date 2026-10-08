@@ -377,13 +377,14 @@ export class AdminService implements OnModuleInit {
   }
 
   async getPendingQueue() {
-    const properties = await this.propertyModel
+    const query: any = this.propertyModel
       .find({ status: { $in: ['PENDING_REVIEW', 'PENDING_APPROVAL'] } })
       .sort({ _id: -1 })
-      .lean()
-      .exec();
+      .lean();
 
-    return properties.map((p) => this.mapPropertyToAdminItem(p));
+    const properties = typeof query?.exec === 'function' ? await query.exec() : await query;
+
+    return (properties || []).map((p: any) => this.mapPropertyToAdminItem(p));
   }
 
   async getQueue() {

@@ -260,6 +260,8 @@ const INITIAL_SEED_PROPERTIES = [
   },
 ];
 
+import { EntitlementsService } from '../entitlements/entitlements.service';
+
 @Injectable()
 export class PropertiesService implements OnModuleInit {
   private readonly logger = new Logger(PropertiesService.name);
@@ -267,6 +269,7 @@ export class PropertiesService implements OnModuleInit {
   constructor(
     @InjectModel(Property.name) private readonly propertyModel: Model<PropertyDocument>,
     @InjectModel(Category.name) private readonly categoryModel: Model<CategoryDocument>,
+    private readonly entitlementsService: EntitlementsService,
   ) {}
 
   async onModuleInit() {
@@ -641,7 +644,7 @@ export class PropertiesService implements OnModuleInit {
     }
   }
 
-  async findBySlug(slug: string) {
+  async findBySlug(slug: string, user?: AuthenticatedUser, ip?: string) {
     try {
       const query: any = {
         $or: [{ slug }, { id: slug }],
@@ -656,6 +659,25 @@ export class PropertiesService implements OnModuleInit {
         throw new NotFoundException(`Property with identifier "${slug}" not found`);
       }
 
+      // Check contact visibility via entitlements
+      let hasContactPermission = false;
+      if (user) {
+        if (user.platformRole === 'SUPER_ADMIN' || user.role === 'SUPER_ADMIN' || user.platformRole === 'ADMIN') {
+          hasContactPermission = true;
+        } else if (this.entitlementsService) {
+          const viewResult = await this.entitlementsService.trackAndValidatePropertyView(
+            user.id,
+            (property as any)._id ? (property as any)._id.toString() : (property as any).id,
+            ip || '127.0.0.1',
+          );
+          hasContactPermission = viewResult.contactVisible;
+        }
+      }
+
+      if (this.entitlementsService) {
+        return this.entitlementsService.redactContactData(property, hasContactPermission);
+      }
+
       return property;
     } catch (err: any) {
       if (err instanceof NotFoundException) throw err;
@@ -663,8 +685,8 @@ export class PropertiesService implements OnModuleInit {
     }
   }
 
-  async findById(id: string) {
-    return this.findBySlug(id);
+  async findById(id: string, user?: AuthenticatedUser, ip?: string) {
+    return this.findBySlug(id, user, ip);
   }
 
   // ==========================================

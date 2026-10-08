@@ -6,6 +6,7 @@ import { Property } from './schemas/property.schema';
 import { Category } from './schemas/category.schema';
 import { UserRole, AccountStatus, PlatformRole, AccountType } from '../auth/enums/auth.enums';
 import { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
+import { EntitlementsService } from '../entitlements/entitlements.service';
 
 describe('PropertiesService (Phase 06 Lifecycle & Security)', () => {
   let service: PropertiesService;
@@ -103,11 +104,27 @@ describe('PropertiesService (Phase 06 Lifecycle & Security)', () => {
       findOneAndDelete: jest.fn(),
     };
 
+    const mockEntitlementsService = {
+      trackAndValidatePropertyView: jest.fn().mockResolvedValue({
+        allowed: true,
+        contactVisible: true,
+        remainingViews: 10,
+        totalViewsUsed: 1,
+        limit: 10,
+        deduplicated: false,
+      }),
+      redactContactData: jest.fn().mockImplementation((prop, hasPerm) => ({
+        ...(prop?.toObject ? prop.toObject() : prop),
+        contactLocked: !hasPerm,
+      })),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         PropertiesService,
         { provide: getModelToken(Property.name), useValue: mockPropertyModel },
         { provide: getModelToken(Category.name), useValue: mockCategoryModel },
+        { provide: EntitlementsService, useValue: mockEntitlementsService },
       ],
     }).compile();
 
