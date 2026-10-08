@@ -31,7 +31,12 @@ export default function AdminIntelligencePage() {
   React.useEffect(() => {
     async function loadData() {
       setLoading(true);
-      const token = typeof window !== 'undefined' ? localStorage.getItem('casa_admin_token') || '' : '';
+      const token =
+        typeof window !== 'undefined'
+          ? localStorage.getItem('casa_admin_access_token') ||
+            localStorage.getItem('casa_admin_token') ||
+            ''
+          : '';
       const [ov, fn, pr] = await Promise.all([
         AdminIntelligenceService.getOperationsOverview(token),
         AdminIntelligenceService.getConversionFunnel(token),
