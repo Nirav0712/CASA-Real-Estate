@@ -47,6 +47,7 @@ export default function AdminLoginPage() {
   const handleRequestOtp = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     setErrorMsg('');
+    setOtp('');
 
     const cleanPhone = phone.replace(/[^0-9]/g, '');
     if (cleanPhone.length < 10) {
@@ -217,7 +218,11 @@ export default function AdminLoginPage() {
               <div className="flex items-center justify-between text-xs pt-1">
                 <button
                   type="button"
-                  onClick={() => setStep('PHONE')}
+                  onClick={() => {
+                    setStep('PHONE');
+                    setOtp('');
+                    setErrorMsg('');
+                  }}
                   className="text-casa-text-secondary hover:text-casa-text-primary font-medium cursor-pointer"
                 >
                   ← Change Number

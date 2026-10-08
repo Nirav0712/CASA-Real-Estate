@@ -89,7 +89,7 @@ export class AuthController {
   }
 
   @Public()
-  @RateLimit({ limit: 5, windowMs: 60000, keyPrefix: 'auth_otp_req' })
+  @RateLimit({ limit: 60, windowMs: 60000, keyPrefix: 'auth_otp_req' })
   @Post('otp/request')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Request 6-digit OTP challenge for mobile authentication' })
@@ -103,7 +103,7 @@ export class AuthController {
   }
 
   @Public()
-  @RateLimit({ limit: 10, windowMs: 60000, keyPrefix: 'auth_otp_ver' })
+  @RateLimit({ limit: 60, windowMs: 60000, keyPrefix: 'auth_otp_ver' })
   @Post('otp/verify')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Verify OTP challenge and obtain authentication credentials' })
