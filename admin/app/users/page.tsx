@@ -23,8 +23,9 @@ import {
   getAdminUserById,
   updateAdminUserStatus,
   updateAdminUserRole,
+  getAdminAssignableRoles,
 } from '@/services/admin-service';
-import { UserRecord, UserDetailRecord, UserRole, AccountStatus } from '@/types';
+import { UserRecord, UserDetailRecord, UserRole, AccountStatus, RoleRecord } from '@/types';
 
 export default function UsersPage() {
   const toast = useToast();
@@ -32,6 +33,10 @@ export default function UsersPage() {
   const [users, setUsers] = React.useState<UserRecord[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
+
+  // Dynamic Roles
+  const [roles, setRoles] = React.useState<RoleRecord[]>([]);
+  const [loadingRoles, setLoadingRoles] = React.useState(false);
 
   // Filters & Pagination
   const [searchQuery, setSearchQuery] = React.useState('');
@@ -55,9 +60,26 @@ export default function UsersPage() {
 
   // Role Action Modal State
   const [roleModalUser, setRoleModalUser] = React.useState<UserRecord | null>(null);
-  const [newRole, setNewRole] = React.useState<UserRole>('AGENT');
+  const [newRole, setNewRole] = React.useState<string>('AGENT');
   const [roleReason, setRoleReason] = React.useState('');
   const [submittingRole, setSubmittingRole] = React.useState(false);
+
+  // Load assignable roles from DB
+  const loadRoles = React.useCallback(async () => {
+    try {
+      setLoadingRoles(true);
+      const data = await getAdminAssignableRoles();
+      setRoles(data || []);
+    } catch (err: unknown) {
+      console.warn('Could not load assignable roles:', err);
+    } finally {
+      setLoadingRoles(false);
+    }
+  }, []);
+
+  React.useEffect(() => {
+    loadRoles();
+  }, [loadRoles]);
 
   // Debounce search input
   React.useEffect(() => {
@@ -140,7 +162,27 @@ export default function UsersPage() {
 
   const handleOpenRoleModal = (user: UserRecord) => {
     setRoleModalUser(user);
-    setNewRole(user.role);
+    if (user.customRoleId) {
+      setNewRole(user.customRoleId);
+    } else {
+      // Find matching system role by slug or role identifier
+      const matchingSysRole = roles.find((r) => {
+        if (!r.isSystemRole) return false;
+        if (user.role === 'SUPER_ADMIN' && r.platformRole === 'SUPER_ADMIN') return true;
+        if (user.role === 'ADMIN' && r.platformRole === 'ADMIN') return true;
+        if (user.role === 'MODERATOR' && r.platformRole === 'MODERATOR') return true;
+        if (user.role === 'VERIFIED_AGENT' && (r.slug === 'verified-agent' || r.slug === 'agent')) return true;
+        if (user.role === 'AGENT' && (r.accountType === 'AGENT' || r.slug === 'agent')) return true;
+        if (user.role === 'PROPERTY_OWNER' && (r.accountType === 'PROPERTY_OWNER' || r.slug === 'property-owner')) return true;
+        if (
+          (user.role === 'PURCHASER' || user.role === 'BUYER') &&
+          (r.accountType === 'BUYER' || r.slug === 'buyer')
+        )
+          return true;
+        return false;
+      });
+      setNewRole(matchingSysRole ? (matchingSysRole.id || matchingSysRole._id || matchingSysRole.slug) : user.role);
+    }
     setRoleReason('');
   };
 
@@ -148,10 +190,14 @@ export default function UsersPage() {
     if (!roleModalUser) return;
     try {
       setSubmittingRole(true);
-      await updateAdminUserRole(roleModalUser.id, newRole, roleReason);
+      const res = await updateAdminUserRole(roleModalUser.id, newRole, roleReason);
+      const assignedName =
+        roles.find((r) => (r.id || r._id) === newRole || r.slug === newRole)?.name ||
+        res.user?.roleName ||
+        newRole.replace('_', ' ');
       toast.success(
         'Role Updated',
-        `User ${roleModalUser.name} role changed to ${newRole.replace('_', ' ')}.`,
+        `User ${roleModalUser.name} role changed to ${assignedName}.`,
       );
       setRoleModalUser(null);
       loadUsers();
@@ -314,8 +360,14 @@ export default function UsersPage() {
                         )}
                       </div>
                       <div className="flex items-center gap-1.5 mt-1">
-                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-casa-brand-subtle text-casa-brand uppercase tracking-wider">
-                          {u.role.replace('_', ' ')}
+                        <span
+                          className={`text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider ${
+                            u.customRole
+                              ? 'bg-purple-50 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300 border border-purple-200 dark:border-purple-800'
+                              : 'bg-casa-brand-subtle text-casa-brand'
+                          }`}
+                        >
+                          {u.customRole?.name || u.roleName || u.role.replace('_', ' ')}
                         </span>
                         <span className="text-[11px] text-casa-text-muted flex items-center gap-1">
                           <Phone className="w-2.5 h-2.5" />
@@ -327,9 +379,22 @@ export default function UsersPage() {
                       )}
                     </td>
                     <td className="px-4 py-3.5">
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-casa-brand-subtle text-casa-brand uppercase">
-                        {u.role.replace('_', ' ')}
-                      </span>
+                      <div className="flex flex-col items-start gap-0.5">
+                        <span
+                          className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase ${
+                            u.customRole
+                              ? 'bg-purple-50 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300 border border-purple-200 dark:border-purple-800'
+                              : 'bg-casa-brand-subtle text-casa-brand'
+                          }`}
+                        >
+                          {u.customRole?.name || u.roleName || u.role.replace('_', ' ')}
+                        </span>
+                        {u.customRole && (
+                          <span className="text-[9px] text-purple-600 dark:text-purple-400 font-semibold">
+                            Custom Dynamic
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="px-4 py-3.5">
                       {u.isVerifiedAgent ? (
@@ -486,9 +551,22 @@ export default function UsersPage() {
                         <div className="text-casa-text-muted font-mono">{selectedUser.email}</div>
                       )}
                     </div>
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-casa-brand-subtle text-casa-brand uppercase">
-                      {selectedUser.role.replace('_', ' ')}
-                    </span>
+                    <div className="text-right flex flex-col items-end gap-0.5">
+                      <span
+                        className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase ${
+                          selectedUser.customRole
+                            ? 'bg-purple-50 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300 border border-purple-200 dark:border-purple-800'
+                            : 'bg-casa-brand-subtle text-casa-brand'
+                        }`}
+                      >
+                        {selectedUser.customRole?.name || selectedUser.roleName || selectedUser.role.replace('_', ' ')}
+                      </span>
+                      {selectedUser.customRole && (
+                        <span className="text-[9px] font-semibold text-purple-600 dark:text-purple-400">
+                          Dynamic Custom Role
+                        </span>
+                      )}
+                    </div>
                   </div>
 
                   <div className="grid grid-cols-2 gap-2 pt-2 border-t border-casa-border-light text-[11px]">
@@ -707,20 +785,50 @@ export default function UsersPage() {
 
             <div className="space-y-3">
               <div>
-                <label className="text-[11px] font-bold text-casa-text-muted uppercase">
-                  Select New Role
+                <label className="text-[11px] font-bold text-casa-text-muted uppercase flex items-center justify-between">
+                  <span>Select New Role (Dynamic DB Roles)</span>
+                  {loadingRoles && (
+                    <span className="text-[10px] text-casa-brand flex items-center gap-1 font-normal">
+                      <RefreshCw className="w-2.5 h-2.5 animate-spin" /> Loading roles...
+                    </span>
+                  )}
                 </label>
                 <select
                   value={newRole}
-                  onChange={(e) => setNewRole(e.target.value as UserRole)}
-                  className="w-full mt-1 p-2 text-xs bg-casa-canvas border border-casa-border-light rounded-xl text-casa-text-primary focus:outline-none focus:ring-2 focus:ring-casa-brand/30"
+                  onChange={(e) => setNewRole(e.target.value)}
+                  className="w-full mt-1 p-2 text-xs bg-casa-canvas border border-casa-border-light rounded-xl text-casa-text-primary focus:outline-none focus:ring-2 focus:ring-casa-brand/30 font-medium"
                 >
-                  <option value="PURCHASER">Purchaser (Buyer)</option>
-                  <option value="PROPERTY_OWNER">Property Owner</option>
-                  <option value="AGENT">Agent (Real Estate Broker)</option>
-                  <option value="VERIFIED_AGENT">Verified Agent (CASA Badge)</option>
-                  <option value="MODERATOR">Moderator (Listing Reviewer)</option>
-                  <option value="ADMIN">Admin (Governance Operator)</option>
+                  {roles.filter((r) => !r.isSystemRole && r.isActive !== false).length > 0 && (
+                    <optgroup label="Active Custom Roles (Dynamic)">
+                      {roles
+                        .filter((r) => !r.isSystemRole && r.isActive !== false)
+                        .map((r) => (
+                          <option key={r.id || r._id} value={r.id || r._id}>
+                            {r.name} (Custom — {r.accountType || r.platformRole || 'Scoped'})
+                          </option>
+                        ))}
+                    </optgroup>
+                  )}
+                  {roles.filter((r) => r.isSystemRole && r.isActive !== false).length > 0 ? (
+                    <optgroup label="Standard System Roles">
+                      {roles
+                        .filter((r) => r.isSystemRole && r.isActive !== false)
+                        .map((r) => (
+                          <option key={r.id || r._id || r.slug} value={r.id || r._id || r.slug}>
+                            {r.name} (System — {r.platformRole === 'USER' ? (r.accountType || 'Buyer') : r.platformRole})
+                          </option>
+                        ))}
+                    </optgroup>
+                  ) : (
+                    <optgroup label="System Roles">
+                      <option value="PURCHASER">Purchaser (Buyer)</option>
+                      <option value="PROPERTY_OWNER">Property Owner</option>
+                      <option value="AGENT">Agent (Real Estate Broker)</option>
+                      <option value="VERIFIED_AGENT">Verified Agent (CASA Badge)</option>
+                      <option value="MODERATOR">Moderator (Listing Reviewer)</option>
+                      <option value="ADMIN">Admin (Governance Operator)</option>
+                    </optgroup>
+                  )}
                 </select>
               </div>
 
@@ -729,7 +837,7 @@ export default function UsersPage() {
                   Reason for Governance Audit Log
                 </label>
                 <textarea
-                  placeholder="e.g. Agent onboarding, operator permission grant..."
+                  placeholder="e.g. Dynamic custom role assignment, agent onboarding, governance permission update..."
                   value={roleReason}
                   onChange={(e) => setRoleReason(e.target.value)}
                   rows={2}

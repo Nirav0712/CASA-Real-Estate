@@ -748,8 +748,27 @@ export class EntitlementsService implements OnModuleInit {
 
     // 2. Resolve Role (Custom Role or Default System Role)
     let roleDoc: any = null;
-    if (user.customRoleId && isValidObjectId(user.customRoleId)) {
-      roleDoc = await this.roleModel.findById(user.customRoleId).lean().exec();
+    let customRoleId = user.customRoleId;
+    const userId = user._id ? user._id.toString() : user.id;
+
+    if (!customRoleId && userId && isValidObjectId(userId)) {
+      try {
+        const dbUser = await this.userModel.findById(userId).lean().exec();
+        if (dbUser) {
+          customRoleId = dbUser.customRoleId;
+          if (dbUser.grantedPermissions?.length) user.grantedPermissions = dbUser.grantedPermissions;
+          if (dbUser.deniedPermissions?.length) user.deniedPermissions = dbUser.deniedPermissions;
+          if (dbUser.bonusLimits) user.bonusLimits = dbUser.bonusLimits;
+          if (dbUser.platformRole) user.platformRole = dbUser.platformRole;
+          if (dbUser.accountType !== undefined) user.accountType = dbUser.accountType;
+        }
+      } catch (err: any) {
+        this.logger.warn(`User DB context resolution warning: ${err?.message}`);
+      }
+    }
+
+    if (customRoleId && isValidObjectId(customRoleId)) {
+      roleDoc = await this.roleModel.findById(customRoleId).lean().exec();
     }
     if (!roleDoc) {
       const slugMatch = user.platformRole === PlatformRole.ADMIN ? 'admin'

@@ -18,6 +18,7 @@ import {
   AgentVerificationDocument,
   AgentVerificationDocumentDocument,
 } from '../agents/schemas/agent-document.schema';
+import { Role, RoleDocument } from '../entitlements/schemas/role.schema';
 import { AdminUserQueryDto } from './dto/admin-user-query.dto';
 import { UpdateUserStatusDto } from './dto/update-user-status.dto';
 import { UpdateUserRoleDto } from './dto/update-user-role.dto';
@@ -252,6 +253,7 @@ export class AdminService implements OnModuleInit {
     @InjectModel(RefreshSession.name) private readonly refreshSessionModel: Model<RefreshSessionDocument>,
     @InjectModel(AgentProfile.name) private readonly agentProfileModel: Model<AgentProfileDocument>,
     @InjectModel(AgentVerificationDocument.name) private readonly agentDocumentModel: Model<AgentVerificationDocumentDocument>,
+    @InjectModel(Role.name) private readonly roleModel: Model<RoleDocument>,
     private readonly authService: AuthService,
   ) {}
 
@@ -922,6 +924,27 @@ export class AdminService implements OnModuleInit {
       this.logger.warn(`Property aggregation warning in getUsers: ${err?.message}`);
     }
 
+    const customRoleIds = users
+      .map((u: any) => u.customRoleId)
+      .filter((id: any) => id && isValidObjectId(id));
+
+    const customRoleMap = new Map<string, any>();
+    if (customRoleIds.length > 0) {
+      try {
+        const foundRoles = await this.roleModel.find({ _id: { $in: customRoleIds } }).lean();
+        foundRoles.forEach((r: any) => {
+          customRoleMap.set(r._id.toString(), {
+            id: r._id.toString(),
+            name: r.name,
+            slug: r.slug,
+            isSystemRole: r.isSystemRole,
+          });
+        });
+      } catch (err: any) {
+        this.logger.warn(`Custom role lookup note in getUsers: ${err?.message}`);
+      }
+    }
+
     const data = users.map((u: any) => {
       const counts = countMap.get(u._id.toString()) || countMap.get(u.normalizedMobile) || { total: 0, published: 0 };
       const norm = normalizeUserRoleModel({
@@ -930,6 +953,8 @@ export class AdminService implements OnModuleInit {
         accountType: u.accountType,
         isVerifiedAgent: u.isVerifiedAgent,
       });
+      const customRole = u.customRoleId ? customRoleMap.get(u.customRoleId.toString()) || null : null;
+
       return {
         id: u._id.toString(),
         _id: u._id.toString(),
@@ -940,6 +965,9 @@ export class AdminService implements OnModuleInit {
         platformRole: norm.platformRole,
         accountType: norm.accountType,
         role: norm.role,
+        customRoleId: u.customRoleId || null,
+        customRole,
+        roleName: customRole ? customRole.name : norm.role,
         status: u.status || 'ACTIVE',
         isVerifiedAgent: norm.isVerifiedAgent,
         agencyName: u.agencyName,
@@ -1014,6 +1042,15 @@ export class AdminService implements OnModuleInit {
       isVerifiedAgent: user.isVerifiedAgent,
     });
 
+    let customRoleDoc: any = null;
+    if (user.customRoleId && isValidObjectId(user.customRoleId)) {
+      try {
+        customRoleDoc = await this.roleModel.findById(user.customRoleId).lean();
+      } catch (err: any) {
+        this.logger.warn(`Custom role lookup error for user ${userIdStr}: ${err?.message}`);
+      }
+    }
+
     return {
       id: userIdStr,
       _id: userIdStr,
@@ -1024,6 +1061,17 @@ export class AdminService implements OnModuleInit {
       platformRole: norm.platformRole,
       accountType: norm.accountType,
       role: norm.role,
+      customRoleId: user.customRoleId || null,
+      customRole: customRoleDoc ? {
+        id: customRoleDoc._id.toString(),
+        name: customRoleDoc.name,
+        slug: customRoleDoc.slug,
+        isSystemRole: customRoleDoc.isSystemRole,
+        permissions: customRoleDoc.permissions,
+        dataScope: customRoleDoc.dataScope,
+        dashboardConfig: customRoleDoc.dashboardConfig,
+      } : null,
+      roleName: customRoleDoc ? customRoleDoc.name : norm.role,
       status: user.status || 'ACTIVE',
       isVerifiedAgent: norm.isVerifiedAgent,
       agencyName: user.agencyName,
@@ -1138,27 +1186,106 @@ export class AdminService implements OnModuleInit {
     }
 
     // Security Rule 2: Moderator cannot change roles
-    if (actor?.role === UserRole.MODERATOR) {
+    if (actor?.role === UserRole.MODERATOR || actor?.platformRole === PlatformRole.MODERATOR) {
       throw new ForbiddenException('Moderators do not possess authority to modify user roles.');
     }
 
-    // Security Rule 3: Only SUPER_ADMIN can promote to SUPER_ADMIN or modify a SUPER_ADMIN
-    if (dto.role === UserRole.SUPER_ADMIN && actor?.role !== UserRole.SUPER_ADMIN) {
-      throw new ForbiddenException('Only a Super Administrator can promote a user to Super Administrator.');
-    }
-    if (user.role === UserRole.SUPER_ADMIN && actor?.role !== UserRole.SUPER_ADMIN) {
+    const isActorSuperAdmin =
+      actor?.role === UserRole.SUPER_ADMIN || actor?.platformRole === PlatformRole.SUPER_ADMIN;
+
+    // Security Rule 3: Target user is SUPER_ADMIN protection
+    if (
+      (user.role === UserRole.SUPER_ADMIN || user.platformRole === PlatformRole.SUPER_ADMIN) &&
+      !isActorSuperAdmin
+    ) {
       throw new ForbiddenException('Only a Super Administrator can modify the role of a Super Administrator.');
     }
 
-    const previousRole = user.role;
-    const norm = normalizeUserRoleModel({ role: dto.role });
-    user.platformRole = norm.platformRole;
-    user.accountType = norm.accountType;
-    user.role = norm.role;
-
-    if (norm.isVerifiedAgent) {
-      user.isVerifiedAgent = true;
+    const targetRoleIdentifier = dto.roleId || dto.role;
+    if (!targetRoleIdentifier) {
+      throw new BadRequestException('A role identifier or roleId must be provided.');
     }
+
+    // Resolve Target Role from DB (custom or system role) or fallback to static system role
+    let roleDoc: RoleDocument | null = null;
+    if (isValidObjectId(targetRoleIdentifier)) {
+      roleDoc = await this.roleModel.findById(targetRoleIdentifier);
+    }
+    if (!roleDoc) {
+      const slugCandidate = targetRoleIdentifier.toLowerCase().replace(/_/g, '-');
+      roleDoc = await this.roleModel.findOne({
+        $or: [
+          { slug: slugCandidate },
+          { slug: targetRoleIdentifier.toLowerCase() },
+          { name: targetRoleIdentifier },
+        ],
+      });
+    }
+
+    const previousRole = user.role;
+    const previousCustomRoleId = user.customRoleId;
+    let newPlatformRole: PlatformRole;
+    let newAccountType: AccountType | null;
+    let newRole: UserRole;
+    let assignedRoleName: string;
+
+    if (roleDoc) {
+      if (roleDoc.isActive === false) {
+        throw new BadRequestException(`Cannot assign inactive role "${roleDoc.name}".`);
+      }
+
+      // Elevation check: assigning SUPER_ADMIN role requires SUPER_ADMIN actor
+      if (
+        (roleDoc.platformRole === PlatformRole.SUPER_ADMIN || roleDoc.slug === 'super-admin') &&
+        !isActorSuperAdmin
+      ) {
+        throw new ForbiddenException('Only a Super Administrator can assign Super Administrator roles.');
+      }
+
+      if (roleDoc.isSystemRole) {
+        user.customRoleId = null;
+        newPlatformRole = roleDoc.platformRole;
+        newAccountType = roleDoc.accountType;
+        const norm = normalizeUserRoleModel({
+          platformRole: roleDoc.platformRole,
+          accountType: roleDoc.accountType,
+          role: roleDoc.slug.toUpperCase().replace(/-/g, '_'),
+        });
+        newRole = norm.role;
+        if (roleDoc.slug === 'verified-agent' || norm.isVerifiedAgent) {
+          user.isVerifiedAgent = true;
+        }
+      } else {
+        // Dynamic Custom Role
+        user.customRoleId = roleDoc._id.toString();
+        newPlatformRole = roleDoc.platformRole || PlatformRole.USER;
+        newAccountType = roleDoc.accountType || null;
+        const norm = normalizeUserRoleModel({
+          platformRole: newPlatformRole,
+          accountType: newAccountType,
+        });
+        newRole = norm.role;
+      }
+      assignedRoleName = roleDoc.name;
+    } else {
+      // Direct enum string fallback
+      const norm = normalizeUserRoleModel({ role: targetRoleIdentifier });
+      if (norm.platformRole === PlatformRole.SUPER_ADMIN && !isActorSuperAdmin) {
+        throw new ForbiddenException('Only a Super Administrator can promote a user to Super Administrator.');
+      }
+      user.customRoleId = null;
+      newPlatformRole = norm.platformRole;
+      newAccountType = norm.accountType;
+      newRole = norm.role;
+      if (norm.isVerifiedAgent || targetRoleIdentifier === 'VERIFIED_AGENT') {
+        user.isVerifiedAgent = true;
+      }
+      assignedRoleName = targetRoleIdentifier;
+    }
+
+    user.platformRole = newPlatformRole;
+    user.accountType = newAccountType;
+    user.role = newRole;
 
     await user.save();
 
@@ -1172,21 +1299,37 @@ export class AdminService implements OnModuleInit {
       targetUserName: user.name,
       targetEntity: 'USER',
       targetEntityId: user._id.toString(),
-      previousValue: { role: previousRole },
-      newValue: { role: dto.role, platformRole: norm.platformRole, accountType: norm.accountType },
-      reason: dto.reason || `User role changed from ${previousRole} to ${dto.role}`,
+      previousValue: { role: previousRole, customRoleId: previousCustomRoleId },
+      newValue: {
+        role: user.role,
+        platformRole: user.platformRole,
+        accountType: user.accountType,
+        customRoleId: user.customRoleId,
+        roleName: assignedRoleName,
+      },
+      reason: dto.reason || `User role updated to ${assignedRoleName}`,
     });
 
     return {
       success: true,
-      message: `User role successfully updated to ${dto.role}.`,
+      message: `User role successfully updated to ${assignedRoleName}.`,
       user: {
         id: user._id.toString(),
         name: user.name,
         mobile: user.mobile,
-        platformRole: norm.platformRole,
-        accountType: norm.accountType,
+        platformRole: user.platformRole,
+        accountType: user.accountType,
         role: user.role,
+        customRoleId: user.customRoleId || null,
+        customRole: roleDoc
+          ? {
+              id: roleDoc._id.toString(),
+              name: roleDoc.name,
+              slug: roleDoc.slug,
+              isSystemRole: roleDoc.isSystemRole,
+            }
+          : null,
+        roleName: assignedRoleName,
         status: user.status,
         isVerifiedAgent: user.isVerifiedAgent,
       },

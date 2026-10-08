@@ -1,5 +1,5 @@
 import { fetchAdminApi } from '@/lib/api-client';
-import { AdminDashboardStats, AdminPropertyItem } from '@/types';
+import { AdminDashboardStats, AdminPropertyItem, RoleRecord } from '@/types';
 
 export async function getAdminDashboardStats(): Promise<{
   stats: AdminDashboardStats;
@@ -293,6 +293,14 @@ export async function updateAdminUserStatus(
   return result.data || { success: true, message: 'User status updated successfully' };
 }
 
+export async function getAdminAssignableRoles(): Promise<RoleRecord[]> {
+  const result = await fetchAdminApi<RoleRecord[]>('/admin/entitlements/roles');
+  if (result.isBackendAvailable && result.data && Array.isArray(result.data)) {
+    return result.data;
+  }
+  return [];
+}
+
 export async function updateAdminUserRole(
   id: string,
   role: string,
@@ -302,7 +310,7 @@ export async function updateAdminUserRole(
     `/admin/users/${encodeURIComponent(id)}/role`,
     {
       method: 'PATCH',
-      body: JSON.stringify({ role, reason }),
+      body: JSON.stringify({ role, roleId: role, reason }),
     },
   );
 

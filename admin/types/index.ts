@@ -172,7 +172,20 @@ export interface UserRecord {
   mobile: string;
   normalizedMobile: string;
   email?: string;
+  platformRole?: PlatformRole;
+  accountType?: AccountType | null;
   role: UserRole;
+  customRoleId?: string | null;
+  customRole?: {
+    id: string;
+    name: string;
+    slug: string;
+    isSystemRole?: boolean;
+    permissions?: string[];
+    dataScope?: string;
+    dashboardConfig?: Record<string, boolean>;
+  } | null;
+  roleName?: string;
   status: AccountStatus;
   isVerifiedAgent: boolean;
   agencyName?: string;

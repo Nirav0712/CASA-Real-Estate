@@ -8,10 +8,8 @@ import { User, UserSchema } from '../auth/schemas/user.schema';
 import { AuditLog, AuditLogSchema } from './schemas/audit-log.schema';
 import { RefreshSession, RefreshSessionSchema } from '../auth/schemas/refresh-session.schema';
 import { AgentProfile, AgentProfileSchema } from '../agents/schemas/agent-profile.schema';
-import {
-  AgentVerificationDocument,
-  AgentVerificationDocumentSchema,
-} from '../agents/schemas/agent-document.schema';
+import { AgentVerificationDocument, AgentVerificationDocumentSchema } from '../agents/schemas/agent-document.schema';
+import { Role, RoleSchema } from '../entitlements/schemas/role.schema';
 import { AuthModule } from '../auth/auth.module';
 
 @Module({
@@ -24,6 +22,7 @@ import { AuthModule } from '../auth/auth.module';
       { name: RefreshSession.name, schema: RefreshSessionSchema },
       { name: AgentProfile.name, schema: AgentProfileSchema },
       { name: AgentVerificationDocument.name, schema: AgentVerificationDocumentSchema },
+      { name: Role.name, schema: RoleSchema },
     ]),
     AuthModule,
   ],

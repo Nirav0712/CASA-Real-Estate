@@ -16,6 +16,7 @@ import { Category } from '../properties/schemas/category.schema';
 import { User } from '../auth/schemas/user.schema';
 import { AuditLog } from './schemas/audit-log.schema';
 import { RefreshSession } from '../auth/schemas/refresh-session.schema';
+import { Role } from '../entitlements/schemas/role.schema';
 import { UserRole, AccountStatus, PlatformRole, AccountType } from '../auth/enums/auth.enums';
 import { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
 
@@ -28,6 +29,7 @@ describe('AdminService Moderation & User Governance (Phase 08)', () => {
   let mockUserModel: any;
   let mockAuditLogModel: any;
   let mockRefreshSessionModel: any;
+  let mockRoleModel: any;
   let mockAuthService: any;
 
   const mockAdminUser: AuthenticatedUser = {
@@ -188,6 +190,14 @@ describe('AdminService Moderation & User Governance (Phase 08)', () => {
       })),
     };
 
+    mockRoleModel = {
+      findById: jest.fn(),
+      findOne: jest.fn(),
+      find: jest.fn().mockReturnValue({
+        lean: jest.fn().mockResolvedValue([]),
+      }),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         AdminService,
@@ -218,6 +228,10 @@ describe('AdminService Moderation & User Governance (Phase 08)', () => {
         {
           provide: getModelToken('AgentVerificationDocument'),
           useValue: mockAgentDocumentModel,
+        },
+        {
+          provide: getModelToken(Role.name),
+          useValue: mockRoleModel,
         },
         {
           provide: AuthService,
@@ -432,6 +446,296 @@ describe('AdminService Moderation & User Governance (Phase 08)', () => {
           actorUserId: mockSuperAdminUser.id,
         }),
       );
+    });
+
+    it('should assign a dynamic custom role by ObjectId and persist to MongoDB', async () => {
+      const customRoleDoc = {
+        _id: '67a21f77bcf86cd799439088',
+        name: 'QA Test Agent',
+        slug: 'qa-test-agent',
+        platformRole: PlatformRole.USER,
+        accountType: AccountType.AGENT,
+        isSystemRole: false,
+        isActive: true,
+        permissions: ['property:view', 'property:create', 'leads:view'],
+        dataScope: 'OWN',
+      };
+      mockRoleModel.findById.mockResolvedValue(customRoleDoc);
+
+      const targetUser = {
+        _id: '507f1f77bcf86cd799439099',
+        name: 'Agent 1',
+        mobile: '9111222333',
+        normalizedMobile: '+919111222333',
+        role: UserRole.BUYER,
+        platformRole: PlatformRole.USER,
+        accountType: AccountType.BUYER,
+        customRoleId: null,
+        status: AccountStatus.ACTIVE,
+        isVerifiedAgent: false,
+        save: jest.fn().mockResolvedValue(true),
+      };
+      mockUserModel.findOne.mockResolvedValue(targetUser);
+
+      const res = await service.updateUserRole(
+        '507f1f77bcf86cd799439099',
+        { roleId: '67a21f77bcf86cd799439088', reason: 'Assigned QA Test Agent role' },
+        mockSuperAdminUser,
+      );
+
+      expect(res.success).toBe(true);
+      expect(targetUser.customRoleId).toBe('67a21f77bcf86cd799439088');
+      expect(targetUser.platformRole).toBe(PlatformRole.USER);
+      expect(targetUser.accountType).toBe(AccountType.AGENT);
+      expect(targetUser.role).toBe(UserRole.AGENT);
+      expect(targetUser.save).toHaveBeenCalled();
+      expect(res.user?.customRole?.name).toBe('QA Test Agent');
+      expect(res.user?.roleName).toBe('QA Test Agent');
+      expect(mockAuditLogModel.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'USER_ROLE_CHANGED',
+          newValue: expect.objectContaining({
+            customRoleId: '67a21f77bcf86cd799439088',
+            roleName: 'QA Test Agent',
+          }),
+        }),
+      );
+    });
+
+    it('should assign a dynamic custom role by slug', async () => {
+      const customRoleDoc = {
+        _id: '67a21f77bcf86cd799439088',
+        name: 'Regional Agency Team Lead',
+        slug: 'regional-team-lead',
+        platformRole: PlatformRole.USER,
+        accountType: AccountType.AGENT,
+        isSystemRole: false,
+        isActive: true,
+        permissions: ['property:view', 'leads:view', 'leads:assign'],
+        dataScope: 'TEAM',
+      };
+      mockRoleModel.findById.mockResolvedValue(null);
+      mockRoleModel.findOne.mockResolvedValue(customRoleDoc);
+
+      const targetUser = {
+        _id: '507f1f77bcf86cd799439099',
+        name: 'Agent 2',
+        mobile: '9111222334',
+        normalizedMobile: '+919111222334',
+        role: UserRole.AGENT,
+        platformRole: PlatformRole.USER,
+        accountType: AccountType.AGENT,
+        customRoleId: null,
+        status: AccountStatus.ACTIVE,
+        save: jest.fn().mockResolvedValue(true),
+      };
+      mockUserModel.findOne.mockResolvedValue(targetUser);
+
+      const res = await service.updateUserRole(
+        '507f1f77bcf86cd799439099',
+        { role: 'regional-team-lead', reason: 'Team lead promotion' },
+        mockAdminUser,
+      );
+
+      expect(res.success).toBe(true);
+      expect(targetUser.customRoleId).toBe('67a21f77bcf86cd799439088');
+      expect(res.user?.customRole?.name).toBe('Regional Agency Team Lead');
+    });
+
+    it('should reject assigning an inactive custom role', async () => {
+      const inactiveRoleDoc = {
+        _id: '67a21f77bcf86cd799439089',
+        name: 'Archived Agent Role',
+        slug: 'archived-agent-role',
+        isActive: false,
+      };
+      mockRoleModel.findById.mockResolvedValue(inactiveRoleDoc);
+
+      const targetUser = {
+        _id: '507f1f77bcf86cd799439099',
+        name: 'Agent 3',
+        save: jest.fn(),
+      };
+      mockUserModel.findOne.mockResolvedValue(targetUser);
+
+      await expect(
+        service.updateUserRole(
+          '507f1f77bcf86cd799439099',
+          { roleId: '67a21f77bcf86cd799439089' },
+          mockAdminUser,
+        ),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should reject unauthorized privilege escalation when non-super-admin assigns SUPER_ADMIN role', async () => {
+      const superAdminRoleDoc = {
+        _id: '67a21f77bcf86cd799439090',
+        name: 'Super Administrator',
+        slug: 'super-admin',
+        platformRole: PlatformRole.SUPER_ADMIN,
+        isSystemRole: true,
+        isActive: true,
+      };
+      mockRoleModel.findById.mockResolvedValue(superAdminRoleDoc);
+
+      const targetUser = {
+        _id: '507f1f77bcf86cd799439099',
+        name: 'Target User',
+        role: UserRole.AGENT,
+        platformRole: PlatformRole.USER,
+        save: jest.fn(),
+      };
+      mockUserModel.findOne.mockResolvedValue(targetUser);
+
+      await expect(
+        service.updateUserRole(
+          '507f1f77bcf86cd799439099',
+          { roleId: '67a21f77bcf86cd799439090' },
+          mockAdminUser, // Non-super-admin actor
+        ),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('should reject modifying a SUPER_ADMIN user by non-super-admin actor', async () => {
+      const targetSuperAdmin = {
+        _id: '507f1f77bcf86cd799439099',
+        name: 'Existing Super Admin',
+        role: UserRole.SUPER_ADMIN,
+        platformRole: PlatformRole.SUPER_ADMIN,
+        save: jest.fn(),
+      };
+      mockUserModel.findOne.mockResolvedValue(targetSuperAdmin);
+
+      await expect(
+        service.updateUserRole(
+          '507f1f77bcf86cd799439099',
+          { role: 'AGENT' },
+          mockAdminUser,
+        ),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('should reject user attempting to modify own role', async () => {
+      const selfUser = {
+        _id: 'user-admin-001',
+        normalizedMobile: '+919876543210',
+        role: UserRole.ADMIN,
+      };
+      mockUserModel.findOne.mockResolvedValue(selfUser);
+
+      await expect(
+        service.updateUserRole(
+          'user-admin-001',
+          { role: 'AGENT' },
+          mockAdminUser,
+        ),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should reject MODERATOR attempting to modify roles', async () => {
+      const mockModUser: AuthenticatedUser = {
+        id: 'user-mod-001',
+        name: 'Moderator User',
+        mobile: '9876543211',
+        normalizedMobile: '+919876543211',
+        role: UserRole.MODERATOR,
+        platformRole: PlatformRole.MODERATOR,
+        accountType: null,
+        status: AccountStatus.ACTIVE,
+        isVerifiedAgent: false,
+      };
+
+      const targetUser = {
+        _id: '507f1f77bcf86cd799439099',
+        name: 'Target User',
+        role: UserRole.BUYER,
+      };
+      mockUserModel.findOne.mockResolvedValue(targetUser);
+
+      await expect(
+        service.updateUserRole(
+          '507f1f77bcf86cd799439099',
+          { role: 'AGENT' },
+          mockModUser,
+        ),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('should assign a system role and clear customRoleId', async () => {
+      const systemAgentDoc = {
+        _id: '67a21f77bcf86cd799439010',
+        name: 'Licensed Real Estate Agent',
+        slug: 'agent',
+        platformRole: PlatformRole.USER,
+        accountType: AccountType.AGENT,
+        isSystemRole: true,
+        isActive: true,
+      };
+      mockRoleModel.findById.mockResolvedValue(systemAgentDoc);
+
+      const targetUser = {
+        _id: '507f1f77bcf86cd799439099',
+        name: 'Agent 4',
+        mobile: '9111222335',
+        normalizedMobile: '+919111222335',
+        role: UserRole.BUYER,
+        platformRole: PlatformRole.USER,
+        accountType: AccountType.BUYER,
+        customRoleId: 'previous-custom-role-id',
+        status: AccountStatus.ACTIVE,
+        isVerifiedAgent: false,
+        save: jest.fn().mockResolvedValue(true),
+      };
+      mockUserModel.findOne.mockResolvedValue(targetUser);
+
+      const res = await service.updateUserRole(
+        '507f1f77bcf86cd799439099',
+        { roleId: '67a21f77bcf86cd799439010' },
+        mockSuperAdminUser,
+      );
+
+      expect(res.success).toBe(true);
+      expect(targetUser.customRoleId).toBeNull();
+      expect(targetUser.platformRole).toBe(PlatformRole.USER);
+      expect(targetUser.accountType).toBe(AccountType.AGENT);
+      expect(targetUser.role).toBe(UserRole.AGENT);
+    });
+
+    it('should return customRole details when calling getUserById', async () => {
+      const customRoleDoc = {
+        _id: '67a21f77bcf86cd799439088',
+        name: 'QA Test Agent',
+        slug: 'qa-test-agent',
+        isSystemRole: false,
+        permissions: ['property:view', 'property:create'],
+        dataScope: 'OWN',
+        dashboardConfig: { overview: true, properties: true, leads: true },
+      };
+      mockRoleModel.findById.mockReturnValue({
+        lean: jest.fn().mockResolvedValue(customRoleDoc),
+      });
+
+      const dbUser = {
+        _id: '507f1f77bcf86cd799439099',
+        name: 'Agent 1',
+        mobile: '9111222333',
+        normalizedMobile: '+919111222333',
+        role: UserRole.AGENT,
+        platformRole: PlatformRole.USER,
+        accountType: AccountType.AGENT,
+        customRoleId: '67a21f77bcf86cd799439088',
+        status: AccountStatus.ACTIVE,
+        isVerifiedAgent: false,
+      };
+      mockUserModel.findOne.mockReturnValue({
+        lean: jest.fn().mockResolvedValue(dbUser),
+      });
+
+      const userDetail = await service.getUserById('507f1f77bcf86cd799439099');
+      expect(userDetail.customRoleId).toBe('67a21f77bcf86cd799439088');
+      expect(userDetail.customRole).toBeDefined();
+      expect(userDetail.customRole?.name).toBe('QA Test Agent');
+      expect(userDetail.roleName).toBe('QA Test Agent');
     });
 
     it('should grant and revoke CASA Verified Agent badge with persistence', async () => {
