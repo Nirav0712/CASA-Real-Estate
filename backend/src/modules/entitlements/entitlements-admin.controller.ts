@@ -120,6 +120,12 @@ export class EntitlementsAdminController {
   // ------------------------------------------
   // USER ENTITLEMENT CONTROL & OVERRIDES
   // ------------------------------------------
+  @Get('usage')
+  @ApiOperation({ summary: 'List entitlement usage metrics and quotas across users' })
+  getUsageMetrics(@Query() query: { search?: string; page?: number; limit?: number }): Promise<any> {
+    return this.entitlementsService.getUsageMetrics(query);
+  }
+
   @Get('users/:id/entitlements')
   @ApiOperation({ summary: 'Get comprehensive user entitlements, package, and usage' })
   getUserEntitlementDetails(@Param('id') id: string): Promise<any> {

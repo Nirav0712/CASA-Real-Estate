@@ -174,7 +174,7 @@ async function runMatrix() {
     const buyerEntitlements = myEntitlementsRes.data?.entitlements || myEntitlementsRes.data?.data?.entitlements || myEntitlementsRes.data;
     assert(Boolean(buyerEntitlements?.limits?.propertyViews !== undefined), `Buyer property views limit is defined (got: ${buyerEntitlements?.limits?.propertyViews})`);
 
-    // 6. Test User Overrides & Bonus Credits
+    // 6. Test User Overrides & Bonus Credits & Usage Metrics
     console.log('\n--- 6. Testing Admin User Overrides & Bonus Credits ---');
     const buyerId = buyerUser._id || buyerUser.id;
     const bonusRes = await request('POST', `/admin/entitlements/users/${buyerId}/bonus-credits`, {
@@ -186,6 +186,16 @@ async function runMatrix() {
     const updatedEntitlementsRes = await request('GET', '/entitlements/me', null, buyerHeaders);
     const updatedUser = updatedEntitlementsRes.data?.user || updatedEntitlementsRes.data?.data?.user;
     assert(updatedUser?.bonusLimits?.propertyViewsBonus >= 25, `Buyer bonus views updated (got: ${updatedUser?.bonusLimits?.propertyViewsBonus})`);
+
+    // Verify Admin Entitlement Usage Monitor Endpoint
+    const usageRes = await request('GET', '/admin/entitlements/usage', null, adminHeaders);
+    assert(usageRes.status === 200, 'Admin /admin/entitlements/usage returns 200');
+    const usagePayload = usageRes.data?.data || usageRes.data;
+    const usageRecords = Array.isArray(usagePayload) ? usagePayload : (usagePayload?.data || []);
+    assert(Array.isArray(usageRecords) && usageRecords.length > 0, `Usage records returned successfully (count: ${usageRecords.length})`);
+    const buyerUsage = usageRecords.find((r) => r.userId === buyerId);
+    assert(Boolean(buyerUsage), 'Buyer usage record is present in usage monitor telemetry');
+    assert(buyerUsage?.propertyViews?.bonus >= 25, `Buyer bonus views reflected in usage monitor (got: ${buyerUsage?.propertyViews?.bonus})`);
 
     // 7. Contact Redaction & View Limits
     console.log('\n--- 7. Testing Property Details Contact Redaction & View Limits ---');

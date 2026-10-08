@@ -927,6 +927,107 @@ export class EntitlementsService implements OnModuleInit {
   // 7. USER DETAIL OVERRIDES & USAGE METRICS
   // ==========================================
 
+  async getUsageMetrics(query: { search?: string; page?: number; limit?: number }): Promise<{
+    data: any[];
+    pagination: { total: number; page: number; limit: number; totalPages: number };
+  }> {
+    const page = Math.max(1, Number(query.page) || 1);
+    const limit = Math.max(1, Math.min(100, Number(query.limit) || 20));
+    const skip = (page - 1) * limit;
+
+    const filter: any = {};
+    if (query.search && query.search.trim()) {
+      const searchRegex = new RegExp(query.search.trim(), 'i');
+      filter.$or = [
+        { name: searchRegex },
+        { mobile: searchRegex },
+        { normalizedMobile: searchRegex },
+        { email: searchRegex },
+      ];
+    }
+
+    const [users, total] = await Promise.all([
+      this.userModel.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit).lean().exec(),
+      this.userModel.countDocuments(filter),
+    ]);
+
+    const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+
+    const data = await Promise.all(
+      users.map(async (user) => {
+        const userId = user._id.toString();
+        const entitlements = await this.resolveUserEntitlements(user);
+
+        // Fetch view count for this user in current month
+        const [viewsUsed, lastView] = await Promise.all([
+          this.propertyViewModel.countDocuments({ userId, viewedAt: { $gte: monthStart } }),
+          this.propertyViewModel.findOne({ userId }).sort({ viewedAt: -1 }).lean().exec(),
+        ]);
+
+        const limits: any = entitlements.limits || {};
+        const bonusLimits: any = user.bonusLimits || {};
+
+        const viewsLimit = limits.propertyViews ?? 10;
+        const viewsBonus = bonusLimits.propertyViewsBonus || 0;
+        const totalViewsLimit = viewsLimit === -1 ? -1 : viewsLimit + viewsBonus;
+        const viewsRemaining = totalViewsLimit === -1 ? -1 : Math.max(0, totalViewsLimit - viewsUsed);
+
+        const listingsLimit = limits.propertyListings ?? 0;
+        const listingsBonus = bonusLimits.propertyListingsBonus || 0;
+        const totalListingsLimit = listingsLimit === -1 ? -1 : listingsLimit + listingsBonus;
+
+        const leadsLimit = limits.monthlyLeads ?? 0;
+        const leadsBonus = bonusLimits.leadsBonus || 0;
+        const totalLeadsLimit = leadsLimit === -1 ? -1 : leadsLimit + leadsBonus;
+
+        return {
+          userId,
+          userName: user.name || 'User',
+          userMobile: user.mobile || user.normalizedMobile || '',
+          userEmail: user.email || '',
+          role: user.role || user.platformRole || 'USER',
+          accountType: user.accountType || undefined,
+          package: entitlements.package
+            ? {
+                id: entitlements.package.id,
+                name: entitlements.package.name,
+                billingPeriod: entitlements.package.billingPeriod || 'MONTHLY',
+              }
+            : undefined,
+          propertyViews: {
+            used: viewsUsed,
+            limit: viewsLimit,
+            bonus: viewsBonus,
+            remaining: viewsRemaining,
+          },
+          propertyListings: {
+            used: 0,
+            limit: listingsLimit,
+            bonus: listingsBonus,
+            remaining: totalListingsLimit === -1 ? -1 : Math.max(0, totalListingsLimit - 0),
+          },
+          leads: {
+            used: 0,
+            limit: leadsLimit,
+            bonus: leadsBonus,
+            remaining: totalLeadsLimit === -1 ? -1 : Math.max(0, totalLeadsLimit - 0),
+          },
+          lastViewedAt: lastView?.viewedAt ? new Date(lastView.viewedAt).toISOString() : undefined,
+        };
+      }),
+    );
+
+    return {
+      data,
+      pagination: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit) || 1,
+      },
+    };
+  }
+
   async getUserEntitlementDetails(userId: string) {
     const user = await this.userModel.findById(userId).lean().exec();
     if (!user) {
