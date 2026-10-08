@@ -1,11 +1,13 @@
-import { UserRole, AccountType, AccountStatus } from '../enums/auth.enums';
+import { PlatformRole, AccountType, AccountStatus, UserRole } from '../enums/auth.enums';
 
 export interface JwtAccessPayload {
   sub: string; // User ID
+  userId?: string; // User ID alias
   mobile: string;
   normalizedMobile: string;
-  role: UserRole;
-  accountType?: AccountType;
+  platformRole: PlatformRole;
+  accountType: AccountType | null;
+  role?: UserRole; // Compatibility alias
   permissions?: string[];
   status: AccountStatus;
   isVerifiedAgent: boolean;
@@ -27,8 +29,9 @@ export interface AuthenticatedUser {
   mobile: string;
   normalizedMobile: string;
   email?: string;
-  role: UserRole;
-  accountType?: AccountType;
+  platformRole: PlatformRole;
+  accountType: AccountType | null;
+  role: UserRole; // Compatibility alias
   permissions?: string[];
   status: AccountStatus;
   isVerifiedAgent: boolean;
@@ -51,3 +54,4 @@ export interface AuthResponseDto {
     tokenType: string;
   };
 }
+

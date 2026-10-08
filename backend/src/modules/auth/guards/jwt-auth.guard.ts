@@ -9,7 +9,7 @@ import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
 import { JwtAccessPayload, AuthenticatedUser } from '../interfaces/jwt-payload.interface';
-import { AccountStatus } from '../enums/auth.enums';
+import { AccountStatus, normalizeUserRoleModel } from '../enums/auth.enums';
 
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
@@ -50,16 +50,24 @@ export class JwtAuthGuard implements CanActivate {
         throw new UnauthorizedException('Your account is deactivated.');
       }
 
+      const norm = normalizeUserRoleModel({
+        role: payload.role,
+        platformRole: payload.platformRole,
+        accountType: payload.accountType,
+        isVerifiedAgent: payload.isVerifiedAgent,
+      });
+
       const authenticatedUser: AuthenticatedUser = {
-        id: payload.sub,
+        id: payload.userId || payload.sub,
         name: '', // Populated by service when required
         mobile: payload.mobile,
         normalizedMobile: payload.normalizedMobile,
-        role: payload.role,
-        accountType: payload.accountType,
+        platformRole: norm.platformRole,
+        accountType: norm.accountType,
+        role: norm.role,
         permissions: payload.permissions || [],
         status: payload.status,
-        isVerifiedAgent: payload.isVerifiedAgent,
+        isVerifiedAgent: norm.isVerifiedAgent,
       };
 
       request.user = authenticatedUser;

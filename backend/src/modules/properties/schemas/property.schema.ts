@@ -371,7 +371,7 @@ export class Property {
 
 export const PropertySchema = SchemaFactory.createForClass(Property);
 
-// Index compound definitions for optimal query performance
+PropertySchema.index({ createdAt: -1 });
 PropertySchema.index({ status: 1, isPublished: 1 });
 PropertySchema.index({ category: 1, status: 1 });
 PropertySchema.index({ 'location.city': 1, status: 1 });

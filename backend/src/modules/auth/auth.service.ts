@@ -4,6 +4,7 @@ import {
   UnauthorizedException,
   ForbiddenException,
   Logger,
+  OnModuleInit,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
@@ -16,7 +17,14 @@ import { RefreshSession, RefreshSessionDocument } from './schemas/refresh-sessio
 import { AgentProfile, AgentProfileDocument } from '../agents/schemas/agent-profile.schema';
 import { RequestOtpDto } from './dto/request-otp.dto';
 import { VerifyOtpDto } from './dto/verify-otp.dto';
-import { UserRole, AccountType, AccountStatus, OtpStatus } from './enums/auth.enums';
+import {
+  PlatformRole,
+  AccountType,
+  UserRole,
+  AccountStatus,
+  OtpStatus,
+  normalizeUserRoleModel,
+} from './enums/auth.enums';
 import { MockOtpProvider } from './providers/mock-otp.provider';
 import { Msg91OtpProvider } from './providers/msg91-otp.provider';
 import {
@@ -33,8 +41,9 @@ interface InMemoryUser {
   normalizedMobile: string;
   email?: string;
   agencyName?: string;
+  platformRole: PlatformRole;
+  accountType: AccountType | null;
   role: UserRole;
-  accountType?: AccountType;
   permissions?: string[];
   status: AccountStatus;
   isVerifiedAgent: boolean;
@@ -75,7 +84,7 @@ interface InMemoryRefreshSession {
 }
 
 @Injectable()
-export class AuthService {
+export class AuthService implements OnModuleInit {
   private readonly logger = new Logger(AuthService.name);
 
   // In-Memory resilient state for offline/fallback operation
@@ -100,6 +109,114 @@ export class AuthService {
     this.seedDefaultUsers();
   }
 
+  async onModuleInit() {
+    if (this.isDbConnected()) {
+      try {
+        // Safe database normalization migration for existing records
+        // 1. Normalize SUPER_ADMIN: platformRole = SUPER_ADMIN, accountType = null
+        await this.userModel.updateMany(
+          {
+            $or: [
+              { role: UserRole.SUPER_ADMIN },
+              { role: 'SUPER_ADMIN' },
+              { platformRole: PlatformRole.SUPER_ADMIN },
+              { normalizedMobile: { $in: ['+919925843599', '+919876543210', '+917359237870'] } },
+            ],
+          },
+          {
+            $set: {
+              platformRole: PlatformRole.SUPER_ADMIN,
+              accountType: null,
+              role: UserRole.SUPER_ADMIN,
+              permissions: ['*'],
+            },
+          },
+        );
+
+        // 2. Normalize ADMIN: platformRole = ADMIN, accountType = null
+        await this.userModel.updateMany(
+          {
+            $or: [{ role: UserRole.ADMIN }, { role: 'ADMIN' }, { platformRole: PlatformRole.ADMIN }],
+            normalizedMobile: { $nin: ['+919925843599', '+919876543210', '+917359237870'] },
+          },
+          {
+            $set: {
+              platformRole: PlatformRole.ADMIN,
+              accountType: null,
+              role: UserRole.ADMIN,
+            },
+          },
+        );
+
+        // 3. Normalize MODERATOR: platformRole = MODERATOR, accountType = null
+        await this.userModel.updateMany(
+          {
+            $or: [
+              { role: UserRole.MODERATOR },
+              { role: 'MODERATOR' },
+              { platformRole: PlatformRole.MODERATOR },
+            ],
+          },
+          {
+            $set: {
+              platformRole: PlatformRole.MODERATOR,
+              accountType: null,
+              role: UserRole.MODERATOR,
+            },
+          },
+        );
+
+        // 4. Normalize Marketplace roles to platformRole = USER
+        const marketplaceMappings = [
+          {
+            roles: [UserRole.BUYER, UserRole.PURCHASER, 'BUYER', 'PURCHASER'],
+            accountType: AccountType.BUYER,
+          },
+          {
+            roles: [UserRole.TENANT, 'TENANT'],
+            accountType: AccountType.TENANT,
+          },
+          {
+            roles: [UserRole.AGENT, UserRole.VERIFIED_AGENT, 'AGENT', 'VERIFIED_AGENT'],
+            accountType: AccountType.AGENT,
+          },
+          {
+            roles: [UserRole.BROKER, 'BROKER'],
+            accountType: AccountType.BROKER,
+          },
+          {
+            roles: [UserRole.DEVELOPER, 'DEVELOPER'],
+            accountType: AccountType.DEVELOPER,
+          },
+          {
+            roles: [UserRole.PROPERTY_OWNER, 'PROPERTY_OWNER'],
+            accountType: AccountType.PROPERTY_OWNER,
+          },
+        ];
+
+        for (const mapping of marketplaceMappings) {
+          await this.userModel.updateMany(
+            {
+              role: { $in: mapping.roles },
+              platformRole: { $nin: [PlatformRole.SUPER_ADMIN, PlatformRole.ADMIN, PlatformRole.MODERATOR] },
+              normalizedMobile: { $nin: ['+919925843599', '+919876543210', '+917359237870'] },
+            },
+            {
+              $set: {
+                platformRole: PlatformRole.USER,
+                accountType: mapping.accountType,
+              },
+            },
+          );
+        }
+
+        this.logger.log('✓ Authoritative RBAC schema migration successfully verified');
+      } catch (err: any) {
+        this.logger.warn(`Database RBAC migration notice: ${err?.message}`);
+      }
+    }
+  }
+
   getMemUsers(): InMemoryUser[] {
     return Array.from(this.memUsers.values());
   }
@@ -120,9 +237,12 @@ export class AuthService {
         name: 'Super Administrator',
         mobile: mob.replace('+91', ''),
         normalizedMobile: mob,
+        platformRole: PlatformRole.SUPER_ADMIN,
+        accountType: null, // Strictly null for platform Super Admins
         role: UserRole.SUPER_ADMIN,
+        permissions: ['*'],
         status: AccountStatus.ACTIVE,
-        isVerifiedAgent: true,
+        isVerifiedAgent: false,
         createdAt: new Date(),
         updatedAt: new Date(),
       });
@@ -173,52 +293,71 @@ export class AuthService {
   }
 
   /**
-   * Resolves appropriate AccountType enum from UserRole
+   * Resolves appropriate AccountType enum from UserRole / AccountType
    */
-  resolveAccountType(role: UserRole): AccountType {
+  resolveAccountType(role?: string, platformRole?: PlatformRole): AccountType | null {
+    if (
+      platformRole === PlatformRole.SUPER_ADMIN ||
+      platformRole === PlatformRole.ADMIN ||
+      platformRole === PlatformRole.MODERATOR ||
+      role === UserRole.SUPER_ADMIN ||
+      role === UserRole.ADMIN ||
+      role === UserRole.MODERATOR
+    ) {
+      return null;
+    }
     switch (role) {
       case UserRole.DEVELOPER:
+      case 'DEVELOPER':
         return AccountType.DEVELOPER;
       case UserRole.AGENT:
       case UserRole.VERIFIED_AGENT:
+      case 'AGENT':
+      case 'VERIFIED_AGENT':
         return AccountType.AGENT;
       case UserRole.BROKER:
+      case 'BROKER':
         return AccountType.BROKER;
       case UserRole.PROPERTY_OWNER:
+      case 'PROPERTY_OWNER':
         return AccountType.PROPERTY_OWNER;
       case UserRole.TENANT:
+      case 'TENANT':
         return AccountType.TENANT;
       case UserRole.BUYER:
       case UserRole.PURCHASER:
+      case 'BUYER':
+      case 'PURCHASER':
       default:
         return AccountType.BUYER;
     }
   }
 
   /**
-   * Resolves default granular permissions based on role
+   * Resolves default granular permissions based on platformRole and accountType
    */
-  getDefaultPermissions(role: UserRole): string[] {
-    switch (role) {
-      case UserRole.SUPER_ADMIN:
-        return ['*'];
-      case UserRole.ADMIN:
-        return ['admin:access', 'properties:moderate', 'users:read', 'agents:verify', 'reports:read'];
-      case UserRole.MODERATOR:
-        return ['properties:moderate', 'reviews:moderate', 'reports:read'];
-      case UserRole.DEVELOPER:
+  getDefaultPermissions(platformRole?: PlatformRole, accountType?: AccountType | null): string[] {
+    if (platformRole === PlatformRole.SUPER_ADMIN) {
+      return ['*'];
+    }
+    if (platformRole === PlatformRole.ADMIN) {
+      return ['admin:access', 'properties:moderate', 'users:read', 'users:manage', 'agents:verify', 'reports:read'];
+    }
+    if (platformRole === PlatformRole.MODERATOR) {
+      return ['properties:moderate', 'reviews:moderate', 'reports:read'];
+    }
+    switch (accountType) {
+      case AccountType.DEVELOPER:
         return ['properties:create', 'properties:manage_own', 'projects:manage', 'leads:manage_own', 'analytics:view_own'];
-      case UserRole.BROKER:
+      case AccountType.BROKER:
         return ['properties:create', 'properties:manage_own', 'leads:manage_own', 'analytics:view_own', 'clients:manage'];
-      case UserRole.AGENT:
-      case UserRole.VERIFIED_AGENT:
+      case AccountType.AGENT:
         return ['properties:create', 'properties:manage_own', 'leads:manage_own', 'analytics:view_own'];
-      case UserRole.PROPERTY_OWNER:
+      case AccountType.PROPERTY_OWNER:
         return ['properties:create', 'properties:manage_own', 'enquiries:read_own'];
-      case UserRole.TENANT:
+      case AccountType.TENANT:
         return ['rentals:search', 'saved:manage', 'enquiries:send', 'visits:book'];
-      case UserRole.BUYER:
-      case UserRole.PURCHASER:
+      case AccountType.BUYER:
       default:
         return ['properties:search', 'saved:manage', 'enquiries:send', 'visits:book', 'comparisons:manage'];
     }
@@ -233,6 +372,24 @@ export class AuthService {
     const expiresInMinutes = this.configService.get<number>('auth.otpExpiresInMinutes') || 5;
     const maxAttempts = this.configService.get<number>('auth.otpMaxAttempts') || 3;
     const now = new Date();
+
+    const adminMobiles = (
+      this.configService.get<string>('auth.adminMobiles') ||
+      '+919925843599,+919876543210,+917359237870'
+    )
+      .split(',')
+      .map((m) => m.trim());
+
+    const isDesignatedAdmin = adminMobiles.includes(normalizedMobile);
+
+    // Section 11: Public registration MUST NOT create SUPER_ADMIN, ADMIN, MODERATOR
+    if (
+      !isDesignatedAdmin &&
+      dto.role &&
+      [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.MODERATOR, 'SUPER_ADMIN', 'ADMIN', 'MODERATOR'].includes(dto.role as any)
+    ) {
+      throw new BadRequestException('Administrative roles cannot be self-registered via public endpoints.');
+    }
 
     const otp = this.generateSecureOtp();
     const otpHash = this.hashOtp(normalizedMobile, otp);
@@ -461,16 +618,31 @@ export class AuthService {
 
     // Prevent unauthorized self-assignment of administrative roles
     let safeRole = resolvedRole;
-    if (!isDesignatedAdmin && safeRole && [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.MODERATOR].includes(safeRole)) {
+    if (!isDesignatedAdmin && safeRole && [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.MODERATOR, 'SUPER_ADMIN', 'ADMIN', 'MODERATOR'].includes(safeRole as any)) {
       this.logger.warn(`Security alert: Public user ${normalizedMobile} attempted to claim administrative role ${safeRole}. Reverting to BUYER.`);
       safeRole = UserRole.BUYER;
     }
 
-    const finalRole = isDesignatedAdmin
-      ? UserRole.SUPER_ADMIN
-      : (safeRole || UserRole.BUYER);
-    const finalAccountType = this.resolveAccountType(finalRole);
-    const finalPermissions = this.getDefaultPermissions(finalRole);
+    // Determine normalized authoritative platformRole and accountType
+    let finalPlatformRole: PlatformRole;
+    let finalAccountType: AccountType | null;
+    let finalRole: UserRole;
+    let finalIsVerifiedAgent = false;
+
+    if (isDesignatedAdmin) {
+      finalPlatformRole = PlatformRole.SUPER_ADMIN;
+      finalAccountType = null; // Super Admin MUST NEVER have an accountType
+      finalRole = UserRole.SUPER_ADMIN;
+      finalIsVerifiedAgent = false;
+    } else {
+      const normalized = normalizeUserRoleModel({ role: safeRole || UserRole.BUYER });
+      finalPlatformRole = PlatformRole.USER;
+      finalAccountType = normalized.accountType;
+      finalRole = normalized.role;
+      finalIsVerifiedAgent = normalized.isVerifiedAgent;
+    }
+
+    const finalPermissions = this.getDefaultPermissions(finalPlatformRole, finalAccountType);
     const finalName = resolvedName || (isDesignatedAdmin ? 'Super Administrator' : 'CASA User');
 
     let user: any = null;
@@ -483,17 +655,18 @@ export class AuthService {
             name: finalName,
             mobile: dto.mobile,
             normalizedMobile,
-            role: finalRole,
+            platformRole: finalPlatformRole,
             accountType: finalAccountType,
+            role: finalRole,
             permissions: finalPermissions,
             agencyName: resolvedAgency || undefined,
             status: AccountStatus.ACTIVE,
-            isVerifiedAgent: isDesignatedAdmin || finalRole === UserRole.VERIFIED_AGENT,
+            isVerifiedAgent: finalIsVerifiedAgent,
             lastLoginAt: now,
           });
 
-          // Ensure AgentProfile exists if registered as AGENT, BROKER, or VERIFIED_AGENT
-          if (finalRole === UserRole.AGENT || finalRole === UserRole.BROKER || finalRole === UserRole.VERIFIED_AGENT) {
+          // Ensure AgentProfile exists if registered as AGENT or BROKER
+          if (finalAccountType === AccountType.AGENT || finalAccountType === AccountType.BROKER) {
             try {
               const slugBase = (finalName.toLowerCase().replace(/[^a-z0-9]+/g, '-') + '-' + normalizedMobile.slice(-4)).replace(/^-+|-+$/g, '');
               await this.agentProfileModel.findOneAndUpdate(
@@ -506,7 +679,7 @@ export class AuthService {
                     phone: dto.mobile,
                     agencyName: resolvedAgency || 'Independent Real Estate Consultant',
                     verificationStatus: 'NOT_SUBMITTED',
-                    isVerifiedAgent: isDesignatedAdmin || finalRole === UserRole.VERIFIED_AGENT,
+                    isVerifiedAgent: false,
                   },
                 },
                 { upsert: true },
@@ -519,19 +692,34 @@ export class AuthService {
           if (user.status === AccountStatus.SUSPENDED) {
             throw new ForbiddenException('Your account has been suspended.');
           }
+
           if (isDesignatedAdmin) {
+            user.platformRole = PlatformRole.SUPER_ADMIN;
+            user.accountType = null; // Super Admin MUST NEVER have accountType
             user.role = UserRole.SUPER_ADMIN;
-            user.accountType = AccountType.AGENT;
             user.permissions = ['*'];
-            user.isVerifiedAgent = true;
-          } else if (safeRole && (user.role === UserRole.PURCHASER || user.role === UserRole.BUYER) && safeRole !== UserRole.PURCHASER && safeRole !== UserRole.BUYER) {
-            user.role = safeRole;
-            user.accountType = this.resolveAccountType(safeRole);
-            user.permissions = this.getDefaultPermissions(safeRole);
-          } else if (!user.accountType) {
-            user.accountType = this.resolveAccountType(user.role);
-            user.permissions = user.permissions && user.permissions.length ? user.permissions : this.getDefaultPermissions(user.role);
+            user.isVerifiedAgent = false;
+          } else {
+            // If already a platform user, preserve platformRole and keep accountType null
+            if (user.platformRole === PlatformRole.SUPER_ADMIN || user.platformRole === PlatformRole.ADMIN || user.platformRole === PlatformRole.MODERATOR) {
+              user.accountType = null;
+            } else {
+              user.platformRole = PlatformRole.USER;
+              if (safeRole && (user.role === UserRole.PURCHASER || user.role === UserRole.BUYER) && safeRole !== UserRole.PURCHASER && safeRole !== UserRole.BUYER) {
+                const norm = normalizeUserRoleModel({ role: safeRole });
+                user.accountType = norm.accountType;
+                user.role = norm.role;
+                user.permissions = this.getDefaultPermissions(PlatformRole.USER, norm.accountType);
+                if (norm.isVerifiedAgent) user.isVerifiedAgent = true;
+              } else if (!user.accountType) {
+                const norm = normalizeUserRoleModel({ role: user.role, platformRole: user.platformRole });
+                user.accountType = norm.accountType;
+                user.role = norm.role;
+                user.permissions = user.permissions && user.permissions.length ? user.permissions : this.getDefaultPermissions(PlatformRole.USER, norm.accountType);
+              }
+            }
           }
+
           if (resolvedName && (user.name === 'CASA User' || user.name !== resolvedName)) {
             user.name = resolvedName;
           }
@@ -541,8 +729,8 @@ export class AuthService {
           user.lastLoginAt = now;
           await user.save();
 
-          // Ensure AgentProfile exists if user role is AGENT, BROKER, or VERIFIED_AGENT
-          if (user.role === UserRole.AGENT || user.role === UserRole.BROKER || user.role === UserRole.VERIFIED_AGENT) {
+          // Ensure AgentProfile exists if user accountType is AGENT or BROKER
+          if (user.accountType === AccountType.AGENT || user.accountType === AccountType.BROKER) {
             try {
               const slugBase = (user.name.toLowerCase().replace(/[^a-z0-9]+/g, '-') + '-' + normalizedMobile.slice(-4)).replace(/^-+|-+$/g, '');
               await this.agentProfileModel.findOneAndUpdate(
@@ -581,11 +769,12 @@ export class AuthService {
           mobile: dto.mobile,
           normalizedMobile,
           agencyName: resolvedAgency || undefined,
-          role: finalRole,
+          platformRole: finalPlatformRole,
           accountType: finalAccountType,
+          role: finalRole,
           permissions: finalPermissions,
           status: AccountStatus.ACTIVE,
-          isVerifiedAgent: isDesignatedAdmin || finalRole === UserRole.VERIFIED_AGENT,
+          isVerifiedAgent: finalIsVerifiedAgent,
           lastLoginAt: now,
           createdAt: now,
           updatedAt: now,
@@ -596,17 +785,28 @@ export class AuthService {
           throw new ForbiddenException('Your account has been suspended.');
         }
         if (isDesignatedAdmin) {
+          memUser.platformRole = PlatformRole.SUPER_ADMIN;
+          memUser.accountType = null;
           memUser.role = UserRole.SUPER_ADMIN;
-          memUser.accountType = AccountType.AGENT;
           memUser.permissions = ['*'];
-          memUser.isVerifiedAgent = true;
-        } else if (safeRole && (memUser.role === UserRole.PURCHASER || memUser.role === UserRole.BUYER) && safeRole !== UserRole.PURCHASER && safeRole !== UserRole.BUYER) {
-          memUser.role = safeRole;
-          memUser.accountType = this.resolveAccountType(safeRole);
-          memUser.permissions = this.getDefaultPermissions(safeRole);
-        } else if (!memUser.accountType) {
-          memUser.accountType = this.resolveAccountType(memUser.role);
-          memUser.permissions = memUser.permissions && memUser.permissions.length ? memUser.permissions : this.getDefaultPermissions(memUser.role);
+          memUser.isVerifiedAgent = false;
+        } else {
+          if (memUser.platformRole === PlatformRole.SUPER_ADMIN || memUser.platformRole === PlatformRole.ADMIN || memUser.platformRole === PlatformRole.MODERATOR) {
+            memUser.accountType = null;
+          } else {
+            memUser.platformRole = PlatformRole.USER;
+            if (safeRole && (memUser.role === UserRole.PURCHASER || memUser.role === UserRole.BUYER) && safeRole !== UserRole.PURCHASER && safeRole !== UserRole.BUYER) {
+              const norm = normalizeUserRoleModel({ role: safeRole });
+              memUser.accountType = norm.accountType;
+              memUser.role = norm.role;
+              memUser.permissions = this.getDefaultPermissions(PlatformRole.USER, norm.accountType);
+            } else if (!memUser.accountType) {
+              const norm = normalizeUserRoleModel({ role: memUser.role, platformRole: memUser.platformRole });
+              memUser.accountType = norm.accountType;
+              memUser.role = norm.role;
+              memUser.permissions = memUser.permissions && memUser.permissions.length ? memUser.permissions : this.getDefaultPermissions(PlatformRole.USER, norm.accountType);
+            }
+          }
         }
         if (resolvedName && (memUser.name === 'CASA User' || memUser.name !== resolvedName)) {
           memUser.name = resolvedName;
@@ -808,15 +1008,29 @@ export class AuthService {
     const sessionId = new Types.ObjectId();
     const userIdStr = user._id ? user._id.toString() : user.id;
 
+    const norm = normalizeUserRoleModel({
+      role: user.role,
+      platformRole: user.platformRole,
+      accountType: user.accountType,
+      isVerifiedAgent: user.isVerifiedAgent,
+    });
+
+    const permissions =
+      user.permissions && user.permissions.length > 0
+        ? user.permissions
+        : this.getDefaultPermissions(norm.platformRole, norm.accountType);
+
     const accessPayload: JwtAccessPayload = {
       sub: userIdStr,
+      userId: userIdStr,
       mobile: user.mobile,
       normalizedMobile: user.normalizedMobile,
-      role: user.role,
-      accountType: user.accountType || this.resolveAccountType(user.role),
-      permissions: user.permissions || this.getDefaultPermissions(user.role),
-      status: user.status,
-      isVerifiedAgent: user.isVerifiedAgent || false,
+      platformRole: norm.platformRole,
+      accountType: norm.accountType, // null for SUPER_ADMIN, ADMIN, MODERATOR
+      role: norm.role, // compatibility alias
+      permissions,
+      status: user.status || AccountStatus.ACTIVE,
+      isVerifiedAgent: norm.isVerifiedAgent,
     };
 
     const refreshPayload: JwtRefreshPayload = {
@@ -875,21 +1089,43 @@ export class AuthService {
     };
   }
 
+  normalizeRoleModel(input: {
+    role?: any;
+    platformRole?: any;
+    accountType?: any;
+    isVerifiedAgent?: boolean;
+  }) {
+    return normalizeUserRoleModel(input);
+  }
+
   /**
-   * Helper: Sanitizes user model removing internal attributes
+   * Helper: Sanitizes user model removing internal attributes and guaranteeing authoritative structure
    */
   sanitizeUser(user: any): AuthenticatedUser {
+    const norm = normalizeUserRoleModel({
+      role: user.role,
+      platformRole: user.platformRole,
+      accountType: user.accountType,
+      isVerifiedAgent: user.isVerifiedAgent,
+    });
+
+    const permissions =
+      user.permissions && user.permissions.length > 0
+        ? user.permissions
+        : this.getDefaultPermissions(norm.platformRole, norm.accountType);
+
     return {
       id: user._id ? user._id.toString() : user.id,
-      name: user.name,
+      name: user.name || 'CASA User',
       mobile: user.mobile,
       normalizedMobile: user.normalizedMobile,
       email: user.email,
-      role: user.role,
-      accountType: user.accountType || this.resolveAccountType(user.role),
-      permissions: user.permissions || this.getDefaultPermissions(user.role),
-      status: user.status,
-      isVerifiedAgent: user.isVerifiedAgent || false,
+      platformRole: norm.platformRole,
+      accountType: norm.accountType, // strictly null for SUPER_ADMIN, ADMIN, MODERATOR
+      role: norm.role, // compatibility alias
+      permissions,
+      status: user.status || AccountStatus.ACTIVE,
+      isVerifiedAgent: norm.isVerifiedAgent,
       agencyName: user.agencyName,
       avatar: user.avatar,
     };

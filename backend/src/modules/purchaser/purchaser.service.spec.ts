@@ -7,7 +7,7 @@ import { User } from '../auth/schemas/user.schema';
 import { Property } from '../properties/schemas/property.schema';
 import { Lead } from '../leads/schemas/lead.schema';
 import { AuditLog } from '../admin/schemas/audit-log.schema';
-import { UserRole, AccountStatus } from '../auth/enums/auth.enums';
+import { UserRole, AccountStatus, PlatformRole, AccountType } from '../auth/enums/auth.enums';
 
 describe('PurchaserService', () => {
   let service: PurchaserService;
@@ -188,6 +188,8 @@ describe('PurchaserService', () => {
       normalizedMobile: '+919876543210',
       name: 'Arun Buyer',
       role: UserRole.PURCHASER,
+      platformRole: PlatformRole.USER,
+      accountType: AccountType.BUYER,
       status: AccountStatus.ACTIVE,
       isVerifiedAgent: false,
     };
@@ -207,6 +209,8 @@ describe('PurchaserService', () => {
       normalizedMobile: '+919876543210',
       name: 'Arun Buyer',
       role: UserRole.PURCHASER,
+      platformRole: PlatformRole.USER,
+      accountType: AccountType.BUYER,
       status: AccountStatus.ACTIVE,
       isVerifiedAgent: false,
     };
@@ -226,6 +230,8 @@ describe('PurchaserService', () => {
       normalizedMobile: '+919876543210',
       name: 'Arun Buyer',
       role: UserRole.PURCHASER,
+      platformRole: PlatformRole.USER,
+      accountType: AccountType.BUYER,
       status: AccountStatus.ACTIVE,
       isVerifiedAgent: false,
     };
@@ -244,6 +250,8 @@ describe('PurchaserService', () => {
       normalizedMobile: '+919876543210',
       name: 'Arun Buyer',
       role: UserRole.PURCHASER,
+      platformRole: PlatformRole.USER,
+      accountType: AccountType.BUYER,
       status: AccountStatus.ACTIVE,
       isVerifiedAgent: false,
     };

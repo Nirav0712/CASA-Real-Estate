@@ -1,6 +1,6 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document } from 'mongoose';
-import { UserRole, AccountType, AccountStatus } from '../enums/auth.enums';
+import { PlatformRole, AccountType, AccountStatus, UserRole } from '../enums/auth.enums';
 
 export type UserDocument = User & Document;
 
@@ -20,19 +20,28 @@ export class User {
 
   @Prop({
     type: String,
+    enum: Object.values(PlatformRole),
+    default: PlatformRole.USER,
+    index: true,
+  })
+  platformRole: PlatformRole;
+
+  @Prop({
+    type: String,
+    enum: Object.values(AccountType),
+    default: null,
+    required: false,
+    index: true,
+  })
+  accountType: AccountType | null;
+
+  @Prop({
+    type: String,
     enum: Object.values(UserRole),
     default: UserRole.BUYER,
     index: true,
   })
   role: UserRole;
-
-  @Prop({
-    type: String,
-    enum: Object.values(AccountType),
-    default: AccountType.BUYER,
-    index: true,
-  })
-  accountType: AccountType;
 
   @Prop({ type: [String], default: [] })
   permissions: string[];
@@ -69,5 +78,7 @@ export class User {
 
 export const UserSchema = SchemaFactory.createForClass(User);
 
-// Compound index for role and status queries
+// Compound indexes for role and status queries
+UserSchema.index({ platformRole: 1, accountType: 1 });
 UserSchema.index({ role: 1, status: 1 });
+

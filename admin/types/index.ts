@@ -1,3 +1,13 @@
+export type PlatformRole = 'SUPER_ADMIN' | 'ADMIN' | 'MODERATOR' | 'USER';
+
+export type AccountType =
+  | 'DEVELOPER'
+  | 'AGENT'
+  | 'BROKER'
+  | 'PROPERTY_OWNER'
+  | 'BUYER'
+  | 'TENANT';
+
 export type UserRole =
   | 'SUPER_ADMIN'
   | 'ADMIN'
@@ -12,14 +22,6 @@ export type UserRole =
   | 'VERIFIED_AGENT'
   | 'GUEST';
 
-export type AccountType =
-  | 'DEVELOPER'
-  | 'AGENT'
-  | 'BROKER'
-  | 'PROPERTY_OWNER'
-  | 'BUYER'
-  | 'TENANT';
-
 export type AccountStatus =
   | 'ACTIVE'
   | 'PENDING_VERIFICATION'
@@ -32,8 +34,9 @@ export interface AdminUser {
   mobile: string;
   normalizedMobile: string;
   email?: string;
+  platformRole?: PlatformRole;
+  accountType?: AccountType | null;
   role: UserRole;
-  accountType?: AccountType;
   permissions?: string[];
   status: AccountStatus;
   avatar?: string;

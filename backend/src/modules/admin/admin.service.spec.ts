@@ -1,3 +1,12 @@
+// Mock @nestjs/jwt for Jest CJS environment
+jest.mock('@nestjs/jwt', () => {
+  return {
+    JwtService: class MockJwtService {
+      signAsync = jest.fn().mockResolvedValue('mock_jwt_token_xyz');
+      verifyAsync = jest.fn();
+    },
+  };
+});
 import { Test, TestingModule } from '@nestjs/testing';
 import { getModelToken } from '@nestjs/mongoose';
 import { NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
@@ -7,8 +16,10 @@ import { Category } from '../properties/schemas/category.schema';
 import { User } from '../auth/schemas/user.schema';
 import { AuditLog } from './schemas/audit-log.schema';
 import { RefreshSession } from '../auth/schemas/refresh-session.schema';
-import { UserRole, AccountStatus } from '../auth/enums/auth.enums';
+import { UserRole, AccountStatus, PlatformRole, AccountType } from '../auth/enums/auth.enums';
 import { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
+
+import { AuthService } from '../auth/auth.service';
 
 describe('AdminService Moderation & User Governance (Phase 08)', () => {
   let service: AdminService;
@@ -17,6 +28,7 @@ describe('AdminService Moderation & User Governance (Phase 08)', () => {
   let mockUserModel: any;
   let mockAuditLogModel: any;
   let mockRefreshSessionModel: any;
+  let mockAuthService: any;
 
   const mockAdminUser: AuthenticatedUser = {
     id: 'user-admin-001',
@@ -24,6 +36,8 @@ describe('AdminService Moderation & User Governance (Phase 08)', () => {
     mobile: '9876543210',
     normalizedMobile: '+919876543210',
     role: UserRole.ADMIN,
+    platformRole: PlatformRole.ADMIN,
+    accountType: null,
     status: AccountStatus.ACTIVE,
     isVerifiedAgent: false,
   };
@@ -34,8 +48,10 @@ describe('AdminService Moderation & User Governance (Phase 08)', () => {
     mobile: '9925843599',
     normalizedMobile: '+919925843599',
     role: UserRole.SUPER_ADMIN,
+    platformRole: PlatformRole.SUPER_ADMIN,
+    accountType: null,
     status: AccountStatus.ACTIVE,
-    isVerifiedAgent: true,
+    isVerifiedAgent: false,
   };
 
   const getMockPropertyDoc = () => ({
@@ -165,6 +181,13 @@ describe('AdminService Moderation & User Governance (Phase 08)', () => {
       updateMany: jest.fn().mockResolvedValue({ modifiedCount: 1 }),
     };
 
+    mockAuthService = {
+      normalizeRoleModel: jest.fn().mockImplementation((user: any) => ({
+        platformRole: user.platformRole || (user.role === 'SUPER_ADMIN' ? 'SUPER_ADMIN' : 'USER'),
+        accountType: user.accountType !== undefined ? user.accountType : (user.role === 'SUPER_ADMIN' ? null : 'AGENT'),
+      })),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         AdminService,
@@ -195,6 +218,10 @@ describe('AdminService Moderation & User Governance (Phase 08)', () => {
         {
           provide: getModelToken('AgentVerificationDocument'),
           useValue: mockAgentDocumentModel,
+        },
+        {
+          provide: AuthService,
+          useValue: mockAuthService,
         },
       ],
     }).compile();
@@ -396,7 +423,7 @@ describe('AdminService Moderation & User Governance (Phase 08)', () => {
       );
 
       expect(res.success).toBe(true);
-      expect(targetUser.role).toBe(UserRole.VERIFIED_AGENT);
+      expect(targetUser.role).toBe(UserRole.AGENT);
       expect(targetUser.isVerifiedAgent).toBe(true);
       expect(targetUser.save).toHaveBeenCalled();
       expect(mockAuditLogModel.create).toHaveBeenCalledWith(

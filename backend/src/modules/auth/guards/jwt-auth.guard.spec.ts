@@ -76,6 +76,8 @@ describe('JwtAuthGuard (Authentication & Token Validation)', () => {
       sub: 'usr-agent-456',
       mobile: '+919925843599',
       normalizedMobile: '+919925843599',
+      platformRole: 'USER',
+      accountType: 'AGENT',
       role: UserRole.AGENT,
       status: AccountStatus.ACTIVE,
       isVerifiedAgent: true,
@@ -85,7 +87,33 @@ describe('JwtAuthGuard (Authentication & Token Validation)', () => {
     expect(result).toBe(true);
     expect(request.user).toBeDefined();
     expect(request.user.id).toBe('usr-agent-456');
+    expect(request.user.platformRole).toBe('USER');
+    expect(request.user.accountType).toBe('AGENT');
     expect(request.user.role).toBe(UserRole.AGENT);
+  });
+
+  it('should authenticate Super Admin with null accountType', async () => {
+    const { context, request } = createMockContext({
+      authorization: 'Bearer superadmin-jwt-token',
+    });
+
+    (jwtService.verifyAsync as jest.Mock).mockResolvedValue({
+      sub: 'usr-superadmin-1',
+      mobile: '+919925843599',
+      normalizedMobile: '+919925843599',
+      platformRole: 'SUPER_ADMIN',
+      accountType: null,
+      role: UserRole.SUPER_ADMIN,
+      status: AccountStatus.ACTIVE,
+      isVerifiedAgent: false,
+    });
+
+    const result = await guard.canActivate(context);
+    expect(result).toBe(true);
+    expect(request.user).toBeDefined();
+    expect(request.user.id).toBe('usr-superadmin-1');
+    expect(request.user.platformRole).toBe('SUPER_ADMIN');
+    expect(request.user.accountType).toBeNull();
   });
 
   it('should authenticate successfully with valid access_token HttpOnly cookie', async () => {
@@ -106,6 +134,8 @@ describe('JwtAuthGuard (Authentication & Token Validation)', () => {
     expect(result).toBe(true);
     expect(request.user).toBeDefined();
     expect(request.user.id).toBe('usr-owner-999');
+    expect(request.user.platformRole).toBe('USER');
+    expect(request.user.accountType).toBe('PROPERTY_OWNER');
     expect(request.user.role).toBe(UserRole.PROPERTY_OWNER);
   });
 

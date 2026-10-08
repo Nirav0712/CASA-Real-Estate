@@ -14,7 +14,7 @@ import { Property } from '../properties/schemas/property.schema';
 import { User } from '../auth/schemas/user.schema';
 import { Lead } from '../leads/schemas/lead.schema';
 import { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
-import { UserRole, AccountStatus } from '../auth/enums/auth.enums';
+import { UserRole, AccountStatus, PlatformRole, AccountType } from '../auth/enums/auth.enums';
 
 describe('EngagementService', () => {
   let service: EngagementService;
@@ -25,6 +25,8 @@ describe('EngagementService', () => {
     mobile: '+919876543210',
     normalizedMobile: '+919876543210',
     role: UserRole.PURCHASER,
+    platformRole: PlatformRole.USER,
+    accountType: AccountType.BUYER,
     status: AccountStatus.ACTIVE,
     isVerifiedAgent: false,
   };
@@ -35,6 +37,8 @@ describe('EngagementService', () => {
     mobile: '+919876543211',
     normalizedMobile: '+919876543211',
     role: UserRole.AGENT,
+    platformRole: PlatformRole.USER,
+    accountType: AccountType.AGENT,
     status: AccountStatus.ACTIVE,
     isVerifiedAgent: true,
   };
@@ -45,6 +49,8 @@ describe('EngagementService', () => {
     mobile: '+919876543212',
     normalizedMobile: '+919876543212',
     role: UserRole.ADMIN,
+    platformRole: PlatformRole.ADMIN,
+    accountType: null,
     status: AccountStatus.ACTIVE,
     isVerifiedAgent: false,
   };

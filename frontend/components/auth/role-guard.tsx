@@ -59,17 +59,20 @@ export function RoleGuard({
     );
   }
 
-  // Check role authorization with compatibility
-  const userRole = user.role;
-  const isSuperAdmin = userRole === 'SUPER_ADMIN';
+  // Check role authorization with authoritative platformRole and accountType
+  const isSuperAdmin =
+    user.platformRole === 'SUPER_ADMIN' || user.role === 'SUPER_ADMIN';
   const hasAccess =
     isSuperAdmin ||
-    allowedRoles.includes(userRole) ||
-    (allowedRoles.includes('BUYER') && userRole === 'PURCHASER') ||
-    (allowedRoles.includes('PURCHASER') && userRole === 'BUYER') ||
-    (allowedRoles.includes('AGENT') && userRole === 'VERIFIED_AGENT');
+    (user.platformRole && allowedRoles.includes(user.platformRole as any)) ||
+    (user.accountType && allowedRoles.includes(user.accountType as any)) ||
+    allowedRoles.includes(user.role) ||
+    (allowedRoles.includes('BUYER') && (user.accountType === 'BUYER' || user.role === 'PURCHASER')) ||
+    (allowedRoles.includes('PURCHASER') && (user.accountType === 'BUYER' || user.role === 'BUYER')) ||
+    (allowedRoles.includes('AGENT') && (user.accountType === 'AGENT' || user.role === 'VERIFIED_AGENT'));
 
   if (!hasAccess) {
+    const currentDisplayRole = user.accountType || user.platformRole || user.role || 'USER';
     return (
       <div className="min-h-[60vh] flex flex-col items-center justify-center p-6 text-center max-w-md mx-auto">
         <div className="w-16 h-16 bg-red-50 dark:bg-red-950/40 text-red-600 rounded-2xl flex items-center justify-center mb-4 shadow-subtle border border-red-200">
@@ -79,7 +82,7 @@ export function RoleGuard({
           Access Restricted (403)
         </h2>
         <p className="text-casa-text-secondary text-sm mb-6 leading-relaxed">
-          Your account is registered as <strong className="uppercase text-casa-brand font-bold">{userRole.replace('_', ' ')}</strong>, which does not have permission to access the <strong>{dashboardName}</strong>.
+          Your account is registered as <strong className="uppercase text-casa-brand font-bold">{currentDisplayRole.replace('_', ' ')}</strong>, which does not have permission to access the <strong>{dashboardName}</strong>.
         </p>
         <div className="flex flex-col sm:flex-row gap-3 w-full justify-center">
           <Button

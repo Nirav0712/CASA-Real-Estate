@@ -22,7 +22,13 @@ import { AdminUserQueryDto } from './dto/admin-user-query.dto';
 import { UpdateUserStatusDto } from './dto/update-user-status.dto';
 import { UpdateUserRoleDto } from './dto/update-user-role.dto';
 import { AdminAuditQueryDto } from './dto/admin-audit-query.dto';
-import { UserRole, AccountStatus } from '../auth/enums/auth.enums';
+import {
+  PlatformRole,
+  AccountType,
+  UserRole,
+  AccountStatus,
+  normalizeUserRoleModel,
+} from '../auth/enums/auth.enums';
 import { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
 import { AuthService } from '../auth/auth.service';
 
@@ -373,7 +379,8 @@ export class AdminService implements OnModuleInit {
   async getPendingQueue() {
     const properties = await this.propertyModel
       .find({ status: { $in: ['PENDING_REVIEW', 'PENDING_APPROVAL'] } })
-      .sort({ createdAt: -1 })
+      .sort({ _id: -1 })
+      .lean()
       .exec();
 
     return properties.map((p) => this.mapPropertyToAdminItem(p));
@@ -439,9 +446,10 @@ export class AdminService implements OnModuleInit {
       this.propertyModel.countDocuments(filter),
       this.propertyModel
         .find(filter)
-        .sort({ createdAt: -1 })
+        .sort({ _id: -1 })
         .skip(skip)
         .limit(limit)
+        .lean()
         .exec(),
     ]);
 
@@ -915,6 +923,12 @@ export class AdminService implements OnModuleInit {
 
     const data = users.map((u: any) => {
       const counts = countMap.get(u._id.toString()) || countMap.get(u.normalizedMobile) || { total: 0, published: 0 };
+      const norm = normalizeUserRoleModel({
+        role: u.role,
+        platformRole: u.platformRole,
+        accountType: u.accountType,
+        isVerifiedAgent: u.isVerifiedAgent,
+      });
       return {
         id: u._id.toString(),
         _id: u._id.toString(),
@@ -922,9 +936,11 @@ export class AdminService implements OnModuleInit {
         mobile: u.mobile,
         normalizedMobile: u.normalizedMobile,
         email: u.email,
-        role: u.role,
+        platformRole: norm.platformRole,
+        accountType: norm.accountType,
+        role: norm.role,
         status: u.status || 'ACTIVE',
-        isVerifiedAgent: Boolean(u.isVerifiedAgent),
+        isVerifiedAgent: norm.isVerifiedAgent,
         agencyName: u.agencyName,
         reraNumber: u.reraNumber,
         avatar: u.avatar,
@@ -990,6 +1006,13 @@ export class AdminService implements OnModuleInit {
       archived: properties.filter((p) => p.status === 'ARCHIVED').length,
     };
 
+    const norm = normalizeUserRoleModel({
+      role: user.role,
+      platformRole: user.platformRole,
+      accountType: user.accountType,
+      isVerifiedAgent: user.isVerifiedAgent,
+    });
+
     return {
       id: userIdStr,
       _id: userIdStr,
@@ -997,9 +1020,11 @@ export class AdminService implements OnModuleInit {
       mobile: user.mobile,
       normalizedMobile: user.normalizedMobile,
       email: user.email,
-      role: user.role,
+      platformRole: norm.platformRole,
+      accountType: norm.accountType,
+      role: norm.role,
       status: user.status || 'ACTIVE',
-      isVerifiedAgent: Boolean(user.isVerifiedAgent),
+      isVerifiedAgent: norm.isVerifiedAgent,
       agencyName: user.agencyName,
       reraNumber: user.reraNumber,
       avatar: user.avatar,
@@ -1125,9 +1150,12 @@ export class AdminService implements OnModuleInit {
     }
 
     const previousRole = user.role;
-    user.role = dto.role;
+    const norm = normalizeUserRoleModel({ role: dto.role });
+    user.platformRole = norm.platformRole;
+    user.accountType = norm.accountType;
+    user.role = norm.role;
 
-    if (dto.role === UserRole.VERIFIED_AGENT) {
+    if (norm.isVerifiedAgent) {
       user.isVerifiedAgent = true;
     }
 
@@ -1144,7 +1172,7 @@ export class AdminService implements OnModuleInit {
       targetEntity: 'USER',
       targetEntityId: user._id.toString(),
       previousValue: { role: previousRole },
-      newValue: { role: dto.role },
+      newValue: { role: dto.role, platformRole: norm.platformRole, accountType: norm.accountType },
       reason: dto.reason || `User role changed from ${previousRole} to ${dto.role}`,
     });
 
@@ -1155,6 +1183,8 @@ export class AdminService implements OnModuleInit {
         id: user._id.toString(),
         name: user.name,
         mobile: user.mobile,
+        platformRole: norm.platformRole,
+        accountType: norm.accountType,
         role: user.role,
         status: user.status,
         isVerifiedAgent: user.isVerifiedAgent,

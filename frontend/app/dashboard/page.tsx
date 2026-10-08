@@ -23,23 +23,30 @@ export default function RoleBasedDashboardHubPage() {
   const { user, isAuthenticated, isLoading, openAuthModal } = useAuth();
   const router = useRouter();
 
-  // Automatic role-based redirect on load
+  // Automatic role-based redirect on load (platformRole first, then accountType)
   React.useEffect(() => {
     if (!isLoading && isAuthenticated && user) {
-      if (user.role === 'DEVELOPER') {
-        router.replace('/dashboard/developer');
-      } else if (user.role === 'BROKER') {
-        router.replace('/dashboard/broker');
-      } else if (user.role === 'AGENT' || user.role === 'VERIFIED_AGENT') {
-        router.replace('/dashboard/agent');
-      } else if (user.role === 'PROPERTY_OWNER') {
-        router.replace('/dashboard/properties');
-      } else if (user.role === 'TENANT') {
-        router.replace('/dashboard/tenant');
-      } else if (user.role === 'BUYER' || user.role === 'PURCHASER') {
-        router.replace('/dashboard/purchaser');
+      if (user.platformRole === 'SUPER_ADMIN' || user.platformRole === 'ADMIN') {
+        // Platform Admins remain on the Command Hub or link directly to Admin Governance
+      } else if (user.platformRole === 'MODERATOR') {
+        // Moderator remains on Command Hub / Moderation
+      } else {
+        // Marketplace users: platformRole === USER
+        const account = user.accountType || user.role;
+        if (account === 'DEVELOPER') {
+          router.replace('/dashboard/developer');
+        } else if (account === 'BROKER') {
+          router.replace('/dashboard/broker');
+        } else if (account === 'AGENT' || account === 'VERIFIED_AGENT') {
+          router.replace('/dashboard/agent');
+        } else if (account === 'PROPERTY_OWNER') {
+          router.replace('/dashboard/seller');
+        } else if (account === 'TENANT') {
+          router.replace('/dashboard/tenant');
+        } else if (account === 'BUYER' || account === 'PURCHASER') {
+          router.replace('/dashboard/buyer');
+        }
       }
-      // For Admin/Super Admin, we remain here to show the Admin Control Hub or allow them to jump
     }
   }, [isLoading, isAuthenticated, user, router]);
 

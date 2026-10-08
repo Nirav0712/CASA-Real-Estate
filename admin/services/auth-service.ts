@@ -5,7 +5,14 @@ const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_URL ||
   'http://localhost:5000/api/v1';
 
-const ADMIN_ROLES = ['SUPER_ADMIN', 'ADMIN', 'MODERATOR'];
+const ADMIN_PLATFORM_ROLES = ['SUPER_ADMIN', 'ADMIN', 'MODERATOR'];
+
+function isPlatformAdmin(user: AdminUser): boolean {
+  if (user.platformRole) {
+    return ADMIN_PLATFORM_ROLES.includes(user.platformRole);
+  }
+  return ADMIN_PLATFORM_ROLES.includes(user.role);
+}
 
 export async function requestAdminOtp(mobile: string): Promise<OtpRequestResponse> {
   const response = await fetch(`${API_BASE_URL}/auth/otp/request`, {
@@ -46,8 +53,8 @@ export async function verifyAdminOtp(mobile: string, otp: string): Promise<Admin
 
   const result = (json.data || json) as AdminAuthResponse;
 
-  // Strict Client-Side Role Enforcement Check
-  if (!ADMIN_ROLES.includes(result.user.role)) {
+  // Strict Client-Side Platform Role Enforcement Check
+  if (!isPlatformAdmin(result.user)) {
     // Revoke token immediately
     try {
       await logoutAdmin();
@@ -80,7 +87,7 @@ export async function refreshAdminSession(): Promise<AdminAuthResponse> {
 
   const result = (json.data || json) as AdminAuthResponse;
 
-  if (!ADMIN_ROLES.includes(result.user.role)) {
+  if (!isPlatformAdmin(result.user)) {
     throw new Error('Access Denied: Insufficient administrative privileges.');
   }
 

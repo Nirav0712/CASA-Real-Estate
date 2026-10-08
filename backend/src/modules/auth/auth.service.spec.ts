@@ -20,13 +20,15 @@ import { OtpChallenge } from './schemas/otp-challenge.schema';
 import { RefreshSession } from './schemas/refresh-session.schema';
 import { MockOtpProvider } from './providers/mock-otp.provider';
 import { Msg91OtpProvider } from './providers/msg91-otp.provider';
-import { UserRole, AccountStatus, OtpStatus } from './enums/auth.enums';
+import { AgentProfile } from '../agents/schemas/agent-profile.schema';
+import { UserRole, AccountStatus, OtpStatus, PlatformRole, AccountType } from './enums/auth.enums';
 
 describe('AuthService (Security-First Unit & Integration Tests)', () => {
   let service: AuthService;
   let mockUserModel: any;
   let mockOtpChallengeModel: any;
   let mockRefreshSessionModel: any;
+  let mockAgentProfileModel: any;
   let mockJwtService: any;
   let mockConfigService: any;
   let mockOtpProvider: any;
@@ -49,6 +51,12 @@ describe('AuthService (Security-First Unit & Integration Tests)', () => {
       create: jest.fn(),
       updateOne: jest.fn().mockResolvedValue({ modifiedCount: 1 }),
       updateMany: jest.fn().mockResolvedValue({ modifiedCount: 1 }),
+    };
+
+    mockAgentProfileModel = {
+      findOne: jest.fn(),
+      create: jest.fn(),
+      updateOne: jest.fn(),
     };
 
     mockJwtService = {
@@ -86,6 +94,7 @@ describe('AuthService (Security-First Unit & Integration Tests)', () => {
         { provide: getModelToken(User.name), useValue: mockUserModel },
         { provide: getModelToken(OtpChallenge.name), useValue: mockOtpChallengeModel },
         { provide: getModelToken(RefreshSession.name), useValue: mockRefreshSessionModel },
+        { provide: getModelToken(AgentProfile.name), useValue: mockAgentProfileModel },
         { provide: JwtService, useValue: mockJwtService },
         { provide: ConfigService, useValue: mockConfigService },
         { provide: MockOtpProvider, useValue: mockOtpProvider },
@@ -293,6 +302,73 @@ describe('AuthService (Security-First Unit & Integration Tests)', () => {
           otp: '123456',
         }),
       ).rejects.toThrow(ForbiddenException);
+    });
+  });
+
+  describe('Authoritative Role & AccountType Normalization', () => {
+    it('12. should strictly normalize SUPER_ADMIN with accountType = null', () => {
+      const normalized = (service as any).normalizeRoleModel({ role: UserRole.SUPER_ADMIN });
+      expect(normalized.platformRole).toBe(PlatformRole.SUPER_ADMIN);
+      expect(normalized.accountType).toBeNull();
+
+      const sanitized = service.sanitizeUser({ _id: 'admin_1', mobile: '+919925843599', role: UserRole.SUPER_ADMIN });
+      expect(sanitized.platformRole).toBe(PlatformRole.SUPER_ADMIN);
+      expect(sanitized.accountType).toBeNull();
+      expect(sanitized.permissions).toEqual(['*']);
+    });
+
+    it('13. should strictly normalize ADMIN with accountType = null', () => {
+      const normalized = (service as any).normalizeRoleModel({ role: UserRole.ADMIN });
+      expect(normalized.platformRole).toBe(PlatformRole.ADMIN);
+      expect(normalized.accountType).toBeNull();
+    });
+
+    it('14. should strictly normalize MODERATOR with accountType = null', () => {
+      const normalized = (service as any).normalizeRoleModel({ role: UserRole.MODERATOR });
+      expect(normalized.platformRole).toBe(PlatformRole.MODERATOR);
+      expect(normalized.accountType).toBeNull();
+    });
+
+    it('15. should normalize marketplace roles to platformRole=USER and respective accountType', () => {
+      const agent = (service as any).normalizeRoleModel({ role: UserRole.AGENT });
+      expect(agent.platformRole).toBe(PlatformRole.USER);
+      expect(agent.accountType).toBe(AccountType.AGENT);
+
+      const buyer = (service as any).normalizeRoleModel({ role: UserRole.BUYER });
+      expect(buyer.platformRole).toBe(PlatformRole.USER);
+      expect(buyer.accountType).toBe(AccountType.BUYER);
+
+      const tenant = (service as any).normalizeRoleModel({ role: UserRole.TENANT });
+      expect(tenant.platformRole).toBe(PlatformRole.USER);
+      expect(tenant.accountType).toBe(AccountType.TENANT);
+
+      const developer = (service as any).normalizeRoleModel({ role: UserRole.DEVELOPER });
+      expect(developer.platformRole).toBe(PlatformRole.USER);
+      expect(developer.accountType).toBe(AccountType.DEVELOPER);
+
+      const broker = (service as any).normalizeRoleModel({ role: UserRole.BROKER });
+      expect(broker.platformRole).toBe(PlatformRole.USER);
+      expect(broker.accountType).toBe(AccountType.BROKER);
+
+      const owner = (service as any).normalizeRoleModel({ role: UserRole.PROPERTY_OWNER });
+      expect(owner.platformRole).toBe(PlatformRole.USER);
+      expect(owner.accountType).toBe(AccountType.PROPERTY_OWNER);
+    });
+
+    it('16. should reject public registration attempts for SUPER_ADMIN or ADMIN roles', async () => {
+      await expect(
+        service.requestOtp({
+          mobile: '9111122222',
+          role: UserRole.SUPER_ADMIN,
+        }),
+      ).rejects.toThrow(BadRequestException);
+
+      await expect(
+        service.requestOtp({
+          mobile: '9111122222',
+          role: UserRole.ADMIN,
+        }),
+      ).rejects.toThrow(BadRequestException);
     });
   });
 });

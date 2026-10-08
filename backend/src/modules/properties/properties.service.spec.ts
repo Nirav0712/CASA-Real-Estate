@@ -4,7 +4,7 @@ import { NotFoundException, ForbiddenException, BadRequestException } from '@nes
 import { PropertiesService } from './properties.service';
 import { Property } from './schemas/property.schema';
 import { Category } from './schemas/category.schema';
-import { UserRole, AccountStatus } from '../auth/enums/auth.enums';
+import { UserRole, AccountStatus, PlatformRole, AccountType } from '../auth/enums/auth.enums';
 import { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
 
 describe('PropertiesService (Phase 06 Lifecycle & Security)', () => {
@@ -18,6 +18,8 @@ describe('PropertiesService (Phase 06 Lifecycle & Security)', () => {
     mobile: '9876543210',
     normalizedMobile: '+919876543210',
     role: UserRole.AGENT,
+    platformRole: PlatformRole.USER,
+    accountType: AccountType.AGENT,
     status: AccountStatus.ACTIVE,
     isVerifiedAgent: true,
   };
@@ -28,6 +30,8 @@ describe('PropertiesService (Phase 06 Lifecycle & Security)', () => {
     mobile: '9988776655',
     normalizedMobile: '+919988776655',
     role: UserRole.PROPERTY_OWNER,
+    platformRole: PlatformRole.USER,
+    accountType: AccountType.PROPERTY_OWNER,
     status: AccountStatus.ACTIVE,
     isVerifiedAgent: false,
   };
@@ -38,6 +42,8 @@ describe('PropertiesService (Phase 06 Lifecycle & Security)', () => {
     mobile: '9123456780',
     normalizedMobile: '+919123456780',
     role: UserRole.SUPER_ADMIN,
+    platformRole: PlatformRole.SUPER_ADMIN,
+    accountType: null,
     status: AccountStatus.ACTIVE,
     isVerifiedAgent: true,
   };

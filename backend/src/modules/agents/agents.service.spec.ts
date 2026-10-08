@@ -7,7 +7,7 @@ import { User } from '../auth/schemas/user.schema';
 import { Property } from '../properties/schemas/property.schema';
 import { Lead } from '../leads/schemas/lead.schema';
 import { AuditLog } from '../admin/schemas/audit-log.schema';
-import { UserRole, AccountStatus } from '../auth/enums/auth.enums';
+import { UserRole, AccountStatus, PlatformRole, AccountType } from '../auth/enums/auth.enums';
 
 describe('AgentsService', () => {
   let service: AgentsService;
@@ -52,6 +52,8 @@ describe('AgentsService', () => {
         id: 'user-agent-1',
         name: 'Rajesh Verma',
         role: UserRole.AGENT,
+        platformRole: PlatformRole.USER,
+        accountType: AccountType.AGENT,
         status: AccountStatus.ACTIVE,
         isVerifiedAgent: false,
       }),
@@ -126,6 +128,8 @@ describe('AgentsService', () => {
       normalizedMobile: '+919925843599',
       name: 'Rajesh Verma',
       role: UserRole.AGENT,
+      platformRole: PlatformRole.USER,
+      accountType: AccountType.AGENT,
       status: AccountStatus.ACTIVE,
       isVerifiedAgent: false,
     };
@@ -144,6 +148,8 @@ describe('AgentsService', () => {
       normalizedMobile: '+919925843599',
       name: 'Rajesh Verma',
       role: UserRole.AGENT,
+      platformRole: PlatformRole.USER,
+      accountType: AccountType.AGENT,
       status: AccountStatus.ACTIVE,
       isVerifiedAgent: false,
     };
@@ -168,6 +174,8 @@ describe('AgentsService', () => {
       normalizedMobile: '+919925843599',
       name: 'Rajesh Verma',
       role: UserRole.AGENT,
+      platformRole: PlatformRole.USER,
+      accountType: AccountType.AGENT,
       status: AccountStatus.ACTIVE,
       isVerifiedAgent: false,
     };
