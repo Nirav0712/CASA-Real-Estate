@@ -115,15 +115,6 @@ export function Header() {
               <Link href="/#categories" className="hover:text-casa-brand transition-colors">
                 {t('categories')}
               </Link>
-              <a
-                href={ADMIN_PORTAL_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-casa-brand hover:text-casa-brand-hover font-semibold transition-colors flex items-center gap-1"
-              >
-                <span>{t('adminPortal')}</span>
-                <span className={isRtl ? 'rtl-flip' : ''}>↗</span>
-              </a>
             </nav>
 
             {/* Controls: Theme, Language, Auth, Post Ad */}
@@ -623,15 +614,6 @@ export function Header() {
               <Sparkles className="w-4 h-4 text-casa-brand" />
               <span>{t('categories')}</span>
             </Link>
-            <a
-              href={ADMIN_PORTAL_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="px-3 py-2.5 rounded-xl bg-casa-brand-subtle text-casa-brand text-sm font-bold flex items-center justify-between mt-2"
-            >
-              <span>{t('adminPortal')}</span>
-              <span className={isRtl ? 'rtl-flip' : ''}>↗</span>
-            </a>
           </div>
 
           <div className="pt-4 border-t border-casa-border-light flex flex-col gap-3">
