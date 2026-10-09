@@ -20,6 +20,7 @@ import { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
 import { AdminUserQueryDto } from './dto/admin-user-query.dto';
 import { UpdateUserStatusDto } from './dto/update-user-status.dto';
 import { UpdateUserRoleDto } from './dto/update-user-role.dto';
+import { UpdateAdminUserDto } from './dto/update-user.dto';
 import { BulkDeleteUsersDto } from './dto/bulk-delete-users.dto';
 import { BulkStatusUsersDto } from './dto/bulk-status-users.dto';
 import { AdminAuditQueryDto } from './dto/admin-audit-query.dto';
@@ -204,6 +205,18 @@ export class AdminController {
   @ApiResponse({ status: 200, description: 'User profile returned' })
   getUserById(@Param('id') id: string) {
     return this.adminService.getUserById(id);
+  }
+
+  @Patch('users/:id')
+  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
+  @ApiOperation({ summary: 'Update user profile, credentials (password), role, and status' })
+  @ApiResponse({ status: 200, description: 'User updated successfully' })
+  updateUser(
+    @Param('id') id: string,
+    @Body() dto: UpdateAdminUserDto,
+    @CurrentUser() user?: AuthenticatedUser,
+  ) {
+    return this.adminService.updateUser(id, dto, user);
   }
 
   @Patch('users/:id/status')

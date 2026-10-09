@@ -22,6 +22,7 @@ import { Role, RoleDocument } from '../entitlements/schemas/role.schema';
 import { AdminUserQueryDto } from './dto/admin-user-query.dto';
 import { UpdateUserStatusDto } from './dto/update-user-status.dto';
 import { UpdateUserRoleDto } from './dto/update-user-role.dto';
+import { UpdateAdminUserDto } from './dto/update-user.dto';
 import { AdminAuditQueryDto } from './dto/admin-audit-query.dto';
 import {
   PlatformRole,
@@ -32,6 +33,7 @@ import {
 } from '../auth/enums/auth.enums';
 import { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
 import { AuthService } from '../auth/auth.service';
+import { hashPassword } from '../auth/utils/password.util';
 
 const INITIAL_PENDING_FIXTURES = [
   {
@@ -346,6 +348,7 @@ export class AdminService implements OnModuleInit {
       isFeatured: !!raw.isFeatured,
       specs: raw.specs,
       amenities: raw.amenities,
+      reraNumber: raw.reraNumber || raw.advertiser?.reraNumber || undefined,
     };
   }
 
@@ -972,6 +975,7 @@ export class AdminService implements OnModuleInit {
         isVerifiedAgent: norm.isVerifiedAgent,
         agencyName: u.agencyName,
         reraNumber: u.reraNumber,
+        hasPassword: Boolean(u.passwordHash),
         avatar: u.avatar,
         propertyCount: counts.total,
         publishedCount: counts.published,
@@ -1076,6 +1080,7 @@ export class AdminService implements OnModuleInit {
       isVerifiedAgent: norm.isVerifiedAgent,
       agencyName: user.agencyName,
       reraNumber: user.reraNumber,
+      hasPassword: Boolean(user.passwordHash),
       avatar: user.avatar,
       lastLoginAt: user.lastLoginAt || user.updatedAt || user.createdAt,
       createdAt: user.createdAt,
@@ -1092,6 +1097,228 @@ export class AdminService implements OnModuleInit {
         isPublished: p.isPublished,
         createdAt: p.createdAt,
       })),
+    };
+  }
+
+  async updateUser(id: string, dto: UpdateAdminUserDto, actor?: AuthenticatedUser) {
+    const query: any = isValidObjectId(id) ? { _id: id } : { $or: [{ id }, { normalizedMobile: id }, { mobile: id }] };
+    const user = await this.userModel.findOne(query);
+
+    if (!user) {
+      throw new NotFoundException(`User with ID "${id}" was not found.`);
+    }
+
+    const previousData = {
+      name: user.name,
+      email: user.email,
+      mobile: user.mobile,
+      role: user.role,
+      status: user.status,
+      isVerifiedAgent: user.isVerifiedAgent,
+    };
+
+    const isActorSuperAdmin =
+      actor?.role === UserRole.SUPER_ADMIN || actor?.platformRole === PlatformRole.SUPER_ADMIN;
+
+    // Security Rule: Only Super Admin can modify another Super Admin
+    if (user.role === UserRole.SUPER_ADMIN && !isActorSuperAdmin) {
+      throw new ForbiddenException('Only a Super Administrator can edit another Super Administrator account.');
+    }
+
+    if (dto.name !== undefined) {
+      user.name = dto.name.trim();
+    }
+
+    if (dto.email !== undefined) {
+      const normalizedEmail = dto.email.trim().toLowerCase();
+      if (normalizedEmail) {
+        const existingEmailUser = await this.userModel.findOne({
+          email: normalizedEmail,
+          _id: { $ne: user._id },
+        });
+        if (existingEmailUser) {
+          throw new BadRequestException(`Email "${normalizedEmail}" is already registered by another user.`);
+        }
+        user.email = normalizedEmail;
+      }
+    }
+
+    if (dto.mobile !== undefined) {
+      const cleanMobile = dto.mobile.replace(/[^0-9]/g, '');
+      const fullMobile = dto.mobile.startsWith('+') ? dto.mobile : `+91${cleanMobile}`;
+      if (fullMobile !== user.mobile) {
+        const existingMobileUser = await this.userModel.findOne({
+          $or: [{ mobile: fullMobile }, { normalizedMobile: fullMobile }],
+          _id: { $ne: user._id },
+        });
+        if (existingMobileUser) {
+          throw new BadRequestException(`Mobile number "${fullMobile}" is already registered by another user.`);
+        }
+        user.mobile = fullMobile;
+        user.normalizedMobile = fullMobile;
+      }
+    }
+
+    if (dto.password && dto.password.trim()) {
+      if (dto.password.length < 6) {
+        throw new BadRequestException('Password must be at least 6 characters long.');
+      }
+      const newHash = await hashPassword(dto.password);
+      user.passwordHash = newHash;
+      user.isEmailVerified = true;
+      this.logger.log(`Password reset/set for user ${user._id} (${user.email || user.mobile}) by administrator.`);
+    }
+
+    if (dto.agencyName !== undefined) {
+      user.agencyName = dto.agencyName.trim();
+    }
+
+    if (dto.reraNumber !== undefined) {
+      user.reraNumber = dto.reraNumber.trim();
+    }
+
+    if (dto.isVerifiedAgent !== undefined) {
+      user.isVerifiedAgent = dto.isVerifiedAgent;
+      if (dto.isVerifiedAgent && user.role === UserRole.AGENT) {
+        user.role = UserRole.VERIFIED_AGENT;
+      }
+    }
+
+    if (dto.status !== undefined) {
+      if (
+        user.role === UserRole.SUPER_ADMIN &&
+        (dto.status === AccountStatus.SUSPENDED || dto.status === AccountStatus.DEACTIVATED)
+      ) {
+        const activeSuperAdmins = await this.userModel.countDocuments({
+          role: UserRole.SUPER_ADMIN,
+          status: AccountStatus.ACTIVE,
+        });
+        if (activeSuperAdmins <= 1) {
+          throw new BadRequestException('Cannot deactivate the sole remaining active Super Administrator account.');
+        }
+      }
+      user.status = dto.status;
+      if (dto.status === AccountStatus.SUSPENDED || dto.status === AccountStatus.DEACTIVATED) {
+        try {
+          await this.refreshSessionModel.updateMany(
+            { userId: user._id },
+            { $set: { isRevoked: true, revokedAt: new Date() } },
+          );
+        } catch (err: any) {
+          this.logger.warn(`Session revocation note: ${err?.message}`);
+        }
+      }
+    }
+
+    if (dto.role || dto.customRoleId !== undefined) {
+      const targetRoleIdentifier = dto.customRoleId || dto.role;
+      if (targetRoleIdentifier) {
+        let roleDoc: RoleDocument | null = null;
+        if (isValidObjectId(targetRoleIdentifier)) {
+          roleDoc = await this.roleModel.findById(targetRoleIdentifier);
+        }
+        if (!roleDoc) {
+          const slugCandidate = targetRoleIdentifier.toLowerCase().replace(/_/g, '-');
+          roleDoc = await this.roleModel.findOne({
+            $or: [
+              { slug: slugCandidate },
+              { slug: targetRoleIdentifier.toLowerCase() },
+              { name: targetRoleIdentifier },
+            ],
+          });
+        }
+
+        if (roleDoc) {
+          if (
+            (roleDoc.platformRole === PlatformRole.SUPER_ADMIN || roleDoc.slug === 'super-admin') &&
+            !isActorSuperAdmin
+          ) {
+            throw new ForbiddenException('Only a Super Administrator can assign Super Administrator role.');
+          }
+          if (roleDoc.isSystemRole) {
+            user.customRoleId = null;
+            user.platformRole = roleDoc.platformRole;
+            user.accountType = roleDoc.accountType;
+            const norm = normalizeUserRoleModel({
+              platformRole: roleDoc.platformRole,
+              accountType: roleDoc.accountType,
+              role: roleDoc.slug.toUpperCase().replace(/-/g, '_'),
+            });
+            user.role = norm.role;
+          } else {
+            user.customRoleId = roleDoc._id.toString();
+            user.platformRole = roleDoc.platformRole || PlatformRole.USER;
+            user.accountType = roleDoc.accountType || null;
+            const norm = normalizeUserRoleModel({
+              platformRole: user.platformRole,
+              accountType: user.accountType,
+            });
+            user.role = norm.role;
+          }
+        } else {
+          const norm = normalizeUserRoleModel({ role: targetRoleIdentifier });
+          if (norm.platformRole === PlatformRole.SUPER_ADMIN && !isActorSuperAdmin) {
+            throw new ForbiddenException('Only a Super Administrator can promote a user to Super Administrator.');
+          }
+          user.customRoleId = null;
+          user.platformRole = norm.platformRole;
+          user.accountType = norm.accountType;
+          user.role = norm.role;
+        }
+      }
+    }
+
+    await user.save();
+
+    await this.recordAuditLog({
+      action: 'USER_UPDATED',
+      actorUserId: actor?.id || 'system_admin',
+      actorName: actor?.name || 'Administrator',
+      actorRole: actor?.role || 'ADMIN',
+      targetUserId: user._id.toString(),
+      targetUserName: user.name,
+      targetEntity: 'USER',
+      targetEntityId: user._id.toString(),
+      previousValue: previousData,
+      newValue: {
+        name: user.name,
+        email: user.email,
+        mobile: user.mobile,
+        role: user.role,
+        status: user.status,
+        isVerifiedAgent: user.isVerifiedAgent,
+        passwordUpdated: Boolean(dto.password),
+      },
+      reason: 'User details and credentials updated by administrator',
+    });
+
+    const norm = normalizeUserRoleModel({
+      role: user.role,
+      platformRole: user.platformRole,
+      accountType: user.accountType,
+      isVerifiedAgent: user.isVerifiedAgent,
+    });
+
+    return {
+      success: true,
+      message: `User ${user.name || user.email || user.mobile} updated successfully.`,
+      user: {
+        id: user._id.toString(),
+        _id: user._id.toString(),
+        name: user.name,
+        email: user.email,
+        mobile: user.mobile,
+        normalizedMobile: user.normalizedMobile,
+        platformRole: norm.platformRole,
+        accountType: norm.accountType,
+        role: norm.role,
+        customRoleId: user.customRoleId || null,
+        status: user.status,
+        isVerifiedAgent: user.isVerifiedAgent,
+        agencyName: user.agencyName,
+        reraNumber: user.reraNumber,
+        hasPassword: Boolean(user.passwordHash),
+      },
     };
   }
 

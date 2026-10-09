@@ -287,6 +287,11 @@ export class PropertyAdvertiserDto {
   @IsOptional()
   @IsString()
   agencyName?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  reraNumber?: string;
 }
 
 export class CreatePropertyDto {
@@ -304,6 +309,11 @@ export class CreatePropertyDto {
   @IsOptional()
   @IsString()
   slug?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  reraNumber?: string;
 
   @ApiProperty({ description: 'Multilingual Title' })
   @ValidateNested()

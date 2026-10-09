@@ -167,6 +167,7 @@ export interface AdminPropertyItem {
   isFeatured?: boolean;
   specs?: any;
   amenities?: string[];
+  reraNumber?: string;
 }
 
 export interface AdminDashboardStats {
@@ -218,6 +219,7 @@ export interface UserRecord {
   isVerifiedAgent: boolean;
   agencyName?: string;
   reraNumber?: string;
+  hasPassword?: boolean;
   avatar?: string;
   propertyCount?: number;
   publishedCount?: number;

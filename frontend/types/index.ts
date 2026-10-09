@@ -225,7 +225,9 @@ export interface Property {
     isVerifiedAgent: boolean;
     role?: string;
     agencyName?: string;
+    reraNumber?: string;
   };
+  reraNumber?: string;
   status: PropertyStatus;
   isPublished?: boolean;
   publishedAt?: string;

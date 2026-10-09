@@ -321,6 +321,36 @@ export async function updateAdminUserRole(
   return result.data || { success: true, message: 'User role updated successfully' };
 }
 
+export async function updateAdminUser(
+  id: string,
+  payload: {
+    name?: string;
+    email?: string;
+    mobile?: string;
+    password?: string;
+    role?: string;
+    customRoleId?: string | null;
+    status?: string;
+    isVerifiedAgent?: boolean;
+    agencyName?: string;
+    reraNumber?: string;
+  },
+): Promise<{ success: boolean; message: string; user?: UserRecord }> {
+  const result = await fetchAdminApi<{ success: boolean; message: string; user?: UserRecord }>(
+    `/admin/users/${encodeURIComponent(id)}`,
+    {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    },
+  );
+
+  if (!result.isBackendAvailable || result.error) {
+    throw new Error(result.error || 'Failed to update user');
+  }
+
+  return result.data || { success: true, message: 'User updated successfully' };
+}
+
 export async function deleteAdminUser(
   id: string,
   reason?: string,

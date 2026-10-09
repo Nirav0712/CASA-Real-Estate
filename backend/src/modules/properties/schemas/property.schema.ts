@@ -196,6 +196,9 @@ export class PropertyAdvertiser {
 
   @Prop()
   agencyName?: string;
+
+  @Prop()
+  reraNumber?: string;
 }
 
 @Schema({ _id: false })
@@ -328,6 +331,9 @@ export class Property {
 
   @Prop({ type: PropertyAdvertiser, required: true })
   advertiser: PropertyAdvertiser;
+
+  @Prop({ index: true })
+  reraNumber?: string;
 
   @Prop({
     default: 'DRAFT',

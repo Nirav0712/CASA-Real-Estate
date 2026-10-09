@@ -146,6 +146,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     async (data: RegisterData): Promise<RegisterResponse> => {
       try {
         const res = await authService.register(data);
+        if ((res as any).tokens?.accessToken && (res as any).user) {
+          setUser((res as any).user);
+          setToken((res as any).tokens.accessToken);
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('casa_access_token', (res as any).tokens.accessToken);
+            localStorage.setItem('casa_user', JSON.stringify((res as any).user));
+          }
+          setIsAuthModalOpen(false);
+          toast.success(
+            'Account Created',
+            `Welcome to CASA, ${(res as any).user.name || (res as any).user.email}!`,
+          );
+        }
         return res;
       } catch (err: unknown) {
         const message = err instanceof Error ? err.message : 'Registration failed. Please try again.';

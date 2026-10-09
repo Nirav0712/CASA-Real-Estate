@@ -23,12 +23,17 @@ import {
   MinusSquare,
   UserCheck,
   UserX,
+  Pencil,
+  Mail,
+  KeyRound,
+  EyeOff,
 } from 'lucide-react';
 import {
   getAdminUsers,
   getAdminUserById,
   updateAdminUserStatus,
   updateAdminUserRole,
+  updateAdminUser,
   getAdminAssignableRoles,
   deleteAdminUser,
   bulkDeleteAdminUsers,
@@ -91,6 +96,23 @@ export default function UsersPage() {
   const [bulkTargetStatus, setBulkTargetStatus] = React.useState<AccountStatus>('SUSPENDED');
   const [bulkStatusReason, setBulkStatusReason] = React.useState('');
   const [submittingBulkStatus, setSubmittingBulkStatus] = React.useState(false);
+
+  // Edit User Modal State
+  const [editModalUser, setEditModalUser] = React.useState<UserRecord | null>(null);
+  const [editForm, setEditForm] = React.useState({
+    name: '',
+    email: '',
+    mobile: '',
+    role: 'AGENT',
+    customRoleId: '' as string | null,
+    status: 'ACTIVE' as AccountStatus,
+    isVerifiedAgent: false,
+    agencyName: '',
+    reraNumber: '',
+    newPassword: '',
+  });
+  const [showEditPassword, setShowEditPassword] = React.useState(false);
+  const [submittingEdit, setSubmittingEdit] = React.useState(false);
 
   // Load assignable roles from DB
   const loadRoles = React.useCallback(async () => {
@@ -191,6 +213,63 @@ export default function UsersPage() {
       toast.error('Detail Error', msg);
     } finally {
       setLoadingDetail(false);
+    }
+  };
+
+  const handleOpenEditModal = (user: UserRecord) => {
+    setEditModalUser(user);
+    setEditForm({
+      name: user.name || '',
+      email: user.email || '',
+      mobile: user.mobile || user.normalizedMobile || '',
+      role: user.role || 'AGENT',
+      customRoleId: user.customRoleId || null,
+      status: user.status || 'ACTIVE',
+      isVerifiedAgent: Boolean(user.isVerifiedAgent),
+      agencyName: user.agencyName || '',
+      reraNumber: user.reraNumber || '',
+      newPassword: '',
+    });
+    setShowEditPassword(false);
+  };
+
+  const handleSaveEditUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editModalUser) return;
+    if (!editForm.name.trim()) {
+      toast.warning('Validation', 'Please enter a user name.');
+      return;
+    }
+    if (editForm.newPassword && editForm.newPassword.length < 6) {
+      toast.warning('Validation', 'Password must be at least 6 characters long.');
+      return;
+    }
+
+    try {
+      setSubmittingEdit(true);
+      const res = await updateAdminUser(editModalUser.id, {
+        name: editForm.name.trim(),
+        email: editForm.email.trim() || undefined,
+        mobile: editForm.mobile.trim() || undefined,
+        role: editForm.role,
+        customRoleId: editForm.customRoleId || null,
+        status: editForm.status,
+        isVerifiedAgent: editForm.isVerifiedAgent,
+        agencyName: editForm.agencyName.trim() || undefined,
+        reraNumber: editForm.reraNumber.trim() || undefined,
+        password: editForm.newPassword.trim() || undefined,
+      });
+
+      if (res.success) {
+        toast.success('User Updated', `User "${editForm.name}" updated successfully.`);
+        setEditModalUser(null);
+        await loadUsers();
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to update user';
+      toast.error('Update Failed', msg);
+    } finally {
+      setSubmittingEdit(false);
     }
   };
 
@@ -620,9 +699,23 @@ export default function UsersPage() {
                             {u.normalizedMobile || u.mobile}
                           </span>
                         </div>
-                        {u.email && (
-                          <div className="text-[10px] text-casa-text-muted font-mono mt-0.5">{u.email}</div>
-                        )}
+                        <div className="flex items-center gap-1 text-xs text-casa-text-primary font-medium mt-1">
+                          <Mail className="w-3.5 h-3.5 text-casa-brand flex-shrink-0" />
+                          <span className="font-mono text-[11px] select-all">
+                            {u.email || <span className="text-casa-text-muted italic">No email</span>}
+                          </span>
+                        </div>
+                        <div className="mt-1">
+                          {u.hasPassword ? (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/60 px-1.5 py-0.5 rounded border border-emerald-200 dark:border-emerald-800">
+                              <KeyRound className="w-2.5 h-2.5 text-emerald-600" /> Password Set
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/60 px-1.5 py-0.5 rounded border border-amber-200 dark:border-amber-800">
+                              <KeyRound className="w-2.5 h-2.5 text-amber-600" /> No Password
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td className="px-4 py-3.5">
                         <div className="flex flex-col items-start gap-0.5">
@@ -653,6 +746,11 @@ export default function UsersPage() {
                           </span>
                         ) : (
                           <span className="text-casa-text-muted text-[11px]">N/A</span>
+                        )}
+                        {u.reraNumber && (
+                          <div className="text-[10px] text-emerald-700 dark:text-emerald-300 font-mono font-semibold mt-0.5">
+                            RERA: {u.reraNumber}
+                          </div>
                         )}
                         {u.agencyName && (
                           <div className="text-[10px] text-casa-text-muted flex items-center gap-1 mt-0.5">
@@ -686,6 +784,16 @@ export default function UsersPage() {
                       </td>
                       <td className="px-4 py-3.5 text-right">
                         <div className="flex items-center justify-end gap-1.5">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleOpenEditModal(u)}
+                            title="Edit User & Set Password"
+                            className="text-xs h-7 px-2 border-casa-brand/40 text-casa-brand hover:bg-casa-brand-subtle flex items-center gap-1 font-semibold"
+                          >
+                            <Pencil className="w-3.5 h-3.5" />
+                            Edit
+                          </Button>
                           <Button
                             variant="outline"
                             size="sm"
@@ -1342,6 +1450,239 @@ export default function UsersPage() {
                   : `Update ${selectedUserIds.size} Users to ${bulkTargetStatus}`}
               </Button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit User & Credentials Modal */}
+      {editModalUser && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-casa-surface border border-casa-border-light rounded-2xl shadow-2xl p-6 w-full max-w-lg space-y-4 animate-in zoom-in-95 duration-150 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between pb-3 border-b border-casa-border-light">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 bg-casa-brand-subtle text-casa-brand rounded-xl">
+                  <Pencil className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-casa-text-primary">Edit User Account</h3>
+                  <p className="text-[11px] text-casa-text-muted font-mono">
+                    ID: {editModalUser.id}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditModalUser(null)}
+                className="p-1.5 rounded-lg text-casa-text-muted hover:text-casa-text-primary hover:bg-casa-canvas"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveEditUser} className="space-y-4">
+              {/* Full Name */}
+              <div>
+                <label className="text-[11px] font-bold text-casa-text-muted uppercase">
+                  Full Name *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={editForm.name}
+                  onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                  placeholder="e.g. Rahul Sharma"
+                  className="w-full mt-1 p-2.5 text-xs bg-casa-canvas border border-casa-border-light rounded-xl text-casa-text-primary focus:outline-none focus:ring-2 focus:ring-casa-brand/30"
+                />
+              </div>
+
+              {/* Email & Mobile */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[11px] font-bold text-casa-text-muted uppercase flex items-center gap-1">
+                    <Mail className="w-3 h-3 text-casa-brand" /> Email Address
+                  </label>
+                  <input
+                    type="email"
+                    value={editForm.email}
+                    onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
+                    placeholder="user@example.com"
+                    className="w-full mt-1 p-2.5 text-xs bg-casa-canvas border border-casa-border-light rounded-xl text-casa-text-primary focus:outline-none focus:ring-2 focus:ring-casa-brand/30"
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] font-bold text-casa-text-muted uppercase flex items-center gap-1">
+                    <Phone className="w-3 h-3 text-casa-brand" /> Mobile Number
+                  </label>
+                  <input
+                    type="tel"
+                    value={editForm.mobile}
+                    onChange={(e) => setEditForm({ ...editForm, mobile: e.target.value })}
+                    placeholder="+919876543210"
+                    className="w-full mt-1 p-2.5 text-xs bg-casa-canvas border border-casa-border-light rounded-xl text-casa-text-primary focus:outline-none focus:ring-2 focus:ring-casa-brand/30"
+                  />
+                </div>
+              </div>
+
+              {/* Role & Status */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[11px] font-bold text-casa-text-muted uppercase">
+                    Account Role
+                  </label>
+                  <select
+                    value={editForm.customRoleId || editForm.role}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      const custom = roles.find((r) => r.id === val);
+                      if (custom) {
+                        setEditForm({
+                          ...editForm,
+                          customRoleId: custom.id,
+                          role: custom.slug.toUpperCase().replace(/-/g, '_'),
+                        });
+                      } else {
+                        setEditForm({ ...editForm, customRoleId: null, role: val });
+                      }
+                    }}
+                    className="w-full mt-1 p-2.5 text-xs bg-casa-canvas border border-casa-border-light rounded-xl text-casa-text-primary focus:outline-none focus:ring-2 focus:ring-casa-brand/30"
+                  >
+                    <optgroup label="System Roles">
+                      <option value="BUYER">BUYER (Purchaser)</option>
+                      <option value="AGENT">AGENT (Real Estate Agent)</option>
+                      <option value="VERIFIED_AGENT">VERIFIED_AGENT</option>
+                      <option value="BROKER">BROKER</option>
+                      <option value="DEVELOPER">DEVELOPER (Builder)</option>
+                      <option value="PROPERTY_OWNER">PROPERTY_OWNER</option>
+                      <option value="MODERATOR">MODERATOR</option>
+                      <option value="ADMIN">ADMIN</option>
+                      <option value="SUPER_ADMIN">SUPER_ADMIN</option>
+                    </optgroup>
+                    {roles.length > 0 && (
+                      <optgroup label="Dynamic Roles">
+                        {roles.map((r) => (
+                          <option key={r.id} value={r.id}>
+                            {r.name}
+                          </option>
+                        ))}
+                      </optgroup>
+                    )}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-[11px] font-bold text-casa-text-muted uppercase">
+                    Account Status
+                  </label>
+                  <select
+                    value={editForm.status}
+                    onChange={(e) => setEditForm({ ...editForm, status: e.target.value as AccountStatus })}
+                    className="w-full mt-1 p-2.5 text-xs bg-casa-canvas border border-casa-border-light rounded-xl text-casa-text-primary focus:outline-none focus:ring-2 focus:ring-casa-brand/30"
+                  >
+                    <option value="ACTIVE">ACTIVE</option>
+                    <option value="SUSPENDED">SUSPENDED</option>
+                    <option value="DEACTIVATED">DEACTIVATED</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Verified Agent & Agency / RERA Details */}
+              <div className="p-3 bg-casa-subtle/50 rounded-xl border border-casa-border-light space-y-3">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={editForm.isVerifiedAgent}
+                    onChange={(e) => setEditForm({ ...editForm, isVerifiedAgent: e.target.checked })}
+                    className="w-4 h-4 text-casa-brand rounded border-casa-border-light focus:ring-casa-brand/30 accent-casa-brand"
+                  />
+                  <span className="text-xs font-semibold text-casa-text-primary flex items-center gap-1">
+                    <CheckCircle className="w-3.5 h-3.5 text-emerald-600" />
+                    CASA Verified Agent Badge
+                  </span>
+                </label>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-[10px] font-bold text-casa-text-muted uppercase">
+                      Agency Name
+                    </label>
+                    <input
+                      type="text"
+                      value={editForm.agencyName}
+                      onChange={(e) => setEditForm({ ...editForm, agencyName: e.target.value })}
+                      placeholder="e.g. Royal Realty Pvt Ltd"
+                      className="w-full mt-1 p-2 text-xs bg-casa-canvas border border-casa-border-light rounded-lg text-casa-text-primary focus:outline-none focus:ring-2 focus:ring-casa-brand/30"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-casa-text-muted uppercase">
+                      RERA Registration Number
+                    </label>
+                    <input
+                      type="text"
+                      value={editForm.reraNumber}
+                      onChange={(e) => setEditForm({ ...editForm, reraNumber: e.target.value })}
+                      placeholder="e.g. UPRERAAGT12890"
+                      className="w-full mt-1 p-2 text-xs bg-casa-canvas border border-casa-border-light rounded-lg text-casa-text-primary font-mono focus:outline-none focus:ring-2 focus:ring-casa-brand/30"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Set/Update Password Field */}
+              <div className="p-3 bg-amber-50/50 dark:bg-amber-950/20 rounded-xl border border-amber-200 dark:border-amber-900/40 space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-[11px] font-bold text-amber-900 dark:text-amber-200 uppercase flex items-center gap-1.5">
+                    <KeyRound className="w-3.5 h-3.5 text-amber-600" />
+                    Set / Reset User Password
+                  </label>
+                  <span className="text-[10px] text-amber-700/80 dark:text-amber-400">
+                    {editModalUser.hasPassword ? 'Current: Password Set' : 'Current: No Password'}
+                  </span>
+                </div>
+                <div className="relative">
+                  <input
+                    type={showEditPassword ? 'text' : 'password'}
+                    value={editForm.newPassword}
+                    onChange={(e) => setEditForm({ ...editForm, newPassword: e.target.value })}
+                    placeholder="Enter new password (leave blank to keep unchanged)"
+                    className="w-full pr-9 pl-3 py-2 text-xs bg-casa-canvas border border-casa-border-light rounded-xl text-casa-text-primary focus:outline-none focus:ring-2 focus:ring-amber-500/30 font-mono"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowEditPassword(!showEditPassword)}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-casa-text-muted hover:text-casa-text-primary p-1"
+                  >
+                    {showEditPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                  </button>
+                </div>
+                <p className="text-[10px] text-amber-800 dark:text-amber-300">
+                  Password will be securely hashed with bcrypt. The user can log in immediately with their email and new password.
+                </p>
+              </div>
+
+              {/* Actions */}
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-casa-border-light">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setEditModalUser(null)}
+                  disabled={submittingEdit}
+                  className="text-xs"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  variant="primary"
+                  size="sm"
+                  disabled={submittingEdit}
+                  className="text-xs bg-casa-brand hover:bg-casa-brand-hover text-white font-semibold"
+                >
+                  {submittingEdit ? 'Saving Changes...' : 'Save User Changes'}
+                </Button>
+              </div>
+            </form>
           </div>
         </div>
       )}

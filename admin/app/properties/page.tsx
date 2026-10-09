@@ -143,6 +143,7 @@ export default function AdminPropertiesPage() {
     advertiserName: 'CASA Premier Realty',
     advertiserPhone: '+917359237870',
     advertiserRole: 'SUPER_ADMIN',
+    reraNumber: '',
     description: '',
     isFeatured: false,
     status: 'PUBLISHED',
@@ -160,6 +161,7 @@ export default function AdminPropertiesPage() {
     carpetAreaSqFt: '1800',
     advertiserName: 'CASA Premier Realty',
     advertiserPhone: '+917359237870',
+    reraNumber: '',
     description: '',
     isFeatured: false,
     status: 'PUBLISHED',
@@ -472,6 +474,7 @@ export default function AdminPropertiesPage() {
         typeof prop.description === 'string'
           ? prop.description
           : prop.rawDescription?.en || '',
+      reraNumber: prop.reraNumber || prop.advertiser?.reraNumber || '',
       isFeatured: Boolean(prop.isFeatured),
       status: prop.status || 'PUBLISHED',
     });
@@ -658,7 +661,9 @@ export default function AdminPropertiesPage() {
           phone: editProp.advertiserPhone,
           isVerifiedAgent: true,
           role: editProp.advertiserRole,
+          reraNumber: editProp.reraNumber.trim() || undefined,
         },
+        reraNumber: editProp.reraNumber.trim() || undefined,
         status: editProp.status,
         isPublished: editProp.status === 'PUBLISHED' || editProp.status === 'ACTIVE',
         isFeatured: editProp.isFeatured,
@@ -751,7 +756,9 @@ export default function AdminPropertiesPage() {
           phone: newProp.advertiserPhone,
           isVerifiedAgent: true,
           role: 'SUPER_ADMIN',
+          reraNumber: newProp.reraNumber.trim() || undefined,
         },
+        reraNumber: newProp.reraNumber.trim() || undefined,
         status: newProp.status,
         isPublished: newProp.status === 'PUBLISHED',
         isFeatured: newProp.isFeatured,
@@ -788,6 +795,7 @@ export default function AdminPropertiesPage() {
           carpetAreaSqFt: '1800',
           advertiserName: 'CASA Premier Realty',
           advertiserPhone: '+917359237870',
+          reraNumber: '',
           description: '',
           isFeatured: false,
           status: 'PUBLISHED',
@@ -1054,10 +1062,15 @@ export default function AdminPropertiesPage() {
                             >
                               {item.title}
                             </button>
-                            <div className="flex items-center gap-1.5 text-[11px] text-casa-text-muted mt-0.5">
+                            <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-casa-text-muted mt-0.5">
                               <span className="font-mono text-[10px] text-casa-brand font-bold">
                                 {item.referenceId || item.id}
                               </span>
+                              {(item.reraNumber || item.advertiser?.reraNumber) && (
+                                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                                  RERA: {item.reraNumber || item.advertiser?.reraNumber}
+                                </span>
+                              )}
                               <span>•</span>
                               <MapPin className="w-3 h-3 flex-shrink-0" />
                               <span className="truncate">{item.location}</span>
@@ -1323,7 +1336,7 @@ export default function AdminPropertiesPage() {
             )}
 
             {/* Quick Status Bar */}
-            <div className="flex items-center justify-between p-3 bg-casa-canvas rounded-xl border border-casa-border-light">
+            <div className="flex flex-wrap items-center justify-between gap-2 p-3 bg-casa-canvas rounded-xl border border-casa-border-light">
               <div>
                 <span className="text-[10px] text-casa-text-muted block">Status</span>
                 <span className="font-bold text-casa-text-primary">{selectedProperty.status}</span>
@@ -1331,6 +1344,12 @@ export default function AdminPropertiesPage() {
               <div>
                 <span className="text-[10px] text-casa-text-muted block">Reference ID</span>
                 <span className="font-mono font-bold text-casa-brand">{selectedProperty.referenceId || selectedProperty.id}</span>
+              </div>
+              <div>
+                <span className="text-[10px] text-casa-text-muted block">RERA Number</span>
+                <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">
+                  {selectedProperty.reraNumber || (selectedProperty as any).advertiser?.reraNumber || 'Not Specified'}
+                </span>
               </div>
               <div>
                 <span className="text-[10px] text-casa-text-muted block">Listing Type</span>
@@ -1638,6 +1657,19 @@ export default function AdminPropertiesPage() {
               value={newProp.locality}
               onChange={(e) => setNewProp({ ...newProp, locality: e.target.value })}
               className="w-full px-3 py-2 text-xs bg-casa-canvas border border-casa-border-light rounded-xl text-casa-text-primary"
+            />
+          </div>
+
+          <div>
+            <label className="text-xs font-semibold text-casa-text-primary block mb-1">
+              RERA Registration Number (Optional / Recommended)
+            </label>
+            <input
+              type="text"
+              placeholder="e.g., UPRERAAGT12890 or UPRERAPRJ12345"
+              value={newProp.reraNumber}
+              onChange={(e) => setNewProp({ ...newProp, reraNumber: e.target.value })}
+              className="w-full px-3 py-2 text-xs bg-casa-canvas border border-casa-border-light rounded-xl text-casa-text-primary font-mono"
             />
           </div>
 
@@ -2096,6 +2128,20 @@ export default function AdminPropertiesPage() {
                   <option value="DRAFT">Draft</option>
                 </select>
               </div>
+            </div>
+
+            {/* RERA Number */}
+            <div>
+              <label className="text-xs font-semibold text-casa-text-primary block mb-1">
+                RERA Registration Number
+              </label>
+              <input
+                type="text"
+                placeholder="e.g., UPRERAAGT12890 or UPRERAPRJ12345"
+                value={editProp.reraNumber}
+                onChange={(e) => setEditProp({ ...editProp, reraNumber: e.target.value })}
+                className="w-full px-3 py-2 text-xs bg-casa-canvas border border-casa-border-light rounded-xl text-casa-text-primary font-mono"
+              />
             </div>
 
             {/* Specifications */}

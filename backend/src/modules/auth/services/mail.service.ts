@@ -257,35 +257,46 @@ export class MailService {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Verify Email - CASA Real Estate</title>
+  <title>Confirm Your Email - CASA Real Estate</title>
   <style>
-    body { margin: 0; padding: 0; background-color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; }
-    .container { max-width: 580px; margin: 40px auto; background: #ffffff; border-radius: 16px; overflow: hidden; border: 1px solid #e2e8f0; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
-    .header { background: #0284c7; padding: 32px 24px; text-align: center; }
-    .header h1 { margin: 0; color: #ffffff; font-size: 24px; font-weight: 700; letter-spacing: -0.5px; }
-    .content { padding: 32px 28px; color: #334155; font-size: 15px; line-height: 1.6; }
-    .greeting { font-size: 18px; font-weight: 600; color: #0f172a; margin-bottom: 16px; }
+    body { margin: 0; padding: 0; background-color: #f1f5f9; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; }
+    .container { max-width: 580px; margin: 40px auto; background: #ffffff; border-radius: 20px; overflow: hidden; border: 1px solid #e2e8f0; box-shadow: 0 10px 25px rgba(0,0,0,0.06); }
+    .header { background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%); padding: 36px 24px; text-align: center; }
+    .logo-badge { display: inline-block; background: rgba(255,255,255,0.2); padding: 8px 16px; border-radius: 30px; color: #ffffff; font-size: 13px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 12px; }
+    .header h1 { margin: 0; color: #ffffff; font-size: 26px; font-weight: 800; letter-spacing: -0.5px; }
+    .content { padding: 36px 32px; color: #334155; font-size: 15px; line-height: 1.6; }
+    .greeting { font-size: 20px; font-weight: 700; color: #0f172a; margin-bottom: 16px; }
+    .info-card { background: #f8fafc; border-left: 4px solid #0284c7; padding: 16px 20px; border-radius: 8px; margin: 24px 0; font-size: 14px; color: #475569; }
     .button-container { text-align: center; margin: 32px 0; }
-    .button { background: #0284c7; color: #ffffff !important; padding: 14px 32px; border-radius: 12px; font-size: 15px; font-weight: 600; text-decoration: none; display: inline-block; }
+    .button { background: linear-gradient(135deg, #0284c7 0%, #026ca3 100%); color: #ffffff !important; padding: 16px 40px; border-radius: 12px; font-size: 16px; font-weight: 700; text-decoration: none; display: inline-block; box-shadow: 0 4px 14px rgba(2, 132, 199, 0.35); }
+    .device-note { background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 12px; padding: 14px 18px; margin-top: 24px; font-size: 13px; color: #1e40af; line-height: 1.5; }
     .notice { font-size: 13px; color: #64748b; margin-top: 24px; padding-top: 20px; border-top: 1px solid #f1f5f9; }
-    .footer { background: #f8fafc; padding: 20px; text-align: center; font-size: 12px; color: #94a3b8; border-top: 1px solid #f1f5f9; }
+    .footer { background: #f8fafc; padding: 24px; text-align: center; font-size: 12px; color: #94a3b8; border-top: 1px solid #f1f5f9; }
   </style>
 </head>
 <body>
   <div class="container">
     <div class="header">
-      <h1>CASA Real Estate</h1>
+      <div class="logo-badge">CASA Real Estate</div>
+      <h1>Confirm Your Email Address</h1>
     </div>
     <div class="content">
-      <div class="greeting">Welcome, ${safeName}!</div>
-      <p>Thank you for registering on <strong>CASA Real Estate Marketplace</strong>. To complete your registration and activate your account, please verify your email address.</p>
+      <div class="greeting">Hello ${safeName},</div>
+      <p>Thank you for registering on <strong>CASA Real Estate Marketplace</strong>. To complete your registration and activate your account, please confirm your email address by clicking the button below:</p>
+      
       <div class="button-container">
-        <a href="${link}" class="button" target="_blank">Verify Email &amp; Activate Account</a>
+        <a href="${link}" class="button" target="_blank">Confirm Email &amp; Activate Account</a>
       </div>
-      <p>Or copy and paste this link into your browser:</p>
+
+      <div class="device-note">
+        💡 <strong>Note:</strong> Once you click this confirmation button, your account will be activated immediately and you can log in to your dashboard from your computer or any web browser.
+      </div>
+
+      <p style="margin-top: 24px;">If the button above does not work, copy and paste this link into your browser:</p>
       <p style="word-break: break-all; font-size: 13px; color: #0284c7;"><a href="${link}">${link}</a></p>
+
       <div class="notice">
-        This verification link will expire in <strong>24 hours</strong>. If you did not create an account on CASA, please disregard this email.
+        This confirmation link will expire in <strong>24 hours</strong>. If you did not create an account on CASA Real Estate, please disregard this email.
       </div>
     </div>
     <div class="footer">
