@@ -20,6 +20,7 @@ import {
   Sparkles,
   KeyRound,
 } from 'lucide-react';
+import * as authService from '@/services/auth-service';
 
 export default function AdminLoginPage() {
   const { isAuthenticated, login, requestOtp, verifyOtp } = useAdminAuth();

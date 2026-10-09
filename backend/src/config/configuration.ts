@@ -19,23 +19,46 @@ function cleanUrl(val?: string, defaultVal = ''): string {
 }
 
 export default () => {
-  const nodeEnv = cleanString(process.env.NODE_ENV, 'development');
+  const nodeEnv = cleanString(process.env.NODE_ENV, 'development').toLowerCase();
   const isProduction = nodeEnv === 'production';
 
+  const PRODUCTION_MARKETPLACE_URL = 'https://casa-real-estate-mocha.vercel.app';
+  const PRODUCTION_ADMIN_URL = 'https://casa-real-estate-ocih.vercel.app';
+  const LOCAL_MARKETPLACE_URL = 'http://localhost:3000';
+  const LOCAL_ADMIN_URL = 'http://localhost:3001';
+
   // Environment-aware default frontend & admin URLs
-  const defaultFrontendUrl = isProduction
-    ? 'https://casa-real-estate-mocha.vercel.app'
-    : 'http://localhost:3000';
+  const defaultFrontendUrl = isProduction ? PRODUCTION_MARKETPLACE_URL : LOCAL_MARKETPLACE_URL;
+  const defaultAdminUrl = isProduction ? PRODUCTION_ADMIN_URL : LOCAL_ADMIN_URL;
 
-  const defaultAdminUrl = isProduction
-    ? 'https://casa-real-estate-ocih.vercel.app'
-    : 'http://localhost:3001';
+  let frontendUrl = cleanUrl(process.env.FRONTEND_URL, defaultFrontendUrl);
+  let adminUrl = cleanUrl(process.env.ADMIN_URL, defaultAdminUrl);
 
-  const frontendUrl = cleanUrl(process.env.FRONTEND_URL, defaultFrontendUrl);
-  const adminUrl = cleanUrl(process.env.ADMIN_URL, defaultAdminUrl);
+  // CRITICAL SAFEGUARD: In production, reject localhost/127.0.0.1 overrides if accidentally copied from dev .env
+  if (isProduction) {
+    if (!frontendUrl || frontendUrl.includes('localhost') || frontendUrl.includes('127.0.0.1')) {
+      frontendUrl = PRODUCTION_MARKETPLACE_URL;
+    }
+    if (!adminUrl || adminUrl.includes('localhost') || adminUrl.includes('127.0.0.1')) {
+      adminUrl = PRODUCTION_ADMIN_URL;
+    }
+  }
 
   const defaultVerificationUrl = `${frontendUrl}/auth/verify-email`;
   const defaultPasswordResetUrl = `${frontendUrl}/auth/reset-password`;
+
+  let verificationUrl = cleanUrl(process.env.EMAIL_VERIFICATION_URL, defaultVerificationUrl);
+  let passwordResetUrl = cleanUrl(process.env.PASSWORD_RESET_URL, defaultPasswordResetUrl);
+
+  // CRITICAL SAFEGUARD: In production, ensure verification and reset URLs NEVER point to localhost or 127.0.0.1
+  if (isProduction) {
+    if (!verificationUrl || verificationUrl.includes('localhost') || verificationUrl.includes('127.0.0.1')) {
+      verificationUrl = `${PRODUCTION_MARKETPLACE_URL}/auth/verify-email`;
+    }
+    if (!passwordResetUrl || passwordResetUrl.includes('localhost') || passwordResetUrl.includes('127.0.0.1')) {
+      passwordResetUrl = `${PRODUCTION_MARKETPLACE_URL}/auth/reset-password`;
+    }
+  }
 
   return {
     port: parseInt(cleanString(process.env.PORT, '5000'), 10),
@@ -85,8 +108,8 @@ export default () => {
       user: cleanString(process.env.SMTP_USER),
       pass: cleanString(process.env.SMTP_PASS),
       from: cleanString(process.env.EMAIL_FROM, '"CASA Real Estate" <no-reply@casarealestate.com>'),
-      verificationUrl: cleanUrl(process.env.EMAIL_VERIFICATION_URL, defaultVerificationUrl),
-      passwordResetUrl: cleanUrl(process.env.PASSWORD_RESET_URL, defaultPasswordResetUrl),
+      verificationUrl,
+      passwordResetUrl,
       devLog: cleanString(process.env.EMAIL_DEV_LOG, 'true').toLowerCase() === 'true',
     },
   };

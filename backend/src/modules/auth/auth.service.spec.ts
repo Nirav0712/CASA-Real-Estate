@@ -742,5 +742,32 @@ describe('AuthService (Security-First Unit & Integration Tests)', () => {
         }),
       ).rejects.toThrow('Password reset link has expired');
     });
+
+    it('34. should reset password successfully when email is omitted and found by token hash', async () => {
+      const rawToken = 'token_only_reset_secret_abc123';
+      const tokenHash = hashToken(rawToken);
+      const user = {
+        _id: '507f1f77bcf86cd799439012',
+        email: 'tokenonly@example.com',
+        passwordResetTokenHash: tokenHash,
+        passwordResetExpiresAt: new Date(Date.now() + 1800000),
+        isEmailVerified: true,
+        status: AccountStatus.ACTIVE,
+        save: jest.fn().mockResolvedValue(true),
+      };
+
+      mockUserModel.findOne.mockReturnValue({
+        select: jest.fn().mockResolvedValue(user),
+      });
+
+      const res = await service.resetPassword({
+        token: rawToken,
+        newPassword: 'NewPasswordSecure123!',
+        confirmPassword: 'NewPasswordSecure123!',
+      });
+
+      expect(res.success).toBe(true);
+      expect(user.passwordResetTokenHash).toBeUndefined();
+    });
   });
 });

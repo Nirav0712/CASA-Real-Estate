@@ -21,6 +21,7 @@ import {
 function ResetPasswordContent() {
   const searchParams = useSearchParams();
   const token = searchParams.get('token') || '';
+  const emailParam = searchParams.get('email') || '';
 
   const [newPassword, setNewPassword] = React.useState('');
   const [confirmPassword, setConfirmPassword] = React.useState('');
@@ -52,6 +53,7 @@ function ResetPasswordContent() {
     try {
       const res = await authService.resetAdminPassword({
         token,
+        email: emailParam || undefined,
         newPassword,
         confirmPassword,
       });

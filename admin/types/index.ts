@@ -69,6 +69,7 @@ export interface ForgotPasswordPayload {
 
 export interface ResetPasswordPayload {
   token: string;
+  email?: string;
   newPassword: string;
   confirmPassword: string;
 }

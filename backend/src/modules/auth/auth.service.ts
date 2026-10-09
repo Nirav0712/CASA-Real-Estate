@@ -1528,21 +1528,37 @@ export class AuthService implements OnModuleInit {
       throw new BadRequestException(strength.message);
     }
 
-    const normalizedEmail = normalizeEmail(dto.email);
+    const normalizedEmail = dto.email ? normalizeEmail(dto.email) : '';
+    const providedHash = hashToken(dto.token);
     let user: any = null;
 
     if (this.isDbConnected()) {
       try {
-        user = await this.userModel
-          .findOne({ email: normalizedEmail })
-          .select('+passwordResetTokenHash');
+        if (normalizedEmail) {
+          user = await this.userModel
+            .findOne({ email: normalizedEmail })
+            .select('+passwordResetTokenHash');
+        } else {
+          user = await this.userModel
+            .findOne({ passwordResetTokenHash: providedHash })
+            .select('+passwordResetTokenHash');
+        }
       } catch (err: any) {
         this.logger.warn(`Database resetPassword lookup fallback: ${err?.message}`);
       }
     }
 
     if (!user) {
-      user = this.memUsers.get(normalizedEmail);
+      if (normalizedEmail) {
+        user = this.memUsers.get(normalizedEmail);
+      } else {
+        for (const u of this.memUsers.values()) {
+          if (u.passwordResetTokenHash === providedHash) {
+            user = u;
+            break;
+          }
+        }
+      }
     }
 
     if (!user || !user.passwordResetTokenHash || !user.passwordResetExpiresAt) {
@@ -1558,7 +1574,6 @@ export class AuthService implements OnModuleInit {
       throw new BadRequestException('Password reset link has expired. Please request a new one.');
     }
 
-    const providedHash = hashToken(dto.token);
     const expectedHash = user.passwordResetTokenHash;
 
     const hashMatch =

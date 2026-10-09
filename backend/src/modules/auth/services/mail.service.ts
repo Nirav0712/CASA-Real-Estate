@@ -51,13 +51,66 @@ export class MailService {
   }
 
   /**
+   * Resolves the base URL for email verification links based on environment and config
+   */
+  getVerificationBaseUrl(): string {
+    const isProduction = this.configService.get<string>('nodeEnv') === 'production';
+    const configuredUrl = this.configService.get<string>('mail.verificationUrl');
+
+    if (isProduction) {
+      if (!configuredUrl || configuredUrl.includes('localhost') || configuredUrl.includes('127.0.0.1')) {
+        return 'https://casa-real-estate-mocha.vercel.app/auth/verify-email';
+      }
+      return configuredUrl;
+    }
+
+    return configuredUrl || 'http://localhost:3000/auth/verify-email';
+  }
+
+  /**
+   * Resolves the base URL for password reset links based on environment and config
+   */
+  getPasswordResetBaseUrl(): string {
+    const isProduction = this.configService.get<string>('nodeEnv') === 'production';
+    const configuredUrl = this.configService.get<string>('mail.passwordResetUrl');
+
+    if (isProduction) {
+      if (!configuredUrl || configuredUrl.includes('localhost') || configuredUrl.includes('127.0.0.1')) {
+        return 'https://casa-real-estate-mocha.vercel.app/auth/reset-password';
+      }
+      return configuredUrl;
+    }
+
+    return configuredUrl || 'http://localhost:3000/auth/reset-password';
+  }
+
+  /**
+   * Generates a fully qualified, URL-encoded verification link
+   */
+  generateVerificationLink(email: string, token: string): string {
+    const baseUrl = this.getVerificationBaseUrl();
+    const url = new URL(baseUrl);
+    url.searchParams.set('token', token);
+    url.searchParams.set('email', email);
+    return url.toString();
+  }
+
+  /**
+   * Generates a fully qualified, URL-encoded password reset link
+   */
+  generatePasswordResetLink(email: string, token: string): string {
+    const baseUrl = this.getPasswordResetBaseUrl();
+    const url = new URL(baseUrl);
+    url.searchParams.set('token', token);
+    url.searchParams.set('email', email);
+    return url.toString();
+  }
+
+  /**
    * Dispatches an account activation & email verification link
    */
   async sendVerificationEmail(to: string, name: string, token: string): Promise<SendMailResult> {
-    const baseUrl =
-      this.configService.get<string>('mail.verificationUrl') ||
-      'http://localhost:3000/auth/verify-email';
-    const verificationLink = `${baseUrl}?token=${encodeURIComponent(token)}&email=${encodeURIComponent(to)}`;
+    const verificationLink = this.generateVerificationLink(to, token);
     const from = this.configService.get<string>('mail.from') || '"CASA Real Estate" <no-reply@casarealestate.com>';
     const isProduction = this.configService.get<string>('nodeEnv') === 'production';
 
@@ -104,10 +157,7 @@ export class MailService {
    * Dispatches a secure password reset link
    */
   async sendPasswordResetEmail(to: string, name: string, token: string): Promise<SendMailResult> {
-    const baseUrl =
-      this.configService.get<string>('mail.passwordResetUrl') ||
-      'http://localhost:3000/auth/reset-password';
-    const resetLink = `${baseUrl}?token=${encodeURIComponent(token)}&email=${encodeURIComponent(to)}`;
+    const resetLink = this.generatePasswordResetLink(to, token);
     const from = this.configService.get<string>('mail.from') || '"CASA Real Estate" <no-reply@casarealestate.com>';
     const isProduction = this.configService.get<string>('nodeEnv') === 'production';
 
