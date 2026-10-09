@@ -8,6 +8,13 @@ export interface SendMailResult {
   isMock?: boolean;
 }
 
+function cleanUrl(val?: string, defaultVal = ''): string {
+  if (!val) return defaultVal;
+  const unquoted = val.trim().replace(/^["']|["']$/g, '').trim();
+  const stripped = unquoted.replace(/\/+$/, '').trim();
+  return stripped || defaultVal;
+}
+
 @Injectable()
 export class MailService {
   private readonly logger = new Logger(MailService.name);
@@ -54,34 +61,76 @@ export class MailService {
    * Resolves the base URL for email verification links based on environment and config
    */
   getVerificationBaseUrl(): string {
-    const isProduction = this.configService.get<string>('nodeEnv') === 'production';
-    const configuredUrl = this.configService.get<string>('mail.verificationUrl');
+    const nodeEnv = (this.configService.get<string>('nodeEnv') || process.env.NODE_ENV || 'development').toLowerCase();
+    const envUrl = cleanUrl(process.env.EMAIL_VERIFICATION_URL);
+    const configUrl = cleanUrl(this.configService.get<string>('mail.verificationUrl'));
+    const frontendUrl = cleanUrl(this.configService.get<string>('cors.frontendUrl') || process.env.FRONTEND_URL);
+
+    const isProduction =
+      nodeEnv === 'production' ||
+      Boolean(process.env.HOSTINGER) ||
+      (envUrl && !envUrl.includes('localhost') && !envUrl.includes('127.0.0.1')) ||
+      (frontendUrl && !frontendUrl.includes('localhost') && !frontendUrl.includes('127.0.0.1'));
+
+    let selectedBaseUrl = '';
 
     if (isProduction) {
-      if (!configuredUrl || configuredUrl.includes('localhost') || configuredUrl.includes('127.0.0.1')) {
-        return 'https://casa-real-estate-mocha.vercel.app/auth/verify-email';
+      if (envUrl && !envUrl.includes('localhost') && !envUrl.includes('127.0.0.1')) {
+        selectedBaseUrl = envUrl;
+      } else if (configUrl && !configUrl.includes('localhost') && !configUrl.includes('127.0.0.1')) {
+        selectedBaseUrl = configUrl;
+      } else if (frontendUrl && !frontendUrl.includes('localhost') && !frontendUrl.includes('127.0.0.1')) {
+        selectedBaseUrl = `${frontendUrl}/auth/verify-email`;
+      } else {
+        selectedBaseUrl = 'https://casa-real-estate-mocha.vercel.app/auth/verify-email';
       }
-      return configuredUrl;
+    } else {
+      selectedBaseUrl = envUrl || configUrl || 'http://localhost:3000/auth/verify-email';
     }
 
-    return configuredUrl || 'http://localhost:3000/auth/verify-email';
+    this.logger.log(
+      `[MailService Diagnosis] Selected Verification Base URL: "${selectedBaseUrl}" (isProduction=${isProduction}, nodeEnv="${nodeEnv}")`,
+    );
+
+    return selectedBaseUrl;
   }
 
   /**
    * Resolves the base URL for password reset links based on environment and config
    */
   getPasswordResetBaseUrl(): string {
-    const isProduction = this.configService.get<string>('nodeEnv') === 'production';
-    const configuredUrl = this.configService.get<string>('mail.passwordResetUrl');
+    const nodeEnv = (this.configService.get<string>('nodeEnv') || process.env.NODE_ENV || 'development').toLowerCase();
+    const envUrl = cleanUrl(process.env.PASSWORD_RESET_URL);
+    const configUrl = cleanUrl(this.configService.get<string>('mail.passwordResetUrl'));
+    const frontendUrl = cleanUrl(this.configService.get<string>('cors.frontendUrl') || process.env.FRONTEND_URL);
+
+    const isProduction =
+      nodeEnv === 'production' ||
+      Boolean(process.env.HOSTINGER) ||
+      (envUrl && !envUrl.includes('localhost') && !envUrl.includes('127.0.0.1')) ||
+      (frontendUrl && !frontendUrl.includes('localhost') && !frontendUrl.includes('127.0.0.1'));
+
+    let selectedBaseUrl = '';
 
     if (isProduction) {
-      if (!configuredUrl || configuredUrl.includes('localhost') || configuredUrl.includes('127.0.0.1')) {
-        return 'https://casa-real-estate-mocha.vercel.app/auth/reset-password';
+      if (envUrl && !envUrl.includes('localhost') && !envUrl.includes('127.0.0.1')) {
+        selectedBaseUrl = envUrl;
+      } else if (configUrl && !configUrl.includes('localhost') && !configUrl.includes('127.0.0.1')) {
+        selectedBaseUrl = configUrl;
+      } else if (frontendUrl && !frontendUrl.includes('localhost') && !frontendUrl.includes('127.0.0.1')) {
+        selectedBaseUrl = `${frontendUrl}/auth/reset-password`;
+      } else {
+        selectedBaseUrl = 'https://casa-real-estate-mocha.vercel.app/auth/reset-password';
       }
-      return configuredUrl;
+    } else {
+      selectedBaseUrl = envUrl || configUrl || 'http://localhost:3000/auth/reset-password';
     }
 
-    return configuredUrl || 'http://localhost:3000/auth/reset-password';
+    this.logger.log(
+      `[MailService Diagnosis] Selected Password Reset Base URL: "${selectedBaseUrl}" (isProduction=${isProduction}, nodeEnv="${nodeEnv}")`,
+    );
+
+    return selectedBaseUrl;
   }
 
   /**
