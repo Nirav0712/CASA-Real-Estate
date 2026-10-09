@@ -20,6 +20,8 @@ import { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
 import { AdminUserQueryDto } from './dto/admin-user-query.dto';
 import { UpdateUserStatusDto } from './dto/update-user-status.dto';
 import { UpdateUserRoleDto } from './dto/update-user-role.dto';
+import { BulkDeleteUsersDto } from './dto/bulk-delete-users.dto';
+import { BulkStatusUsersDto } from './dto/bulk-status-users.dto';
 import { AdminAuditQueryDto } from './dto/admin-audit-query.dto';
 
 @ApiTags('Admin Governance & Moderation')
@@ -226,6 +228,40 @@ export class AdminController {
     @CurrentUser() user?: AuthenticatedUser,
   ) {
     return this.adminService.updateUserRole(id, dto, user);
+  }
+
+  @Delete('users/:id')
+  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
+  @ApiOperation({ summary: 'Delete a single user account with session & profile cleanup' })
+  @ApiResponse({ status: 200, description: 'User deleted and audit trail logged' })
+  deleteUser(
+    @Param('id') id: string,
+    @Body() body?: { reason?: string },
+    @CurrentUser() user?: AuthenticatedUser,
+  ) {
+    return this.adminService.deleteUser(id, body?.reason, user);
+  }
+
+  @Post('users/bulk-delete')
+  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
+  @ApiOperation({ summary: 'Bulk delete selected user accounts' })
+  @ApiResponse({ status: 200, description: 'Bulk user deletion report' })
+  bulkDeleteUsers(
+    @Body() dto: BulkDeleteUsersDto,
+    @CurrentUser() user?: AuthenticatedUser,
+  ) {
+    return this.adminService.bulkDeleteUsers(dto.userIds, dto.reason, user);
+  }
+
+  @Post('users/bulk-status')
+  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
+  @ApiOperation({ summary: 'Bulk update status (ACTIVE, SUSPENDED, DEACTIVATED) for selected users' })
+  @ApiResponse({ status: 200, description: 'Bulk user status update report' })
+  bulkUpdateUserStatus(
+    @Body() dto: BulkStatusUsersDto,
+    @CurrentUser() user?: AuthenticatedUser,
+  ) {
+    return this.adminService.bulkUpdateUserStatus(dto.userIds, dto.status, dto.reason, user);
   }
 
   // ==========================================

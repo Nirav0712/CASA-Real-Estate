@@ -321,6 +321,68 @@ export async function updateAdminUserRole(
   return result.data || { success: true, message: 'User role updated successfully' };
 }
 
+export async function deleteAdminUser(
+  id: string,
+  reason?: string,
+): Promise<{ success: boolean; message: string; deletedUserId?: string }> {
+  const result = await fetchAdminApi<{ success: boolean; message: string; deletedUserId?: string }>(
+    `/admin/users/${encodeURIComponent(id)}`,
+    {
+      method: 'DELETE',
+      body: JSON.stringify({ reason }),
+    },
+  );
+
+  if (!result.isBackendAvailable || result.error) {
+    throw new Error(result.error || 'Failed to delete user');
+  }
+
+  return result.data || { success: true, message: 'User deleted successfully' };
+}
+
+export async function bulkDeleteAdminUsers(
+  userIds: string[],
+  reason?: string,
+): Promise<{ success: boolean; deletedCount: number; skippedCount: number; message: string }> {
+  const result = await fetchAdminApi<{
+    success: boolean;
+    deletedCount: number;
+    skippedCount: number;
+    message: string;
+  }>('/admin/users/bulk-delete', {
+    method: 'POST',
+    body: JSON.stringify({ userIds, reason }),
+  });
+
+  if (!result.isBackendAvailable || result.error) {
+    throw new Error(result.error || 'Failed to execute bulk user deletion');
+  }
+
+  return result.data || { success: true, deletedCount: userIds.length, skippedCount: 0, message: 'Users deleted' };
+}
+
+export async function bulkUpdateAdminUserStatus(
+  userIds: string[],
+  status: string,
+  reason?: string,
+): Promise<{ success: boolean; updatedCount: number; skippedCount: number; message: string }> {
+  const result = await fetchAdminApi<{
+    success: boolean;
+    updatedCount: number;
+    skippedCount: number;
+    message: string;
+  }>('/admin/users/bulk-status', {
+    method: 'POST',
+    body: JSON.stringify({ userIds, status, reason }),
+  });
+
+  if (!result.isBackendAvailable || result.error) {
+    throw new Error(result.error || 'Failed to update user statuses');
+  }
+
+  return result.data || { success: true, updatedCount: userIds.length, skippedCount: 0, message: 'User statuses updated' };
+}
+
 export async function getAdminAgents(params?: {
   page?: number;
   limit?: number;

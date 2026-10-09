@@ -50,6 +50,11 @@ export class SearchPropertiesDto {
   @IsString()
   listingType?: string;
 
+  @ApiPropertyOptional({ description: 'Country (e.g., India, United Arab Emirates, United States)' })
+  @IsOptional()
+  @IsString()
+  country?: string;
+
   @ApiPropertyOptional({ description: 'State (e.g., Uttar Pradesh)' })
   @IsOptional()
   @IsString()

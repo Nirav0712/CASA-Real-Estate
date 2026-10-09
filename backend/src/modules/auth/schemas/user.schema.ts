@@ -15,8 +15,34 @@ export class User {
   @Prop({ required: true, unique: true, index: true, trim: true })
   normalizedMobile: string;
 
-  @Prop({ required: false, trim: true, lowercase: true })
+  @Prop({
+    required: false,
+    trim: true,
+    lowercase: true,
+    index: { unique: true, sparse: true },
+  })
   email?: string;
+
+  @Prop({ required: false, select: false })
+  passwordHash?: string;
+
+  @Prop({ default: false, index: true })
+  isEmailVerified: boolean;
+
+  @Prop({ default: false, index: true })
+  isMobileVerified: boolean;
+
+  @Prop({ required: false, select: false })
+  emailVerificationTokenHash?: string;
+
+  @Prop({ required: false })
+  emailVerificationExpiresAt?: Date;
+
+  @Prop({ required: false, select: false })
+  passwordResetTokenHash?: string;
+
+  @Prop({ required: false })
+  passwordResetExpiresAt?: Date;
 
   @Prop({
     type: String,

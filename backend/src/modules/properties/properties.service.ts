@@ -309,6 +309,8 @@ export class PropertiesService implements OnModuleInit {
   async findAll(query: {
     category?: string;
     type?: string;
+    country?: string;
+    state?: string;
     city?: string;
     q?: string;
     featured?: boolean | string;
@@ -344,6 +346,14 @@ export class PropertiesService implements OnModuleInit {
         filter.category = new RegExp(catNormalized, 'i');
       }
 
+      if (query.country && query.country !== 'all') {
+        filter['location.country'] = new RegExp(query.country.trim(), 'i');
+      }
+
+      if (query.state && query.state !== 'all') {
+        filter['location.state'] = new RegExp(query.state.trim(), 'i');
+      }
+
       if (query.city && query.city !== 'all') {
         filter['location.city'] = new RegExp(query.city.trim(), 'i');
       }
@@ -366,6 +376,8 @@ export class PropertiesService implements OnModuleInit {
           { 'description.en': searchRegex },
           { 'location.locality': searchRegex },
           { 'location.city': searchRegex },
+          { 'location.state': searchRegex },
+          { 'location.country': searchRegex },
           { category: searchRegex },
         ];
       }
@@ -415,6 +427,7 @@ export class PropertiesService implements OnModuleInit {
           { 'location.city': searchRegex },
           { 'location.district': searchRegex },
           { 'location.state': searchRegex },
+          { 'location.country': searchRegex },
           { category: searchRegex },
           { referenceId: searchRegex },
         ];
@@ -432,6 +445,12 @@ export class PropertiesService implements OnModuleInit {
       }
 
       // 5. Hierarchical Location Filters (Legacy Names + Normalized IDs)
+      if (dto.countryId) {
+        filter['location.countryId'] = dto.countryId;
+      } else if (dto.country && dto.country !== 'all') {
+        filter['location.country'] = new RegExp(dto.country.trim(), 'i');
+      }
+
       if (dto.stateId) {
         filter['location.stateId'] = dto.stateId;
       } else if (dto.state && dto.state !== 'all') {

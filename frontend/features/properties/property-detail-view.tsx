@@ -48,7 +48,12 @@ import {
   Copy,
   Check,
   ExternalLink,
+  Play,
+  Video,
+  Film,
+  AlertTriangle,
 } from 'lucide-react';
+import { parseYouTubeUrl } from '@/lib/video';
 
 interface PropertyDetailViewProps {
   property: Property;
@@ -68,6 +73,17 @@ export function PropertyDetailView({
   const { isSaved, toggleSave } = useSavedProperties();
   const { isCompared, addToCompare, removeFromCompare } = useComparison();
   const [selectedImageIndex, setSelectedImageIndex] = React.useState(0);
+
+  const hasVideo = Boolean(property.media?.videoUrl);
+  const isVideoPrimary = property.media?.primaryMediaType === 'VIDEO' || (hasVideo && (!property.media?.images || property.media.images.length === 0));
+  const [activeMediaMode, setActiveMediaMode] = React.useState<'VIDEO' | 'IMAGE'>(
+    hasVideo && isVideoPrimary ? 'VIDEO' : 'IMAGE'
+  );
+  const [videoLoadError, setVideoLoadError] = React.useState(false);
+
+  const videoUrl = property.media?.videoUrl;
+  const isYouTube = hasVideo && (property.media?.videoType === 'YOUTUBE' || videoUrl?.includes('youtu'));
+  const parsedYouTube = isYouTube && videoUrl ? parseYouTubeUrl(videoUrl) : null;
 
   const propertyId = property.id || (property as any)._id;
   const saved = isSaved(propertyId);
@@ -413,19 +429,85 @@ export function PropertyDetailView({
           <div className="lg:col-span-2 space-y-8">
             {/* Gallery Card */}
             <Card className="p-0 overflow-hidden border-casa-border-light shadow-subtle">
-              {/* Primary Active Image Display */}
-              <div className="relative aspect-[16/10] w-full bg-black/5 overflow-hidden">
-                <Image
-                  src={images[selectedImageIndex] || property.media.thumbnailUrl}
-                  alt={`${localizedTitle} - Photo ${selectedImageIndex + 1}`}
-                  fill
-                  priority
-                  sizes="(max-width: 1024px) 100vw, 66vw"
-                  className="object-cover transition-all duration-300"
-                />
+              {/* Media Switcher Header (if Video is available) */}
+              {hasVideo && (
+                <div className="flex border-b border-casa-border-light bg-casa-subtle/50 text-xs">
+                  <button
+                    type="button"
+                    onClick={() => setActiveMediaMode('VIDEO')}
+                    className={`flex-1 py-2.5 px-4 font-bold flex items-center justify-center gap-2 transition-colors ${
+                      activeMediaMode === 'VIDEO'
+                        ? 'bg-casa-surface text-rose-600 border-b-2 border-rose-600'
+                        : 'text-casa-text-muted hover:text-casa-text-primary'
+                    }`}
+                  >
+                    <Play className="w-3.5 h-3.5 fill-rose-600" />
+                    <span>Property Video Tour</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveMediaMode('IMAGE')}
+                    className={`flex-1 py-2.5 px-4 font-bold flex items-center justify-center gap-2 transition-colors ${
+                      activeMediaMode === 'IMAGE'
+                        ? 'bg-casa-surface text-casa-brand border-b-2 border-casa-brand'
+                        : 'text-casa-text-muted hover:text-casa-text-primary'
+                    }`}
+                  >
+                    <Film className="w-3.5 h-3.5" />
+                    <span>Photo Gallery ({images.length})</span>
+                  </button>
+                </div>
+              )}
+
+              {/* Primary Active Display Area */}
+              <div className="relative aspect-[16/10] w-full bg-black overflow-hidden">
+                {/* Mode 1: Property Video Player */}
+                {hasVideo && activeMediaMode === 'VIDEO' && !videoLoadError ? (
+                  <div className="w-full h-full relative flex items-center justify-center bg-black">
+                    {isYouTube && parsedYouTube?.embedUrl ? (
+                      <iframe
+                        src={parsedYouTube.embedUrl}
+                        title={localizedTitle}
+                        className="w-full h-full border-0"
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                        allowFullScreen
+                      />
+                    ) : videoUrl ? (
+                      <video
+                        src={videoUrl}
+                        controls
+                        autoPlay
+                        muted
+                        playsInline
+                        poster={property.media.thumbnailUrl}
+                        onError={() => {
+                          setVideoLoadError(true);
+                          setActiveMediaMode('IMAGE');
+                          toast.warning('Video Notice', 'Video stream unavailable. Showing photo gallery.');
+                        }}
+                        className="w-full h-full object-contain"
+                      />
+                    ) : null}
+                  </div>
+                ) : (
+                  /* Mode 2: Photo Display */
+                  <Image
+                    src={images[selectedImageIndex] || property.media.thumbnailUrl}
+                    alt={`${localizedTitle} - Photo ${selectedImageIndex + 1}`}
+                    fill
+                    priority
+                    sizes="(max-width: 1024px) 100vw, 66vw"
+                    className="object-cover transition-all duration-300"
+                  />
+                )}
 
                 {/* Badges Overlay */}
                 <div className="absolute top-4 start-4 flex flex-wrap gap-2 z-10 pointer-events-none">
+                  {hasVideo && activeMediaMode === 'VIDEO' && (
+                    <Badge variant="default" size="md" className="bg-rose-600 text-white font-bold shadow-subtle border-0">
+                      <Play className="w-3 h-3 fill-white inline mr-1" /> Video Tour
+                    </Badge>
+                  )}
                   {property.isFeatured && (
                     <Badge variant="featured" size="md">
                       ★ {t('featured')}
@@ -445,9 +527,11 @@ export function PropertyDetailView({
 
                 {/* Gallery Quick Counter & Actions */}
                 <div className="absolute top-4 end-4 flex items-center gap-2 z-10">
-                  <span className="text-[11px] font-semibold bg-black/60 text-white backdrop-blur-md px-2.5 py-1 rounded-full">
-                    {selectedImageIndex + 1} / {images.length}
-                  </span>
+                  {activeMediaMode === 'IMAGE' && (
+                    <span className="text-[11px] font-semibold bg-black/60 text-white backdrop-blur-md px-2.5 py-1 rounded-full">
+                      {selectedImageIndex + 1} / {images.length}
+                    </span>
+                  )}
                   <button
                     type="button"
                     onClick={handleNativeShare}
@@ -485,32 +569,60 @@ export function PropertyDetailView({
                 </div>
               </div>
 
-              {/* Thumbnail Strip */}
-              {images.length > 1 && (
-                <div className="p-3 bg-casa-surface border-t border-casa-border-light flex gap-2.5 overflow-x-auto">
-                  {images.map((img, idx) => (
-                    <button
-                      key={idx}
-                      type="button"
-                      onClick={() => setSelectedImageIndex(idx)}
-                      aria-label={`View photo ${idx + 1}`}
-                      className={`relative w-20 h-14 rounded-xl overflow-hidden flex-shrink-0 border-2 transition-all cursor-pointer ${
-                        selectedImageIndex === idx
-                          ? 'border-casa-brand scale-105 shadow-subtle'
-                          : 'border-transparent opacity-70 hover:opacity-100'
-                      }`}
-                    >
-                      <Image
-                        src={img}
-                        alt={`Thumbnail ${idx + 1}`}
-                        fill
-                        sizes="80px"
-                        className="object-cover"
+              {/* Thumbnail Strip (Includes Video Tile + Photos) */}
+              <div className="p-3 bg-casa-surface border-t border-casa-border-light flex gap-2.5 overflow-x-auto">
+                {/* Video Thumbnail Button */}
+                {hasVideo && (
+                  <button
+                    type="button"
+                    onClick={() => setActiveMediaMode('VIDEO')}
+                    className={`relative w-20 h-14 rounded-xl overflow-hidden flex-shrink-0 border-2 transition-all cursor-pointer bg-slate-900 flex flex-col items-center justify-center ${
+                      activeMediaMode === 'VIDEO'
+                        ? 'border-rose-600 scale-105 shadow-subtle ring-2 ring-rose-500/30'
+                        : 'border-transparent opacity-80 hover:opacity-100'
+                    }`}
+                  >
+                    {parsedYouTube?.thumbnailUrl || property.media.thumbnailUrl ? (
+                      /* eslint-disable-next-line @next/next/no-img-element */
+                      <img
+                        src={parsedYouTube?.thumbnailUrl || property.media.thumbnailUrl}
+                        alt="Video Tour"
+                        className="w-full h-full object-cover opacity-60"
                       />
-                    </button>
-                  ))}
-                </div>
-              )}
+                    ) : null}
+                    <div className="absolute inset-0 flex flex-col items-center justify-center text-white gap-0.5 bg-black/40">
+                      <Play className="w-4 h-4 fill-white" />
+                      <span className="text-[8px] font-bold uppercase tracking-wider">Video</span>
+                    </div>
+                  </button>
+                )}
+
+                {/* Photo Thumbnails */}
+                {images.map((img, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => {
+                      setActiveMediaMode('IMAGE');
+                      setSelectedImageIndex(idx);
+                    }}
+                    aria-label={`View photo ${idx + 1}`}
+                    className={`relative w-20 h-14 rounded-xl overflow-hidden flex-shrink-0 border-2 transition-all cursor-pointer ${
+                      activeMediaMode === 'IMAGE' && selectedImageIndex === idx
+                        ? 'border-casa-brand scale-105 shadow-subtle'
+                        : 'border-transparent opacity-70 hover:opacity-100'
+                    }`}
+                  >
+                    <Image
+                      src={img}
+                      alt={`Thumbnail ${idx + 1}`}
+                      fill
+                      sizes="80px"
+                      className="object-cover"
+                    />
+                  </button>
+                ))}
+              </div>
             </Card>
 
             {/* Core Header Information */}

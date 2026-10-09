@@ -235,6 +235,26 @@ export class PropertyMediaDto {
   @IsOptional()
   @IsArray()
   videos?: string[];
+
+  @ApiPropertyOptional({ description: 'Primary video URL (YouTube watch/embed or local uploaded video URL)' })
+  @IsOptional()
+  @IsString()
+  videoUrl?: string;
+
+  @ApiPropertyOptional({ description: 'Video provider type: YOUTUBE, LOCAL, EMBED', enum: ['YOUTUBE', 'LOCAL', 'EMBED'] })
+  @IsOptional()
+  @IsString()
+  videoType?: string;
+
+  @ApiPropertyOptional({ description: 'High-res video poster thumbnail' })
+  @IsOptional()
+  @IsString()
+  videoThumbnail?: string;
+
+  @ApiPropertyOptional({ description: 'Primary media type to display on listing cards (IMAGE or VIDEO)', enum: ['IMAGE', 'VIDEO'] })
+  @IsOptional()
+  @IsString()
+  primaryMediaType?: string;
 }
 
 export class PropertyAdvertiserDto {

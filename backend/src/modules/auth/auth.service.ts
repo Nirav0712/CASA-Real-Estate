@@ -3,6 +3,7 @@ import {
   BadRequestException,
   UnauthorizedException,
   ForbiddenException,
+  ConflictException,
   Logger,
   OnModuleInit,
 } from '@nestjs/common';
@@ -17,6 +18,22 @@ import { RefreshSession, RefreshSessionDocument } from './schemas/refresh-sessio
 import { AgentProfile, AgentProfileDocument } from '../agents/schemas/agent-profile.schema';
 import { RequestOtpDto } from './dto/request-otp.dto';
 import { VerifyOtpDto } from './dto/verify-otp.dto';
+import { RegisterDto } from './dto/register.dto';
+import { LoginDto } from './dto/login.dto';
+import { VerifyEmailDto } from './dto/verify-email.dto';
+import { ResendVerificationDto } from './dto/resend-verification.dto';
+import { ForgotPasswordDto } from './dto/forgot-password.dto';
+import { ResetPasswordDto } from './dto/reset-password.dto';
+import { LinkCredentialsDto } from './dto/link-credentials.dto';
+import { MailService } from './services/mail.service';
+import {
+  normalizeEmail,
+  validatePasswordStrength,
+  hashPassword,
+  comparePassword,
+  generateSecureToken,
+  hashToken,
+} from './utils/password.util';
 import {
   PlatformRole,
   AccountType,
@@ -40,6 +57,13 @@ interface InMemoryUser {
   mobile: string;
   normalizedMobile: string;
   email?: string;
+  passwordHash?: string;
+  isEmailVerified?: boolean;
+  isMobileVerified?: boolean;
+  emailVerificationTokenHash?: string;
+  emailVerificationExpiresAt?: Date;
+  passwordResetTokenHash?: string;
+  passwordResetExpiresAt?: Date;
   agencyName?: string;
   platformRole: PlatformRole;
   accountType: AccountType | null;
@@ -104,6 +128,7 @@ export class AuthService implements OnModuleInit {
     private readonly configService: ConfigService,
     private readonly mockOtpProvider: MockOtpProvider,
     private readonly msg91OtpProvider: Msg91OtpProvider,
+    private readonly mailService: MailService,
   ) {
     // Seed default admin and test users in memory store
     this.seedDefaultUsers();
@@ -226,6 +251,16 @@ export class AuthService implements OnModuleInit {
       if (u._id === id || u.normalizedMobile === id || u.mobile === id) return u;
     }
     return undefined;
+  }
+
+  deleteMemUser(id: string): boolean {
+    for (const [key, u] of this.memUsers.entries()) {
+      if (u._id === id || u.normalizedMobile === id || u.mobile === id) {
+        this.memUsers.delete(key);
+        return true;
+      }
+    }
+    return false;
   }
 
   private seedDefaultUsers() {
@@ -949,8 +984,9 @@ export class AuthService implements OnModuleInit {
    */
   async logoutAll(userId: string) {
     if (this.isDbConnected()) {
+      const userObjectId = Types.ObjectId.isValid(userId) ? new Types.ObjectId(userId) : userId;
       await this.refreshSessionModel.updateMany(
-        { userId: new Types.ObjectId(userId), isRevoked: false },
+        { userId: userObjectId as any, isRevoked: false },
         { $set: { isRevoked: true, revokedAt: new Date() } },
       ).catch(() => {});
     }
@@ -1096,6 +1132,561 @@ export class AuthService implements OnModuleInit {
     };
   }
 
+  /**
+   * Step 2B.1: Register New Account with Email & Password
+   */
+  async register(dto: RegisterDto) {
+    if (dto.password !== dto.confirmPassword) {
+      throw new BadRequestException('Passwords do not match.');
+    }
+
+    const strength = validatePasswordStrength(dto.password);
+    if (!strength.isValid) {
+      throw new BadRequestException(strength.message);
+    }
+
+    const normalizedEmail = normalizeEmail(dto.email);
+    const normalizedMobile = this.normalizeMobile(dto.mobile);
+    const passwordHash = await hashPassword(dto.password);
+    const fullName = dto.fullName.trim();
+
+    // Security: Do not allow public registration to set administrative roles
+    const safeRole = dto.role || (dto.accountType as any) || UserRole.BUYER;
+    if (
+      [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.MODERATOR, 'SUPER_ADMIN', 'ADMIN', 'MODERATOR'].includes(
+        safeRole as any,
+      )
+    ) {
+      throw new BadRequestException('Administrative roles cannot be registered through public endpoints.');
+    }
+
+    const norm = normalizeUserRoleModel({ role: safeRole });
+    const finalPlatformRole = PlatformRole.USER;
+    const finalAccountType = norm.accountType;
+    const finalRole = norm.role;
+    const finalPermissions = this.getDefaultPermissions(finalPlatformRole, finalAccountType);
+
+    const rawToken = generateSecureToken();
+    const tokenHash = hashToken(rawToken);
+    const verificationExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+
+    if (this.isDbConnected()) {
+      try {
+        const existingByEmail = await this.userModel.findOne({ email: normalizedEmail });
+
+        if (existingByEmail) {
+          // If already verified or active, reject duplicate email
+          if (existingByEmail.isEmailVerified || existingByEmail.status !== AccountStatus.PENDING_VERIFICATION) {
+            throw new ConflictException('An account with this email address already exists.');
+          }
+
+          // Unverified pending account retrying registration: refresh details and token
+          existingByEmail.name = fullName;
+          existingByEmail.mobile = dto.mobile.trim();
+          existingByEmail.normalizedMobile = normalizedMobile;
+          existingByEmail.passwordHash = passwordHash;
+          existingByEmail.accountType = finalAccountType;
+          existingByEmail.role = finalRole;
+          existingByEmail.permissions = finalPermissions;
+          existingByEmail.agencyName = dto.agencyName?.trim() || undefined;
+          existingByEmail.emailVerificationTokenHash = tokenHash;
+          existingByEmail.emailVerificationExpiresAt = verificationExpiresAt;
+          await existingByEmail.save();
+        } else {
+          // Check if mobile number is already in use by a different email
+          const existingByMobile = await this.userModel.findOne({ normalizedMobile });
+          if (existingByMobile) {
+            if (existingByMobile.email && existingByMobile.email !== normalizedEmail) {
+              throw new ConflictException('An account with this mobile number is already registered under a different email.');
+            }
+            // If existing mobile-only user, attach email & password
+            existingByMobile.email = normalizedEmail;
+            existingByMobile.name = fullName;
+            existingByMobile.passwordHash = passwordHash;
+            existingByMobile.isEmailVerified = false;
+            existingByMobile.emailVerificationTokenHash = tokenHash;
+            existingByMobile.emailVerificationExpiresAt = verificationExpiresAt;
+            if (existingByMobile.status === AccountStatus.ACTIVE) {
+              // Preserve active status if verified via OTP previously, but require email verification for email-login
+            } else {
+              existingByMobile.status = AccountStatus.PENDING_VERIFICATION;
+            }
+            await existingByMobile.save();
+          } else {
+            // Create brand new user
+            await this.userModel.create({
+              name: fullName,
+              email: normalizedEmail,
+              mobile: dto.mobile.trim(),
+              normalizedMobile,
+              passwordHash,
+              isEmailVerified: false,
+              isMobileVerified: false,
+              emailVerificationTokenHash: tokenHash,
+              emailVerificationExpiresAt: verificationExpiresAt,
+              platformRole: finalPlatformRole,
+              accountType: finalAccountType,
+              role: finalRole,
+              permissions: finalPermissions,
+              status: AccountStatus.PENDING_VERIFICATION,
+              agencyName: dto.agencyName?.trim() || undefined,
+            });
+          }
+        }
+      } catch (err: any) {
+        if (err instanceof ConflictException || err instanceof BadRequestException) throw err;
+        if (err.code === 11000 || err.codeName === 'DuplicateKey' || err.message?.includes('duplicate key')) {
+          throw new ConflictException('An account with this email address or mobile number already exists.');
+        }
+        this.logger.error(`Database registration error: ${err?.message}`);
+        throw err;
+      }
+    }
+
+    // Update in-memory user store for fallback/test resilience
+    this.memUsers.set(normalizedEmail, {
+      _id: new Types.ObjectId().toString(),
+      name: fullName,
+      email: normalizedEmail,
+      mobile: dto.mobile.trim(),
+      normalizedMobile,
+      passwordHash,
+      isEmailVerified: false,
+      isMobileVerified: false,
+      emailVerificationTokenHash: tokenHash,
+      emailVerificationExpiresAt: verificationExpiresAt,
+      platformRole: finalPlatformRole,
+      accountType: finalAccountType,
+      role: finalRole,
+      permissions: finalPermissions,
+      status: AccountStatus.PENDING_VERIFICATION,
+      isVerifiedAgent: false,
+      agencyName: dto.agencyName?.trim() || undefined,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    // Send single-use verification email
+    await this.mailService.sendVerificationEmail(normalizedEmail, fullName, rawToken);
+
+    return {
+      success: true,
+      message: 'Registration successful. Please check your email to activate your account.',
+      email: normalizedEmail,
+      isEmailVerified: false,
+    };
+  }
+
+  /**
+   * Step 2B.2: Login with Email & Password
+   */
+  async login(dto: LoginDto, metadata?: { ipAddress?: string; userAgent?: string }) {
+    const normalizedEmail = normalizeEmail(dto.email);
+    let user: any = null;
+
+    if (this.isDbConnected()) {
+      try {
+        user = await this.userModel.findOne({ email: normalizedEmail }).select('+passwordHash');
+      } catch (err: any) {
+        this.logger.warn(`Database login lookup fallback: ${err?.message}`);
+      }
+    }
+
+    if (!user) {
+      user = this.memUsers.get(normalizedEmail);
+    }
+
+    if (!user || !user.passwordHash) {
+      throw new UnauthorizedException('Invalid email or password.');
+    }
+
+    const isPasswordValid = await comparePassword(dto.password, user.passwordHash);
+    if (!isPasswordValid) {
+      throw new UnauthorizedException('Invalid email or password.');
+    }
+
+    if (user.status === AccountStatus.SUSPENDED) {
+      throw new ForbiddenException('Your account has been suspended. Please contact support.');
+    }
+
+    if (user.status === AccountStatus.DEACTIVATED) {
+      throw new ForbiddenException('Your account has been deactivated. Please contact support.');
+    }
+
+    if (!user.isEmailVerified || user.status === AccountStatus.PENDING_VERIFICATION) {
+      throw new UnauthorizedException(
+        'Please verify your email address before logging in. You can request a new verification link if needed.',
+      );
+    }
+
+    user.lastLoginAt = new Date();
+    if (typeof user.save === 'function') {
+      await user.save().catch(() => {});
+    }
+
+    const tokens = await this.generateTokens(user, metadata);
+
+    return {
+      success: true,
+      message: 'Authentication successful.',
+      user: this.sanitizeUser(user),
+      tokens,
+    };
+  }
+
+  /**
+   * Step 2B.3: Verify Email Address with Token
+   */
+  async verifyEmail(dto: VerifyEmailDto) {
+    const normalizedEmail = dto.email ? normalizeEmail(dto.email) : '';
+
+    if (!dto.token) {
+      throw new BadRequestException('Verification token is required.');
+    }
+
+    const providedHash = hashToken(dto.token);
+    let user: any = null;
+
+    if (this.isDbConnected()) {
+      try {
+        if (normalizedEmail) {
+          user = await this.userModel
+            .findOne({ email: normalizedEmail })
+            .select('+emailVerificationTokenHash');
+        } else {
+          user = await this.userModel
+            .findOne({ emailVerificationTokenHash: providedHash })
+            .select('+emailVerificationTokenHash');
+        }
+      } catch (err: any) {
+        this.logger.warn(`Database verifyEmail lookup fallback: ${err?.message}`);
+      }
+    }
+
+    if (!user) {
+      if (normalizedEmail) {
+        user = this.memUsers.get(normalizedEmail);
+      } else {
+        for (const u of this.memUsers.values()) {
+          if (u.emailVerificationTokenHash === providedHash) {
+            user = u;
+            break;
+          }
+        }
+      }
+    }
+
+    if (!user) {
+      throw new BadRequestException('Invalid or expired email verification link.');
+    }
+
+    if (user.isEmailVerified) {
+      return {
+        success: true,
+        message: 'Email is already verified. You can now log in.',
+      };
+    }
+
+    if (
+      !user.emailVerificationTokenHash ||
+      !user.emailVerificationExpiresAt ||
+      new Date(user.emailVerificationExpiresAt) < new Date()
+    ) {
+      throw new BadRequestException('Email verification link has expired. Please request a new one.');
+    }
+
+    const expectedHash = user.emailVerificationTokenHash;
+    const hashMatch =
+      providedHash.length === expectedHash.length &&
+      crypto.timingSafeEqual(Buffer.from(providedHash), Buffer.from(expectedHash));
+
+    if (!hashMatch) {
+      throw new BadRequestException('Invalid or expired email verification link.');
+    }
+
+    user.isEmailVerified = true;
+    if (user.status === AccountStatus.PENDING_VERIFICATION) {
+      user.status = AccountStatus.ACTIVE;
+    }
+    user.emailVerificationTokenHash = undefined;
+    user.emailVerificationExpiresAt = undefined;
+
+    if (typeof user.save === 'function') {
+      await user.save();
+    }
+
+    return {
+      success: true,
+      message: 'Email address verified successfully. You may now log in.',
+    };
+  }
+
+  /**
+   * Step 2B.4: Resend Verification Email
+   */
+  async resendVerification(dto: ResendVerificationDto) {
+    const normalizedEmail = normalizeEmail(dto.email);
+    const genericResponse = {
+      success: true,
+      message: 'If an unverified account exists for this email address, a verification link has been sent.',
+    };
+
+    let user: any = null;
+
+    if (this.isDbConnected()) {
+      try {
+        user = await this.userModel.findOne({ email: normalizedEmail });
+      } catch (err: any) {
+        this.logger.warn(`Database resendVerification lookup fallback: ${err?.message}`);
+      }
+    }
+
+    if (!user) {
+      user = this.memUsers.get(normalizedEmail);
+    }
+
+    if (
+      !user ||
+      user.isEmailVerified ||
+      user.status === AccountStatus.SUSPENDED ||
+      user.status === AccountStatus.DEACTIVATED
+    ) {
+      return genericResponse;
+    }
+
+    const rawToken = generateSecureToken();
+    const tokenHash = hashToken(rawToken);
+    const verificationExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+
+    user.emailVerificationTokenHash = tokenHash;
+    user.emailVerificationExpiresAt = verificationExpiresAt;
+
+    if (typeof user.save === 'function') {
+      await user.save();
+    }
+
+    await this.mailService.sendVerificationEmail(normalizedEmail, user.name, rawToken);
+
+    return genericResponse;
+  }
+
+  /**
+   * Step 2B.5: Forgot Password — Request Password Reset Token
+   */
+  async forgotPassword(dto: ForgotPasswordDto) {
+    const normalizedEmail = normalizeEmail(dto.email);
+    const genericResponse = {
+      success: true,
+      message: 'If an account exists with this email address, password reset instructions have been sent.',
+    };
+
+    let user: any = null;
+
+    if (this.isDbConnected()) {
+      try {
+        user = await this.userModel.findOne({ email: normalizedEmail });
+      } catch (err: any) {
+        this.logger.warn(`Database forgotPassword lookup fallback: ${err?.message}`);
+      }
+    }
+
+    if (!user) {
+      user = this.memUsers.get(normalizedEmail);
+    }
+
+    if (!user || user.status === AccountStatus.SUSPENDED || user.status === AccountStatus.DEACTIVATED) {
+      return genericResponse;
+    }
+
+    const rawToken = generateSecureToken();
+    const tokenHash = hashToken(rawToken);
+    const expiryMinutes = this.configService.get<number>('auth.passwordResetExpiresMinutes') || 60;
+    const resetExpiresAt = new Date(Date.now() + expiryMinutes * 60 * 1000);
+
+    user.passwordResetTokenHash = tokenHash;
+    user.passwordResetExpiresAt = resetExpiresAt;
+
+    if (typeof user.save === 'function') {
+      await user.save();
+    }
+
+    await this.mailService.sendPasswordResetEmail(normalizedEmail, user.name, rawToken);
+
+    return genericResponse;
+  }
+
+  /**
+   * Step 2B.6: Reset Password with Token
+   */
+  async resetPassword(dto: ResetPasswordDto) {
+    if (dto.newPassword !== dto.confirmPassword) {
+      throw new BadRequestException('Passwords do not match.');
+    }
+
+    const strength = validatePasswordStrength(dto.newPassword);
+    if (!strength.isValid) {
+      throw new BadRequestException(strength.message);
+    }
+
+    const normalizedEmail = normalizeEmail(dto.email);
+    let user: any = null;
+
+    if (this.isDbConnected()) {
+      try {
+        user = await this.userModel
+          .findOne({ email: normalizedEmail })
+          .select('+passwordResetTokenHash');
+      } catch (err: any) {
+        this.logger.warn(`Database resetPassword lookup fallback: ${err?.message}`);
+      }
+    }
+
+    if (!user) {
+      user = this.memUsers.get(normalizedEmail);
+    }
+
+    if (!user || !user.passwordResetTokenHash || !user.passwordResetExpiresAt) {
+      throw new BadRequestException('Invalid or expired password reset link.');
+    }
+
+    if (new Date(user.passwordResetExpiresAt) < new Date()) {
+      user.passwordResetTokenHash = undefined;
+      user.passwordResetExpiresAt = undefined;
+      if (typeof user.save === 'function') {
+        await user.save().catch(() => {});
+      }
+      throw new BadRequestException('Password reset link has expired. Please request a new one.');
+    }
+
+    const providedHash = hashToken(dto.token);
+    const expectedHash = user.passwordResetTokenHash;
+
+    const hashMatch =
+      providedHash.length === expectedHash.length &&
+      crypto.timingSafeEqual(Buffer.from(providedHash), Buffer.from(expectedHash));
+
+    if (!hashMatch) {
+      throw new BadRequestException('Invalid or expired password reset link.');
+    }
+
+    const newPasswordHash = await hashPassword(dto.newPassword);
+    user.passwordHash = newPasswordHash;
+    user.passwordResetTokenHash = undefined;
+    user.passwordResetExpiresAt = undefined;
+
+    // If reset is performed by an unverified account via email token, mark email verified
+    if (!user.isEmailVerified && user.status === AccountStatus.PENDING_VERIFICATION) {
+      user.isEmailVerified = true;
+      user.status = AccountStatus.ACTIVE;
+      user.emailVerificationTokenHash = undefined;
+      user.emailVerificationExpiresAt = undefined;
+    }
+
+    const userIdStr = user._id ? user._id.toString() : user.id;
+
+    if (typeof user.save === 'function') {
+      await user.save();
+    }
+
+    // Revoke all existing refresh sessions for this user
+    await this.logoutAll(userIdStr);
+
+    return {
+      success: true,
+      message: 'Password has been reset successfully. Please log in with your new password.',
+    };
+  }
+
+  /**
+   * Step 4 / Onboarding: Link Email & Password to Authenticated Account
+   * Used by existing administrators and users migrating to email/password authentication.
+   * Securely binds target account from authenticated JWT session (never client body ID).
+   */
+  async linkCredentials(userId: string, dto: LinkCredentialsDto) {
+    if (dto.password !== dto.confirmPassword) {
+      throw new BadRequestException('Passwords do not match.');
+    }
+
+    validatePasswordStrength(dto.password);
+    const normalizedEmail = normalizeEmail(dto.email);
+
+    let user: any = null;
+    if (this.isDbConnected()) {
+      try {
+        user = await this.userModel.findById(userId);
+      } catch (err: any) {
+        this.logger.warn(`Database linkCredentials fallback: ${err?.message}`);
+      }
+    }
+
+    if (!user) {
+      for (const u of this.memUsers.values()) {
+        if (u._id === userId) {
+          user = u;
+          break;
+        }
+      }
+    }
+
+    if (!user) {
+      throw new UnauthorizedException('Target account not found.');
+    }
+
+    if (user.status === AccountStatus.SUSPENDED || user.status === AccountStatus.DEACTIVATED) {
+      throw new ForbiddenException(`Account is ${user.status.toLowerCase()}.`);
+    }
+
+    // Check email uniqueness against other accounts
+    if (this.isDbConnected()) {
+      const existing = await this.userModel.findOne({
+        email: normalizedEmail,
+        _id: { $ne: user._id },
+      });
+      if (existing) {
+        throw new ConflictException('This email address is already in use by another account.');
+      }
+    } else {
+      for (const u of this.memUsers.values()) {
+        if (u._id !== userId && u.email && u.email.toLowerCase() === normalizedEmail) {
+          throw new ConflictException('This email address is already in use by another account.');
+        }
+      }
+    }
+
+    const newPasswordHash = await hashPassword(dto.password);
+    const rawToken = generateSecureToken();
+    const tokenHash = hashToken(rawToken);
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+
+    user.email = normalizedEmail;
+    user.passwordHash = newPasswordHash;
+    user.isEmailVerified = false;
+    user.emailVerificationTokenHash = tokenHash;
+    user.emailVerificationExpiresAt = expiresAt;
+
+    if (typeof user.save === 'function') {
+      await user.save();
+    }
+
+    // Dispatch verification email
+    try {
+      await this.mailService.sendVerificationEmail(
+        normalizedEmail,
+        user.name || 'Administrator',
+        rawToken,
+      );
+    } catch (err: any) {
+      this.logger.error(`Failed to dispatch email verification link: ${err?.message}`);
+    }
+
+    return {
+      success: true,
+      message:
+        'Email and password have been linked. A verification link has been sent to your email address. Please verify your email before logging in with email and password.',
+      user: this.sanitizeUser(user),
+    };
+  }
+
   normalizeRoleModel(input: {
     role?: any;
     platformRole?: any;
@@ -1133,6 +1724,8 @@ export class AuthService implements OnModuleInit {
       permissions,
       status: user.status || AccountStatus.ACTIVE,
       isVerifiedAgent: norm.isVerifiedAgent,
+      isEmailVerified: !!user.isEmailVerified,
+      hasPassword: !!user.passwordHash,
       agencyName: user.agencyName,
       avatar: user.avatar,
     };

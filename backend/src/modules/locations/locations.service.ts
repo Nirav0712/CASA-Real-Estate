@@ -1152,7 +1152,240 @@ export class LocationsService implements OnModuleInit {
       });
     }
 
-    this.logger.log('Initial location hierarchy seeded successfully with 35+ verified micro-markets.');
+    // -------------------------------------------------------------------------
+    // 7. GLOBAL DESTINATIONS: UAE, USA, UK, SAUDI ARABIA
+    // -------------------------------------------------------------------------
+    let uae = await this.locationModel.findOne({ slug: 'united-arab-emirates' });
+    if (!uae) {
+      uae = await this.locationModel.create({
+        name: 'United Arab Emirates',
+        slug: 'united-arab-emirates',
+        type: LocationType.COUNTRY,
+        countryCode: 'AE',
+        ancestorIds: [],
+        localizedNames: { en: 'United Arab Emirates', ar: 'الإمارات العربية المتحدة', hi: 'संयुक्त अरब अमीरात', ur: 'متحدہ عرب امارات' },
+        aliases: ['UAE', 'Emirates'],
+        isActive: true,
+        isFeatured: true,
+        sortOrder: 2,
+      });
+
+      const dubaiEmirate = await this.locationModel.create({
+        name: 'Dubai',
+        slug: 'dubai-emirate',
+        type: LocationType.STATE,
+        parentId: uae._id,
+        ancestorIds: [uae._id],
+        countryCode: 'AE',
+        stateCode: 'DXB',
+        localizedNames: { en: 'Dubai', ar: 'دبي', hi: 'दुबई' },
+        isActive: true,
+        isFeatured: true,
+        sortOrder: 1,
+      });
+
+      const dubaiCity = await this.locationModel.create({
+        name: 'Dubai',
+        slug: 'dubai',
+        type: LocationType.CITY,
+        parentId: dubaiEmirate._id,
+        ancestorIds: [uae._id, dubaiEmirate._id],
+        countryCode: 'AE',
+        stateCode: 'DXB',
+        cityCode: 'DXB',
+        localizedNames: { en: 'Dubai', ar: 'دبي', hi: 'दुबई', ur: 'دبئی' },
+        latitude: 25.2048,
+        longitude: 55.2708,
+        geo: { type: 'Point', coordinates: [55.2708, 25.2048] },
+        isActive: true,
+        isFeatured: true,
+        sortOrder: 1,
+      });
+
+      const dxbLocalities = [
+        { name: 'Downtown Dubai', slug: 'downtown-dubai', lat: 25.1972, lng: 55.2744 },
+        { name: 'Dubai Marina', slug: 'dubai-marina', lat: 25.0805, lng: 55.1403 },
+        { name: 'Palm Jumeirah', slug: 'palm-jumeirah', lat: 25.1124, lng: 55.139 },
+        { name: 'Business Bay', slug: 'business-bay', lat: 25.1837, lng: 55.2666 },
+      ];
+
+      for (const loc of dxbLocalities) {
+        await this.locationModel.create({
+          name: loc.name,
+          slug: loc.slug,
+          type: LocationType.LOCALITY,
+          parentId: dubaiCity._id,
+          ancestorIds: [uae._id, dubaiEmirate._id, dubaiCity._id],
+          countryCode: 'AE',
+          stateCode: 'DXB',
+          cityCode: 'DXB',
+          latitude: loc.lat,
+          longitude: loc.lng,
+          geo: { type: 'Point', coordinates: [loc.lng, loc.lat] },
+          isActive: true,
+          isFeatured: true,
+        });
+      }
+
+      const abuDhabiEmirate = await this.locationModel.create({
+        name: 'Abu Dhabi',
+        slug: 'abu-dhabi-emirate',
+        type: LocationType.STATE,
+        parentId: uae._id,
+        ancestorIds: [uae._id],
+        countryCode: 'AE',
+        stateCode: 'AUH',
+        localizedNames: { en: 'Abu Dhabi', ar: 'أبو ظبي', hi: 'अबू धाबी' },
+        isActive: true,
+        isFeatured: true,
+        sortOrder: 2,
+      });
+
+      await this.locationModel.create({
+        name: 'Abu Dhabi',
+        slug: 'abu-dhabi',
+        type: LocationType.CITY,
+        parentId: abuDhabiEmirate._id,
+        ancestorIds: [uae._id, abuDhabiEmirate._id],
+        countryCode: 'AE',
+        stateCode: 'AUH',
+        cityCode: 'AUH',
+        localizedNames: { en: 'Abu Dhabi', ar: 'أبو ظبي', hi: 'अबू धाबी', ur: 'ابوظہبی' },
+        latitude: 24.4539,
+        longitude: 54.3773,
+        geo: { type: 'Point', coordinates: [54.3773, 24.4539] },
+        isActive: true,
+        isFeatured: true,
+        sortOrder: 1,
+      });
+    }
+
+    let usa = await this.locationModel.findOne({ slug: 'united-states' });
+    if (!usa) {
+      usa = await this.locationModel.create({
+        name: 'United States',
+        slug: 'united-states',
+        type: LocationType.COUNTRY,
+        countryCode: 'US',
+        ancestorIds: [],
+        localizedNames: { en: 'United States', hi: 'संयुक्त राज्य अमेरिका', ar: 'الولايات المتحدة', ur: 'ریاستہائے متحدہ امریکہ' },
+        aliases: ['USA', 'America'],
+        isActive: true,
+        isFeatured: true,
+        sortOrder: 3,
+      });
+
+      const california = await this.locationModel.create({
+        name: 'California',
+        slug: 'california',
+        type: LocationType.STATE,
+        parentId: usa._id,
+        ancestorIds: [usa._id],
+        countryCode: 'US',
+        stateCode: 'CA',
+        localizedNames: { en: 'California' },
+        isActive: true,
+        isFeatured: true,
+        sortOrder: 1,
+      });
+
+      await this.locationModel.create({
+        name: 'San Francisco',
+        slug: 'san-francisco',
+        type: LocationType.CITY,
+        parentId: california._id,
+        ancestorIds: [usa._id, california._id],
+        countryCode: 'US',
+        stateCode: 'CA',
+        cityCode: 'SFO',
+        latitude: 37.7749,
+        longitude: -122.4194,
+        geo: { type: 'Point', coordinates: [-122.4194, 37.7749] },
+        isActive: true,
+        isFeatured: true,
+        sortOrder: 1,
+      });
+
+      const newYorkState = await this.locationModel.create({
+        name: 'New York',
+        slug: 'new-york-state',
+        type: LocationType.STATE,
+        parentId: usa._id,
+        ancestorIds: [usa._id],
+        countryCode: 'US',
+        stateCode: 'NY',
+        localizedNames: { en: 'New York' },
+        isActive: true,
+        isFeatured: true,
+        sortOrder: 2,
+      });
+
+      await this.locationModel.create({
+        name: 'New York City',
+        slug: 'new-york-city',
+        type: LocationType.CITY,
+        parentId: newYorkState._id,
+        ancestorIds: [usa._id, newYorkState._id],
+        countryCode: 'US',
+        stateCode: 'NY',
+        cityCode: 'NYC',
+        latitude: 40.7128,
+        longitude: -74.006,
+        geo: { type: 'Point', coordinates: [-74.006, 40.7128] },
+        isActive: true,
+        isFeatured: true,
+        sortOrder: 1,
+      });
+    }
+
+    let uk = await this.locationModel.findOne({ slug: 'united-kingdom' });
+    if (!uk) {
+      uk = await this.locationModel.create({
+        name: 'United Kingdom',
+        slug: 'united-kingdom',
+        type: LocationType.COUNTRY,
+        countryCode: 'GB',
+        ancestorIds: [],
+        localizedNames: { en: 'United Kingdom', hi: 'यूनाइटेड किंगडम', ar: 'المملكة المتحدة', ur: 'برطانیہ' },
+        aliases: ['UK', 'Britain', 'Great Britain'],
+        isActive: true,
+        isFeatured: true,
+        sortOrder: 4,
+      });
+
+      const england = await this.locationModel.create({
+        name: 'England',
+        slug: 'england',
+        type: LocationType.STATE,
+        parentId: uk._id,
+        ancestorIds: [uk._id],
+        countryCode: 'GB',
+        stateCode: 'ENG',
+        localizedNames: { en: 'England' },
+        isActive: true,
+        isFeatured: true,
+        sortOrder: 1,
+      });
+
+      await this.locationModel.create({
+        name: 'London',
+        slug: 'london',
+        type: LocationType.CITY,
+        parentId: england._id,
+        ancestorIds: [uk._id, england._id],
+        countryCode: 'GB',
+        stateCode: 'ENG',
+        cityCode: 'LON',
+        latitude: 51.5074,
+        longitude: -0.1278,
+        geo: { type: 'Point', coordinates: [-0.1278, 51.5074] },
+        isActive: true,
+        isFeatured: true,
+        sortOrder: 1,
+      });
+    }
+
+    this.logger.log('Initial location hierarchy seeded successfully with global micro-markets.');
   }
 
   // ---------------------------------------------------------------------------

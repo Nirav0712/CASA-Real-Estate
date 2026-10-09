@@ -20,8 +20,11 @@ import { OtpChallenge } from './schemas/otp-challenge.schema';
 import { RefreshSession } from './schemas/refresh-session.schema';
 import { MockOtpProvider } from './providers/mock-otp.provider';
 import { Msg91OtpProvider } from './providers/msg91-otp.provider';
+import { MailService } from './services/mail.service';
 import { AgentProfile } from '../agents/schemas/agent-profile.schema';
 import { UserRole, AccountStatus, OtpStatus, PlatformRole, AccountType } from './enums/auth.enums';
+import { hashPassword, hashToken } from './utils/password.util';
+import { ConflictException } from '@nestjs/common';
 
 describe('AuthService (Security-First Unit & Integration Tests)', () => {
   let service: AuthService;
@@ -32,6 +35,7 @@ describe('AuthService (Security-First Unit & Integration Tests)', () => {
   let mockJwtService: any;
   let mockConfigService: any;
   let mockOtpProvider: any;
+  let mockMailService: any;
 
   beforeEach(async () => {
     mockUserModel = {
@@ -57,6 +61,7 @@ describe('AuthService (Security-First Unit & Integration Tests)', () => {
       findOne: jest.fn(),
       create: jest.fn(),
       updateOne: jest.fn(),
+      findOneAndUpdate: jest.fn().mockResolvedValue({}),
     };
 
     mockJwtService = {
@@ -72,6 +77,7 @@ describe('AuthService (Security-First Unit & Integration Tests)', () => {
           'auth.otpExpiresInMinutes': 5,
           'auth.otpMaxAttempts': 3,
           'auth.otpSecretSalt': 'test_otp_salt_secret',
+          'auth.passwordResetExpiresMinutes': 60,
           'sms.provider': 'mock',
           'sms.enableMockSms': true,
           'jwt.accessSecret': 'test_access_secret',
@@ -88,6 +94,11 @@ describe('AuthService (Security-First Unit & Integration Tests)', () => {
       sendOtp: jest.fn().mockResolvedValue({ success: true, isMock: true, provider: 'mock' }),
     };
 
+    mockMailService = {
+      sendVerificationEmail: jest.fn().mockResolvedValue({ success: true }),
+      sendPasswordResetEmail: jest.fn().mockResolvedValue({ success: true }),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         AuthService,
@@ -99,6 +110,7 @@ describe('AuthService (Security-First Unit & Integration Tests)', () => {
         { provide: ConfigService, useValue: mockConfigService },
         { provide: MockOtpProvider, useValue: mockOtpProvider },
         { provide: Msg91OtpProvider, useValue: { name: 'msg91', sendOtp: jest.fn() } },
+        { provide: MailService, useValue: mockMailService },
       ],
     }).compile();
 
@@ -369,6 +381,366 @@ describe('AuthService (Security-First Unit & Integration Tests)', () => {
           role: UserRole.ADMIN,
         }),
       ).rejects.toThrow(BadRequestException);
+    });
+  });
+
+  describe('Step 2B: Email/Password Registration', () => {
+    it('17. should successfully register a new user and send verification email', async () => {
+      mockUserModel.findOne.mockResolvedValue(null);
+      mockUserModel.create.mockResolvedValue({
+        _id: 'user_new_1',
+        email: 'newuser@example.com',
+        status: AccountStatus.PENDING_VERIFICATION,
+        isEmailVerified: false,
+      });
+
+      const res = await service.register({
+        fullName: 'New User',
+        email: 'NewUser@example.com',
+        mobile: '9876543210',
+        password: 'Password123!',
+        confirmPassword: 'Password123!',
+      });
+
+      expect(res.success).toBe(true);
+      expect(res.email).toBe('newuser@example.com');
+      expect(res.isEmailVerified).toBe(false);
+      expect(mockMailService.sendVerificationEmail).toHaveBeenCalledWith(
+        'newuser@example.com',
+        'New User',
+        expect.any(String),
+      );
+    });
+
+    it('18. should reject registration when passwords do not match', async () => {
+      await expect(
+        service.register({
+          fullName: 'Test User',
+          email: 'test@example.com',
+          mobile: '9876543210',
+          password: 'Password123!',
+          confirmPassword: 'DifferentPassword123!',
+        }),
+      ).rejects.toThrow('Passwords do not match');
+    });
+
+    it('19. should reject registration with password shorter than 8 characters', async () => {
+      await expect(
+        service.register({
+          fullName: 'Test User',
+          email: 'test@example.com',
+          mobile: '9876543210',
+          password: 'short',
+          confirmPassword: 'short',
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('20. should reject duplicate registration with 409 Conflict if account is already verified', async () => {
+      mockUserModel.findOne.mockResolvedValue({
+        _id: 'existing_user_id',
+        email: 'existing@example.com',
+        isEmailVerified: true,
+        status: AccountStatus.ACTIVE,
+      });
+
+      await expect(
+        service.register({
+          fullName: 'Existing User',
+          email: 'existing@example.com',
+          mobile: '9876543210',
+          password: 'Password123!',
+          confirmPassword: 'Password123!',
+        }),
+      ).rejects.toThrow(ConflictException);
+    });
+
+    it('21. should reject public registration claiming administrative roles', async () => {
+      await expect(
+        service.register({
+          fullName: 'Hacker',
+          email: 'hacker@example.com',
+          mobile: '9876543210',
+          password: 'Password123!',
+          confirmPassword: 'Password123!',
+          role: UserRole.SUPER_ADMIN,
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
+  });
+
+  describe('Step 2B: Email/Password Login', () => {
+    it('22. should authenticate user with valid email & password and issue tokens', async () => {
+      const hashedPassword = await hashPassword('ValidPassword123!');
+      const mockUser = {
+        _id: 'user_login_1',
+        name: 'Active User',
+        email: 'loginuser@example.com',
+        mobile: '+919876543210',
+        normalizedMobile: '+919876543210',
+        passwordHash: hashedPassword,
+        isEmailVerified: true,
+        status: AccountStatus.ACTIVE,
+        role: UserRole.BUYER,
+        platformRole: PlatformRole.USER,
+        accountType: AccountType.BUYER,
+        save: jest.fn().mockResolvedValue(true),
+      };
+
+      mockUserModel.findOne.mockReturnValue({
+        select: jest.fn().mockResolvedValue(mockUser),
+      });
+
+      const res = await service.login({
+        email: 'LoginUser@example.com',
+        password: 'ValidPassword123!',
+      });
+
+      expect(res.success).toBe(true);
+      expect(res.tokens.accessToken).toBe('mock_jwt_token_xyz');
+      expect(res.user.email).toBe('loginuser@example.com');
+    });
+
+    it('23. should reject login with invalid password using generic error', async () => {
+      const hashedPassword = await hashPassword('CorrectPassword123!');
+      const mockUser = {
+        _id: 'user_login_1',
+        email: 'user@example.com',
+        passwordHash: hashedPassword,
+        isEmailVerified: true,
+        status: AccountStatus.ACTIVE,
+      };
+
+      mockUserModel.findOne.mockReturnValue({
+        select: jest.fn().mockResolvedValue(mockUser),
+      });
+
+      await expect(
+        service.login({
+          email: 'user@example.com',
+          password: 'WrongPassword!',
+        }),
+      ).rejects.toThrow(UnauthorizedException);
+    });
+
+    it('24. should reject login for unverified email accounts', async () => {
+      const hashedPassword = await hashPassword('ValidPassword123!');
+      const unverifiedUser = {
+        _id: 'unverified_1',
+        email: 'unverified@example.com',
+        passwordHash: hashedPassword,
+        isEmailVerified: false,
+        status: AccountStatus.PENDING_VERIFICATION,
+      };
+
+      mockUserModel.findOne.mockReturnValue({
+        select: jest.fn().mockResolvedValue(unverifiedUser),
+      });
+
+      await expect(
+        service.login({
+          email: 'unverified@example.com',
+          password: 'ValidPassword123!',
+        }),
+      ).rejects.toThrow('Please verify your email address before logging in');
+    });
+
+    it('25. should reject login for suspended accounts with ForbiddenException', async () => {
+      const hashedPassword = await hashPassword('ValidPassword123!');
+      const suspendedUser = {
+        _id: 'suspended_1',
+        email: 'suspended@example.com',
+        passwordHash: hashedPassword,
+        isEmailVerified: true,
+        status: AccountStatus.SUSPENDED,
+      };
+
+      mockUserModel.findOne.mockReturnValue({
+        select: jest.fn().mockResolvedValue(suspendedUser),
+      });
+
+      await expect(
+        service.login({
+          email: 'suspended@example.com',
+          password: 'ValidPassword123!',
+        }),
+      ).rejects.toThrow(ForbiddenException);
+    });
+  });
+
+  describe('Step 2B: Email Verification & Resending', () => {
+    it('26. should verify email successfully with valid token and activate pending user', async () => {
+      const rawToken = 'test_valid_token_1234567890abcdef';
+      const tokenHash = hashToken(rawToken);
+      const pendingUser = {
+        _id: 'pending_user_1',
+        email: 'pending@example.com',
+        isEmailVerified: false,
+        status: AccountStatus.PENDING_VERIFICATION,
+        emailVerificationTokenHash: tokenHash,
+        emailVerificationExpiresAt: new Date(Date.now() + 3600000),
+        save: jest.fn().mockResolvedValue(true),
+      };
+
+      mockUserModel.findOne.mockReturnValue({
+        select: jest.fn().mockResolvedValue(pendingUser),
+      });
+
+      const res = await service.verifyEmail({
+        email: 'pending@example.com',
+        token: rawToken,
+      });
+
+      expect(res.success).toBe(true);
+      expect(pendingUser.isEmailVerified).toBe(true);
+      expect(pendingUser.status).toBe(AccountStatus.ACTIVE);
+      expect(pendingUser.emailVerificationTokenHash).toBeUndefined();
+    });
+
+    it('27. should reject verification with expired token', async () => {
+      const rawToken = 'test_token_expired';
+      const tokenHash = hashToken(rawToken);
+      const expiredUser = {
+        email: 'expired@example.com',
+        isEmailVerified: false,
+        emailVerificationTokenHash: tokenHash,
+        emailVerificationExpiresAt: new Date(Date.now() - 3600000), // Expired 1 hr ago
+      };
+
+      mockUserModel.findOne.mockReturnValue({
+        select: jest.fn().mockResolvedValue(expiredUser),
+      });
+
+      await expect(
+        service.verifyEmail({
+          email: 'expired@example.com',
+          token: rawToken,
+        }),
+      ).rejects.toThrow('Email verification link has expired');
+    });
+
+    it('28. should reject verification with mismatched token', async () => {
+      const userWithToken = {
+        email: 'user@example.com',
+        isEmailVerified: false,
+        emailVerificationTokenHash: hashToken('correct_token'),
+        emailVerificationExpiresAt: new Date(Date.now() + 3600000),
+      };
+
+      mockUserModel.findOne.mockReturnValue({
+        select: jest.fn().mockResolvedValue(userWithToken),
+      });
+
+      await expect(
+        service.verifyEmail({
+          email: 'user@example.com',
+          token: 'wrong_token',
+        }),
+      ).rejects.toThrow('Invalid or expired email verification link');
+    });
+
+    it('29. should return generic response on resend-verification for unverified account', async () => {
+      const user = {
+        email: 'user@example.com',
+        name: 'User',
+        isEmailVerified: false,
+        status: AccountStatus.PENDING_VERIFICATION,
+        save: jest.fn().mockResolvedValue(true),
+      };
+      mockUserModel.findOne.mockResolvedValue(user);
+
+      const res = await service.resendVerification({ email: 'user@example.com' });
+
+      expect(res.success).toBe(true);
+      expect(mockMailService.sendVerificationEmail).toHaveBeenCalled();
+    });
+  });
+
+  describe('Step 2B: Forgot Password & Reset Password', () => {
+    it('30. should dispatch reset email on forgotPassword request', async () => {
+      const user = {
+        _id: 'user_123',
+        email: 'forgot@example.com',
+        name: 'Forgot User',
+        status: AccountStatus.ACTIVE,
+        save: jest.fn().mockResolvedValue(true),
+      };
+      mockUserModel.findOne.mockResolvedValue(user);
+
+      const res = await service.forgotPassword({ email: 'forgot@example.com' });
+
+      expect(res.success).toBe(true);
+      expect(user.save).toHaveBeenCalled();
+      expect(mockMailService.sendPasswordResetEmail).toHaveBeenCalledWith(
+        'forgot@example.com',
+        'Forgot User',
+        expect.any(String),
+      );
+    });
+
+    it('31. should successfully reset password and revoke user sessions', async () => {
+      const rawToken = 'reset_token_secret_12345678';
+      const tokenHash = hashToken(rawToken);
+      const user = {
+        _id: '507f1f77bcf86cd799439011',
+        email: 'resetme@example.com',
+        passwordResetTokenHash: tokenHash,
+        passwordResetExpiresAt: new Date(Date.now() + 1800000),
+        isEmailVerified: true,
+        status: AccountStatus.ACTIVE,
+        save: jest.fn().mockResolvedValue(true),
+      };
+
+      mockUserModel.findOne.mockReturnValue({
+        select: jest.fn().mockResolvedValue(user),
+      });
+
+      const res = await service.resetPassword({
+        email: 'resetme@example.com',
+        token: rawToken,
+        newPassword: 'BrandNewSecurePassword123!',
+        confirmPassword: 'BrandNewSecurePassword123!',
+      });
+
+      expect(res.success).toBe(true);
+      expect(user.passwordResetTokenHash).toBeUndefined();
+      expect(mockRefreshSessionModel.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({ userId: expect.anything() }),
+        expect.anything(),
+      );
+    });
+
+    it('32. should reject resetPassword when passwords do not match', async () => {
+      await expect(
+        service.resetPassword({
+          email: 'reset@example.com',
+          token: 'some_token',
+          newPassword: 'Password123!',
+          confirmPassword: 'MismatchedPassword123!',
+        }),
+      ).rejects.toThrow('Passwords do not match');
+    });
+
+    it('33. should reject resetPassword with invalid or expired token', async () => {
+      const user = {
+        email: 'reset@example.com',
+        passwordResetTokenHash: hashToken('valid_token'),
+        passwordResetExpiresAt: new Date(Date.now() - 1000), // Expired
+        save: jest.fn().mockResolvedValue(true),
+      };
+
+      mockUserModel.findOne.mockReturnValue({
+        select: jest.fn().mockResolvedValue(user),
+      });
+
+      await expect(
+        service.resetPassword({
+          email: 'reset@example.com',
+          token: 'valid_token',
+          newPassword: 'NewPassword123!',
+          confirmPassword: 'NewPassword123!',
+        }),
+      ).rejects.toThrow('Password reset link has expired');
     });
   });
 });

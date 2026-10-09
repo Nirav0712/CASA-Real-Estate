@@ -161,6 +161,18 @@ export class PropertyMedia {
   @Prop({ type: [String], default: [] })
   videos?: string[];
 
+  @Prop()
+  videoUrl?: string; // Primary property video (YouTube or uploaded media URL)
+
+  @Prop({ default: 'YOUTUBE' })
+  videoType?: string; // YOUTUBE, LOCAL, EMBED
+
+  @Prop()
+  videoThumbnail?: string; // High-res poster/thumbnail for video
+
+  @Prop({ default: 'IMAGE' })
+  primaryMediaType?: string; // IMAGE or VIDEO
+
   @Prop({ type: [PropertyMediaItem], default: [] })
   items?: PropertyMediaItem[];
 }

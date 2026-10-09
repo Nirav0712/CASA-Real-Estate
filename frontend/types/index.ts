@@ -57,6 +57,54 @@ export interface AuthResponse {
   tokens: AuthTokens;
 }
 
+export interface RegisterData {
+  fullName: string;
+  email: string;
+  mobile: string;
+  password: string;
+  confirmPassword: string;
+  role?: UserRole;
+  accountType?: AccountType;
+  agencyName?: string;
+}
+
+export interface RegisterResponse {
+  success: boolean;
+  message: string;
+  email: string;
+  isEmailVerified: boolean;
+}
+
+export interface LoginData {
+  email: string;
+  password: string;
+}
+
+export interface VerifyEmailData {
+  email: string;
+  token: string;
+}
+
+export interface ResendVerificationData {
+  email: string;
+}
+
+export interface ForgotPasswordData {
+  email: string;
+}
+
+export interface ResetPasswordData {
+  email: string;
+  token: string;
+  newPassword: string;
+  confirmPassword: string;
+}
+
+export interface GenericAuthResponse {
+  success: boolean;
+  message: string;
+}
+
 export interface OtpRequestResponse {
   success: boolean;
   message: string;
@@ -165,6 +213,10 @@ export interface Property {
     coverImage?: string;
     images: string[];
     videos?: string[];
+    videoUrl?: string;
+    videoType?: 'YOUTUBE' | 'LOCAL' | 'EMBED';
+    videoThumbnail?: string;
+    primaryMediaType?: 'IMAGE' | 'VIDEO';
   };
   advertiser: {
     name: string;

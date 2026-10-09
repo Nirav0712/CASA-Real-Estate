@@ -2,10 +2,12 @@
 
 import * as React from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Container } from '@/components/ui/card';
 import { Modal } from '@/components/ui/modal';
 import { Drawer } from '@/components/ui/drawer';
+import { GlobalLocationSelector, SelectedLocationData } from '@/components/ui/global-location-selector';
 import { useLanguage } from '@/contexts/language-context';
 import { useTheme } from '@/contexts/theme-context';
 import { useAuth } from '@/contexts/auth-context';
@@ -35,15 +37,24 @@ import {
   SlidersHorizontal,
   ExternalLink,
   Shield,
+  MapPin,
 } from 'lucide-react';
 
 const ADMIN_PORTAL_URL = process.env.NEXT_PUBLIC_ADMIN_URL || 'http://localhost:3001';
 
 export function Header() {
+  const router = useRouter();
   const { locale, setLocale, t, isRtl } = useLanguage();
   const { theme, resolvedTheme, setTheme } = useTheme();
   const { user, isAuthenticated, openAuthModal, logout } = useAuth();
   const [isLangModalOpen, setIsLangModalOpen] = React.useState(false);
+  const [isLocationModalOpen, setIsLocationModalOpen] = React.useState(false);
+  const [headerLocation, setHeaderLocation] = React.useState<SelectedLocationData>({
+    country: 'india',
+    countryName: 'India',
+    state: 'all',
+    city: 'all',
+  });
   const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = React.useState(false);
 
@@ -68,9 +79,9 @@ export function Header() {
 
   return (
     <>
-      <header className="sticky top-0 z-40 bg-casa-surface/90 backdrop-blur-md border-b border-casa-border-light transition-colors duration-200">
+      <header className="sticky top-0 z-40 bg-casa-surface/95 backdrop-blur-md border-b border-casa-border-light transition-colors duration-200 py-1.5 sm:py-2">
         <Container>
-          <div className="flex items-center justify-between h-18">
+          <div className="flex items-center justify-between min-h-[4.75rem] py-2">
             {/* Logo & Brand Identity */}
             <Link href="/" className="flex items-center gap-2.5 group">
               <div className="w-10 h-10 rounded-2xl bg-casa-brand flex items-center justify-center text-white shadow-subtle transition-transform duration-200 group-hover:scale-105">
@@ -130,6 +141,22 @@ export function Header() {
                 ) : (
                   <Sun className="w-4 h-4 text-amber-500" />
                 )}
+              </button>
+
+              {/* Global Location Selector Button */}
+              <button
+                type="button"
+                onClick={() => setIsLocationModalOpen(true)}
+                aria-label="Select global country, region and city"
+                title="Select Global Location"
+                className="p-1.5 sm:px-2.5 sm:py-1.5 text-casa-text-secondary hover:text-casa-text-primary hover:bg-casa-subtle rounded-xl transition-colors flex items-center gap-1.5 text-xs font-semibold cursor-pointer border border-casa-border-light max-w-[150px]"
+              >
+                <MapPin className="w-3.5 h-3.5 text-amber-500 flex-shrink-0" />
+                <span className="truncate hidden sm:inline">
+                  {headerLocation.cityName && headerLocation.cityName !== 'all'
+                    ? headerLocation.cityName
+                    : headerLocation.countryName || 'Global'}
+                </span>
               </button>
 
               {/* Language Switcher Button */}
@@ -489,6 +516,59 @@ export function Header() {
               </button>
             );
           })}
+        </div>
+      </Modal>
+
+      {/* Global Location Selection Modal */}
+      <Modal
+        isOpen={isLocationModalOpen}
+        onClose={() => setIsLocationModalOpen(false)}
+        title="Select Global Market & Location"
+      >
+        <div className="space-y-5 p-1 text-start">
+          <p className="text-xs text-casa-text-secondary">
+            Choose a country, state or region, and verified micro-market to browse local real estate portfolios.
+          </p>
+
+          <div className="p-3 bg-casa-canvas rounded-2xl border border-casa-border-light">
+            <GlobalLocationSelector
+              value={headerLocation}
+              onChange={(loc) => setHeaderLocation(loc)}
+              variant="stacked"
+            />
+          </div>
+
+          <div className="flex items-center justify-end gap-2 pt-2 border-t border-casa-border-light">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setIsLocationModalOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={() => {
+                setIsLocationModalOpen(false);
+                const params = new URLSearchParams();
+                if (headerLocation.country && headerLocation.country !== 'all') {
+                  params.set('country', headerLocation.country);
+                }
+                if (headerLocation.state && headerLocation.state !== 'all') {
+                  params.set('state', headerLocation.state);
+                }
+                if (headerLocation.city && headerLocation.city !== 'all') {
+                  params.set('city', headerLocation.city);
+                }
+                router.push(`/properties?${params.toString()}`);
+              }}
+              className="flex items-center gap-1.5"
+            >
+              <Search className="w-3.5 h-3.5" />
+              <span>Explore Selected Market</span>
+            </Button>
+          </div>
         </div>
       </Modal>
 

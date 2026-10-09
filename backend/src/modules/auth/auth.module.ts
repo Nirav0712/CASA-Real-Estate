@@ -10,6 +10,7 @@ import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
 import { MockOtpProvider } from './providers/mock-otp.provider';
 import { Msg91OtpProvider } from './providers/msg91-otp.provider';
+import { MailService } from './services/mail.service';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { RolesGuard } from './guards/roles.guard';
 
@@ -37,6 +38,7 @@ import { RolesGuard } from './guards/roles.guard';
   controllers: [AuthController],
   providers: [
     AuthService,
+    MailService,
     MockOtpProvider,
     Msg91OtpProvider,
     JwtAuthGuard,
@@ -44,6 +46,7 @@ import { RolesGuard } from './guards/roles.guard';
   ],
   exports: [
     AuthService,
+    MailService,
     JwtModule,
     JwtAuthGuard,
     RolesGuard,

@@ -1336,6 +1336,150 @@ export class AdminService implements OnModuleInit {
     };
   }
 
+  async deleteUser(id: string, reason?: string, actor?: AuthenticatedUser) {
+    const query: any = isValidObjectId(id) ? { _id: id } : { $or: [{ id }, { normalizedMobile: id }, { mobile: id }] };
+    const user = await this.userModel.findOne(query);
+
+    let memUser: any = null;
+    if (!user) {
+      memUser = this.authService.getMemUserById(id);
+      if (!memUser) {
+        throw new NotFoundException(`User with ID "${id}" was not found.`);
+      }
+    }
+
+    const userIdStr = user ? user._id.toString() : memUser._id;
+    const userRole = user ? user.role : memUser.role;
+    const userMobile = user ? user.normalizedMobile || user.mobile : memUser.normalizedMobile || memUser.mobile;
+    const userName = user ? user.name : memUser.name;
+
+    // Security Rule 1: User cannot delete own account
+    if (actor && (userIdStr === actor.id || userMobile === actor.normalizedMobile)) {
+      throw new BadRequestException('Administrators cannot delete their own account.');
+    }
+
+    // Security Rule 2: SUPER_ADMIN protection
+    if (userRole === UserRole.SUPER_ADMIN && actor?.role !== UserRole.SUPER_ADMIN) {
+      throw new ForbiddenException('Only a Super Administrator can delete another Super Administrator account.');
+    }
+
+    // Security Rule 3: Last active SUPER_ADMIN protection
+    if (userRole === UserRole.SUPER_ADMIN) {
+      const activeSuperAdmins = await this.userModel.countDocuments({
+        role: UserRole.SUPER_ADMIN,
+        status: AccountStatus.ACTIVE,
+      }).catch(() => 0);
+      if (activeSuperAdmins <= 1 && user?.status === AccountStatus.ACTIVE) {
+        throw new BadRequestException('Cannot delete the sole remaining active Super Administrator account.');
+      }
+    }
+
+    // Cleanup: Invalidate refresh sessions
+    try {
+      if (user) {
+        await this.refreshSessionModel.deleteMany({ userId: user._id });
+      }
+    } catch (err: any) {
+      this.logger.warn(`Session cleanup warning on user delete: ${err?.message}`);
+    }
+
+    // Cleanup: Agent verification & profile
+    try {
+      if (user) {
+        await this.agentDocumentModel?.deleteMany({ userId: user._id });
+        await this.agentProfileModel?.deleteMany({ userId: user._id });
+      }
+    } catch (err: any) {
+      this.logger.warn(`Agent profile cleanup note on delete: ${err?.message}`);
+    }
+
+    // Delete DB user
+    if (user) {
+      await this.userModel.deleteOne({ _id: user._id });
+    }
+
+    // Delete memUser fallback
+    this.authService.deleteMemUser(id);
+    if (userMobile) this.authService.deleteMemUser(userMobile);
+
+    // Record Audit Log
+    await this.recordAuditLog({
+      action: 'USER_DELETED',
+      actorUserId: actor?.id || 'system_admin',
+      actorName: actor?.name || 'Administrator',
+      actorRole: actor?.role || 'ADMIN',
+      targetUserId: userIdStr,
+      targetUserName: userName,
+      targetEntity: 'USER',
+      targetEntityId: userIdStr,
+      previousValue: { name: userName, role: userRole, mobile: userMobile },
+      newValue: null,
+      reason: reason || 'User account deleted by administrator',
+    });
+
+    return {
+      success: true,
+      message: `User ${userName || userMobile} successfully deleted.`,
+      deletedUserId: userIdStr,
+    };
+  }
+
+  async bulkDeleteUsers(userIds: string[], reason?: string, actor?: AuthenticatedUser) {
+    if (!Array.isArray(userIds) || userIds.length === 0) {
+      throw new BadRequestException('At least one user ID must be provided for bulk deletion.');
+    }
+
+    let deletedCount = 0;
+    let skippedCount = 0;
+    const errors: string[] = [];
+
+    for (const id of userIds) {
+      try {
+        await this.deleteUser(id, reason, actor);
+        deletedCount++;
+      } catch (err: any) {
+        skippedCount++;
+        errors.push(`User ${id}: ${err?.message || 'Failed to delete'}`);
+      }
+    }
+
+    return {
+      success: deletedCount > 0,
+      deletedCount,
+      skippedCount,
+      message: `Bulk delete completed. ${deletedCount} user(s) deleted, ${skippedCount} skipped.`,
+      errors: errors.length > 0 ? errors : undefined,
+    };
+  }
+
+  async bulkUpdateUserStatus(userIds: string[], status: AccountStatus, reason?: string, actor?: AuthenticatedUser) {
+    if (!Array.isArray(userIds) || userIds.length === 0) {
+      throw new BadRequestException('At least one user ID must be provided for bulk status update.');
+    }
+
+    let updatedCount = 0;
+    let skippedCount = 0;
+    const errors: string[] = [];
+
+    for (const id of userIds) {
+      try {
+        await this.updateUserStatus(id, { status, reason }, actor);
+        updatedCount++;
+      } catch (err: any) {
+        skippedCount++;
+        errors.push(`User ${id}: ${err?.message || 'Failed to update status'}`);
+      }
+    }
+
+    return {
+      success: updatedCount > 0,
+      updatedCount,
+      skippedCount,
+      message: `Bulk status update completed. ${updatedCount} user(s) set to ${status}, ${skippedCount} skipped.`,
+      errors: errors.length > 0 ? errors : undefined,
+    };
+  }
+
   async getAgents(dto: AdminUserQueryDto) {
     const queryDto: AdminUserQueryDto = {
       ...dto,

@@ -17,6 +17,12 @@ import {
   AlertTriangle,
   X,
   Clock,
+  Trash2,
+  CheckSquare,
+  Square,
+  MinusSquare,
+  UserCheck,
+  UserX,
 } from 'lucide-react';
 import {
   getAdminUsers,
@@ -24,8 +30,11 @@ import {
   updateAdminUserStatus,
   updateAdminUserRole,
   getAdminAssignableRoles,
+  deleteAdminUser,
+  bulkDeleteAdminUsers,
+  bulkUpdateAdminUserStatus,
 } from '@/services/admin-service';
-import { UserRecord, UserDetailRecord, UserRole, AccountStatus, RoleRecord } from '@/types';
+import { UserRecord, UserDetailRecord, AccountStatus, RoleRecord } from '@/types';
 
 export default function UsersPage() {
   const toast = useToast();
@@ -48,21 +57,40 @@ export default function UsersPage() {
   const [totalPages, setTotalPages] = React.useState(1);
   const [totalUsers, setTotalUsers] = React.useState(0);
 
+  // Bulk Selection State
+  const [selectedUserIds, setSelectedUserIds] = React.useState<Set<string>>(new Set());
+
   // User Detail Drawer State
   const [selectedUser, setSelectedUser] = React.useState<UserDetailRecord | null>(null);
   const [loadingDetail, setLoadingDetail] = React.useState(false);
 
-  // Status Action Modal State
+  // Single Status Action Modal State
   const [statusModalUser, setStatusModalUser] = React.useState<UserRecord | null>(null);
   const [newStatus, setNewStatus] = React.useState<AccountStatus>('ACTIVE');
   const [statusReason, setStatusReason] = React.useState('');
   const [submittingStatus, setSubmittingStatus] = React.useState(false);
 
-  // Role Action Modal State
+  // Single Role Action Modal State
   const [roleModalUser, setRoleModalUser] = React.useState<UserRecord | null>(null);
   const [newRole, setNewRole] = React.useState<string>('AGENT');
   const [roleReason, setRoleReason] = React.useState('');
   const [submittingRole, setSubmittingRole] = React.useState(false);
+
+  // Single Delete Modal State
+  const [deleteModalUser, setDeleteModalUser] = React.useState<UserRecord | null>(null);
+  const [deleteReason, setDeleteReason] = React.useState('');
+  const [submittingDelete, setSubmittingDelete] = React.useState(false);
+
+  // Bulk Delete Modal State
+  const [bulkDeleteModalOpen, setBulkDeleteModalOpen] = React.useState(false);
+  const [bulkDeleteReason, setBulkDeleteReason] = React.useState('');
+  const [submittingBulkDelete, setSubmittingBulkDelete] = React.useState(false);
+
+  // Bulk Status Modal State
+  const [bulkStatusModalOpen, setBulkStatusModalOpen] = React.useState(false);
+  const [bulkTargetStatus, setBulkTargetStatus] = React.useState<AccountStatus>('SUSPENDED');
+  const [bulkStatusReason, setBulkStatusReason] = React.useState('');
+  const [submittingBulkStatus, setSubmittingBulkStatus] = React.useState(false);
 
   // Load assignable roles from DB
   const loadRoles = React.useCallback(async () => {
@@ -118,6 +146,40 @@ export default function UsersPage() {
     loadUsers();
   }, [loadUsers]);
 
+  // Selection handlers
+  const isAllPageSelected =
+    users.length > 0 && users.every((u) => selectedUserIds.has(u.id));
+  const isSomePageSelected =
+    users.some((u) => selectedUserIds.has(u.id)) && !isAllPageSelected;
+
+  const toggleSelectAllPage = () => {
+    setSelectedUserIds((prev) => {
+      const next = new Set(prev);
+      if (isAllPageSelected) {
+        users.forEach((u) => next.delete(u.id));
+      } else {
+        users.forEach((u) => next.add(u.id));
+      }
+      return next;
+    });
+  };
+
+  const toggleSelectUser = (id: string) => {
+    setSelectedUserIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
+
+  const clearSelection = () => {
+    setSelectedUserIds(new Set());
+  };
+
   const handleOpenDetail = async (user: UserRecord) => {
     try {
       setLoadingDetail(true);
@@ -165,7 +227,6 @@ export default function UsersPage() {
     if (user.customRoleId) {
       setNewRole(user.customRoleId);
     } else {
-      // Find matching system role by slug or role identifier
       const matchingSysRole = roles.find((r) => {
         if (!r.isSystemRole) return false;
         if (user.role === 'SUPER_ADMIN' && r.platformRole === 'SUPER_ADMIN') return true;
@@ -209,6 +270,96 @@ export default function UsersPage() {
       toast.error('Role Update Failed', msg);
     } finally {
       setSubmittingRole(false);
+    }
+  };
+
+  // Single User Delete Handlers
+  const handleOpenDeleteModal = (user: UserRecord) => {
+    setDeleteModalUser(user);
+    setDeleteReason('');
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!deleteModalUser) return;
+    try {
+      setSubmittingDelete(true);
+      await deleteAdminUser(deleteModalUser.id, deleteReason);
+      toast.success(
+        'User Deleted',
+        `User ${deleteModalUser.name || deleteModalUser.normalizedMobile} has been permanently deleted.`,
+      );
+      setSelectedUserIds((prev) => {
+        const next = new Set(prev);
+        next.delete(deleteModalUser.id);
+        return next;
+      });
+      if (selectedUser?.id === deleteModalUser.id) {
+        setSelectedUser(null);
+      }
+      setDeleteModalUser(null);
+      loadUsers();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Delete operation failed';
+      toast.error('Delete Failed', msg);
+    } finally {
+      setSubmittingDelete(false);
+    }
+  };
+
+  // Bulk Delete Handlers
+  const handleOpenBulkDeleteModal = () => {
+    if (selectedUserIds.size === 0) return;
+    setBulkDeleteReason('');
+    setBulkDeleteModalOpen(true);
+  };
+
+  const handleConfirmBulkDelete = async () => {
+    if (selectedUserIds.size === 0) return;
+    try {
+      setSubmittingBulkDelete(true);
+      const userIdsArray = Array.from(selectedUserIds);
+      const res = await bulkDeleteAdminUsers(userIdsArray, bulkDeleteReason);
+      toast.success(
+        'Bulk Delete Completed',
+        res.message || `${res.deletedCount || userIdsArray.length} users successfully deleted.`,
+      );
+      clearSelection();
+      setBulkDeleteModalOpen(false);
+      loadUsers();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Bulk deletion failed';
+      toast.error('Bulk Delete Failed', msg);
+    } finally {
+      setSubmittingBulkDelete(false);
+    }
+  };
+
+  // Bulk Status Update Handlers
+  const handleOpenBulkStatusModal = (status: AccountStatus) => {
+    if (selectedUserIds.size === 0) return;
+    setBulkTargetStatus(status);
+    setBulkStatusReason('');
+    setBulkStatusModalOpen(true);
+  };
+
+  const handleConfirmBulkStatus = async () => {
+    if (selectedUserIds.size === 0) return;
+    try {
+      setSubmittingBulkStatus(true);
+      const userIdsArray = Array.from(selectedUserIds);
+      const res = await bulkUpdateAdminUserStatus(userIdsArray, bulkTargetStatus, bulkStatusReason);
+      toast.success(
+        'Bulk Status Updated',
+        res.message || `${userIdsArray.length} users updated to ${bulkTargetStatus}.`,
+      );
+      clearSelection();
+      setBulkStatusModalOpen(false);
+      loadUsers();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Bulk status update failed';
+      toast.error('Bulk Update Failed', msg);
+    } finally {
+      setSubmittingBulkStatus(false);
     }
   };
 
@@ -314,6 +465,67 @@ export default function UsersPage() {
         </div>
       </Card>
 
+      {/* Floating / Sticky Bulk Action Bar */}
+      {selectedUserIds.size > 0 && (
+        <div className="sticky top-4 z-40 bg-casa-surface dark:bg-slate-900 border-2 border-casa-brand/40 shadow-2xl rounded-2xl p-3 md:p-4 flex flex-wrap items-center justify-between gap-3 animate-in fade-in slide-in-from-top-3 duration-200">
+          <div className="flex items-center gap-3">
+            <div className="flex items-center justify-center w-7 h-7 rounded-xl bg-casa-brand text-white font-bold text-xs">
+              {selectedUserIds.size}
+            </div>
+            <div>
+              <span className="text-xs md:text-sm font-bold text-casa-text-primary">
+                {selectedUserIds.size} User{selectedUserIds.size > 1 ? 's' : ''} Selected
+              </span>
+              <p className="text-[11px] text-casa-text-muted hidden sm:block">
+                Choose an administrative action to apply in bulk
+              </p>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handleOpenBulkStatusModal('SUSPENDED')}
+              className="text-xs h-8 px-3 text-amber-700 dark:text-amber-300 border-amber-300 hover:bg-amber-50 dark:hover:bg-amber-950/40 flex items-center gap-1.5 font-semibold"
+            >
+              <UserX className="w-3.5 h-3.5 text-amber-600" />
+              Suspend ({selectedUserIds.size})
+            </Button>
+
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handleOpenBulkStatusModal('ACTIVE')}
+              className="text-xs h-8 px-3 text-emerald-700 dark:text-emerald-300 border-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 flex items-center gap-1.5 font-semibold"
+            >
+              <UserCheck className="w-3.5 h-3.5 text-emerald-600" />
+              Activate ({selectedUserIds.size})
+            </Button>
+
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={handleOpenBulkDeleteModal}
+              className="text-xs h-8 px-3 bg-red-600 hover:bg-red-700 text-white flex items-center gap-1.5 font-semibold shadow-sm"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              Delete ({selectedUserIds.size})
+            </Button>
+
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={clearSelection}
+              className="text-xs h-8 px-2.5 text-casa-text-muted hover:text-casa-text-primary"
+              title="Clear selection"
+            >
+              <X className="w-3.5 h-3.5" />
+            </Button>
+          </div>
+        </div>
+      )}
+
       {/* Main Table */}
       <Card className="bg-casa-surface border border-casa-border-light shadow-subtle overflow-hidden">
         {loading ? (
@@ -340,6 +552,22 @@ export default function UsersPage() {
             <table className="w-full text-left text-xs text-casa-text-secondary">
               <thead className="bg-casa-subtle/50 text-[11px] uppercase font-bold text-casa-text-muted border-b border-casa-border-light">
                 <tr>
+                  <th className="w-10 px-4 py-3 text-center">
+                    <button
+                      type="button"
+                      onClick={toggleSelectAllPage}
+                      className="p-1 text-casa-text-secondary hover:text-casa-brand transition-colors inline-flex items-center justify-center"
+                      title={isAllPageSelected ? 'Deselect all on this page' : 'Select all on this page'}
+                    >
+                      {isAllPageSelected ? (
+                        <CheckSquare className="w-4 h-4 text-casa-brand" />
+                      ) : isSomePageSelected ? (
+                        <MinusSquare className="w-4 h-4 text-casa-brand" />
+                      ) : (
+                        <Square className="w-4 h-4 text-casa-text-muted" />
+                      )}
+                    </button>
+                  </th>
                   <th className="px-4 py-3">User & Contact</th>
                   <th className="px-4 py-3">Role</th>
                   <th className="px-4 py-3">Verification</th>
@@ -350,127 +578,155 @@ export default function UsersPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-casa-border-light">
-                {users.map((u) => (
-                  <tr key={u.id} className="hover:bg-casa-canvas/50 transition-colors">
-                    <td className="px-4 py-3.5">
-                      <div className="font-semibold text-casa-text-primary flex items-center gap-1.5">
-                        {u.name || 'Unnamed User'}
-                        {u.role === 'SUPER_ADMIN' && (
-                          <Shield className="w-3.5 h-3.5 text-amber-500 fill-amber-500/20" />
-                        )}
-                      </div>
-                      <div className="flex items-center gap-1.5 mt-1">
-                        <span
-                          className={`text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider ${
-                            u.customRole
-                              ? 'bg-purple-50 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300 border border-purple-200 dark:border-purple-800'
-                              : 'bg-casa-brand-subtle text-casa-brand'
-                          }`}
-                        >
-                          {u.customRole?.name || u.roleName || u.role.replace('_', ' ')}
-                        </span>
-                        <span className="text-[11px] text-casa-text-muted flex items-center gap-1">
-                          <Phone className="w-2.5 h-2.5" />
-                          {u.normalizedMobile || u.mobile}
-                        </span>
-                      </div>
-                      {u.email && (
-                        <div className="text-[10px] text-casa-text-muted font-mono mt-0.5">{u.email}</div>
-                      )}
-                    </td>
-                    <td className="px-4 py-3.5">
-                      <div className="flex flex-col items-start gap-0.5">
-                        <span
-                          className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase ${
-                            u.customRole
-                              ? 'bg-purple-50 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300 border border-purple-200 dark:border-purple-800'
-                              : 'bg-casa-brand-subtle text-casa-brand'
-                          }`}
-                        >
-                          {u.customRole?.name || u.roleName || u.role.replace('_', ' ')}
-                        </span>
-                        {u.customRole && (
-                          <span className="text-[9px] text-purple-600 dark:text-purple-400 font-semibold">
-                            Custom Dynamic
-                          </span>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3.5">
-                      {u.isVerifiedAgent ? (
-                        <span className="text-emerald-600 font-semibold text-[11px] flex items-center gap-1">
-                          <CheckCircle className="w-3.5 h-3.5" /> CASA Verified
-                        </span>
-                      ) : u.role === 'AGENT' ? (
-                        <span className="text-amber-600 text-[11px] flex items-center gap-1">
-                          <Clock className="w-3.5 h-3.5" /> Pending Badge
-                        </span>
-                      ) : (
-                        <span className="text-casa-text-muted text-[11px]">N/A</span>
-                      )}
-                      {u.agencyName && (
-                        <div className="text-[10px] text-casa-text-muted flex items-center gap-1 mt-0.5">
-                          <Building2 className="w-2.5 h-2.5" /> {u.agencyName}
+                {users.map((u) => {
+                  const isSelected = selectedUserIds.has(u.id);
+                  return (
+                    <tr
+                      key={u.id}
+                      className={`transition-colors ${
+                        isSelected
+                          ? 'bg-casa-brand-subtle/30 dark:bg-casa-brand/10'
+                          : 'hover:bg-casa-canvas/50'
+                      }`}
+                    >
+                      <td className="px-4 py-3.5 text-center">
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => toggleSelectUser(u.id)}
+                          aria-label={`Select user ${u.name || u.mobile}`}
+                          className="w-4 h-4 text-casa-brand rounded border-casa-border-light focus:ring-casa-brand/30 cursor-pointer accent-casa-brand"
+                        />
+                      </td>
+                      <td className="px-4 py-3.5">
+                        <div className="font-semibold text-casa-text-primary flex items-center gap-1.5">
+                          {u.name || 'Unnamed User'}
+                          {u.role === 'SUPER_ADMIN' && (
+                            <Shield className="w-3.5 h-3.5 text-amber-500 fill-amber-500/20" />
+                          )}
                         </div>
-                      )}
-                    </td>
-                    <td className="px-4 py-3.5">
-                      <div className="font-semibold text-casa-text-primary">
-                        {u.propertyCount ?? 0} Total
-                      </div>
-                      <div className="text-[10px] text-emerald-600">
-                        {u.publishedCount ?? 0} Published
-                      </div>
-                    </td>
-                    <td className="px-4 py-3.5">
-                      <span
-                        className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                          u.status === 'ACTIVE'
-                            ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300'
-                            : u.status === 'SUSPENDED'
-                            ? 'bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-300'
-                            : 'bg-red-50 text-red-700 dark:bg-red-950 dark:text-red-300'
-                        }`}
-                      >
-                        {u.status}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3.5 text-casa-text-muted text-[11px]">
-                      {u.createdAt ? new Date(u.createdAt).toLocaleDateString() : '—'}
-                    </td>
-                    <td className="px-4 py-3.5 text-right">
-                      <div className="flex items-center justify-end gap-1.5">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleOpenDetail(u)}
-                          title="View Details"
-                          className="text-xs p-1.5 h-7"
-                        >
-                          <Eye className="w-3.5 h-3.5" />
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleOpenRoleModal(u)}
-                          className="text-xs h-7 px-2"
-                        >
-                          Role
-                        </Button>
-                        <Button
-                          variant={u.status === 'ACTIVE' ? 'outline' : 'primary'}
-                          size="sm"
-                          onClick={() => handleOpenStatusModal(u)}
-                          className={`text-xs h-7 px-2 ${
-                            u.status === 'ACTIVE' ? 'hover:bg-red-50 hover:text-red-600' : ''
+                        <div className="flex items-center gap-1.5 mt-1">
+                          <span
+                            className={`text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider ${
+                              u.customRole
+                                ? 'bg-purple-50 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300 border border-purple-200 dark:border-purple-800'
+                                : 'bg-casa-brand-subtle text-casa-brand'
+                            }`}
+                          >
+                            {u.customRole?.name || u.roleName || u.role.replace('_', ' ')}
+                          </span>
+                          <span className="text-[11px] text-casa-text-muted flex items-center gap-1">
+                            <Phone className="w-2.5 h-2.5" />
+                            {u.normalizedMobile || u.mobile}
+                          </span>
+                        </div>
+                        {u.email && (
+                          <div className="text-[10px] text-casa-text-muted font-mono mt-0.5">{u.email}</div>
+                        )}
+                      </td>
+                      <td className="px-4 py-3.5">
+                        <div className="flex flex-col items-start gap-0.5">
+                          <span
+                            className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase ${
+                              u.customRole
+                                ? 'bg-purple-50 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300 border border-purple-200 dark:border-purple-800'
+                                : 'bg-casa-brand-subtle text-casa-brand'
+                            }`}
+                          >
+                            {u.customRole?.name || u.roleName || u.role.replace('_', ' ')}
+                          </span>
+                          {u.customRole && (
+                            <span className="text-[9px] text-purple-600 dark:text-purple-400 font-semibold">
+                              Custom Dynamic
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3.5">
+                        {u.isVerifiedAgent ? (
+                          <span className="text-emerald-600 font-semibold text-[11px] flex items-center gap-1">
+                            <CheckCircle className="w-3.5 h-3.5" /> CASA Verified
+                          </span>
+                        ) : u.role === 'AGENT' ? (
+                          <span className="text-amber-600 text-[11px] flex items-center gap-1">
+                            <Clock className="w-3.5 h-3.5" /> Pending Badge
+                          </span>
+                        ) : (
+                          <span className="text-casa-text-muted text-[11px]">N/A</span>
+                        )}
+                        {u.agencyName && (
+                          <div className="text-[10px] text-casa-text-muted flex items-center gap-1 mt-0.5">
+                            <Building2 className="w-2.5 h-2.5" /> {u.agencyName}
+                          </div>
+                        )}
+                      </td>
+                      <td className="px-4 py-3.5">
+                        <div className="font-semibold text-casa-text-primary">
+                          {u.propertyCount ?? 0} Total
+                        </div>
+                        <div className="text-[10px] text-emerald-600">
+                          {u.publishedCount ?? 0} Published
+                        </div>
+                      </td>
+                      <td className="px-4 py-3.5">
+                        <span
+                          className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                            u.status === 'ACTIVE'
+                              ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300'
+                              : u.status === 'SUSPENDED'
+                              ? 'bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-300'
+                              : 'bg-red-50 text-red-700 dark:bg-red-950 dark:text-red-300'
                           }`}
                         >
-                          {u.status === 'ACTIVE' ? 'Suspend' : 'Activate'}
-                        </Button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                          {u.status}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3.5 text-casa-text-muted text-[11px]">
+                        {u.createdAt ? new Date(u.createdAt).toLocaleDateString() : '—'}
+                      </td>
+                      <td className="px-4 py-3.5 text-right">
+                        <div className="flex items-center justify-end gap-1.5">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleOpenDetail(u)}
+                            title="View Details"
+                            className="text-xs p-1.5 h-7"
+                          >
+                            <Eye className="w-3.5 h-3.5" />
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleOpenRoleModal(u)}
+                            className="text-xs h-7 px-2"
+                          >
+                            Role
+                          </Button>
+                          <Button
+                            variant={u.status === 'ACTIVE' ? 'outline' : 'primary'}
+                            size="sm"
+                            onClick={() => handleOpenStatusModal(u)}
+                            className={`text-xs h-7 px-2 ${
+                              u.status === 'ACTIVE' ? 'hover:bg-red-50 hover:text-red-600' : ''
+                            }`}
+                          >
+                            {u.status === 'ACTIVE' ? 'Suspend' : 'Activate'}
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleOpenDeleteModal(u)}
+                            title="Delete User"
+                            className="text-xs p-1.5 h-7 text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 border-red-200 dark:border-red-900/50"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -674,7 +930,7 @@ export default function UsersPage() {
                 </div>
 
                 {/* Actions Footer */}
-                <div className="pt-4 border-t border-casa-border-light flex gap-2">
+                <div className="pt-4 border-t border-casa-border-light flex flex-wrap gap-2">
                   <Button
                     variant="outline"
                     className="flex-1 text-xs"
@@ -695,6 +951,16 @@ export default function UsersPage() {
                   >
                     {selectedUser.status === 'ACTIVE' ? 'Suspend Account' : 'Activate Account'}
                   </Button>
+                  <Button
+                    variant="outline"
+                    className="w-full text-xs text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 border-red-200 dark:border-red-900/50 flex items-center justify-center gap-1.5"
+                    onClick={() => {
+                      handleOpenDeleteModal(selectedUser);
+                    }}
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    Delete User Account
+                  </Button>
                 </div>
               </div>
             )}
@@ -702,7 +968,7 @@ export default function UsersPage() {
         </div>
       )}
 
-      {/* Status Action Modal */}
+      {/* Single Status Action Modal */}
       {statusModalUser && (
         <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-casa-surface border border-casa-border-light rounded-2xl shadow-2xl p-6 w-full max-w-md space-y-4">
@@ -864,6 +1130,216 @@ export default function UsersPage() {
                 className="text-xs"
               >
                 {submittingRole ? 'Updating...' : 'Confirm Role Change'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Single User Delete Confirmation Modal */}
+      {deleteModalUser && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-casa-surface border border-casa-border-light rounded-2xl shadow-2xl p-6 w-full max-w-md space-y-4 animate-in zoom-in-95 duration-150">
+            <div className="flex items-center gap-2.5 text-red-600">
+              <div className="p-2 bg-red-100 dark:bg-red-950/60 rounded-xl">
+                <Trash2 className="w-5 h-5 text-red-600 dark:text-red-400" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-casa-text-primary">Delete User Account</h3>
+                <p className="text-[11px] text-red-600 dark:text-red-400 font-medium">Permanent Action</p>
+              </div>
+            </div>
+
+            <div className="p-3 bg-red-50/70 dark:bg-red-950/30 border border-red-200 dark:border-red-900/50 rounded-xl space-y-1.5 text-xs">
+              <p className="text-red-900 dark:text-red-200 font-medium">
+                Are you sure you want to permanently delete{' '}
+                <strong>{deleteModalUser.name || deleteModalUser.normalizedMobile}</strong>?
+              </p>
+              <p className="text-red-700/80 dark:text-red-300/80 text-[11px]">
+                Mobile: <span className="font-mono">{deleteModalUser.normalizedMobile || deleteModalUser.mobile}</span> • Role: {deleteModalUser.role}
+              </p>
+              <p className="text-red-700/80 dark:text-red-300/80 text-[11px]">
+                This will revoke all active login sessions and delete user documents from the system.
+              </p>
+            </div>
+
+            <div>
+              <label className="text-[11px] font-bold text-casa-text-muted uppercase">
+                Reason for Audit Log (Optional)
+              </label>
+              <textarea
+                placeholder="e.g. Account removal request, fraudulent activity, duplicate entry..."
+                value={deleteReason}
+                onChange={(e) => setDeleteReason(e.target.value)}
+                rows={2}
+                className="w-full mt-1 p-2 text-xs bg-casa-canvas border border-casa-border-light rounded-xl text-casa-text-primary focus:outline-none focus:ring-2 focus:ring-red-500/30"
+              />
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-casa-border-light">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setDeleteModalUser(null)}
+                disabled={submittingDelete}
+                className="text-xs"
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={handleConfirmDelete}
+                disabled={submittingDelete}
+                className="text-xs bg-red-600 hover:bg-red-700 text-white"
+              >
+                {submittingDelete ? 'Deleting...' : 'Permanently Delete User'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Bulk Delete Confirmation Modal */}
+      {bulkDeleteModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-casa-surface border border-casa-border-light rounded-2xl shadow-2xl p-6 w-full max-w-md space-y-4 animate-in zoom-in-95 duration-150">
+            <div className="flex items-center gap-2.5 text-red-600">
+              <div className="p-2 bg-red-100 dark:bg-red-950/60 rounded-xl">
+                <Trash2 className="w-5 h-5 text-red-600 dark:text-red-400" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-casa-text-primary">Bulk Delete Users</h3>
+                <p className="text-[11px] text-red-600 dark:text-red-400 font-medium">
+                  {selectedUserIds.size} User Accounts Selected
+                </p>
+              </div>
+            </div>
+
+            <div className="p-3 bg-red-50/70 dark:bg-red-950/30 border border-red-200 dark:border-red-900/50 rounded-xl space-y-1 text-xs text-red-900 dark:text-red-200">
+              <p className="font-semibold">
+                You are about to permanently delete {selectedUserIds.size} user accounts.
+              </p>
+              <p className="text-[11px] text-red-700/80 dark:text-red-300/80">
+                All associated sessions will be invalidated immediately. This action is irreversible.
+              </p>
+            </div>
+
+            <div>
+              <label className="text-[11px] font-bold text-casa-text-muted uppercase">
+                Reason for Audit Log
+              </label>
+              <textarea
+                placeholder="e.g. Bulk cleanup of test / duplicate accounts..."
+                value={bulkDeleteReason}
+                onChange={(e) => setBulkDeleteReason(e.target.value)}
+                rows={2}
+                className="w-full mt-1 p-2 text-xs bg-casa-canvas border border-casa-border-light rounded-xl text-casa-text-primary focus:outline-none focus:ring-2 focus:ring-red-500/30"
+              />
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-casa-border-light">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setBulkDeleteModalOpen(false)}
+                disabled={submittingBulkDelete}
+                className="text-xs"
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={handleConfirmBulkDelete}
+                disabled={submittingBulkDelete}
+                className="text-xs bg-red-600 hover:bg-red-700 text-white"
+              >
+                {submittingBulkDelete
+                  ? 'Deleting Users...'
+                  : `Delete ${selectedUserIds.size} Users`}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Bulk Status Confirmation Modal */}
+      {bulkStatusModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-casa-surface border border-casa-border-light rounded-2xl shadow-2xl p-6 w-full max-w-md space-y-4 animate-in zoom-in-95 duration-150">
+            <div className="flex items-center gap-2.5 text-casa-text-primary">
+              <div
+                className={`p-2 rounded-xl ${
+                  bulkTargetStatus === 'ACTIVE'
+                    ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-400'
+                    : 'bg-amber-100 text-amber-600 dark:bg-amber-950/60 dark:text-amber-400'
+                }`}
+              >
+                {bulkTargetStatus === 'ACTIVE' ? (
+                  <UserCheck className="w-5 h-5" />
+                ) : (
+                  <UserX className="w-5 h-5" />
+                )}
+              </div>
+              <div>
+                <h3 className="text-base font-bold">Bulk Update Status</h3>
+                <p className="text-[11px] text-casa-text-muted font-medium">
+                  {selectedUserIds.size} User Accounts Selected
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <label className="text-[11px] font-bold text-casa-text-muted uppercase">
+                  Target Status
+                </label>
+                <select
+                  value={bulkTargetStatus}
+                  onChange={(e) => setBulkTargetStatus(e.target.value as AccountStatus)}
+                  className="w-full mt-1 p-2 text-xs bg-casa-canvas border border-casa-border-light rounded-xl text-casa-text-primary focus:outline-none focus:ring-2 focus:ring-casa-brand/30"
+                >
+                  <option value="SUSPENDED">SUSPENDED — Block access to protected actions</option>
+                  <option value="ACTIVE">ACTIVE — Normal access granted</option>
+                  <option value="DEACTIVATED">DEACTIVATED — Permanently disabled</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="text-[11px] font-bold text-casa-text-muted uppercase">
+                  Reason for Audit Log
+                </label>
+                <textarea
+                  placeholder="e.g. Mass suspension due to policy update..."
+                  value={bulkStatusReason}
+                  onChange={(e) => setBulkStatusReason(e.target.value)}
+                  rows={2}
+                  className="w-full mt-1 p-2 text-xs bg-casa-canvas border border-casa-border-light rounded-xl text-casa-text-primary focus:outline-none focus:ring-2 focus:ring-casa-brand/30"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-casa-border-light">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setBulkStatusModalOpen(false)}
+                disabled={submittingBulkStatus}
+                className="text-xs"
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={handleConfirmBulkStatus}
+                disabled={submittingBulkStatus}
+                className="text-xs"
+              >
+                {submittingBulkStatus
+                  ? 'Updating...'
+                  : `Update ${selectedUserIds.size} Users to ${bulkTargetStatus}`}
               </Button>
             </div>
           </div>

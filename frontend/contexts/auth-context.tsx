@@ -1,9 +1,11 @@
 'use client';
 
 import * as React from 'react';
-import { User, OtpRequestResponse } from '@/types';
+import { User, OtpRequestResponse, RegisterData, RegisterResponse } from '@/types';
 import * as authService from '@/services/auth-service';
 import { useToast } from './toast-context';
+
+export type AuthModalMode = 'SIGN_IN' | 'REGISTER' | 'FORGOT_PASSWORD';
 
 interface AuthContextType {
   user: User | null;
@@ -11,8 +13,13 @@ interface AuthContextType {
   isAuthenticated: boolean;
   isLoading: boolean;
   isAuthModalOpen: boolean;
-  openAuthModal: () => void;
+  authModalMode: AuthModalMode;
+  openAuthModal: (initialMode?: AuthModalMode | React.MouseEvent | any) => void;
   closeAuthModal: () => void;
+  setAuthModalMode: (mode: AuthModalMode) => void;
+  login: (email: string, password: string) => Promise<void>;
+  register: (data: RegisterData) => Promise<RegisterResponse>;
+  logout: () => Promise<void>;
   requestOtp: (
     mobile: string,
     name?: string,
@@ -26,7 +33,6 @@ interface AuthContextType {
     role?: string,
     agencyName?: string,
   ) => Promise<void>;
-  logout: () => Promise<void>;
 }
 
 const AuthContext = React.createContext<AuthContextType | undefined>(undefined);
@@ -36,6 +42,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [token, setToken] = React.useState<string | null>(null);
   const [isLoading, setIsLoading] = React.useState<boolean>(true);
   const [isAuthModalOpen, setIsAuthModalOpen] = React.useState<boolean>(false);
+  const [authModalMode, setAuthModalMode] = React.useState<AuthModalMode>('SIGN_IN');
   const toast = useToast();
 
   // Instantly restore cached session from localStorage on mount, then silently refresh
@@ -89,13 +96,65 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
-  const openAuthModal = React.useCallback(() => {
+  const openAuthModal = React.useCallback((initialMode?: any) => {
+    if (initialMode && typeof initialMode === 'string') {
+      setAuthModalMode(initialMode as AuthModalMode);
+    }
     setIsAuthModalOpen(true);
   }, []);
 
   const closeAuthModal = React.useCallback(() => {
     setIsAuthModalOpen(false);
   }, []);
+
+  /**
+   * Email/Password Sign In
+   */
+  const login = React.useCallback(
+    async (email: string, password: string): Promise<void> => {
+      try {
+        const res = await authService.login({ email, password });
+        setUser(res.user);
+        setToken(res.tokens.accessToken);
+        if (typeof window !== 'undefined') {
+          if (res.tokens.accessToken) {
+            localStorage.setItem('casa_access_token', res.tokens.accessToken);
+          }
+          if (res.user) {
+            localStorage.setItem('casa_user', JSON.stringify(res.user));
+          }
+        }
+        setIsAuthModalOpen(false);
+        const roleLabel = res.user.role ? ` (${res.user.role.replace('_', ' ')})` : '';
+        toast.success(
+          'Welcome to CASA',
+          `Signed in as ${res.user.name || res.user.email || res.user.normalizedMobile}${roleLabel}`,
+        );
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : 'Invalid credentials or login failure.';
+        toast.error('Sign In Failed', message);
+        throw err;
+      }
+    },
+    [toast],
+  );
+
+  /**
+   * Email/Password Registration
+   */
+  const register = React.useCallback(
+    async (data: RegisterData): Promise<RegisterResponse> => {
+      try {
+        const res = await authService.register(data);
+        return res;
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : 'Registration failed. Please try again.';
+        toast.error('Registration Error', message);
+        throw err;
+      }
+    },
+    [toast],
+  );
 
   const requestOtp = React.useCallback(
     async (
@@ -173,11 +232,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         isAuthenticated: !!user,
         isLoading,
         isAuthModalOpen,
+        authModalMode,
         openAuthModal,
         closeAuthModal,
+        setAuthModalMode,
+        login,
+        register,
+        logout,
         requestOtp,
         verifyOtp,
-        logout,
       }}
     >
       {children}
@@ -192,3 +255,4 @@ export function useAuth(): AuthContextType {
   }
   return context;
 }
+

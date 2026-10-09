@@ -25,17 +25,26 @@ import {
   ArrowRight,
   ShieldCheck,
   Layers,
+  Play,
+  Video,
 } from 'lucide-react';
+import { parseYouTubeUrl } from '@/lib/video';
 
 export function PropertyCard({ property }: { property: Property }) {
   const { locale, t, isRtl } = useLanguage();
   const toast = useToast();
   const { isSaved, toggleSave } = useSavedProperties();
   const { isCompared, addToCompare, removeFromCompare } = useComparison();
+  const [isHovered, setIsHovered] = React.useState(false);
 
   const propertyId = property.id || (property as any)._id;
   const saved = isSaved(propertyId);
   const compared = isCompared(propertyId);
+
+  const hasVideo = Boolean(property.media?.videoUrl);
+  const isVideoPrimary = property.media?.primaryMediaType === 'VIDEO' || (hasVideo && !property.media?.thumbnailUrl);
+  const videoUrl = property.media?.videoUrl;
+  const isYouTube = hasVideo && (property.media?.videoType === 'YOUTUBE' || videoUrl?.includes('youtu'));
 
   const toggleCompare = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -83,21 +92,51 @@ export function PropertyCard({ property }: { property: Property }) {
   });
 
   return (
-    <Card hoverable className="flex flex-col group text-start overflow-hidden border-casa-border-light hover:border-casa-brand/40 transition-all duration-200">
-      {/* Thumbnail Container */}
+    <Card
+      hoverable
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+      className="flex flex-col group text-start overflow-hidden border-casa-border-light hover:border-casa-brand/40 transition-all duration-200"
+    >
+      {/* Thumbnail / Video Container */}
       <div className="relative aspect-[16/10] w-full bg-casa-subtle overflow-hidden">
-        <Link href={`/property/${property.slug}`} className="block w-full h-full">
+        <Link href={`/property/${property.slug}`} className="block w-full h-full relative">
+          {/* Base Poster/Thumbnail Image */}
           <Image
-            src={property.media.thumbnailUrl}
+            src={property.media.thumbnailUrl || 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=800&q=80'}
             alt={localizedTitle}
             fill
             sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-            className="object-cover transition-transform duration-300 group-hover:scale-105"
+            className={`object-cover transition-transform duration-300 group-hover:scale-105 ${
+              hasVideo && isHovered && !isYouTube ? 'opacity-0' : 'opacity-100'
+            }`}
           />
+
+          {/* Local Video Hover Preview */}
+          {hasVideo && !isYouTube && videoUrl && isHovered && (
+            <video
+              src={videoUrl}
+              autoPlay
+              muted
+              loop
+              playsInline
+              className="absolute inset-0 w-full h-full object-cover z-0 transition-opacity duration-300"
+            />
+          )}
         </Link>
 
         {/* Top Badges */}
         <div className="absolute top-3 start-3 flex flex-wrap gap-1.5 z-10 pointer-events-none">
+          {hasVideo && (
+            <Badge
+              variant="default"
+              size="sm"
+              className="bg-rose-600/95 backdrop-blur-sm text-white font-bold shadow-subtle border-0 text-[10px] flex items-center gap-1"
+            >
+              <Play className="w-2.5 h-2.5 fill-white" />
+              <span>Video Tour</span>
+            </Badge>
+          )}
           {property.isFeatured && (
             <Badge variant="featured" size="sm">
               ★ {t('featured')}

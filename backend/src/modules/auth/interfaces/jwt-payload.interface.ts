@@ -35,6 +35,8 @@ export interface AuthenticatedUser {
   permissions?: string[];
   status: AccountStatus;
   isVerifiedAgent: boolean;
+  isEmailVerified?: boolean;
+  hasPassword?: boolean;
   agencyName?: string;
   avatar?: string;
 }

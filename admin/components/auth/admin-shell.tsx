@@ -4,15 +4,23 @@ import * as React from 'react';
 import { usePathname } from 'next/navigation';
 import { AdminSidebar, AdminHeader } from '@/components/layout/sidebar';
 import { useAdminAuth } from '@/contexts/auth-context';
+import { AdminOnboardingBanner } from './admin-onboarding-banner';
 import { Loader2 } from 'lucide-react';
+
+const PUBLIC_AUTH_PATHS = [
+  '/login',
+  '/forgot-password',
+  '/reset-password',
+  '/verify-email',
+];
 
 export function AdminShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { isAuthenticated, isLoading } = useAdminAuth();
 
-  const isLoginPage = pathname === '/login';
+  const isAuthPage = PUBLIC_AUTH_PATHS.some((p) => pathname === p || pathname?.startsWith(p));
 
-  if (isLoginPage) {
+  if (isAuthPage) {
     return <div className="flex-1 w-full min-h-screen flex flex-col">{children}</div>;
   }
 
@@ -38,6 +46,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
       <AdminSidebar />
       <div className="flex-1 flex flex-col min-w-0">
         <AdminHeader />
+        <AdminOnboardingBanner />
         <main className="flex-1 p-6 md:p-8 overflow-y-auto">{children}</main>
       </div>
     </div>

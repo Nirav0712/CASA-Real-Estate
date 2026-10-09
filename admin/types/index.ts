@@ -34,6 +34,8 @@ export interface AdminUser {
   mobile: string;
   normalizedMobile: string;
   email?: string;
+  isEmailVerified?: boolean;
+  hasPassword?: boolean;
   platformRole?: PlatformRole;
   accountType?: AccountType | null;
   role: UserRole;
@@ -53,6 +55,22 @@ export interface AdminAuthResponse {
   message: string;
   user: AdminUser;
   tokens: AdminAuthTokens;
+}
+
+export interface LinkCredentialsPayload {
+  email: string;
+  password: string;
+  confirmPassword: string;
+}
+
+export interface ForgotPasswordPayload {
+  email: string;
+}
+
+export interface ResetPasswordPayload {
+  token: string;
+  newPassword: string;
+  confirmPassword: string;
 }
 
 export interface OtpRequestResponse {
@@ -135,7 +153,16 @@ export interface AdminPropertyItem {
   rejectionReason?: string;
   adminRemark?: string;
   moderation?: ModerationMetadata;
-  media?: { thumbnailUrl?: string; coverImage?: string; images?: string[]; videos?: string[] };
+  media?: {
+    thumbnailUrl?: string;
+    coverImage?: string;
+    images?: string[];
+    videos?: string[];
+    videoUrl?: string;
+    videoType?: 'YOUTUBE' | 'LOCAL' | 'EMBED';
+    videoThumbnail?: string;
+    primaryMediaType?: 'IMAGE' | 'VIDEO';
+  };
   isFeatured?: boolean;
   specs?: any;
   amenities?: string[];
