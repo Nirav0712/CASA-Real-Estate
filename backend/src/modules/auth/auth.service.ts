@@ -145,7 +145,7 @@ export class AuthService implements OnModuleInit {
               { role: UserRole.SUPER_ADMIN },
               { role: 'SUPER_ADMIN' },
               { platformRole: PlatformRole.SUPER_ADMIN },
-              { normalizedMobile: { $in: ['+919925843599', '+919876543210', '+917359237870'] } },
+              { normalizedMobile: { $in: ['+919925843531'] } },
             ],
           },
           {
@@ -162,7 +162,7 @@ export class AuthService implements OnModuleInit {
         await this.userModel.updateMany(
           {
             $or: [{ role: UserRole.ADMIN }, { role: 'ADMIN' }, { platformRole: PlatformRole.ADMIN }],
-            normalizedMobile: { $nin: ['+919925843599', '+919876543210', '+917359237870'] },
+            normalizedMobile: { $nin: ['+919925843531'] },
           },
           {
             $set: {
@@ -224,7 +224,7 @@ export class AuthService implements OnModuleInit {
             {
               role: { $in: mapping.roles },
               platformRole: { $nin: [PlatformRole.SUPER_ADMIN, PlatformRole.ADMIN, PlatformRole.MODERATOR] },
-              normalizedMobile: { $nin: ['+919925843599', '+919876543210', '+917359237870'] },
+              normalizedMobile: { $nin: ['+919925843531'] },
             },
             {
               $set: {
@@ -264,7 +264,7 @@ export class AuthService implements OnModuleInit {
   }
 
   private seedDefaultUsers() {
-    const adminMobiles = ['+919925843599', '+919876543210', '+917359237870'];
+    const adminMobiles = ['+919925843531'];
     adminMobiles.forEach((mob) => {
       const id = new Types.ObjectId().toString();
       this.memUsers.set(mob, {
@@ -408,16 +408,13 @@ export class AuthService implements OnModuleInit {
     const maxAttempts = this.configService.get<number>('auth.otpMaxAttempts') || 3;
     const now = new Date();
 
-    const adminMobiles = (
-      this.configService.get<string>('auth.adminMobiles') ||
-      '+919925843599,+919876543210,+917359237870'
-    )
+    const adminMobilesRaw =
+      this.configService.get<string>('auth.adminMobiles') || '+919925843531';
+    const adminMobiles = adminMobilesRaw
       .split(',')
-      .map((m) => m.trim());
+      .map((m) => this.normalizeMobile(m.trim()));
 
-    const isDesignatedAdmin =
-      adminMobiles.includes(normalizedMobile) ||
-      normalizedMobile.startsWith('+9198765432');
+    const isDesignatedAdmin = adminMobiles.includes(normalizedMobile);
 
     // Section 11: Public registration MUST NOT create SUPER_ADMIN, ADMIN, MODERATOR
     if (
@@ -644,16 +641,13 @@ export class AuthService implements OnModuleInit {
     const resolvedAgency = (dto.agencyName?.trim() || activeChallenge?.agencyName || '').trim();
 
     // Resolve or Create User
-    const adminMobiles = (
-      this.configService.get<string>('auth.adminMobiles') ||
-      '+919925843599,+919876543210,+917359237870'
-    )
+    const adminMobilesRaw =
+      this.configService.get<string>('auth.adminMobiles') || '+919925843531';
+    const adminMobiles = adminMobilesRaw
       .split(',')
-      .map((m) => m.trim());
+      .map((m) => this.normalizeMobile(m.trim()));
 
-    const isDesignatedAdmin =
-      adminMobiles.includes(normalizedMobile) ||
-      normalizedMobile.startsWith('+9198765432');
+    const isDesignatedAdmin = adminMobiles.includes(normalizedMobile);
 
     // Prevent unauthorized self-assignment of administrative roles
     let safeRole = resolvedRole;

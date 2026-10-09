@@ -100,6 +100,11 @@ export default function AdminLoginPage() {
       return;
     }
 
+    if (cleanPhone !== '9925843531') {
+      setErrorMsg('Access Restricted: Only authorized administrator (+91 99258 43531) can log into the Governance Portal.');
+      return;
+    }
+
     setLoading(true);
     try {
       const fullMobile = `+91${cleanPhone}`;
@@ -320,13 +325,13 @@ export default function AdminLoginPage() {
               {otpStep === 'PHONE' ? (
                 <form onSubmit={handleRequestOtp} className="space-y-4">
                   <div
-                    onClick={() => setPhone('9876543210')}
+                    onClick={() => setPhone('9925843531')}
                     className="p-3 bg-blue-50 dark:bg-blue-950/60 border border-blue-200 dark:border-blue-900 rounded-xl text-xs flex items-center justify-between cursor-pointer hover:bg-blue-100/70 transition-colors"
                   >
                     <div className="flex items-center gap-2">
                       <Sparkles className="w-3.5 h-3.5 text-casa-brand flex-shrink-0" />
                       <span className="text-blue-900 dark:text-blue-200 font-medium">
-                        Super Admin Demo: <strong className="font-mono tracking-wider">98765 43210</strong>
+                        Super Admin Demo: <strong className="font-mono tracking-wider">99258 43531</strong>
                       </span>
                     </div>
                     <span className="text-[10px] text-casa-brand font-bold uppercase underline">
@@ -345,7 +350,7 @@ export default function AdminLoginPage() {
                       <div className="flex-1">
                         <Input
                           type="tel"
-                          placeholder="98765 43210"
+                          placeholder="99258 43531"
                           value={phone}
                           onChange={(e) => setPhone(e.target.value.replace(/[^0-9]/g, ''))}
                           maxLength={10}

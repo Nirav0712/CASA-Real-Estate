@@ -35,13 +35,18 @@ export class MockOtpProvider implements IOtpProvider {
         );
       }
 
-      // Normalize digits for strict whitelist matching
-      const cleanAllowed = allowedMobileRaw.replace(/\D/g, '');
+      // Normalize digits for strict whitelist matching (handles comma-separated and formatted numbers)
+      const allowedList = allowedMobileRaw
+        .split(',')
+        .map((m) => m.replace(/\D/g, ''))
+        .filter((m) => m.length >= 10);
       const cleanTarget = options.normalizedMobile.replace(/\D/g, '');
 
-      const isMatch =
-        cleanAllowed === cleanTarget ||
-        (cleanAllowed.length >= 10 && cleanTarget.endsWith(cleanAllowed.slice(-10)));
+      const isMatch = allowedList.some(
+        (cleanAllowed) =>
+          cleanAllowed === cleanTarget ||
+          cleanTarget.endsWith(cleanAllowed.slice(-10)),
+      );
 
       if (!isMatch) {
         this.logger.warn(

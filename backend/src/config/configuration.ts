@@ -80,6 +80,7 @@ export default () => {
       refreshExpiresIn: cleanString(process.env.JWT_REFRESH_EXPIRES_IN, '7d'),
     },
     auth: {
+      adminMobiles: cleanString(process.env.ADMIN_MOBILES, '+919925843531'),
       otpExpiresInMinutes: parseInt(cleanString(process.env.OTP_EXPIRES_IN_MINUTES, '5'), 10),
       otpMaxAttempts: parseInt(cleanString(process.env.OTP_MAX_ATTEMPTS, '3'), 10),
       otpCooldownSeconds: parseInt(cleanString(process.env.OTP_COOLDOWN_SECONDS, '60'), 10),
