@@ -997,7 +997,8 @@ export function PropertyDetailView({
                     <span>Book a Site Visit</span>
                   </Button>
 
-                  {/* Direct Chat with Agent Button */}
+                  {/* Direct Chat with Agent Button (temporarily commented out) */}
+                  {/*
                   <Button
                     onClick={handleStartChat}
                     variant="outline"
@@ -1008,6 +1009,7 @@ export function PropertyDetailView({
                     <MessageCircle className="w-4 h-4" />
                     <span>Chat with Agent</span>
                   </Button>
+                  */}
 
                   {whatsappUrl ? (
                     <a

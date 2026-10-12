@@ -134,7 +134,8 @@ export function Header() {
                 )}
               </button>
 
-              {/* Global Location Selector Button */}
+              {/* Global Location Selector Button (temporarily commented out) */}
+              {/*
               <button
                 type="button"
                 onClick={() => setIsLocationModalOpen(true)}
@@ -149,6 +150,7 @@ export function Header() {
                     : headerLocation.countryName || 'Global'}
                 </span>
               </button>
+              */}
 
               {/* Language Switcher Button */}
               <button
