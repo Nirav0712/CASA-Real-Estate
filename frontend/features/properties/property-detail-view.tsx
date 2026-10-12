@@ -656,11 +656,82 @@ export function PropertyDetailView({
               </div>
             </div>
 
+            {/* RERA Compliance & Statutory Verification Card */}
+            {(property.rera?.isReraRegistered || (property as any).reraNumber) && (
+              <Card className="p-5 border-emerald-500/30 bg-emerald-500/5">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="flex items-start gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 flex items-center justify-center flex-shrink-0">
+                      <ShieldCheck className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h2 className="text-sm font-bold text-casa-text-primary">
+                          Indian RERA Compliance Details
+                        </h2>
+                        {property.rera?.verificationStatus === 'VERIFIED' ? (
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-600 text-white flex items-center gap-1">
+                            <Check className="w-2.5 h-2.5" />
+                            VERIFIED
+                          </span>
+                        ) : property.rera?.isReraRegistered === 'YES' || (property as any).reraNumber ? (
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-700 dark:text-amber-300">
+                            VERIFICATION IN PROGRESS
+                          </span>
+                        ) : (
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-casa-subtle text-casa-text-muted">
+                            STATUTORY EXEMPTION
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="mt-1 space-y-0.5 text-xs text-casa-text-secondary">
+                        {(property.rera?.reraNumber || (property as any).reraNumber) ? (
+                          <p>
+                            RERA Reg No:{' '}
+                            <span className="font-mono font-bold text-casa-brand">
+                              {property.rera?.reraNumber || (property as any).reraNumber}
+                            </span>
+                            {property.rera?.authority && ` • ${property.rera.authority}`}
+                            {property.rera?.projectName && ` • Project: ${property.rera.projectName}`}
+                          </p>
+                        ) : (
+                          <p>
+                            Exemption Rationale:{' '}
+                            <span className="font-medium text-casa-text-primary">
+                              {property.rera?.exemptionReason || 'Individual Resale / Tenancy Exemption'}
+                            </span>
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {property.rera?.certificateUrl && (
+                    <a
+                      href={property.rera.certificateUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl border border-emerald-500/30 text-xs font-semibold text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/10 transition-colors w-fit"
+                    >
+                      <span>View RERA Certificate</span>
+                      <ExternalLink className="w-3.5 h-3.5" />
+                    </a>
+                  )}
+                </div>
+              </Card>
+            )}
+
             {/* Key Specifications Grid */}
             <Card className="p-6 border-casa-border-light">
               <h2 className="text-base font-bold text-casa-text-primary mb-4 flex items-center gap-2">
                 <Building className="w-4 h-4 text-casa-brand" />
                 <span>{t('propertyOverview')}</span>
+                {(property as any).subcategory && (
+                  <span className="text-xs font-normal text-casa-text-muted">
+                    • {(property as any).subcategory}
+                  </span>
+                )}
               </h2>
 
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-start">
@@ -688,6 +759,18 @@ export function PropertyDetailView({
                   </div>
                 )}
 
+                {(property.specs as any)?.balconies && (
+                  <div className="p-3.5 rounded-2xl bg-casa-canvas border border-casa-border-light">
+                    <div className="flex items-center gap-1.5 text-xs text-casa-text-muted mb-1">
+                      <Layers className="w-3.5 h-3.5 text-casa-brand" />
+                      <span>Balconies</span>
+                    </div>
+                    <span className="text-sm font-bold text-casa-text-primary">
+                      {(property.specs as any).balconies} Balconies
+                    </span>
+                  </div>
+                )}
+
                 {property.specs?.carpetAreaSqFt && (
                   <div className="p-3.5 rounded-2xl bg-casa-canvas border border-casa-border-light">
                     <div className="flex items-center gap-1.5 text-xs text-casa-text-muted mb-1">
@@ -696,6 +779,56 @@ export function PropertyDetailView({
                     </div>
                     <span className="text-sm font-bold text-casa-text-primary">
                       {property.specs.carpetAreaSqFt.toLocaleString()} sq.ft
+                    </span>
+                  </div>
+                )}
+
+                {(property.specs as any)?.builtUpArea && (
+                  <div className="p-3.5 rounded-2xl bg-casa-canvas border border-casa-border-light">
+                    <div className="flex items-center gap-1.5 text-xs text-casa-text-muted mb-1">
+                      <Maximize className="w-3.5 h-3.5 text-casa-brand" />
+                      <span>Built-up Area</span>
+                    </div>
+                    <span className="text-sm font-bold text-casa-text-primary">
+                      {(property.specs as any).builtUpArea.toLocaleString()} sq.ft
+                    </span>
+                  </div>
+                )}
+
+                {/* Commercial Specific Attributes */}
+                {(property.specs as any)?.cabins && (
+                  <div className="p-3.5 rounded-2xl bg-casa-canvas border border-casa-border-light">
+                    <div className="flex items-center gap-1.5 text-xs text-casa-text-muted mb-1">
+                      <Building className="w-3.5 h-3.5 text-casa-brand" />
+                      <span>Cabins</span>
+                    </div>
+                    <span className="text-sm font-bold text-casa-text-primary">
+                      {(property.specs as any).cabins} Private Cabins
+                    </span>
+                  </div>
+                )}
+
+                {(property.specs as any)?.workstations && (
+                  <div className="p-3.5 rounded-2xl bg-casa-canvas border border-casa-border-light">
+                    <div className="flex items-center gap-1.5 text-xs text-casa-text-muted mb-1">
+                      <Layers className="w-3.5 h-3.5 text-casa-brand" />
+                      <span>Workstations</span>
+                    </div>
+                    <span className="text-sm font-bold text-casa-text-primary">
+                      {(property.specs as any).workstations} Seats
+                    </span>
+                  </div>
+                )}
+
+                {/* Land / Plot Dimensions */}
+                {(property.specs as any)?.plotLength && (property.specs as any)?.plotBreadth && (
+                  <div className="p-3.5 rounded-2xl bg-casa-canvas border border-casa-border-light">
+                    <div className="flex items-center gap-1.5 text-xs text-casa-text-muted mb-1">
+                      <Maximize className="w-3.5 h-3.5 text-casa-brand" />
+                      <span>Plot Dimensions</span>
+                    </div>
+                    <span className="text-sm font-bold text-casa-text-primary">
+                      {(property.specs as any).plotLength} × {(property.specs as any).plotBreadth} ft
                     </span>
                   </div>
                 )}
@@ -742,6 +875,18 @@ export function PropertyDetailView({
                     </div>
                     <span className="text-sm font-bold text-casa-text-primary">
                       {property.specs.parking}
+                    </span>
+                  </div>
+                )}
+
+                {(property.specs as any)?.ownershipType && (
+                  <div className="p-3.5 rounded-2xl bg-casa-canvas border border-casa-border-light">
+                    <div className="flex items-center gap-1.5 text-xs text-casa-text-muted mb-1">
+                      <ShieldCheck className="w-3.5 h-3.5 text-casa-brand" />
+                      <span>Ownership Title</span>
+                    </div>
+                    <span className="text-sm font-bold text-casa-text-primary">
+                      {(property.specs as any).ownershipType}
                     </span>
                   </div>
                 )}

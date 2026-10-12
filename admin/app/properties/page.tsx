@@ -25,6 +25,7 @@ import {
   RefreshCw,
   User,
   ShieldAlert,
+  ShieldCheck,
   Video,
   Play,
   Film,
@@ -43,6 +44,8 @@ import {
   toggleFeatureAdminProperty,
   deleteAdminProperty,
   updateAdminProperty,
+  verifyPropertyRera,
+  rejectPropertyRera,
 } from '@/services/admin-service';
 import { fetchAdminApi } from '@/lib/api-client';
 import { AdminPropertyItem } from '@/types';
@@ -68,6 +71,7 @@ export default function AdminPropertiesPage() {
   const [selectedStatus, setSelectedStatus] = React.useState('ALL');
   const [selectedType, setSelectedType] = React.useState('ALL');
   const [selectedFeatured, setSelectedFeatured] = React.useState('ALL');
+  const [selectedReraStatus, setSelectedReraStatus] = React.useState('ALL');
 
   // Bulk Selection State
   const [selectedIds, setSelectedIds] = React.useState<string[]>([]);
@@ -362,6 +366,52 @@ export default function AdminPropertiesPage() {
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Failed to toggle featured';
       toast.error('Action Failed', msg);
+    }
+  };
+
+  const handleVerifyRera = async (prop: AdminPropertyItem) => {
+    try {
+      await verifyPropertyRera(prop.id, 'Verified by CASA Admin');
+      toast.success('RERA Verified', `RERA credentials for "${prop.title}" marked as Verified.`);
+      setSelectedProperty((prev) =>
+        prev
+          ? {
+              ...prev,
+              rera: {
+                ...(prev.rera || {}),
+                verificationStatus: 'VERIFIED',
+                isReraRegistered: prev.rera?.isReraRegistered || 'YES',
+              },
+            }
+          : null,
+      );
+      await loadData();
+    } catch (err: unknown) {
+      toast.error('Verification Error', err instanceof Error ? err.message : 'Failed to verify RERA');
+    }
+  };
+
+  const handleRejectRera = async (prop: AdminPropertyItem) => {
+    const reason = prompt('Please enter RERA rejection reason (e.g., INVALID_RERA_REGISTRATION):', 'INVALID_RERA_REGISTRATION');
+    if (!reason) return;
+    try {
+      await rejectPropertyRera(prop.id, reason, 'Admin audit failed');
+      toast.warning('RERA Rejected', `RERA credentials for "${prop.title}" marked as Rejected.`);
+      setSelectedProperty((prev) =>
+        prev
+          ? {
+              ...prev,
+              rera: {
+                ...(prev.rera || {}),
+                verificationStatus: 'REJECTED',
+                isReraRegistered: prev.rera?.isReraRegistered || 'YES',
+              },
+            }
+          : null,
+      );
+      await loadData();
+    } catch (err: unknown) {
+      toast.error('Rejection Error', err instanceof Error ? err.message : 'Failed to reject RERA');
     }
   };
 
@@ -663,6 +713,15 @@ export default function AdminPropertiesPage() {
           role: editProp.advertiserRole,
           reraNumber: editProp.reraNumber.trim() || undefined,
         },
+        rera: {
+          isReraRegistered: editProp.reraNumber.trim() ? 'YES' : ((editingProperty as any)?.rera?.isReraRegistered || 'NO'),
+          reraNumber: editProp.reraNumber.trim() || undefined,
+          authority: (editingProperty as any)?.rera?.authority || 'UPRERA',
+          verificationStatus: (editingProperty as any)?.rera?.verificationStatus || (editProp.reraNumber.trim() ? 'VERIFIED' : 'NOT_APPLICABLE'),
+          projectName: (editingProperty as any)?.rera?.projectName,
+          certificateUrl: (editingProperty as any)?.rera?.certificateUrl,
+          exemptionReason: (editingProperty as any)?.rera?.exemptionReason,
+        },
         reraNumber: editProp.reraNumber.trim() || undefined,
         status: editProp.status,
         isPublished: editProp.status === 'PUBLISHED' || editProp.status === 'ACTIVE',
@@ -757,6 +816,12 @@ export default function AdminPropertiesPage() {
           isVerifiedAgent: true,
           role: 'SUPER_ADMIN',
           reraNumber: newProp.reraNumber.trim() || undefined,
+        },
+        rera: {
+          isReraRegistered: newProp.reraNumber.trim() ? 'YES' : 'NO',
+          reraNumber: newProp.reraNumber.trim() || undefined,
+          authority: 'UPRERA',
+          verificationStatus: newProp.reraNumber.trim() ? 'VERIFIED' : 'NOT_APPLICABLE',
         },
         reraNumber: newProp.reraNumber.trim() || undefined,
         status: newProp.status,
@@ -929,6 +994,19 @@ export default function AdminPropertiesPage() {
             <option value="true">★ Featured Only</option>
             <option value="false">Standard Only</option>
           </select>
+
+          {/* RERA Status Filter */}
+          <select
+            value={selectedReraStatus}
+            onChange={(e) => setSelectedReraStatus(e.target.value)}
+            className="px-3 py-2 text-xs bg-casa-canvas border border-casa-border-light rounded-xl focus:outline-none focus:ring-2 focus:ring-casa-brand/30 text-casa-text-primary"
+          >
+            <option value="ALL">All RERA Statuses</option>
+            <option value="VERIFIED">RERA: Verified</option>
+            <option value="PENDING">RERA: Pending Audit</option>
+            <option value="REJECTED">RERA: Rejected</option>
+            <option value="NOT_APPLICABLE">RERA: Statutory Exemption</option>
+          </select>
         </div>
       </Card>
 
@@ -995,14 +1073,24 @@ export default function AdminPropertiesPage() {
                     Loading live properties from MongoDB Atlas...
                   </td>
                 </tr>
-              ) : properties.length === 0 ? (
+              ) : properties.filter((item) => {
+                  if (selectedReraStatus === 'ALL') return true;
+                  const st = item.rera?.verificationStatus || (item.reraNumber ? 'PENDING' : 'NOT_APPLICABLE');
+                  return st === selectedReraStatus;
+                }).length === 0 ? (
                 <tr>
                   <td colSpan={8} className="px-6 py-12 text-center text-casa-text-muted">
                     No matching properties found.
                   </td>
                 </tr>
               ) : (
-                properties.map((item) => {
+                properties
+                  .filter((item) => {
+                    if (selectedReraStatus === 'ALL') return true;
+                    const st = item.rera?.verificationStatus || (item.reraNumber ? 'PENDING' : 'NOT_APPLICABLE');
+                    return st === selectedReraStatus;
+                  })
+                  .map((item) => {
                   const isPending =
                     item.status === 'PENDING_REVIEW' || item.status === 'PENDING_APPROVAL';
                   const isPublished =
@@ -1359,6 +1447,68 @@ export default function AdminPropertiesPage() {
                 <span className="text-[10px] text-casa-text-muted block">Price</span>
                 <span className="font-bold text-casa-brand">{formatPrice(selectedProperty.price)}</span>
               </div>
+            </div>
+
+            {/* RERA Audit & Verification Box */}
+            <div className="p-3.5 bg-emerald-500/5 border border-emerald-500/30 rounded-xl space-y-2">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <ShieldCheck className="w-5 h-5 text-emerald-600 flex-shrink-0" />
+                  <div>
+                    <span className="font-bold text-xs text-casa-text-primary block">
+                      Indian RERA Statutory Compliance &amp; Audit
+                    </span>
+                    <div className="text-[11px] text-casa-text-secondary">
+                      Reg No:{' '}
+                      <strong className="font-mono text-casa-brand">
+                        {selectedProperty.rera?.reraNumber || selectedProperty.reraNumber || (selectedProperty as any).advertiser?.reraNumber || 'Not Specified'}
+                      </strong>
+                      {selectedProperty.rera?.authority && ` • Authority: ${selectedProperty.rera.authority}`}
+                      {selectedProperty.rera?.projectName && ` • Project: ${selectedProperty.rera.projectName}`}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${
+                    selectedProperty.rera?.verificationStatus === 'VERIFIED'
+                      ? 'bg-emerald-100 text-emerald-700'
+                      : selectedProperty.rera?.verificationStatus === 'REJECTED'
+                      ? 'bg-red-100 text-red-700'
+                      : 'bg-amber-100 text-amber-700'
+                  }`}>
+                    {selectedProperty.rera?.verificationStatus || (selectedProperty.reraNumber ? 'PENDING' : 'NOT_APPLICABLE')}
+                  </span>
+
+                  {selectedProperty.rera?.verificationStatus !== 'VERIFIED' && (
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      onClick={() => handleVerifyRera(selectedProperty)}
+                      className="bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] py-1 px-2.5 h-auto"
+                    >
+                      Verify RERA
+                    </Button>
+                  )}
+
+                  {selectedProperty.rera?.verificationStatus !== 'REJECTED' && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleRejectRera(selectedProperty)}
+                      className="text-red-600 border-red-200 hover:bg-red-50 text-[11px] py-1 px-2.5 h-auto"
+                    >
+                      Reject RERA
+                    </Button>
+                  )}
+                </div>
+              </div>
+
+              {selectedProperty.rera?.exemptionReason && (
+                <div className="text-[11px] text-casa-text-muted">
+                  Claimed Statutory Exemption: {selectedProperty.rera.exemptionReason}
+                </div>
+              )}
             </div>
 
             {/* Rejection / Moderation History Banner */}

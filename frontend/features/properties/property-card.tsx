@@ -142,9 +142,14 @@ export function PropertyCard({ property }: { property: Property }) {
               ★ {t('featured')}
             </Badge>
           )}
-          {(property.reraNumber || (property.advertiser as any)?.reraNumber) && (
-            <Badge variant="default" size="sm" className="bg-emerald-600/95 backdrop-blur-sm text-white font-bold text-[10px] border-0 shadow-subtle">
-              RERA: {property.reraNumber || (property.advertiser as any)?.reraNumber}
+          {(property.rera?.verificationStatus === 'VERIFIED' || property.reraNumber || (property.advertiser as any)?.reraNumber) && (
+            <Badge variant="default" size="sm" className="bg-emerald-600/95 backdrop-blur-sm text-white font-bold text-[10px] border-0 shadow-subtle flex items-center gap-1">
+              <ShieldCheck className="w-3 h-3 inline" />
+              <span>
+                {property.rera?.verificationStatus === 'VERIFIED'
+                  ? 'RERA VERIFIED'
+                  : `RERA: ${property.reraNumber || (property.advertiser as any)?.reraNumber}`}
+              </span>
             </Badge>
           )}
           {property.advertiser.isVerifiedAgent ? (

@@ -346,9 +346,11 @@ export class AdminService implements OnModuleInit {
       moderation: raw.moderation || {},
       media: raw.media,
       isFeatured: !!raw.isFeatured,
+      subcategory: raw.subcategory,
       specs: raw.specs,
       amenities: raw.amenities,
-      reraNumber: raw.reraNumber || raw.advertiser?.reraNumber || undefined,
+      rera: raw.rera,
+      reraNumber: raw.reraNumber || raw.rera?.reraNumber || raw.advertiser?.reraNumber || undefined,
     };
   }
 
@@ -753,6 +755,109 @@ export class AdminService implements OnModuleInit {
     return {
       success: true,
       message: property.isFeatured ? 'Property marked as Featured.' : 'Property removed from Featured.',
+      property: this.mapPropertyToAdminItem(property),
+    };
+  }
+
+  async verifyPropertyRera(
+    id: string,
+    body?: { notes?: string; reraNumber?: string },
+    user?: { id?: string; name?: string; role?: string; email?: string },
+  ) {
+    const query: any = { $or: [{ id }] };
+    if (isValidObjectId(id)) {
+      query.$or.push({ _id: id });
+    }
+
+    const property = await this.propertyModel.findOne(query).exec();
+    if (!property) {
+      throw new NotFoundException(`Property with ID "${id}" was not found.`);
+    }
+
+    const currentRera = property.rera || { reraRegistered: 'YES', verificationStatus: 'PENDING' };
+    const reraNumber = (body?.reraNumber || currentRera.reraNumber || property.reraNumber || '').trim();
+
+    if (!reraNumber) {
+      throw new BadRequestException('Cannot verify property RERA without an official RERA registration number.');
+    }
+
+    const previousStatus = currentRera.verificationStatus || 'PENDING';
+    const auditEntry = {
+      action: 'VERIFIED',
+      actorId: user?.id || 'admin',
+      actorRole: user?.role || 'ADMIN',
+      previousStatus,
+      newStatus: 'VERIFIED',
+      notes: body?.notes || 'RERA registration verified by CASA administration.',
+      timestamp: new Date(),
+    };
+
+    property.rera = {
+      ...currentRera,
+      reraRegistered: 'YES',
+      reraNumber,
+      verificationStatus: 'VERIFIED',
+      verifiedBy: user?.name || user?.email || user?.id || 'admin',
+      verifiedAt: new Date(),
+      auditHistory: [...(currentRera.auditHistory || []), auditEntry],
+    };
+    property.reraNumber = reraNumber;
+
+    await property.save();
+    this.logger.log(`🛡️ Property "${property.id}" RERA VERIFIED by ${user?.name || user?.id || 'Admin'}`);
+
+    return {
+      success: true,
+      message: 'Property RERA registration marked as VERIFIED.',
+      property: this.mapPropertyToAdminItem(property),
+    };
+  }
+
+  async rejectPropertyRera(
+    id: string,
+    reason: string,
+    user?: { id?: string; name?: string; role?: string; email?: string },
+  ) {
+    if (!reason || !reason.trim()) {
+      throw new BadRequestException('Rejection reason is required when rejecting RERA registration.');
+    }
+
+    const query: any = { $or: [{ id }] };
+    if (isValidObjectId(id)) {
+      query.$or.push({ _id: id });
+    }
+
+    const property = await this.propertyModel.findOne(query).exec();
+    if (!property) {
+      throw new NotFoundException(`Property with ID "${id}" was not found.`);
+    }
+
+    const currentRera = property.rera || { reraRegistered: 'YES', verificationStatus: 'PENDING' };
+    const previousStatus = currentRera.verificationStatus || 'PENDING';
+
+    const auditEntry = {
+      action: 'REJECTED',
+      actorId: user?.id || 'admin',
+      actorRole: user?.role || 'ADMIN',
+      previousStatus,
+      newStatus: 'REJECTED',
+      notes: reason.trim(),
+      timestamp: new Date(),
+    };
+
+    property.rera = {
+      ...currentRera,
+      verificationStatus: 'REJECTED',
+      rejectionNotes: reason.trim(),
+      auditHistory: [...(currentRera.auditHistory || []), auditEntry],
+    };
+
+    await property.save();
+    this.logger.log(`⚠️ Property "${property.id}" RERA REJECTED by ${user?.name || user?.id || 'Admin'}: ${reason}`);
+
+    return {
+      success: true,
+      message: 'Property RERA registration marked as REJECTED.',
       property: this.mapPropertyToAdminItem(property),
     };
   }

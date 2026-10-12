@@ -60,6 +60,11 @@ export class PropertyPriceDto {
   @IsNumber()
   maintenance?: number;
 
+  @ApiPropertyOptional({ default: 'OWNER' })
+  @IsOptional()
+  @IsString()
+  maintenancePayer?: string;
+
   @ApiPropertyOptional()
   @IsOptional()
   @IsNumber()
@@ -69,6 +74,77 @@ export class PropertyPriceDto {
   @IsOptional()
   @IsString()
   rentPeriod?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber()
+  bookingAmount?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber()
+  pricePerSqFt?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber()
+  leaseDurationMonths?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber()
+  noticePeriodMonths?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber()
+  lockInPeriodMonths?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber()
+  rentEscalationPercentage?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  preferredTenantType?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber()
+  brokerageAmount?: number;
+
+  // PG / Co-living specific
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  pgPricingModel?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  occupancyType?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsBoolean()
+  mealsIncluded?: boolean;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  foodPreferences?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  genderAccommodation?: string;
+
+  @ApiPropertyOptional({ type: [String] })
+  @IsOptional()
+  @IsArray()
+  includedFacilities?: string[];
 }
 
 export class PropertyLocationDto {
@@ -157,6 +233,11 @@ export class PropertySpecsDto {
   @ApiPropertyOptional()
   @IsOptional()
   @IsNumber()
+  balconies?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber()
   area?: number;
 
   @ApiPropertyOptional({ default: 'SQ_FT' })
@@ -173,6 +254,16 @@ export class PropertySpecsDto {
   @IsOptional()
   @IsNumber()
   carpetAreaSqFt?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber()
+  builtUpArea?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber()
+  superBuiltUpArea?: number;
 
   @ApiPropertyOptional({ default: 'READY_TO_MOVE' })
   @IsOptional()
@@ -213,6 +304,98 @@ export class PropertySpecsDto {
   @IsOptional()
   @IsString()
   propertyAge?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  ownershipType?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  possessionStatus?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  possessionDate?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  availableFrom?: string;
+
+  // Land / Plots Specific
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  plotDimensions?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsBoolean()
+  cornerPlot?: boolean;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsBoolean()
+  boundaryWall?: boolean;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber()
+  openSides?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber()
+  roadWidthFt?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  soilType?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  landZone?: string;
+
+  // Commercial Specific
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber()
+  washrooms?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber()
+  cabins?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber()
+  workstations?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  pantry?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber()
+  powerBackupKva?: number;
+
+  @ApiPropertyOptional({ type: [String] })
+  @IsOptional()
+  @IsArray()
+  suitableFor?: string[];
+
+  @ApiPropertyOptional({ type: [String] })
+  @IsOptional()
+  @IsArray()
+  includedAppliances?: string[];
 }
 
 export class PropertyMediaDto {
@@ -294,6 +477,48 @@ export class PropertyAdvertiserDto {
   reraNumber?: string;
 }
 
+export class PropertyReraDto {
+  @ApiPropertyOptional({ enum: ['YES', 'NO', 'NOT_APPLICABLE'], default: 'NOT_APPLICABLE' })
+  @IsOptional()
+  @IsString()
+  reraRegistered?: string;
+
+  @ApiPropertyOptional({ description: 'Official RERA registration number' })
+  @IsOptional()
+  @IsString()
+  reraNumber?: string;
+
+  @ApiPropertyOptional({ description: 'State / Authority (e.g. UP-RERA, MahaRERA)' })
+  @IsOptional()
+  @IsString()
+  reraState?: string;
+
+  @ApiPropertyOptional({ description: 'Authority name' })
+  @IsOptional()
+  @IsString()
+  reraAuthority?: string;
+
+  @ApiPropertyOptional({ description: 'Registered project name under RERA' })
+  @IsOptional()
+  @IsString()
+  reraProjectName?: string;
+
+  @ApiPropertyOptional({ description: 'URL to uploaded RERA certificate document' })
+  @IsOptional()
+  @IsString()
+  certificateUrl?: string;
+
+  @ApiPropertyOptional({ enum: ['PENDING', 'VERIFIED', 'REJECTED', 'NOT_APPLICABLE'], default: 'NOT_APPLICABLE' })
+  @IsOptional()
+  @IsString()
+  verificationStatus?: string;
+
+  @ApiPropertyOptional({ description: 'Reason if RERA is not applicable (e.g. Completed resale unit with OC)' })
+  @IsOptional()
+  @IsString()
+  exemptionReason?: string;
+}
+
 export class CreatePropertyDto {
   @ApiPropertyOptional()
   @IsOptional()
@@ -330,8 +555,13 @@ export class CreatePropertyDto {
   @IsNotEmpty()
   category: string;
 
-  @ApiProperty({ enum: ['SALE', 'RENT', 'LEASE'], default: 'SALE' })
-  @IsEnum(['SALE', 'RENT', 'LEASE'])
+  @ApiPropertyOptional({ description: 'Specific subcategory' })
+  @IsOptional()
+  @IsString()
+  subcategory?: string;
+
+  @ApiProperty({ enum: ['SALE', 'RENT', 'LEASE', 'PG_COLIVING', 'COMMERCIAL_LEASE'], default: 'SALE' })
+  @IsEnum(['SALE', 'RENT', 'LEASE', 'PG_COLIVING', 'COMMERCIAL_LEASE'])
   listingType: string;
 
   @ApiProperty({ description: 'Pricing details' })
@@ -349,6 +579,12 @@ export class CreatePropertyDto {
   @ValidateNested()
   @Type(() => PropertySpecsDto)
   specs?: PropertySpecsDto;
+
+  @ApiPropertyOptional({ description: 'RERA Compliance details' })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => PropertyReraDto)
+  rera?: PropertyReraDto;
 
   @ApiPropertyOptional({ type: [String] })
   @IsOptional()

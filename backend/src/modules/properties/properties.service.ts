@@ -439,7 +439,13 @@ export class PropertiesService implements OnModuleInit {
         filter.category = new RegExp(`^${catClean.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i');
       }
 
-      // 4. Listing Type Filter (SALE / RENT / LEASE)
+      // 3b. Subcategory Filter
+      if (dto.subcategory && dto.subcategory !== 'all') {
+        const subClean = dto.subcategory.trim();
+        filter.subcategory = new RegExp(`^${subClean.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i');
+      }
+
+      // 4. Listing Type Filter (SALE / RENT / LEASE / PG_COLIVING / COMMERCIAL_LEASE)
       if (dto.listingType && dto.listingType !== 'all') {
         filter.listingType = new RegExp(`^${dto.listingType.trim()}$`, 'i');
       }
@@ -582,6 +588,23 @@ export class PropertiesService implements OnModuleInit {
       // 11. Featured Filter
       if (dto.featured === true) {
         filter.isFeatured = true;
+      }
+
+      // 11b. RERA Compliance Filters
+      if (dto.reraVerifiedOnly || dto.reraStatus === 'VERIFIED') {
+        filter.$or = [
+          ...(filter.$or || []),
+          { 'rera.verificationStatus': 'VERIFIED' },
+          { 'advertiser.isVerifiedAgent': true, reraNumber: { $exists: true, $ne: '' } },
+        ];
+      } else if (dto.reraStatus === 'REGISTERED') {
+        filter.$or = [
+          ...(filter.$or || []),
+          { 'rera.reraRegistered': 'YES' },
+          { reraNumber: { $exists: true, $ne: '' } },
+        ];
+      } else if (dto.reraStatus && dto.reraStatus !== 'all') {
+        filter['rera.verificationStatus'] = dto.reraStatus.toUpperCase();
       }
 
       // 12. Sorting Options
@@ -738,15 +761,35 @@ export class PropertiesService implements OnModuleInit {
 
     const priceObj =
       typeof dto.price === 'number'
-        ? { amount: dto.price, currency: 'INR', priceUnit: 'TOTAL', isNegotiable: true }
+        ? {
+            amount: dto.price,
+            currency: 'INR',
+            priceUnit: 'TOTAL',
+            isNegotiable: true,
+          }
         : {
             amount: Number(dto.price?.amount || 0),
             currency: dto.price?.currency || 'INR',
             priceUnit: dto.price?.priceUnit || 'TOTAL',
             isNegotiable: dto.price?.isNegotiable !== undefined ? dto.price.isNegotiable : true,
             maintenance: Number(dto.price?.maintenance || 0),
+            maintenancePayer: dto.price?.maintenancePayer || 'OWNER',
             securityDeposit: Number(dto.price?.securityDeposit || 0),
             rentPeriod: dto.price?.rentPeriod,
+            bookingAmount: dto.price?.bookingAmount ? Number(dto.price.bookingAmount) : undefined,
+            pricePerSqFt: dto.price?.pricePerSqFt ? Number(dto.price.pricePerSqFt) : undefined,
+            leaseDurationMonths: dto.price?.leaseDurationMonths ? Number(dto.price.leaseDurationMonths) : undefined,
+            noticePeriodMonths: dto.price?.noticePeriodMonths ? Number(dto.price.noticePeriodMonths) : undefined,
+            lockInPeriodMonths: dto.price?.lockInPeriodMonths ? Number(dto.price.lockInPeriodMonths) : undefined,
+            rentEscalationPercentage: dto.price?.rentEscalationPercentage ? Number(dto.price.rentEscalationPercentage) : undefined,
+            preferredTenantType: dto.price?.preferredTenantType,
+            brokerageAmount: dto.price?.brokerageAmount ? Number(dto.price.brokerageAmount) : undefined,
+            pgPricingModel: dto.price?.pgPricingModel,
+            occupancyType: dto.price?.occupancyType,
+            mealsIncluded: Boolean(dto.price?.mealsIncluded),
+            foodPreferences: dto.price?.foodPreferences,
+            genderAccommodation: dto.price?.genderAccommodation,
+            includedFacilities: Array.isArray(dto.price?.includedFacilities) ? dto.price.includedFacilities : [],
           };
 
     const locObj =
@@ -797,6 +840,45 @@ export class PropertiesService implements OnModuleInit {
 
     const ownerId = user?.id || dto.ownerId || 'usr-anon';
 
+    // RERA handling & compliance
+    const reraInput = dto.rera || {};
+    const rawReraNumber = (dto.reraNumber || reraInput.reraNumber || '').trim();
+    const reraRegistered =
+      reraInput.reraRegistered ||
+      reraInput.isReraRegistered ||
+      (rawReraNumber ? 'YES' : 'NOT_APPLICABLE');
+
+    let verificationStatus = 'NOT_APPLICABLE';
+    if (reraRegistered === 'YES') {
+      verificationStatus = isDirectAdmin && reraInput.verificationStatus ? reraInput.verificationStatus : 'PENDING';
+    }
+
+    const reraObj = {
+      reraRegistered,
+      isReraRegistered: reraRegistered,
+      reraNumber: rawReraNumber || undefined,
+      reraState: reraInput.reraState || reraInput.state || undefined,
+      reraAuthority: reraInput.reraAuthority || reraInput.authority || undefined,
+      authority: reraInput.reraAuthority || reraInput.authority || undefined,
+      reraProjectName: reraInput.reraProjectName || reraInput.projectName || undefined,
+      projectName: reraInput.reraProjectName || reraInput.projectName || undefined,
+      certificateUrl: reraInput.certificateUrl || undefined,
+      verificationStatus,
+      exemptionReason: reraInput.exemptionReason || undefined,
+      verifiedBy: verificationStatus === 'VERIFIED' ? (user?.id || 'admin') : undefined,
+      verifiedAt: verificationStatus === 'VERIFIED' ? new Date() : undefined,
+      auditHistory: [
+        {
+          action: 'CREATED',
+          actorId: user?.id || 'system',
+          actorRole: user?.role || 'PROPERTY_OWNER',
+          newStatus: verificationStatus,
+          notes: reraRegistered === 'YES' ? 'Listing RERA record initiated.' : 'Marked not applicable or exempt.',
+          timestamp: new Date(),
+        },
+      ],
+    };
+
     const propertyRecord = {
       id,
       referenceId,
@@ -808,6 +890,7 @@ export class PropertiesService implements OnModuleInit {
       title: titleObj,
       description: descObj,
       category: dto.category || 'House / Home',
+      subcategory: dto.subcategory || undefined,
       listingType: dto.listingType || 'SALE',
       price: priceObj,
       location: locObj,
@@ -815,6 +898,8 @@ export class PropertiesService implements OnModuleInit {
       amenities: dto.amenities || ['24/7 Security', 'Water Supply'],
       media: mediaObj,
       advertiser: advertiserObj,
+      rera: reraObj,
+      reraNumber: rawReraNumber || undefined,
       status: initialStatus,
       isPublished,
       publishedAt: isPublished ? new Date() : undefined,
@@ -921,6 +1006,23 @@ export class PropertiesService implements OnModuleInit {
       if (updateDto.ownerId) {
         delete updateDto.ownerId;
       }
+      // Security Check: Non-admins cannot self-certify RERA as VERIFIED
+      if (updateDto.rera) {
+        if (updateDto.rera.verificationStatus === 'VERIFIED') {
+          updateDto.rera.verificationStatus = existing.rera?.verificationStatus || 'PENDING';
+        }
+        delete updateDto.rera.verifiedBy;
+        delete updateDto.rera.verifiedAt;
+      }
+    }
+
+    // Keep root reraNumber and rera.reraNumber in sync
+    if (updateDto.reraNumber !== undefined || updateDto.rera?.reraNumber !== undefined) {
+      const num = (updateDto.reraNumber || updateDto.rera?.reraNumber || '').trim();
+      updateDto.reraNumber = num || undefined;
+      if (updateDto.rera) {
+        updateDto.rera.reraNumber = num || undefined;
+      }
     }
 
     // Set updatedBy
@@ -974,6 +1076,16 @@ export class PropertiesService implements OnModuleInit {
       throw new BadRequestException(
         `Cannot submit property in status "${property.status}". Allowed from DRAFT, REJECTED, or UNPUBLISHED.`,
       );
+    }
+
+    // Indian RERA rules validation: if declared RERA registered, require registration number before submission
+    if (property.rera?.reraRegistered === 'YES' || property.rera?.isReraRegistered === 'YES') {
+      const regNum = (property.rera.reraNumber || property.reraNumber || '').trim();
+      if (!regNum) {
+        throw new BadRequestException(
+          'A valid RERA registration number is mandatory for RERA-registered listings before review submission.',
+        );
+      }
     }
 
     const previousStatus = property.status;

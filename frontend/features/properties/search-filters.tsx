@@ -24,6 +24,7 @@ import {
   Layers,
   Compass,
   DollarSign,
+  ShieldCheck,
 } from 'lucide-react';
 
 const POPULAR_CITIES = [
@@ -229,18 +230,20 @@ export function SearchFilters({
         </div>
       </div>
 
-      {/* 2. Listing Type (SALE / RENT / LEASE) */}
+      {/* 2. Listing Type */}
       <div className="space-y-1.5">
         <label className="text-xs font-semibold text-casa-text-secondary flex items-center gap-1.5">
           <Tag className="w-3.5 h-3.5 text-casa-brand" />
           Listing Type
         </label>
-        <div className="grid grid-cols-4 gap-1 p-1 bg-casa-subtle rounded-xl border border-casa-border-light">
+        <div className="grid grid-cols-3 sm:grid-cols-6 gap-1 p-1 bg-casa-subtle rounded-xl border border-casa-border-light">
           {[
             { id: 'all', label: 'All' },
             { id: 'SALE', label: 'Buy' },
             { id: 'RENT', label: 'Rent' },
             { id: 'LEASE', label: 'Lease' },
+            { id: 'PG_COLIVING', label: 'PG / Co-live' },
+            { id: 'COMMERCIAL_LEASE', label: 'Comm Lease' },
           ].map((type) => {
             const isSelected = (!filters.listingType && type.id === 'all') || filters.listingType === type.id;
             return (
@@ -249,11 +252,11 @@ export function SearchFilters({
                 type="button"
                 onClick={() =>
                   onFilterChange({
-                    listingType: type.id === 'all' ? undefined : type.id,
+                    listingType: type.id === 'all' ? undefined : (type.id as any),
                     page: 1,
                   })
                 }
-                className={`py-1.5 text-[11px] font-semibold rounded-lg transition-all cursor-pointer text-center ${
+                className={`py-1.5 text-[10px] font-semibold rounded-lg transition-all cursor-pointer text-center truncate ${
                   isSelected
                     ? 'bg-casa-surface text-casa-brand shadow-2xs font-bold'
                     : 'text-casa-text-muted hover:text-casa-text-primary'
@@ -545,7 +548,28 @@ export function SearchFilters({
         </select>
       </div>
 
-      {/* 10. Featured Only Toggle */}
+      {/* 10. RERA Verified Only Toggle */}
+      <div className="pt-2 border-t border-casa-border-light">
+        <label className="flex items-center justify-between cursor-pointer group">
+          <span className="text-xs font-semibold text-casa-text-secondary group-hover:text-emerald-600 transition-colors flex items-center gap-1.5">
+            <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+            RERA Verified Listings Only
+          </span>
+          <input
+            type="checkbox"
+            checked={filters.reraVerifiedOnly === true || (filters as any).reraVerifiedOnly === 'true'}
+            onChange={(e) =>
+              onFilterChange({
+                reraVerifiedOnly: e.target.checked ? true : undefined,
+                page: 1,
+              })
+            }
+            className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+          />
+        </label>
+      </div>
+
+      {/* 11. Featured Only Toggle */}
       <div className="pt-2 border-t border-casa-border-light">
         <label className="flex items-center justify-between cursor-pointer group">
           <span className="text-xs font-semibold text-casa-text-secondary group-hover:text-casa-brand transition-colors flex items-center gap-1.5">

@@ -45,7 +45,12 @@ export class SearchPropertiesDto {
   @IsString()
   category?: string;
 
-  @ApiPropertyOptional({ description: 'Listing Type (SALE, RENT, LEASE)', enum: ['SALE', 'RENT', 'LEASE'] })
+  @ApiPropertyOptional({ description: 'Subcategory (e.g., Flat/Apartment, Penthouse, Office Space)' })
+  @IsOptional()
+  @IsString()
+  subcategory?: string;
+
+  @ApiPropertyOptional({ description: 'Listing Type (SALE, RENT, LEASE, PG_COLIVING, COMMERCIAL_LEASE)' })
   @IsOptional()
   @IsString()
   listingType?: string;
@@ -198,6 +203,17 @@ export class SearchPropertiesDto {
   @Transform(({ value }) => value === 'true' || value === true || value === '1')
   @IsBoolean()
   verifiedOnly?: boolean;
+
+  @ApiPropertyOptional({ description: 'Filter only RERA verified properties' })
+  @IsOptional()
+  @Transform(({ value }) => value === 'true' || value === true || value === '1')
+  @IsBoolean()
+  reraVerifiedOnly?: boolean;
+
+  @ApiPropertyOptional({ description: 'Filter by RERA status (VERIFIED, PENDING, REGISTERED, NOT_APPLICABLE)' })
+  @IsOptional()
+  @IsString()
+  reraStatus?: string;
 
   @ApiPropertyOptional({ description: 'Filter by poster role (AGENT or OWNER)' })
   @IsOptional()

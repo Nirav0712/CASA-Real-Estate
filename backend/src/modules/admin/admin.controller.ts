@@ -181,6 +181,30 @@ export class AdminController {
     return this.adminService.toggleFeature(id, false);
   }
 
+  @Post('properties/:id/rera-verify')
+  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN, UserRole.MODERATOR)
+  @ApiOperation({ summary: 'Admin verify RERA registration for a property' })
+  @ApiResponse({ status: 200, description: 'Property RERA marked VERIFIED' })
+  verifyPropertyRera(
+    @Param('id') id: string,
+    @Body() body?: { notes?: string; reraNumber?: string },
+    @CurrentUser() user?: AuthenticatedUser,
+  ) {
+    return this.adminService.verifyPropertyRera(id, body, user);
+  }
+
+  @Post('properties/:id/rera-reject')
+  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN, UserRole.MODERATOR)
+  @ApiOperation({ summary: 'Admin reject RERA registration for a property' })
+  @ApiResponse({ status: 200, description: 'Property RERA marked REJECTED' })
+  rejectPropertyRera(
+    @Param('id') id: string,
+    @Body() body: { reason: string },
+    @CurrentUser() user?: AuthenticatedUser,
+  ) {
+    return this.adminService.rejectPropertyRera(id, body?.reason, user);
+  }
+
   @Delete('properties/:id')
   @ApiOperation({ summary: 'Admin delete property listing' })
   deleteProperty(@Param('id') id: string) {

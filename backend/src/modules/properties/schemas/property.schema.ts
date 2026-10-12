@@ -27,7 +27,7 @@ export class PropertyPrice {
   currency: string;
 
   @Prop({ default: 'TOTAL' })
-  priceUnit?: string; // TOTAL, PER_SQ_FT, PER_MONTH, PER_YEAR
+  priceUnit?: string; // TOTAL, PER_SQ_FT, PER_MONTH, PER_YEAR, PER_BED, PER_ROOM
 
   @Prop({ default: true })
   isNegotiable: boolean;
@@ -35,11 +35,57 @@ export class PropertyPrice {
   @Prop({ default: 0 })
   maintenance?: number;
 
+  @Prop({ default: 'OWNER' })
+  maintenancePayer?: string; // OWNER, TENANT
+
   @Prop({ default: 0 })
   securityDeposit?: number;
 
   @Prop()
   rentPeriod?: string; // MONTHLY, YEARLY, LEASE_TERM
+
+  @Prop()
+  bookingAmount?: number;
+
+  @Prop()
+  pricePerSqFt?: number;
+
+  @Prop()
+  leaseDurationMonths?: number;
+
+  @Prop()
+  noticePeriodMonths?: number;
+
+  @Prop()
+  lockInPeriodMonths?: number;
+
+  @Prop()
+  rentEscalationPercentage?: number;
+
+  @Prop()
+  preferredTenantType?: string; // Family, Bachelors, Company Lease, Any
+
+  @Prop()
+  brokerageAmount?: number;
+
+  // PG / Co-living specific
+  @Prop()
+  pgPricingModel?: string; // PER_BED, PER_ROOM
+
+  @Prop()
+  occupancyType?: string; // Single, Double, Triple, Four+
+
+  @Prop({ default: false })
+  mealsIncluded?: boolean;
+
+  @Prop()
+  foodPreferences?: string; // Veg Only, Veg & Non-Veg
+
+  @Prop()
+  genderAccommodation?: string; // Male, Female, Coed/Unisex
+
+  @Prop({ type: [String], default: [] })
+  includedFacilities?: string[];
 }
 
 @Schema({ _id: false })
@@ -96,10 +142,13 @@ export class PropertySpecs {
   bathrooms?: number;
 
   @Prop()
+  balconies?: number;
+
+  @Prop()
   area?: number;
 
   @Prop({ default: 'SQ_FT' })
-  areaUnit?: string; // SQ_FT, SQ_YARDS, ACRES, BIGHAS
+  areaUnit?: string; // SQ_FT, SQ_YARDS, SQ_METER, ACRES, BIGHAS, GUNTHA
 
   @Prop()
   carpetArea?: number;
@@ -107,11 +156,17 @@ export class PropertySpecs {
   @Prop()
   carpetAreaSqFt?: number;
 
+  @Prop()
+  builtUpArea?: number;
+
+  @Prop()
+  superBuiltUpArea?: number;
+
   @Prop({ default: 'READY_TO_MOVE' })
   constructionStatus: string; // READY_TO_MOVE, UNDER_CONSTRUCTION, RESALE, NEW_LAUNCH
 
   @Prop({ default: 'SEMI_FURNISHED' })
-  furnishing?: string; // UNFURNISHED, SEMI_FURNISHED, FULLY_FURNISHED
+  furnishing?: string; // UNFURNISHED, SEMI_FURNISHED, FULLY_FURNISHED, BARE_SHELL, WARM_SHELL
 
   @Prop({ default: 'East' })
   facing?: string; // North, East, West, South, North-East, North-West, South-East, South-West
@@ -130,6 +185,62 @@ export class PropertySpecs {
 
   @Prop()
   propertyAge?: string; // 0-1 years, 1-5 years, 5-10 years, 10+ years, Under Construction
+
+  @Prop()
+  ownershipType?: string; // FREEHOLD, LEASEHOLD, POWER_OF_ATTORNEY, COOPERATIVE
+
+  @Prop()
+  possessionStatus?: string; // Ready to Move, Under Construction
+
+  @Prop()
+  possessionDate?: string;
+
+  @Prop()
+  availableFrom?: string;
+
+  // Land & Plots Specific
+  @Prop()
+  plotDimensions?: string; // e.g., 30 x 50 ft
+
+  @Prop()
+  cornerPlot?: boolean;
+
+  @Prop()
+  boundaryWall?: boolean;
+
+  @Prop()
+  openSides?: number;
+
+  @Prop()
+  roadWidthFt?: number;
+
+  @Prop()
+  soilType?: string;
+
+  @Prop()
+  landZone?: string; // Residential Zone, Commercial Zone, Agricultural, Industrial
+
+  // Commercial Specific
+  @Prop()
+  washrooms?: number;
+
+  @Prop()
+  cabins?: number;
+
+  @Prop()
+  workstations?: number;
+
+  @Prop()
+  pantry?: string; // DRY, WET, NONE
+
+  @Prop()
+  powerBackupKva?: number;
+
+  @Prop({ type: [String], default: [] })
+  suitableFor?: string[];
+
+  @Prop({ type: [String], default: [] })
+  includedAppliances?: string[];
 }
 
 @Schema({ _id: false })
@@ -279,6 +390,82 @@ export class PropertySeo {
   canonicalSlug?: string;
 }
 
+@Schema({ _id: false })
+export class PropertyReraAuditEntry {
+  @Prop({ required: true })
+  action: string; // SUBMITTED, VERIFIED, REJECTED, UPDATED
+
+  @Prop({ required: true })
+  actorId: string;
+
+  @Prop({ required: true })
+  actorRole: string;
+
+  @Prop()
+  previousStatus?: string;
+
+  @Prop()
+  newStatus?: string;
+
+  @Prop()
+  notes?: string;
+
+  @Prop({ default: Date.now })
+  timestamp: Date;
+}
+
+@Schema({ _id: false })
+export class PropertyRera {
+  @Prop({ default: 'NOT_APPLICABLE', enum: ['YES', 'NO', 'NOT_APPLICABLE'] })
+  reraRegistered: string; // YES, NO, NOT_APPLICABLE
+
+  @Prop()
+  isReraRegistered?: string; // Alias for reraRegistered
+
+  @Prop({ index: true })
+  reraNumber?: string;
+
+  @Prop()
+  reraState?: string; // e.g. UP-RERA, MahaRERA, Delhi RERA
+
+  @Prop()
+  reraAuthority?: string;
+
+  @Prop()
+  authority?: string; // Alias for reraAuthority
+
+  @Prop()
+  reraProjectName?: string;
+
+  @Prop()
+  projectName?: string; // Alias for reraProjectName
+
+  @Prop()
+  certificateUrl?: string;
+
+  @Prop({
+    default: 'NOT_APPLICABLE',
+    enum: ['PENDING', 'VERIFIED', 'REJECTED', 'NOT_APPLICABLE'],
+    index: true,
+  })
+  verificationStatus: string; // PENDING, VERIFIED, REJECTED, NOT_APPLICABLE
+
+  @Prop()
+  exemptionReason?: string; // Reason why RERA is not applicable
+
+  @Prop()
+  verifiedBy?: string;
+
+  @Prop()
+  verifiedAt?: Date;
+
+  @Prop()
+  rejectionNotes?: string;
+
+  @Prop({ type: [PropertyReraAuditEntry], default: [] })
+  auditHistory?: PropertyReraAuditEntry[];
+}
+
 @Schema({ timestamps: true })
 export class Property {
   @Prop({ required: true, unique: true, index: true })
@@ -311,7 +498,15 @@ export class Property {
   @Prop({ required: true, index: true })
   category: string;
 
-  @Prop({ required: true, enum: ['SALE', 'RENT', 'LEASE'], default: 'SALE', index: true })
+  @Prop({ index: true })
+  subcategory?: string;
+
+  @Prop({
+    required: true,
+    enum: ['SALE', 'RENT', 'LEASE', 'PG_COLIVING', 'COMMERCIAL_LEASE'],
+    default: 'SALE',
+    index: true,
+  })
   listingType: string;
 
   @Prop({ type: PropertyPrice, required: true })
@@ -331,6 +526,9 @@ export class Property {
 
   @Prop({ type: PropertyAdvertiser, required: true })
   advertiser: PropertyAdvertiser;
+
+  @Prop({ type: PropertyRera, default: () => ({ reraRegistered: 'NOT_APPLICABLE', verificationStatus: 'NOT_APPLICABLE' }) })
+  rera?: PropertyRera;
 
   @Prop({ index: true })
   reraNumber?: string;
@@ -392,6 +590,9 @@ export const PropertySchema = SchemaFactory.createForClass(Property);
 PropertySchema.index({ createdAt: -1 });
 PropertySchema.index({ status: 1, isPublished: 1 });
 PropertySchema.index({ category: 1, status: 1 });
+PropertySchema.index({ subcategory: 1, status: 1 });
+PropertySchema.index({ listingType: 1, status: 1 });
+PropertySchema.index({ 'rera.verificationStatus': 1, status: 1 });
 PropertySchema.index({ 'location.city': 1, status: 1 });
 PropertySchema.index({ 'location.cityId': 1, status: 1 });
 PropertySchema.index({ 'location.localityId': 1, status: 1 });

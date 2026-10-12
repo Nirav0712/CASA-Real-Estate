@@ -119,6 +119,25 @@ export interface ModerationMetadata {
   reasonsFlagged?: string[];
 }
 
+export interface PropertyRera {
+  reraRegistered?: 'YES' | 'NO' | 'NOT_APPLICABLE';
+  isReraRegistered?: 'YES' | 'NO' | 'NOT_APPLICABLE';
+  reraNumber?: string;
+  reraState?: string;
+  authority?: string;
+  reraAuthority?: string;
+  projectName?: string;
+  reraProjectName?: string;
+  certificateUrl?: string;
+  verificationStatus: 'PENDING' | 'VERIFIED' | 'REJECTED' | 'NOT_APPLICABLE';
+  exemptionReason?: string;
+  verifiedBy?: string;
+  verifiedAt?: string;
+  rejectionNotes?: string;
+  adminRemarks?: string;
+  auditHistory?: any[];
+}
+
 export interface AdminPropertyItem {
   id: string;
   _id?: string;
@@ -131,6 +150,7 @@ export interface AdminPropertyItem {
   description?: string;
   rawDescription?: any;
   category: string;
+  subcategory?: string;
   listingType?: string;
   price: number;
   rawPrice?: any;
@@ -167,6 +187,7 @@ export interface AdminPropertyItem {
   isFeatured?: boolean;
   specs?: any;
   amenities?: string[];
+  rera?: PropertyRera;
   reraNumber?: string;
 }
 

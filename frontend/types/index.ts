@@ -116,7 +116,12 @@ export interface OtpRequestResponse {
   devMockOtp?: string;
 }
 
-export type ListingType = 'SALE' | 'RENT' | 'LEASE';
+export type ListingType =
+  | 'SALE'
+  | 'RENT'
+  | 'LEASE'
+  | 'PG_COLIVING'
+  | 'COMMERCIAL_LEASE';
 
 export type PropertyStatus =
   | 'DRAFT'
@@ -164,10 +169,13 @@ export interface ModerationMetadata {
 export interface PropertySpecs {
   bedrooms?: number;
   bathrooms?: number;
+  balconies?: number;
   area?: number;
   areaUnit?: string;
   carpetArea?: number;
   carpetAreaSqFt?: number;
+  builtUpArea?: number;
+  superBuiltUpArea?: number;
   constructionStatus?: ConstructionStatus;
   furnishing?: FurnishingStatus;
   facing?: string;
@@ -176,6 +184,43 @@ export interface PropertySpecs {
   floorNumber?: string;
   totalFloors?: number;
   propertyAge?: string;
+  ownershipType?: string;
+  possessionStatus?: string;
+  possessionDate?: string;
+  availableFrom?: string;
+  plotDimensions?: string;
+  cornerPlot?: boolean;
+  boundaryWall?: boolean;
+  openSides?: number;
+  roadWidthFt?: number;
+  soilType?: string;
+  landZone?: string;
+  washrooms?: number;
+  cabins?: number;
+  workstations?: number;
+  pantry?: string;
+  powerBackupKva?: number;
+  suitableFor?: string[];
+  includedAppliances?: string[];
+}
+
+export interface PropertyRera {
+  reraRegistered?: 'YES' | 'NO' | 'NOT_APPLICABLE';
+  isReraRegistered?: 'YES' | 'NO' | 'NOT_APPLICABLE';
+  reraNumber?: string;
+  reraState?: string;
+  authority?: string;
+  reraAuthority?: string;
+  projectName?: string;
+  reraProjectName?: string;
+  certificateUrl?: string;
+  verificationStatus: 'PENDING' | 'VERIFIED' | 'REJECTED' | 'NOT_APPLICABLE';
+  exemptionReason?: string;
+  verifiedBy?: string;
+  verifiedAt?: string;
+  rejectionNotes?: string;
+  adminRemarks?: string;
+  auditHistory?: any[];
 }
 
 export interface Property {
@@ -187,6 +232,7 @@ export interface Property {
   title: LocalizedText;
   description: LocalizedText;
   category: string;
+  subcategory?: string;
   listingType: ListingType;
   price: {
     amount: number;
@@ -194,8 +240,23 @@ export interface Property {
     priceUnit?: string;
     isNegotiable?: boolean;
     maintenance?: number;
+    maintenancePayer?: 'OWNER' | 'TENANT';
     securityDeposit?: number;
     rentPeriod?: string;
+    bookingAmount?: number;
+    pricePerSqFt?: number;
+    leaseDurationMonths?: number;
+    noticePeriodMonths?: number;
+    lockInPeriodMonths?: number;
+    rentEscalationPercentage?: number;
+    preferredTenantType?: string;
+    brokerageAmount?: number;
+    pgPricingModel?: 'PER_BED' | 'PER_ROOM';
+    occupancyType?: string;
+    mealsIncluded?: boolean;
+    foodPreferences?: string;
+    genderAccommodation?: string;
+    includedFacilities?: string[];
   };
   location: {
     state?: string;
@@ -227,6 +288,7 @@ export interface Property {
     agencyName?: string;
     reraNumber?: string;
   };
+  rera?: PropertyRera;
   reraNumber?: string;
   status: PropertyStatus;
   isPublished?: boolean;
@@ -284,6 +346,7 @@ export interface PaginatedResponse<T> {
 export interface SearchPropertiesParams {
   q?: string;
   category?: string;
+  subcategory?: string;
   listingType?: string;
   state?: string;
   district?: string;
@@ -310,6 +373,8 @@ export interface SearchPropertiesParams {
   amenities?: string;
   freshness?: string;
   featured?: boolean | string;
+  reraStatus?: string;
+  reraVerifiedOnly?: boolean | string;
   lat?: number;
   lng?: number;
   radius?: number;

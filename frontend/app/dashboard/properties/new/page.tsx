@@ -6,8 +6,16 @@ import Link from 'next/link';
 import { useAuth } from '@/contexts/auth-context';
 import { useToast } from '@/contexts/toast-context';
 import { createProperty, submitPropertyForApproval } from '@/services/property-service';
-import { fetchLocationAutocomplete, fetchLocations } from '@/services/location-service';
+import { fetchLocationAutocomplete } from '@/services/location-service';
 import { formatPrice } from '@/lib/utils';
+import {
+  CATEGORY_GROUPS,
+  LISTING_TYPES,
+  RERA_AUTHORITIES,
+  RERA_EXEMPTION_REASONS,
+  getCategoryFieldVisibility,
+  validateReraNumber,
+} from '@/lib/property-categories';
 import {
   Home,
   ArrowRight,
@@ -20,20 +28,14 @@ import {
   Building,
   ShieldCheck,
   Check,
+  AlertCircle,
+  FileText,
+  Bed,
+  Bath,
+  IndianRupee,
+  Layers,
+  Sparkles,
 } from 'lucide-react';
-
-const CANONICAL_CATEGORIES = [
-  'House / Home',
-  'Apartment',
-  'Flats',
-  'Plotting Land',
-  'Small Land',
-  'Big Land',
-  'Shop',
-  'Warehouse',
-  'Lease',
-  'Litigated',
-];
 
 const STANDARD_AMENITIES = [
   '24/7 Gated Security & CCTV',
@@ -53,6 +55,21 @@ const STANDARD_AMENITIES = [
   'Water Storage & Borewell',
 ];
 
+const PG_FACILITIES_OPTIONS = [
+  'High-Speed Wi-Fi',
+  'Daily Room Cleaning',
+  'Air Conditioning (AC)',
+  'Attached Washroom',
+  'Geyser / Hot Water',
+  'Washing Machine & Laundry',
+  'RO Purified Drinking Water',
+  'Refrigerator Access',
+  'Cupboard & Study Desk',
+  'CCTV & Biometric Access',
+  'Power Backup',
+  'Warden / Caretaker on site',
+];
+
 export default function NewPropertyWizardPage() {
   const { isAuthenticated, isLoading: isAuthLoading, openAuthModal } = useAuth();
   const toast = useToast();
@@ -63,34 +80,86 @@ export default function NewPropertyWizardPage() {
 
   // Wizard Form State
   const [formData, setFormData] = React.useState({
-    // Step 1: Basic
+    // Step 1: Category & Basic
+    categoryGroup: 'RESIDENTIAL',
+    category: 'Apartment',
+    subcategory: 'Flat/Apartment',
+    listingType: 'SALE' as 'SALE' | 'RENT' | 'LEASE' | 'PG_COLIVING' | 'COMMERCIAL_LEASE',
     titleEn: '',
-    category: 'House / Home',
-    listingType: 'SALE' as 'SALE' | 'RENT' | 'LEASE',
     descriptionEn: '',
 
-    // Step 2: Specs
+    // Step 2: Specs & Dimensions
     bedrooms: '3',
     bathrooms: '3',
+    balconies: '2',
     area: '1800',
     areaUnit: 'SQ_FT',
-    carpetArea: '1600',
+    carpetArea: '1500',
+    builtUpArea: '1650',
+    superBuiltUpArea: '1800',
     furnishing: 'SEMI_FURNISHED',
     facing: 'East',
     parking: '1 Covered, 1 Open',
-    floorLevel: '1st Floor',
-    totalFloors: '4',
+    floorLevel: '3rd Floor',
+    totalFloors: '14',
     constructionStatus: 'READY_TO_MOVE',
     propertyAge: '0-1 years',
+    possessionStatus: 'READY_TO_MOVE',
+    possessionDate: '',
+    availableFrom: '',
 
-    // Step 3: Pricing
+    // Commercial Specs
+    cabins: '',
+    workstations: '',
+    washrooms: '',
+    pantry: 'DRY',
+    powerBackupKva: '',
+    suitableFor: '',
+
+    // Plot/Land Specs
+    plotLength: '',
+    plotBreadth: '',
+    openSides: '1',
+    boundaryWall: true,
+    cornerPlot: false,
+    roadWidthFt: '40',
+    soilType: '',
+    landZone: 'Residential',
+
+    // RERA Section
+    reraRegistered: 'YES' as 'YES' | 'NO' | 'NOT_APPLICABLE',
+    reraNumber: '',
+    reraAuthority: 'UPRERA',
+    reraProjectName: '',
+    reraCertificateUrl: '',
+    reraExemptionReason: '',
+    reraRemarks: '',
+
+    // Step 3: Pricing & Commercial Terms
     priceAmount: '',
     currency: 'INR',
     priceUnit: 'TOTAL',
     isNegotiable: true,
+    bookingAmount: '',
     maintenance: '',
+    maintenancePayer: 'Owner',
     securityDeposit: '',
     rentPeriod: 'MONTHLY',
+    ownershipType: 'Freehold',
+    leaseDurationMonths: '11',
+    noticePeriodMonths: '1',
+    lockInPeriodMonths: '3',
+    rentEscalationPercentage: '5',
+    preferredTenantType: 'ANY',
+    brokerageAmount: '0',
+
+    // PG / Co-living Specifics
+    pgPricingModel: 'PER_BED',
+    occupancyType: 'DOUBLE',
+    mealsIncluded: 'BREAKFAST_AND_DINNER',
+    foodPreferences: 'VEG_AND_NON_VEG',
+    genderAccommodation: 'ANY',
+    includedFacilities: ['High-Speed Wi-Fi', 'Daily Room Cleaning', 'RO Purified Drinking Water', 'Air Conditioning (AC)'],
 
     // Step 4: Location
     state: 'Uttar Pradesh',
@@ -108,6 +177,60 @@ export default function NewPropertyWizardPage() {
   });
 
   const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+  // Field visibility matrix
+  const visibility = React.useMemo(() => {
+    return getCategoryFieldVisibility(formData.category, formData.subcategory);
+  }, [formData.category, formData.subcategory]);
+
+  // Current category group definition
+  const currentCategoryGroup = React.useMemo(() => {
+    return CATEGORY_GROUPS.find((g) => g.group === formData.categoryGroup) || CATEGORY_GROUPS[0];
+  }, [formData.categoryGroup]);
+
+  // Subcategories available for current group
+  const availableSubcategories = React.useMemo(() => {
+    return currentCategoryGroup.subcategories;
+  }, [currentCategoryGroup]);
+
+  // RERA number validation feedback
+  const reraValidation = React.useMemo(() => {
+    if (formData.reraRegistered !== 'YES') {
+      return { valid: true, message: 'RERA registration not applicable for this listing' };
+    }
+    return validateReraNumber(formData.reraNumber, formData.reraAuthority);
+  }, [formData.reraRegistered, formData.reraNumber, formData.reraAuthority]);
+
+  // Handle Category Group Change
+  const handleCategoryGroupChange = (newGroup: string) => {
+    const groupDef = CATEGORY_GROUPS.find((g) => g.group === newGroup) || CATEGORY_GROUPS[0];
+    const firstSub = groupDef.subcategories[0] || '';
+    const defaultListingType = groupDef.supportedListingTypes[0] || 'SALE';
+
+    setFormData((prev) => ({
+      ...prev,
+      categoryGroup: newGroup,
+      category: groupDef.name,
+      subcategory: firstSub,
+      listingType: groupDef.supportedListingTypes.includes(prev.listingType as any)
+        ? prev.listingType
+        : (defaultListingType as any),
+      // Auto-adjust default RERA for agricultural land or rental
+      reraRegistered: newGroup === 'AGRICULTURAL_LAND' ? 'NOT_APPLICABLE' : prev.reraRegistered,
+      reraExemptionReason:
+        newGroup === 'AGRICULTURAL_LAND' ? 'Agricultural / Non-plotted rural land' : prev.reraExemptionReason,
+    }));
+  };
+
+  // Auto calculate price per sq ft
+  const calculatedPricePerSqFt = React.useMemo(() => {
+    const price = Number(formData.priceAmount);
+    const area = Number(formData.carpetArea) || Number(formData.area);
+    if (price > 0 && area > 0) {
+      return Math.round(price / area);
+    }
+    return 0;
+  }, [formData.priceAmount, formData.carpetArea, formData.area]);
 
   // File Upload Handler
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -153,6 +276,18 @@ export default function NewPropertyWizardPage() {
     });
   };
 
+  const togglePgFacility = (facility: string) => {
+    setFormData((prev) => {
+      const exists = prev.includedFacilities.includes(facility);
+      return {
+        ...prev,
+        includedFacilities: exists
+          ? prev.includedFacilities.filter((f) => f !== facility)
+          : [...prev.includedFacilities, facility],
+      };
+    });
+  };
+
   // Step Validation
   const validateStep = (step: number): boolean => {
     if (step === 1) {
@@ -164,25 +299,58 @@ export default function NewPropertyWizardPage() {
         toast.warning('Description Required', 'Please enter a description for your listing.');
         return false;
       }
+      if (!formData.subcategory) {
+        toast.warning('Subcategory Required', 'Please select a specific property subcategory.');
+        return false;
+      }
     }
+
+    if (step === 2) {
+      // Area is always required
+      if (!formData.area || Number(formData.area) <= 0) {
+        toast.warning('Area Required', 'Please provide a valid property area.');
+        return false;
+      }
+
+      // RERA validation check
+      if (formData.reraRegistered === 'YES') {
+        if (!formData.reraNumber.trim()) {
+          toast.warning('RERA Number Mandatory', 'RERA registration number is required for RERA-registered projects before submission.');
+          return false;
+        }
+        if (!reraValidation.valid) {
+          toast.warning('Invalid RERA Format', reraValidation.message);
+          return false;
+        }
+      } else if (formData.reraRegistered === 'NO' || formData.reraRegistered === 'NOT_APPLICABLE') {
+        if (!formData.reraExemptionReason) {
+          toast.warning('Exemption Reason Required', 'Please select an applicable statutory reason why RERA registration is not required.');
+          return false;
+        }
+      }
+    }
+
     if (step === 3) {
       if (!formData.priceAmount || Number(formData.priceAmount) <= 0) {
         toast.warning('Price Required', 'Please enter a valid price/rent amount.');
         return false;
       }
     }
+
     if (step === 4) {
       if (!formData.locality.trim()) {
         toast.warning('Locality Required', 'Please enter the locality/neighborhood.');
         return false;
       }
     }
+
     if (step === 6) {
       if (formData.uploadedImages.length === 0) {
         toast.warning('Photo Required', 'Please upload at least one image from your computer.');
         return false;
       }
     }
+
     return true;
   };
 
@@ -207,15 +375,34 @@ export default function NewPropertyWizardPage() {
       title: { en: formData.titleEn },
       description: { en: formData.descriptionEn },
       category: formData.category,
+      subcategory: formData.subcategory,
       listingType: formData.listingType,
       price: {
         amount: Number(formData.priceAmount) || 0,
         currency: formData.currency,
         priceUnit: formData.priceUnit,
         isNegotiable: formData.isNegotiable,
+        bookingAmount: formData.bookingAmount ? Number(formData.bookingAmount) : undefined,
+        pricePerSqFt: calculatedPricePerSqFt > 0 ? calculatedPricePerSqFt : undefined,
         maintenance: Number(formData.maintenance) || 0,
+        maintenancePayer: formData.maintenancePayer,
         securityDeposit: Number(formData.securityDeposit) || 0,
-        rentPeriod: formData.listingType === 'RENT' ? formData.rentPeriod : undefined,
+        rentPeriod:
+          formData.listingType === 'RENT' || formData.listingType === 'COMMERCIAL_LEASE'
+            ? formData.rentPeriod
+            : undefined,
+        leaseDurationMonths: formData.leaseDurationMonths ? Number(formData.leaseDurationMonths) : undefined,
+        noticePeriodMonths: formData.noticePeriodMonths ? Number(formData.noticePeriodMonths) : undefined,
+        lockInPeriodMonths: formData.lockInPeriodMonths ? Number(formData.lockInPeriodMonths) : undefined,
+        rentEscalationPercentage: formData.rentEscalationPercentage ? Number(formData.rentEscalationPercentage) : undefined,
+        preferredTenantType: formData.preferredTenantType,
+        brokerageAmount: formData.brokerageAmount ? Number(formData.brokerageAmount) : undefined,
+        pgPricingModel: formData.listingType === 'PG_COLIVING' ? formData.pgPricingModel : undefined,
+        occupancyType: formData.listingType === 'PG_COLIVING' ? formData.occupancyType : undefined,
+        mealsIncluded: formData.listingType === 'PG_COLIVING' ? formData.mealsIncluded : undefined,
+        foodPreferences: formData.listingType === 'PG_COLIVING' ? formData.foodPreferences : undefined,
+        genderAccommodation: formData.listingType === 'PG_COLIVING' ? formData.genderAccommodation : undefined,
+        includedFacilities: formData.listingType === 'PG_COLIVING' ? formData.includedFacilities : undefined,
       },
       location: {
         state: formData.state,
@@ -227,20 +414,55 @@ export default function NewPropertyWizardPage() {
         coordinates: [80.9462, 26.8467],
       },
       specs: {
-        bedrooms: Number(formData.bedrooms) || undefined,
-        bathrooms: Number(formData.bathrooms) || undefined,
+        bedrooms: visibility.hasBedrooms && formData.bedrooms ? Number(formData.bedrooms) : undefined,
+        bathrooms: visibility.hasBedrooms && formData.bathrooms ? Number(formData.bathrooms) : undefined,
+        balconies: visibility.hasBedrooms && formData.balconies ? Number(formData.balconies) : undefined,
         area: Number(formData.area) || undefined,
         areaUnit: formData.areaUnit,
-        carpetArea: Number(formData.carpetArea) || undefined,
+        carpetArea: formData.carpetArea ? Number(formData.carpetArea) : undefined,
         carpetAreaSqFt: Number(formData.area) || undefined,
-        furnishing: formData.furnishing,
+        builtUpArea: formData.builtUpArea ? Number(formData.builtUpArea) : undefined,
+        superBuiltUpArea: formData.superBuiltUpArea ? Number(formData.superBuiltUpArea) : undefined,
+        furnishing: visibility.hasFurnishing ? formData.furnishing : undefined,
         facing: formData.facing,
         parking: formData.parking,
         floorLevel: formData.floorLevel,
-        totalFloors: Number(formData.totalFloors) || undefined,
+        floorNumber: formData.floorLevel,
+        totalFloors: formData.totalFloors ? Number(formData.totalFloors) : undefined,
         constructionStatus: formData.constructionStatus,
         propertyAge: formData.propertyAge,
+        possessionStatus: formData.possessionStatus,
+        possessionDate: formData.possessionDate || undefined,
+        availableFrom: formData.availableFrom || undefined,
+        ownershipType: formData.ownershipType,
+        // Commercial
+        washrooms: visibility.hasCommercialSpaces && formData.washrooms ? Number(formData.washrooms) : undefined,
+        cabins: visibility.hasCommercialSpaces && formData.cabins ? Number(formData.cabins) : undefined,
+        workstations: visibility.hasCommercialSpaces && formData.workstations ? Number(formData.workstations) : undefined,
+        pantry: visibility.hasCommercialSpaces ? formData.pantry : undefined,
+        powerBackupKva: visibility.hasCommercialSpaces && formData.powerBackupKva ? Number(formData.powerBackupKva) : undefined,
+        suitableFor: visibility.hasCommercialSpaces && formData.suitableFor ? formData.suitableFor.split(',').map((s) => s.trim()) : undefined,
+        // Plot / Land
+        plotLength: visibility.hasPlotDimensions && formData.plotLength ? Number(formData.plotLength) : undefined,
+        plotBreadth: visibility.hasPlotDimensions && formData.plotBreadth ? Number(formData.plotBreadth) : undefined,
+        openSides: visibility.hasPlotDimensions && formData.openSides ? Number(formData.openSides) : undefined,
+        boundaryWall: visibility.hasPlotDimensions ? formData.boundaryWall : undefined,
+        cornerPlot: visibility.hasPlotDimensions ? formData.cornerPlot : undefined,
+        roadWidthFt: visibility.hasPlotDimensions && formData.roadWidthFt ? Number(formData.roadWidthFt) : undefined,
+        soilType: visibility.hasPlotDimensions ? formData.soilType : undefined,
+        landZone: visibility.hasPlotDimensions ? formData.landZone : undefined,
       },
+      rera: {
+        isReraRegistered: formData.reraRegistered,
+        reraNumber: formData.reraRegistered === 'YES' ? formData.reraNumber.trim() : undefined,
+        authority: formData.reraRegistered === 'YES' ? formData.reraAuthority : undefined,
+        projectName: formData.reraRegistered === 'YES' && formData.reraProjectName ? formData.reraProjectName.trim() : undefined,
+        certificateUrl: formData.reraCertificateUrl || undefined,
+        verificationStatus: formData.reraRegistered === 'YES' ? 'PENDING' : 'NOT_APPLICABLE',
+        exemptionReason: formData.reraRegistered !== 'YES' ? formData.reraExemptionReason : undefined,
+        adminRemarks: formData.reraRemarks || undefined,
+      },
+      reraNumber: formData.reraRegistered === 'YES' ? formData.reraNumber.trim() : undefined,
       amenities: formData.amenities,
       media: {
         thumbnailUrl: primaryImg,
@@ -269,7 +491,7 @@ export default function NewPropertyWizardPage() {
   };
 
   const handleSubmitForReview = async () => {
-    if (!validateStep(1) || !validateStep(3) || !validateStep(4) || !validateStep(6)) return;
+    if (!validateStep(1) || !validateStep(2) || !validateStep(3) || !validateStep(4) || !validateStep(6)) return;
     setIsSubmitting(true);
     try {
       const payload = buildPayload();
@@ -277,7 +499,7 @@ export default function NewPropertyWizardPage() {
       await submitPropertyForApproval(created.id);
       toast.success(
         'Listing Submitted',
-        'Your property has been submitted for CASA review and moderation.',
+        'Your property has been submitted for CASA review. RERA details will be verified by compliance admins.',
       );
       router.push('/dashboard/properties');
     } catch (err: unknown) {
@@ -297,7 +519,7 @@ export default function NewPropertyWizardPage() {
           </div>
           <h2 className="text-xl font-bold text-casa-text-primary">Sign In to Post a Property</h2>
           <p className="text-xs text-casa-text-secondary">
-            You must be logged in as an Agent or Property Owner to access the 8-step listing wizard.
+            You must be logged in as an Agent, Broker, Developer, or Property Owner to access the listing wizard.
           </p>
           <button
             type="button"
@@ -323,11 +545,14 @@ export default function NewPropertyWizardPage() {
             <ArrowLeft className="w-3.5 h-3.5" />
             <span>Back to My Properties</span>
           </Link>
-          <h1 className="text-xl md:text-2xl font-bold text-casa-text-primary">
-            Post New Real Estate Listing
+          <h1 className="text-xl md:text-2xl font-bold text-casa-text-primary flex items-center gap-2">
+            <span>Post New Real Estate Listing</span>
+            <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-casa-brand-subtle text-casa-brand">
+              RERA Compliant
+            </span>
           </h1>
           <p className="text-xs text-casa-text-secondary">
-            Step-by-step verified listing creation engine for CASA Marketplace.
+            Dynamic, category-aware verified listing creation wizard for CASA Marketplace.
           </p>
         </div>
 
@@ -348,9 +573,9 @@ export default function NewPropertyWizardPage() {
       <div className="bg-casa-surface border border-casa-border-light rounded-2xl p-4 shadow-subtle">
         <div className="grid grid-cols-4 sm:grid-cols-8 gap-2 text-center text-[10px]">
           {[
-            { step: 1, label: 'Basic Info' },
-            { step: 2, label: 'Specs' },
-            { step: 3, label: 'Pricing' },
+            { step: 1, label: 'Category & Info' },
+            { step: 2, label: 'Specs & RERA' },
+            { step: 3, label: 'Pricing Terms' },
             { step: 4, label: 'Location' },
             { step: 5, label: 'Amenities' },
             { step: 6, label: 'Photos' },
@@ -392,55 +617,104 @@ export default function NewPropertyWizardPage() {
 
       {/* Wizard Content Card */}
       <div className="bg-casa-surface border border-casa-border-light rounded-2xl p-6 sm:p-8 shadow-subtle">
-        {/* STEP 1: Basic Information */}
+        {/* STEP 1: Category & Basic Information */}
         {currentStep === 1 && (
-          <div className="space-y-5">
+          <div className="space-y-6">
             <div className="border-b border-casa-border-light pb-3">
               <h2 className="text-base font-bold text-casa-text-primary flex items-center gap-2">
                 <span className="w-6 h-6 rounded-full bg-casa-brand text-white text-xs flex items-center justify-center">1</span>
-                <span>Basic Property Information</span>
+                <span>Category Selection & Basic Information</span>
               </h2>
               <p className="text-xs text-casa-text-secondary mt-0.5">
-                Select canonical category, listing type, and provide clear descriptive details.
+                Select your property classification to dynamically unlock relevant Indian real estate fields.
               </p>
             </div>
 
+            {/* Category Groups Buttons */}
+            <div>
+              <label className="text-xs font-semibold text-casa-text-primary block mb-2">
+                Select Property Classification *
+              </label>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                {CATEGORY_GROUPS.map((cg) => {
+                  const isSelected = formData.categoryGroup === cg.group;
+                  return (
+                    <button
+                      type="button"
+                      key={cg.group}
+                      onClick={() => handleCategoryGroupChange(cg.group)}
+                      className={`p-3.5 rounded-xl border text-left transition-all cursor-pointer ${
+                        isSelected
+                          ? 'border-casa-brand bg-casa-brand-subtle shadow-xs'
+                          : 'border-casa-border-light bg-casa-canvas hover:border-casa-border-dark'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className={`text-xs font-bold ${isSelected ? 'text-casa-brand' : 'text-casa-text-primary'}`}>
+                          {cg.name}
+                        </span>
+                        {isSelected && <Check className="w-4 h-4 text-casa-brand" />}
+                      </div>
+                      <p className="text-[10px] text-casa-text-muted mt-1">
+                        {cg.subcategories.slice(0, 3).join(', ')}...
+                      </p>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Subcategory & Listing Purpose */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="text-xs font-semibold text-casa-text-primary block mb-1.5">
-                  Property Category *
+                  Subcategory *
                 </label>
                 <select
-                  value={formData.category}
-                  onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                  value={formData.subcategory}
+                  onChange={(e) => setFormData({ ...formData, subcategory: e.target.value })}
                   className="w-full px-3.5 py-2.5 text-xs bg-casa-canvas border border-casa-border-light rounded-xl text-casa-text-primary font-medium"
                 >
-                  {CANONICAL_CATEGORIES.map((c) => (
-                    <option key={c} value={c}>
-                      {c}
+                  {availableSubcategories.map((sub) => (
+                    <option key={sub} value={sub}>
+                      {sub}
                     </option>
                   ))}
                 </select>
+                <span className="text-[10px] text-casa-text-muted mt-1 block">
+                  Category will be stored as: {formData.category} ({formData.subcategory})
+                </span>
               </div>
 
               <div>
                 <label className="text-xs font-semibold text-casa-text-primary block mb-1.5">
-                  Listing Type *
+                  Listing Purpose / Type *
                 </label>
                 <select
                   value={formData.listingType}
                   onChange={(e) =>
-                    setFormData({ ...formData, listingType: e.target.value as 'SALE' | 'RENT' | 'LEASE' })
+                    setFormData({
+                      ...formData,
+                      listingType: e.target.value as any,
+                    })
                   }
                   className="w-full px-3.5 py-2.5 text-xs bg-casa-canvas border border-casa-border-light rounded-xl text-casa-text-primary font-medium"
                 >
-                  <option value="SALE">For Sale</option>
-                  <option value="RENT">For Rent</option>
-                  <option value="LEASE">For Commercial Lease</option>
+                  {LISTING_TYPES.filter((lt) => currentCategoryGroup.supportedListingTypes.includes(lt.value as any)).map(
+                    (lt) => (
+                      <option key={lt.value} value={lt.value}>
+                        {lt.label}
+                      </option>
+                    ),
+                  )}
                 </select>
+                <span className="text-[10px] text-casa-text-muted mt-1 block">
+                  Only compatible listing purposes are available for {currentCategoryGroup.name}.
+                </span>
               </div>
             </div>
 
+            {/* Title & Description */}
             <div>
               <label className="text-xs font-semibold text-casa-text-primary block mb-1.5">
                 Property Title (English) *
@@ -448,21 +722,27 @@ export default function NewPropertyWizardPage() {
               <input
                 type="text"
                 required
-                placeholder="e.g., Luxury 4 BHK Contemporary Villa with Private Garden"
+                placeholder={
+                  formData.categoryGroup === 'RESIDENTIAL'
+                    ? 'e.g., Luxury 3 BHK High-Rise Apartment with Club Amenities'
+                    : formData.categoryGroup === 'COMMERCIAL'
+                    ? 'e.g., Grade-A Furnished Office Space in Prime Financial District'
+                    : 'e.g., Prime Gated Agricultural Farmland with Deep Borewell'
+                }
                 value={formData.titleEn}
                 onChange={(e) => setFormData({ ...formData, titleEn: e.target.value })}
-                className="w-full px-3.5 py-2.5 text-xs bg-casa-canvas border border-casa-border-light rounded-xl focus:ring-2 focus:ring-casa-brand/30 text-casa-text-primary"
+                className="w-full px-3.5 py-2.5 text-xs bg-casa-canvas border border-casa-border-light rounded-xl focus:ring-2 focus:ring-casa-brand/30 text-casa-text-primary font-medium"
               />
             </div>
 
             <div>
               <label className="text-xs font-semibold text-casa-text-primary block mb-1.5">
-                Detailed Description (English) *
+                Detailed Property Description *
               </label>
               <textarea
                 rows={4}
                 required
-                placeholder="Describe key architectural features, connectivity, society amenities, and nearby landmarks..."
+                placeholder="Detail key architectural highlights, connectivity, title status, layout dimensions, society perks..."
                 value={formData.descriptionEn}
                 onChange={(e) => setFormData({ ...formData, descriptionEn: e.target.value })}
                 className="w-full px-3.5 py-2.5 text-xs bg-casa-canvas border border-casa-border-light rounded-xl focus:ring-2 focus:ring-casa-brand/30 text-casa-text-primary leading-relaxed"
@@ -471,181 +751,593 @@ export default function NewPropertyWizardPage() {
           </div>
         )}
 
-        {/* STEP 2: Specifications */}
+        {/* STEP 2: Specifications, Dimensions & Dedicated RERA Section */}
         {currentStep === 2 && (
-          <div className="space-y-5">
+          <div className="space-y-6">
             <div className="border-b border-casa-border-light pb-3">
               <h2 className="text-base font-bold text-casa-text-primary flex items-center gap-2">
                 <span className="w-6 h-6 rounded-full bg-casa-brand text-white text-xs flex items-center justify-center">2</span>
-                <span>Property Specifications & Dimensions</span>
+                <span>Dynamic Specifications & RERA Compliance</span>
               </h2>
               <p className="text-xs text-casa-text-secondary mt-0.5">
-                Accurate floor area, bedrooms, bathrooms, furnishing, and orientation.
+                Fields shown adapt specifically for {formData.subcategory} ({formData.category}).
               </p>
             </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              <div>
-                <label className="text-xs font-semibold text-casa-text-primary block mb-1.5">Bedrooms</label>
-                <input
-                  type="number"
-                  value={formData.bedrooms}
-                  onChange={(e) => setFormData({ ...formData, bedrooms: e.target.value })}
-                  className="w-full px-3 py-2 text-xs bg-casa-canvas border border-casa-border-light rounded-xl text-casa-text-primary"
-                />
+            {/* SECTION A: Category Specific Specifications */}
+            <div className="space-y-4 bg-casa-canvas/50 p-4 rounded-2xl border border-casa-border-light">
+              <h3 className="text-xs font-bold text-casa-text-primary uppercase tracking-wider flex items-center gap-1.5">
+                <Building className="w-4 h-4 text-casa-brand" />
+                <span>Physical Specifications & Dimensions</span>
+              </h3>
+
+              {/* Area & Units - Common to all */}
+              <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                <div>
+                  <label className="text-xs font-semibold text-casa-text-primary block mb-1.5">
+                    {visibility.hasPlotDimensions ? 'Plot Area *' : 'Total Area / Super Built-up *'}
+                  </label>
+                  <input
+                    type="number"
+                    value={formData.area}
+                    onChange={(e) => setFormData({ ...formData, area: e.target.value })}
+                    className="w-full px-3 py-2 text-xs bg-casa-surface border border-casa-border-light rounded-xl text-casa-text-primary font-bold"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-semibold text-casa-text-primary block mb-1.5">Area Unit *</label>
+                  <select
+                    value={formData.areaUnit}
+                    onChange={(e) => setFormData({ ...formData, areaUnit: e.target.value })}
+                    className="w-full px-3 py-2 text-xs bg-casa-surface border border-casa-border-light rounded-xl text-casa-text-primary"
+                  >
+                    <option value="SQ_FT">Sq.Ft</option>
+                    <option value="SQ_YARDS">Sq.Yards</option>
+                    <option value="SQ_MTR">Sq.Meters</option>
+                    <option value="ACRES">Acres</option>
+                    <option value="BIGHAS">Bighas</option>
+                    <option value="GUNTHA">Guntha</option>
+                  </select>
+                </div>
+
+                {!visibility.hasPlotDimensions && (
+                  <>
+                    <div>
+                      <label className="text-xs font-semibold text-casa-text-primary block mb-1.5">Carpet Area</label>
+                      <input
+                        type="number"
+                        placeholder="RERA carpet area"
+                        value={formData.carpetArea}
+                        onChange={(e) => setFormData({ ...formData, carpetArea: e.target.value })}
+                        className="w-full px-3 py-2 text-xs bg-casa-surface border border-casa-border-light rounded-xl text-casa-text-primary"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-xs font-semibold text-casa-text-primary block mb-1.5">Built-up Area</label>
+                      <input
+                        type="number"
+                        value={formData.builtUpArea}
+                        onChange={(e) => setFormData({ ...formData, builtUpArea: e.target.value })}
+                        className="w-full px-3 py-2 text-xs bg-casa-surface border border-casa-border-light rounded-xl text-casa-text-primary"
+                      />
+                    </div>
+                  </>
+                )}
               </div>
 
-              <div>
-                <label className="text-xs font-semibold text-casa-text-primary block mb-1.5">Bathrooms</label>
-                <input
-                  type="number"
-                  value={formData.bathrooms}
-                  onChange={(e) => setFormData({ ...formData, bathrooms: e.target.value })}
-                  className="w-full px-3 py-2 text-xs bg-casa-canvas border border-casa-border-light rounded-xl text-casa-text-primary"
-                />
+              {/* Residential Fields: Bedrooms, Bathrooms, Balconies */}
+              {visibility.hasBedrooms && (
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
+                  <div>
+                    <label className="text-xs font-semibold text-casa-text-primary block mb-1.5">Bedrooms (BHK)</label>
+                    <input
+                      type="number"
+                      value={formData.bedrooms}
+                      onChange={(e) => setFormData({ ...formData, bedrooms: e.target.value })}
+                      className="w-full px-3 py-2 text-xs bg-casa-surface border border-casa-border-light rounded-xl text-casa-text-primary"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-semibold text-casa-text-primary block mb-1.5">Bathrooms</label>
+                    <input
+                      type="number"
+                      value={formData.bathrooms}
+                      onChange={(e) => setFormData({ ...formData, bathrooms: e.target.value })}
+                      className="w-full px-3 py-2 text-xs bg-casa-surface border border-casa-border-light rounded-xl text-casa-text-primary"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-semibold text-casa-text-primary block mb-1.5">Balconies</label>
+                    <input
+                      type="number"
+                      value={formData.balconies}
+                      onChange={(e) => setFormData({ ...formData, balconies: e.target.value })}
+                      className="w-full px-3 py-2 text-xs bg-casa-surface border border-casa-border-light rounded-xl text-casa-text-primary"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Commercial Specific Spaces */}
+              {visibility.hasCommercialSpaces && (
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2">
+                  <div>
+                    <label className="text-xs font-semibold text-casa-text-primary block mb-1.5">Cabins</label>
+                    <input
+                      type="number"
+                      placeholder="e.g., 4"
+                      value={formData.cabins}
+                      onChange={(e) => setFormData({ ...formData, cabins: e.target.value })}
+                      className="w-full px-3 py-2 text-xs bg-casa-surface border border-casa-border-light rounded-xl text-casa-text-primary"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-semibold text-casa-text-primary block mb-1.5">Workstations</label>
+                    <input
+                      type="number"
+                      placeholder="e.g., 25"
+                      value={formData.workstations}
+                      onChange={(e) => setFormData({ ...formData, workstations: e.target.value })}
+                      className="w-full px-3 py-2 text-xs bg-casa-surface border border-casa-border-light rounded-xl text-casa-text-primary"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-semibold text-casa-text-primary block mb-1.5">Washrooms</label>
+                    <input
+                      type="number"
+                      placeholder="e.g., 2"
+                      value={formData.washrooms}
+                      onChange={(e) => setFormData({ ...formData, washrooms: e.target.value })}
+                      className="w-full px-3 py-2 text-xs bg-casa-surface border border-casa-border-light rounded-xl text-casa-text-primary"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-semibold text-casa-text-primary block mb-1.5">Power Backup (kVA)</label>
+                    <input
+                      type="number"
+                      placeholder="e.g., 50"
+                      value={formData.powerBackupKva}
+                      onChange={(e) => setFormData({ ...formData, powerBackupKva: e.target.value })}
+                      className="w-full px-3 py-2 text-xs bg-casa-surface border border-casa-border-light rounded-xl text-casa-text-primary"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Plot Dimensions for Land/Plot */}
+              {visibility.hasPlotDimensions && (
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2">
+                  <div>
+                    <label className="text-xs font-semibold text-casa-text-primary block mb-1.5">Length (ft)</label>
+                    <input
+                      type="number"
+                      placeholder="e.g., 60"
+                      value={formData.plotLength}
+                      onChange={(e) => setFormData({ ...formData, plotLength: e.target.value })}
+                      className="w-full px-3 py-2 text-xs bg-casa-surface border border-casa-border-light rounded-xl text-casa-text-primary"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-semibold text-casa-text-primary block mb-1.5">Breadth / Frontage (ft)</label>
+                    <input
+                      type="number"
+                      placeholder="e.g., 40"
+                      value={formData.plotBreadth}
+                      onChange={(e) => setFormData({ ...formData, plotBreadth: e.target.value })}
+                      className="w-full px-3 py-2 text-xs bg-casa-surface border border-casa-border-light rounded-xl text-casa-text-primary"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-semibold text-casa-text-primary block mb-1.5">Facing Road Width (ft)</label>
+                    <input
+                      type="number"
+                      placeholder="e.g., 40"
+                      value={formData.roadWidthFt}
+                      onChange={(e) => setFormData({ ...formData, roadWidthFt: e.target.value })}
+                      className="w-full px-3 py-2 text-xs bg-casa-surface border border-casa-border-light rounded-xl text-casa-text-primary"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-semibold text-casa-text-primary block mb-1.5">Open Sides</label>
+                    <select
+                      value={formData.openSides}
+                      onChange={(e) => setFormData({ ...formData, openSides: e.target.value })}
+                      className="w-full px-3 py-2 text-xs bg-casa-surface border border-casa-border-light rounded-xl text-casa-text-primary"
+                    >
+                      <option value="1">1 Side Open</option>
+                      <option value="2">2 Sides Open (Corner)</option>
+                      <option value="3">3 Sides Open</option>
+                      <option value="4">4 Sides Open</option>
+                    </select>
+                  </div>
+                </div>
+              )}
+
+              {/* Common Property Attributes: Furnishing, Facing, Parking, Floor */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2">
+                {visibility.hasFurnishing && (
+                  <div>
+                    <label className="text-xs font-semibold text-casa-text-primary block mb-1.5">Furnishing</label>
+                    <select
+                      value={formData.furnishing}
+                      onChange={(e) => setFormData({ ...formData, furnishing: e.target.value })}
+                      className="w-full px-3 py-2 text-xs bg-casa-surface border border-casa-border-light rounded-xl text-casa-text-primary"
+                    >
+                      <option value="FULLY_FURNISHED">Fully Furnished</option>
+                      <option value="SEMI_FURNISHED">Semi Furnished</option>
+                      <option value="UNFURNISHED">Unfurnished</option>
+                    </select>
+                  </div>
+                )}
+
+                <div>
+                  <label className="text-xs font-semibold text-casa-text-primary block mb-1.5">Facing</label>
+                  <select
+                    value={formData.facing}
+                    onChange={(e) => setFormData({ ...formData, facing: e.target.value })}
+                    className="w-full px-3 py-2 text-xs bg-casa-surface border border-casa-border-light rounded-xl text-casa-text-primary"
+                  >
+                    <option value="North">North</option>
+                    <option value="East">East</option>
+                    <option value="North-East">North-East</option>
+                    <option value="West">West</option>
+                    <option value="South">South</option>
+                  </select>
+                </div>
+
+                {visibility.hasFloors && (
+                  <>
+                    <div>
+                      <label className="text-xs font-semibold text-casa-text-primary block mb-1.5">Floor Level</label>
+                      <input
+                        type="text"
+                        placeholder="e.g., 3rd Floor"
+                        value={formData.floorLevel}
+                        onChange={(e) => setFormData({ ...formData, floorLevel: e.target.value })}
+                        className="w-full px-3 py-2 text-xs bg-casa-surface border border-casa-border-light rounded-xl text-casa-text-primary"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-xs font-semibold text-casa-text-primary block mb-1.5">Total Floors</label>
+                      <input
+                        type="number"
+                        placeholder="e.g., 14"
+                        value={formData.totalFloors}
+                        onChange={(e) => setFormData({ ...formData, totalFloors: e.target.value })}
+                        className="w-full px-3 py-2 text-xs bg-casa-surface border border-casa-border-light rounded-xl text-casa-text-primary"
+                      />
+                    </div>
+                  </>
+                )}
               </div>
 
-              <div>
-                <label className="text-xs font-semibold text-casa-text-primary block mb-1.5">Super Area</label>
-                <input
-                  type="number"
-                  value={formData.area}
-                  onChange={(e) => setFormData({ ...formData, area: e.target.value })}
-                  className="w-full px-3 py-2 text-xs bg-casa-canvas border border-casa-border-light rounded-xl text-casa-text-primary"
-                />
-              </div>
+              {/* Status, Age, Ownership */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
+                <div>
+                  <label className="text-xs font-semibold text-casa-text-primary block mb-1.5">Construction Status</label>
+                  <select
+                    value={formData.constructionStatus}
+                    onChange={(e) => setFormData({ ...formData, constructionStatus: e.target.value })}
+                    className="w-full px-3 py-2 text-xs bg-casa-surface border border-casa-border-light rounded-xl text-casa-text-primary"
+                  >
+                    <option value="READY_TO_MOVE">Ready to Move</option>
+                    <option value="UNDER_CONSTRUCTION">Under Construction</option>
+                    <option value="RESALE">Resale</option>
+                    <option value="NEW_LAUNCH">New Launch</option>
+                  </select>
+                </div>
 
-              <div>
-                <label className="text-xs font-semibold text-casa-text-primary block mb-1.5">Area Unit</label>
-                <select
-                  value={formData.areaUnit}
-                  onChange={(e) => setFormData({ ...formData, areaUnit: e.target.value })}
-                  className="w-full px-3 py-2 text-xs bg-casa-canvas border border-casa-border-light rounded-xl text-casa-text-primary"
-                >
-                  <option value="SQ_FT">Sq.Ft</option>
-                  <option value="SQ_YARDS">Sq.Yards</option>
-                  <option value="ACRES">Acres</option>
-                  <option value="BIGHAS">Bighas</option>
-                </select>
+                <div>
+                  <label className="text-xs font-semibold text-casa-text-primary block mb-1.5">Age of Property</label>
+                  <select
+                    value={formData.propertyAge}
+                    onChange={(e) => setFormData({ ...formData, propertyAge: e.target.value })}
+                    className="w-full px-3 py-2 text-xs bg-casa-surface border border-casa-border-light rounded-xl text-casa-text-primary"
+                  >
+                    <option value="New Construction">New Construction (&lt; 1 yr)</option>
+                    <option value="1-3 years">1-3 years</option>
+                    <option value="3-5 years">3-5 years</option>
+                    <option value="5-10 years">5-10 years</option>
+                    <option value="10+ years">10+ years</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-xs font-semibold text-casa-text-primary block mb-1.5">Title / Ownership Type</label>
+                  <select
+                    value={formData.ownershipType}
+                    onChange={(e) => setFormData({ ...formData, ownershipType: e.target.value })}
+                    className="w-full px-3 py-2 text-xs bg-casa-surface border border-casa-border-light rounded-xl text-casa-text-primary"
+                  >
+                    <option value="Freehold">Freehold Title</option>
+                    <option value="Leasehold">Leasehold (Govt / Authority)</option>
+                    <option value="Co-operative Society">Co-operative Society</option>
+                    <option value="Power of Attorney">Power of Attorney</option>
+                  </select>
+                </div>
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <div>
-                <label className="text-xs font-semibold text-casa-text-primary block mb-1.5">Carpet Area</label>
-                <input
-                  type="number"
-                  value={formData.carpetArea}
-                  onChange={(e) => setFormData({ ...formData, carpetArea: e.target.value })}
-                  className="w-full px-3 py-2 text-xs bg-casa-canvas border border-casa-border-light rounded-xl text-casa-text-primary"
-                />
+            {/* SECTION B: Dedicated Indian RERA Compliance Section */}
+            <div className="space-y-4 bg-emerald-500/5 p-5 rounded-2xl border-2 border-emerald-500/30">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-lg bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
+                    <ShieldCheck className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-casa-text-primary">
+                      Indian RERA Registration & Statutory Compliance
+                    </h3>
+                    <p className="text-[11px] text-casa-text-secondary">
+                      Mandated by Real Estate (Regulation and Development) Act 2016 for commercial & residential projects.
+                    </p>
+                  </div>
+                </div>
+
+                <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300">
+                  Audit Enforced
+                </span>
               </div>
 
+              {/* RERA Registered Radio */}
               <div>
-                <label className="text-xs font-semibold text-casa-text-primary block mb-1.5">Furnishing</label>
-                <select
-                  value={formData.furnishing}
-                  onChange={(e) => setFormData({ ...formData, furnishing: e.target.value })}
-                  className="w-full px-3 py-2 text-xs bg-casa-canvas border border-casa-border-light rounded-xl text-casa-text-primary"
-                >
-                  <option value="FULLY_FURNISHED">Fully Furnished</option>
-                  <option value="SEMI_FURNISHED">Semi Furnished</option>
-                  <option value="UNFURNISHED">Unfurnished</option>
-                </select>
+                <label className="text-xs font-bold text-casa-text-primary block mb-2">
+                  Is this property / project RERA Registered? *
+                </label>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                  {[
+                    { value: 'YES', label: 'Yes — RERA Registered Project', desc: 'Promoter / builder registered under State RERA' },
+                    { value: 'NO', label: 'No — Exempt or Unregistered', desc: 'Completed resale with OC or individual build' },
+                    { value: 'NOT_APPLICABLE', label: 'Not Applicable', desc: 'Rural / agricultural land or individual tenancy' },
+                  ].map((opt) => (
+                    <button
+                      type="button"
+                      key={opt.value}
+                      onClick={() =>
+                        setFormData({
+                          ...formData,
+                          reraRegistered: opt.value as any,
+                          reraExemptionReason:
+                            opt.value !== 'YES' && !formData.reraExemptionReason
+                              ? RERA_EXEMPTION_REASONS[0]
+                              : formData.reraExemptionReason,
+                        })
+                      }
+                      className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
+                        formData.reraRegistered === opt.value
+                          ? 'border-emerald-600 bg-emerald-500/15 shadow-2xs font-semibold'
+                          : 'border-casa-border-light bg-casa-surface hover:border-casa-border-dark'
+                      }`}
+                    >
+                      <div className="text-xs font-bold text-casa-text-primary">{opt.label}</div>
+                      <div className="text-[10px] text-casa-text-muted mt-0.5">{opt.desc}</div>
+                    </button>
+                  ))}
+                </div>
               </div>
 
-              <div>
-                <label className="text-xs font-semibold text-casa-text-primary block mb-1.5">Facing Direction</label>
-                <select
-                  value={formData.facing}
-                  onChange={(e) => setFormData({ ...formData, facing: e.target.value })}
-                  className="w-full px-3 py-2 text-xs bg-casa-canvas border border-casa-border-light rounded-xl text-casa-text-primary"
-                >
-                  <option value="North">North</option>
-                  <option value="East">East</option>
-                  <option value="North-East">North-East</option>
-                  <option value="West">West</option>
-                  <option value="South">South</option>
-                </select>
-              </div>
-            </div>
+              {/* If RERA Registered: YES */}
+              {formData.reraRegistered === 'YES' && (
+                <div className="space-y-3.5 pt-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div>
+                      <label className="text-xs font-semibold text-casa-text-primary block mb-1">
+                        State RERA Authority *
+                      </label>
+                      <select
+                        value={formData.reraAuthority}
+                        onChange={(e) => setFormData({ ...formData, reraAuthority: e.target.value })}
+                        className="w-full px-3 py-2 text-xs bg-casa-surface border border-casa-border-light rounded-xl text-casa-text-primary font-medium"
+                      >
+                        {RERA_AUTHORITIES.map((auth) => (
+                          <option key={auth.code} value={auth.code}>
+                            {auth.name} ({auth.state})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <div>
-                <label className="text-xs font-semibold text-casa-text-primary block mb-1.5">Construction Status</label>
-                <select
-                  value={formData.constructionStatus}
-                  onChange={(e) => setFormData({ ...formData, constructionStatus: e.target.value })}
-                  className="w-full px-3 py-2 text-xs bg-casa-canvas border border-casa-border-light rounded-xl text-casa-text-primary"
-                >
-                  <option value="READY_TO_MOVE">Ready to Move</option>
-                  <option value="UNDER_CONSTRUCTION">Under Construction</option>
-                  <option value="RESALE">Resale</option>
-                  <option value="NEW_LAUNCH">New Launch</option>
-                </select>
-              </div>
+                    <div>
+                      <label className="text-xs font-semibold text-casa-text-primary block mb-1">
+                        RERA Registration Number *
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="e.g., UPRERAPRJ12345 or P51800012345"
+                        value={formData.reraNumber}
+                        onChange={(e) => setFormData({ ...formData, reraNumber: e.target.value })}
+                        className={`w-full px-3 py-2 text-xs bg-casa-surface border rounded-xl text-casa-text-primary font-mono font-bold ${
+                          formData.reraNumber
+                            ? reraValidation.valid
+                              ? 'border-emerald-500 ring-1 ring-emerald-500/30'
+                              : 'border-amber-500 ring-1 ring-amber-500/30'
+                            : 'border-casa-border-light'
+                        }`}
+                      />
+                      {formData.reraNumber && (
+                        <div
+                          className={`text-[10px] mt-1 flex items-center gap-1 ${
+                            reraValidation.valid ? 'text-emerald-600 font-semibold' : 'text-amber-600'
+                          }`}
+                        >
+                          {reraValidation.valid ? <Check className="w-3 h-3" /> : <AlertCircle className="w-3 h-3" />}
+                          <span>{reraValidation.message}</span>
+                        </div>
+                      )}
+                    </div>
 
-              <div>
-                <label className="text-xs font-semibold text-casa-text-primary block mb-1.5">Floor Level</label>
-                <input
-                  type="text"
-                  placeholder="e.g., 3rd Floor / G+2"
-                  value={formData.floorLevel}
-                  onChange={(e) => setFormData({ ...formData, floorLevel: e.target.value })}
-                  className="w-full px-3 py-2 text-xs bg-casa-canvas border border-casa-border-light rounded-xl text-casa-text-primary"
-                />
-              </div>
+                    <div>
+                      <label className="text-xs font-semibold text-casa-text-primary block mb-1">
+                        RERA Project Name
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="e.g., Godrej Emerald Heights Phase 2"
+                        value={formData.reraProjectName}
+                        onChange={(e) => setFormData({ ...formData, reraProjectName: e.target.value })}
+                        className="w-full px-3 py-2 text-xs bg-casa-surface border border-casa-border-light rounded-xl text-casa-text-primary"
+                      />
+                    </div>
+                  </div>
 
-              <div>
-                <label className="text-xs font-semibold text-casa-text-primary block mb-1.5">Parking Slots</label>
-                <input
-                  type="text"
-                  placeholder="e.g., 1 Covered, 1 Open"
-                  value={formData.parking}
-                  onChange={(e) => setFormData({ ...formData, parking: e.target.value })}
-                  className="w-full px-3 py-2 text-xs bg-casa-canvas border border-casa-border-light rounded-xl text-casa-text-primary"
-                />
-              </div>
+                  <div>
+                    <label className="text-xs font-semibold text-casa-text-primary block mb-1">
+                      RERA Registration Certificate / Public URL
+                    </label>
+                    <input
+                      type="url"
+                      placeholder="https://uprera.org/project/details/12345"
+                      value={formData.reraCertificateUrl}
+                      onChange={(e) => setFormData({ ...formData, reraCertificateUrl: e.target.value })}
+                      className="w-full px-3 py-2 text-xs bg-casa-surface border border-casa-border-light rounded-xl text-casa-text-primary"
+                    />
+                  </div>
+
+                  <div className="p-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-xl text-[11px] text-amber-800 dark:text-amber-300 flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                    <span>
+                      <strong>Audit Notice:</strong> Upon submission, your listing status will be set to{' '}
+                      <span className="font-bold underline">Pending RERA Verification</span>. CASA Compliance Admins will audit your registration number before conferring the verified green checkmark badge.
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {/* If RERA Registered: NO or NOT_APPLICABLE */}
+              {formData.reraRegistered !== 'YES' && (
+                <div className="space-y-3 pt-2">
+                  <div>
+                    <label className="text-xs font-semibold text-casa-text-primary block mb-1">
+                      Statutory Exemption Rationale *
+                    </label>
+                    <select
+                      value={formData.reraExemptionReason}
+                      onChange={(e) => setFormData({ ...formData, reraExemptionReason: e.target.value })}
+                      className="w-full px-3 py-2 text-xs bg-casa-surface border border-casa-border-light rounded-xl text-casa-text-primary"
+                    >
+                      {RERA_EXEMPTION_REASONS.map((reason) => (
+                        <option key={reason} value={reason}>
+                          {reason}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-semibold text-casa-text-primary block mb-1">
+                      Additional Exemption Details / Remarks (Optional)
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g., Occupancy certificate received in 2019, direct individual resale"
+                      value={formData.reraRemarks}
+                      onChange={(e) => setFormData({ ...formData, reraRemarks: e.target.value })}
+                      className="w-full px-3 py-2 text-xs bg-casa-surface border border-casa-border-light rounded-xl text-casa-text-primary"
+                    />
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         )}
 
-        {/* STEP 3: Pricing */}
+        {/* STEP 3: Dynamic Pricing & Commercial Terms */}
         {currentStep === 3 && (
-          <div className="space-y-5">
+          <div className="space-y-6">
             <div className="border-b border-casa-border-light pb-3">
               <h2 className="text-base font-bold text-casa-text-primary flex items-center gap-2">
                 <span className="w-6 h-6 rounded-full bg-casa-brand text-white text-xs flex items-center justify-center">3</span>
-                <span>Pricing & Financial Terms</span>
+                <span>
+                  {formData.listingType === 'SALE'
+                    ? 'Sale Pricing & Financial Terms'
+                    : formData.listingType === 'PG_COLIVING'
+                    ? 'PG / Co-Living Rental & Facility Tariffs'
+                    : 'Lease & Rental Commercial Terms'}
+                </span>
               </h2>
               <p className="text-xs text-casa-text-secondary mt-0.5">
-                Set total price or rent, negotiable status, maintenance charges, and security deposit.
+                Financial terms tailored specifically for listing type: {formData.listingType}.
               </p>
             </div>
 
+            {/* Price Inputs */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="text-xs font-semibold text-casa-text-primary block mb-1.5">
-                  {formData.listingType === 'SALE' ? 'Total Price (INR ₹) *' : 'Rent Amount per Month (INR ₹) *'}
+                  {formData.listingType === 'SALE'
+                    ? 'Expected Sale Price (INR ₹) *'
+                    : formData.listingType === 'PG_COLIVING'
+                    ? 'Tariff per Bed / Room per Month (INR ₹) *'
+                    : 'Monthly Rent / Lease Amount (INR ₹) *'}
                 </label>
-                <input
-                  type="number"
-                  required
-                  placeholder="e.g., 8500000"
-                  value={formData.priceAmount}
-                  onChange={(e) => setFormData({ ...formData, priceAmount: e.target.value })}
-                  className="w-full px-3.5 py-2.5 text-xs bg-casa-canvas border border-casa-border-light rounded-xl text-casa-text-primary font-bold"
-                />
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-casa-text-muted text-xs font-bold">
+                    ₹
+                  </span>
+                  <input
+                    type="number"
+                    required
+                    placeholder="e.g., 8500000"
+                    value={formData.priceAmount}
+                    onChange={(e) => setFormData({ ...formData, priceAmount: e.target.value })}
+                    className="w-full pl-8 pr-3 py-2.5 text-xs bg-casa-canvas border border-casa-border-light rounded-xl text-casa-text-primary font-bold"
+                  />
+                </div>
                 {formData.priceAmount && (
                   <p className="text-[11px] text-casa-brand font-bold mt-1">
                     Display: {formatPrice(Number(formData.priceAmount))}
+                    {calculatedPricePerSqFt > 0 && ` (₹${calculatedPricePerSqFt.toLocaleString()}/sq.ft)`}
                   </p>
                 )}
               </div>
 
+              {formData.listingType === 'SALE' ? (
+                <div>
+                  <label className="text-xs font-semibold text-casa-text-primary block mb-1.5">
+                    Booking / Token Amount (INR ₹)
+                  </label>
+                  <input
+                    type="number"
+                    placeholder="e.g., 500000"
+                    value={formData.bookingAmount}
+                    onChange={(e) => setFormData({ ...formData, bookingAmount: e.target.value })}
+                    className="w-full px-3.5 py-2.5 text-xs bg-casa-canvas border border-casa-border-light rounded-xl text-casa-text-primary"
+                  />
+                </div>
+              ) : (
+                <div>
+                  <label className="text-xs font-semibold text-casa-text-primary block mb-1.5">
+                    Security Deposit (INR ₹)
+                  </label>
+                  <input
+                    type="number"
+                    placeholder="e.g., 50000"
+                    value={formData.securityDeposit}
+                    onChange={(e) => setFormData({ ...formData, securityDeposit: e.target.value })}
+                    className="w-full px-3.5 py-2.5 text-xs bg-casa-canvas border border-casa-border-light rounded-xl text-casa-text-primary"
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* Maintenance & Payer */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="text-xs font-semibold text-casa-text-primary block mb-1.5">
-                  Monthly Maintenance (INR ₹)
+                  Society Maintenance Charges (INR ₹ / month)
                 </label>
                 <input
                   type="number"
@@ -655,36 +1347,201 @@ export default function NewPropertyWizardPage() {
                   className="w-full px-3.5 py-2.5 text-xs bg-casa-canvas border border-casa-border-light rounded-xl text-casa-text-primary"
                 />
               </div>
-            </div>
 
-            {formData.listingType !== 'SALE' && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {formData.listingType !== 'SALE' && (
                 <div>
                   <label className="text-xs font-semibold text-casa-text-primary block mb-1.5">
-                    Security Deposit (INR ₹)
+                    Maintenance Paid By
                   </label>
-                  <input
-                    type="number"
-                    placeholder="e.g., 150000"
-                    value={formData.securityDeposit}
-                    onChange={(e) => setFormData({ ...formData, securityDeposit: e.target.value })}
+                  <select
+                    value={formData.maintenancePayer}
+                    onChange={(e) => setFormData({ ...formData, maintenancePayer: e.target.value })}
                     className="w-full px-3.5 py-2.5 text-xs bg-casa-canvas border border-casa-border-light rounded-xl text-casa-text-primary"
-                  />
+                  >
+                    <option value="Owner">Included in Rent (Owner Pays)</option>
+                    <option value="Tenant">Additional (Tenant Pays Society Directly)</option>
+                  </select>
+                </div>
+              )}
+            </div>
+
+            {/* Lease Specifics */}
+            {(formData.listingType === 'RENT' ||
+              formData.listingType === 'LEASE' ||
+              formData.listingType === 'COMMERCIAL_LEASE') && (
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-4 bg-casa-canvas rounded-2xl border border-casa-border-light">
+                <div>
+                  <label className="text-xs font-semibold text-casa-text-primary block mb-1">Lease Duration</label>
+                  <select
+                    value={formData.leaseDurationMonths}
+                    onChange={(e) => setFormData({ ...formData, leaseDurationMonths: e.target.value })}
+                    className="w-full px-3 py-2 text-xs bg-casa-surface border border-casa-border-light rounded-xl text-casa-text-primary"
+                  >
+                    <option value="11">11 Months</option>
+                    <option value="24">24 Months</option>
+                    <option value="36">36 Months</option>
+                    <option value="60">5 Years</option>
+                  </select>
                 </div>
 
                 <div>
-                  <label className="text-xs font-semibold text-casa-text-primary block mb-1.5">
-                    Rent Payment Period
-                  </label>
+                  <label className="text-xs font-semibold text-casa-text-primary block mb-1">Lock-in Period</label>
                   <select
-                    value={formData.rentPeriod}
-                    onChange={(e) => setFormData({ ...formData, rentPeriod: e.target.value })}
-                    className="w-full px-3.5 py-2.5 text-xs bg-casa-canvas border border-casa-border-light rounded-xl text-casa-text-primary"
+                    value={formData.lockInPeriodMonths}
+                    onChange={(e) => setFormData({ ...formData, lockInPeriodMonths: e.target.value })}
+                    className="w-full px-3 py-2 text-xs bg-casa-surface border border-casa-border-light rounded-xl text-casa-text-primary"
                   >
-                    <option value="MONTHLY">Monthly</option>
-                    <option value="QUARTERLY">Quarterly</option>
-                    <option value="YEARLY">Yearly</option>
+                    <option value="0">None</option>
+                    <option value="3">3 Months</option>
+                    <option value="6">6 Months</option>
+                    <option value="12">12 Months</option>
                   </select>
+                </div>
+
+                <div>
+                  <label className="text-xs font-semibold text-casa-text-primary block mb-1">Notice Period</label>
+                  <select
+                    value={formData.noticePeriodMonths}
+                    onChange={(e) => setFormData({ ...formData, noticePeriodMonths: e.target.value })}
+                    className="w-full px-3 py-2 text-xs bg-casa-surface border border-casa-border-light rounded-xl text-casa-text-primary"
+                  >
+                    <option value="1">1 Month</option>
+                    <option value="2">2 Months</option>
+                    <option value="3">3 Months</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-xs font-semibold text-casa-text-primary block mb-1">Annual Escalation %</label>
+                  <input
+                    type="number"
+                    placeholder="e.g., 5"
+                    value={formData.rentEscalationPercentage}
+                    onChange={(e) => setFormData({ ...formData, rentEscalationPercentage: e.target.value })}
+                    className="w-full px-3 py-2 text-xs bg-casa-surface border border-casa-border-light rounded-xl text-casa-text-primary"
+                  />
+                </div>
+
+                <div className="sm:col-span-2 pt-2">
+                  <label className="text-xs font-semibold text-casa-text-primary block mb-1">Preferred Tenant Type</label>
+                  <select
+                    value={formData.preferredTenantType}
+                    onChange={(e) => setFormData({ ...formData, preferredTenantType: e.target.value })}
+                    className="w-full px-3 py-2 text-xs bg-casa-surface border border-casa-border-light rounded-xl text-casa-text-primary"
+                  >
+                    <option value="ANY">Any Good Standing Tenant</option>
+                    <option value="FAMILY">Family Only</option>
+                    <option value="BACHELORS">Bachelors / Working Professionals</option>
+                    <option value="COMPANY_LEASE">Corporate / Company Lease</option>
+                  </select>
+                </div>
+
+                <div className="sm:col-span-2 pt-2">
+                  <label className="text-xs font-semibold text-casa-text-primary block mb-1">Brokerage / Commission (INR ₹)</label>
+                  <input
+                    type="number"
+                    placeholder="e.g., 0 (Zero Brokerage)"
+                    value={formData.brokerageAmount}
+                    onChange={(e) => setFormData({ ...formData, brokerageAmount: e.target.value })}
+                    className="w-full px-3 py-2 text-xs bg-casa-surface border border-casa-border-light rounded-xl text-casa-text-primary"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* PG / Co-living Specifics */}
+            {formData.listingType === 'PG_COLIVING' && (
+              <div className="space-y-4 p-4 bg-casa-canvas rounded-2xl border border-casa-border-light">
+                <h3 className="text-xs font-bold text-casa-text-primary uppercase tracking-wider flex items-center gap-1.5">
+                  <Sparkles className="w-4 h-4 text-casa-brand" />
+                  <span>PG / Co-Living Arrangement & Inclusions</span>
+                </h3>
+
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  <div>
+                    <label className="text-xs font-semibold text-casa-text-primary block mb-1">Tariff Model</label>
+                    <select
+                      value={formData.pgPricingModel}
+                      onChange={(e) => setFormData({ ...formData, pgPricingModel: e.target.value })}
+                      className="w-full px-3 py-2 text-xs bg-casa-surface border border-casa-border-light rounded-xl text-casa-text-primary"
+                    >
+                      <option value="PER_BED">Per Bed</option>
+                      <option value="PER_ROOM">Per Room</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-semibold text-casa-text-primary block mb-1">Occupancy</label>
+                    <select
+                      value={formData.occupancyType}
+                      onChange={(e) => setFormData({ ...formData, occupancyType: e.target.value })}
+                      className="w-full px-3 py-2 text-xs bg-casa-surface border border-casa-border-light rounded-xl text-casa-text-primary"
+                    >
+                      <option value="SINGLE">Single Private Room</option>
+                      <option value="DOUBLE">Double Sharing</option>
+                      <option value="TRIPLE">Triple Sharing</option>
+                      <option value="FOUR_PLUS">4+ Sharing Dorm</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-semibold text-casa-text-primary block mb-1">Meals Included</label>
+                    <select
+                      value={formData.mealsIncluded}
+                      onChange={(e) => setFormData({ ...formData, mealsIncluded: e.target.value })}
+                      className="w-full px-3 py-2 text-xs bg-casa-surface border border-casa-border-light rounded-xl text-casa-text-primary"
+                    >
+                      <option value="ALL_MEALS">Breakfast, Lunch & Dinner</option>
+                      <option value="BREAKFAST_AND_DINNER">Breakfast & Dinner</option>
+                      <option value="BREAKFAST_ONLY">Breakfast Only</option>
+                      <option value="NONE">No Meals (Self Cooking)</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-semibold text-casa-text-primary block mb-1">Gender Stay</label>
+                    <select
+                      value={formData.genderAccommodation}
+                      onChange={(e) => setFormData({ ...formData, genderAccommodation: e.target.value })}
+                      className="w-full px-3 py-2 text-xs bg-casa-surface border border-casa-border-light rounded-xl text-casa-text-primary"
+                    >
+                      <option value="ANY">Co-ed / All Welcome</option>
+                      <option value="FEMALE_ONLY">Females Only</option>
+                      <option value="MALE_ONLY">Males Only</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-xs font-semibold text-casa-text-primary block mb-2">
+                    Included PG Facilities
+                  </label>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    {PG_FACILITIES_OPTIONS.map((fac) => {
+                      const isChecked = formData.includedFacilities.includes(fac);
+                      return (
+                        <button
+                          type="button"
+                          key={fac}
+                          onClick={() => togglePgFacility(fac)}
+                          className={`p-2 rounded-lg border text-left text-[11px] transition-colors cursor-pointer flex items-center gap-1.5 ${
+                            isChecked
+                              ? 'bg-casa-brand-subtle border-casa-brand text-casa-brand font-semibold'
+                              : 'bg-casa-surface border-casa-border-light text-casa-text-secondary'
+                          }`}
+                        >
+                          <div
+                            className={`w-3.5 h-3.5 rounded flex items-center justify-center border ${
+                              isChecked ? 'bg-casa-brand border-casa-brand text-white' : 'border-casa-border-light'
+                            }`}
+                          >
+                            {isChecked && <Check className="w-2.5 h-2.5" />}
+                          </div>
+                          <span className="truncate">{fac}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
             )}
@@ -698,13 +1555,13 @@ export default function NewPropertyWizardPage() {
                 className="w-4 h-4 rounded text-casa-brand"
               />
               <label htmlFor="isNeg" className="text-xs font-semibold text-casa-text-primary cursor-pointer">
-                Price is negotiable upon direct inquiry
+                Price is open for direct buyer negotiation
               </label>
             </div>
           </div>
         )}
 
-        {/* STEP 4: Location */}
+        {/* STEP 4: Geographic Location */}
         {currentStep === 4 && (
           <div className="space-y-5">
             <div className="border-b border-casa-border-light pb-3">
@@ -713,7 +1570,7 @@ export default function NewPropertyWizardPage() {
                 <span>Geographic Location</span>
               </h2>
               <p className="text-xs text-casa-text-secondary mt-0.5">
-                Accurate city, locality, and landmark for buyer discovery.
+                Accurate micro-market, locality, and landmark for buyer discovery.
               </p>
             </div>
 
@@ -725,7 +1582,7 @@ export default function NewPropertyWizardPage() {
               </label>
               <input
                 type="text"
-                placeholder="Type your locality or micro-market (e.g. Satellite, Gomti Nagar, Bandra)..."
+                placeholder="Type your locality or micro-market (e.g. Gomti Nagar, Bandra, Whitefield, Satellite)..."
                 onChange={async (e) => {
                   const val = e.target.value;
                   if (val.length >= 2) {
@@ -748,12 +1605,21 @@ export default function NewPropertyWizardPage() {
               />
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div>
-                <label className="text-xs font-semibold text-casa-text-primary block mb-1.5">City *</label>
+                <label className="text-xs font-semibold text-casa-text-primary block mb-1.5">State</label>
                 <input
                   type="text"
-                  required
+                  value={formData.state}
+                  onChange={(e) => setFormData({ ...formData, state: e.target.value })}
+                  className="w-full px-3.5 py-2.5 text-xs bg-casa-canvas border border-casa-border-light rounded-xl text-casa-text-primary"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-casa-text-primary block mb-1.5">City</label>
+                <input
+                  type="text"
                   value={formData.city}
                   onChange={(e) => setFormData({ ...formData, city: e.target.value })}
                   className="w-full px-3.5 py-2.5 text-xs bg-casa-canvas border border-casa-border-light rounded-xl text-casa-text-primary font-medium"
@@ -761,28 +1627,24 @@ export default function NewPropertyWizardPage() {
               </div>
 
               <div>
-                <label className="text-xs font-semibold text-casa-text-primary block mb-1.5">
-                  Locality / Neighborhood *
-                </label>
+                <label className="text-xs font-semibold text-casa-text-primary block mb-1.5">Locality / Neighborhood *</label>
                 <input
                   type="text"
                   required
-                  placeholder="e.g., Gomti Nagar Extension / Hazratganj"
+                  placeholder="e.g., Gomti Nagar Extension, Sector 4"
                   value={formData.locality}
                   onChange={(e) => setFormData({ ...formData, locality: e.target.value })}
-                  className="w-full px-3.5 py-2.5 text-xs bg-casa-canvas border border-casa-border-light rounded-xl text-casa-text-primary"
+                  className="w-full px-3.5 py-2.5 text-xs bg-casa-canvas border border-casa-border-light rounded-xl text-casa-text-primary font-medium"
                 />
               </div>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="text-xs font-semibold text-casa-text-primary block mb-1.5">
-                  Landmark (Optional)
-                </label>
+                <label className="text-xs font-semibold text-casa-text-primary block mb-1.5">Landmark</label>
                 <input
                   type="text"
-                  placeholder="e.g., Near Lulu Mall / Ekana Stadium"
+                  placeholder="e.g., Near Phoenix Palassio Mall"
                   value={formData.landmark}
                   onChange={(e) => setFormData({ ...formData, landmark: e.target.value })}
                   className="w-full px-3.5 py-2.5 text-xs bg-casa-canvas border border-casa-border-light rounded-xl text-casa-text-primary"
@@ -790,9 +1652,7 @@ export default function NewPropertyWizardPage() {
               </div>
 
               <div>
-                <label className="text-xs font-semibold text-casa-text-primary block mb-1.5">
-                  Postal Pincode
-                </label>
+                <label className="text-xs font-semibold text-casa-text-primary block mb-1.5">PIN Code</label>
                 <input
                   type="text"
                   placeholder="e.g., 226010"
@@ -811,10 +1671,10 @@ export default function NewPropertyWizardPage() {
             <div className="border-b border-casa-border-light pb-3">
               <h2 className="text-base font-bold text-casa-text-primary flex items-center gap-2">
                 <span className="w-6 h-6 rounded-full bg-casa-brand text-white text-xs flex items-center justify-center">5</span>
-                <span>Select Society Amenities</span>
+                <span>Select Society & Property Amenities</span>
               </h2>
               <p className="text-xs text-casa-text-secondary mt-0.5">
-                Highlight key lifestyle and security amenities to attract premium purchasers.
+                Highlight lifestyle, security, and infrastructure amenities to attract premium purchasers.
               </p>
             </div>
 
@@ -919,19 +1779,19 @@ export default function NewPropertyWizardPage() {
 
         {/* STEP 7: Live Marketplace Preview */}
         {currentStep === 7 && (
-          <div className="space-y-5">
+          <div className="space-y-6">
             <div className="border-b border-casa-border-light pb-3">
               <h2 className="text-base font-bold text-casa-text-primary flex items-center gap-2">
                 <span className="w-6 h-6 rounded-full bg-casa-brand text-white text-xs flex items-center justify-center">7</span>
                 <span>Live Marketplace Listing Preview</span>
               </h2>
               <p className="text-xs text-casa-text-secondary mt-0.5">
-                Review how your listing appears to potential buyers on CASA Marketplace.
+                Review how your listing and RERA credentials appear to prospective buyers on CASA Marketplace.
               </p>
             </div>
 
-            <div className="max-w-md mx-auto bg-casa-canvas border border-casa-border-light rounded-2xl overflow-hidden shadow-subtle space-y-3">
-              <div className="relative h-48 bg-casa-subtle">
+            <div className="max-w-xl mx-auto bg-casa-canvas border border-casa-border-light rounded-2xl overflow-hidden shadow-subtle space-y-3">
+              <div className="relative h-56 bg-casa-subtle">
                 {formData.uploadedImages.length > 0 ? (
                   /* eslint-disable-next-line @next/next/no-img-element */
                   <img src={formData.uploadedImages[0]} alt="" className="w-full h-full object-cover" />
@@ -941,38 +1801,86 @@ export default function NewPropertyWizardPage() {
                   </div>
                 )}
                 <div className="absolute top-3 left-3 bg-casa-brand text-white text-[10px] font-bold px-2.5 py-1 rounded-full shadow-xs">
-                  {formData.category} • {formData.listingType}
+                  {formData.category} • {formData.subcategory}
+                </div>
+                <div className="absolute top-3 right-3 bg-casa-surface/90 backdrop-blur-sm text-casa-text-primary text-[10px] font-bold px-2.5 py-1 rounded-full shadow-xs">
+                  {formData.listingType}
                 </div>
               </div>
 
-              <div className="p-4 space-y-2">
+              <div className="p-5 space-y-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-base font-bold text-casa-brand">
-                    {formatPrice(Number(formData.priceAmount) || 0)}
-                  </span>
+                  <div>
+                    <span className="text-lg font-bold text-casa-brand">
+                      {formatPrice(Number(formData.priceAmount) || 0)}
+                    </span>
+                    {calculatedPricePerSqFt > 0 && (
+                      <span className="text-xs text-casa-text-muted ml-2">
+                        (₹{calculatedPricePerSqFt.toLocaleString()}/sq.ft)
+                      </span>
+                    )}
+                  </div>
                   <span className="text-[11px] text-casa-text-muted">
                     {formData.isNegotiable ? 'Negotiable' : 'Fixed Price'}
                   </span>
                 </div>
 
-                <h3 className="font-bold text-xs text-casa-text-primary line-clamp-2">
+                <h3 className="font-bold text-sm text-casa-text-primary line-clamp-2">
                   {formData.titleEn || 'Untitled Property'}
                 </h3>
 
-                <div className="flex items-center gap-1 text-[11px] text-casa-text-muted">
-                  <MapPin className="w-3.5 h-3.5 flex-shrink-0" />
-                  <span>{formData.locality || 'Locality'}, {formData.city}</span>
+                <div className="flex items-center gap-1 text-xs text-casa-text-muted">
+                  <MapPin className="w-3.5 h-3.5 flex-shrink-0 text-casa-brand" />
+                  <span>{formData.locality || 'Locality'}, {formData.city}, {formData.state}</span>
                 </div>
 
-                <div className="pt-2 border-t border-casa-border-light grid grid-cols-3 gap-1 text-[10px] text-center text-casa-text-secondary">
-                  <div className="p-1 bg-casa-surface rounded">
-                    {formData.bedrooms} BHK
+                {/* RERA Badge Card */}
+                <div className="p-3 rounded-xl border flex items-center justify-between gap-2 text-xs bg-casa-surface border-casa-border-light">
+                  <div className="flex items-center gap-2">
+                    <ShieldCheck className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                    <div>
+                      <span className="font-bold text-casa-text-primary block">
+                        {formData.reraRegistered === 'YES'
+                          ? `RERA: ${formData.reraNumber || 'Registration Pending'} (${formData.reraAuthority})`
+                          : `RERA Exemption: ${formData.reraExemptionReason || 'Individual Exemption'}`}
+                      </span>
+                      <span className="text-[10px] text-casa-text-muted">
+                        {formData.reraRegistered === 'YES'
+                          ? 'Verification Status: PENDING CASA ADMIN AUDIT'
+                          : 'Exempt from mandatory promoter registration'}
+                      </span>
+                    </div>
                   </div>
-                  <div className="p-1 bg-casa-surface rounded">
-                    {formData.area} {formData.areaUnit}
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${
+                    formData.reraRegistered === 'YES'
+                      ? 'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300'
+                      : 'bg-casa-subtle text-casa-text-muted'
+                  }`}>
+                    {formData.reraRegistered === 'YES' ? 'PENDING' : 'EXEMPT'}
+                  </span>
+                </div>
+
+                {/* Category-Specific Specs Summary */}
+                <div className="pt-2 border-t border-casa-border-light grid grid-cols-3 gap-2 text-[10px] text-center text-casa-text-secondary">
+                  {visibility.hasBedrooms && (
+                    <div className="p-2 bg-casa-surface rounded-lg">
+                      <span className="font-bold block">{formData.bedrooms} BHK</span>
+                      <span>{formData.bathrooms} Baths</span>
+                    </div>
+                  )}
+                  {visibility.hasCommercialSpaces && (
+                    <div className="p-2 bg-casa-surface rounded-lg">
+                      <span className="font-bold block">{formData.cabins || '0'} Cabins</span>
+                      <span>{formData.workstations || '0'} Seats</span>
+                    </div>
+                  )}
+                  <div className="p-2 bg-casa-surface rounded-lg">
+                    <span className="font-bold block">{formData.area} {formData.areaUnit}</span>
+                    <span>{formData.constructionStatus?.replace(/_/g, ' ')}</span>
                   </div>
-                  <div className="p-1 bg-casa-surface rounded truncate">
-                    {formData.furnishing}
+                  <div className="p-2 bg-casa-surface rounded-lg truncate">
+                    <span className="font-bold block">{formData.furnishing?.replace(/_/g, ' ') || 'Unfurnished'}</span>
+                    <span>Facing: {formData.facing}</span>
                   </div>
                 </div>
               </div>
@@ -990,7 +1898,7 @@ export default function NewPropertyWizardPage() {
             <div className="space-y-1.5">
               <h2 className="text-xl font-bold text-casa-text-primary">Ready for CASA Moderation</h2>
               <p className="text-xs text-casa-text-secondary leading-relaxed">
-                Your listing details and PC photos have been validated. Submit now to send to CASA admin review, or save as a draft to edit later.
+                Your listing details, RERA compliance filings, and PC photos have been validated. Submit now to send to CASA admin review, or save as a draft to edit later.
               </p>
             </div>
 
@@ -1001,11 +1909,21 @@ export default function NewPropertyWizardPage() {
               </div>
               <div className="flex justify-between">
                 <span className="text-casa-text-muted">Category:</span>
-                <span className="font-semibold text-casa-text-primary">{formData.category} ({formData.listingType})</span>
+                <span className="font-semibold text-casa-text-primary">
+                  {formData.category} &gt; {formData.subcategory} ({formData.listingType})
+                </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-casa-text-muted">Price:</span>
                 <span className="font-bold text-casa-brand">{formatPrice(Number(formData.priceAmount) || 0)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-casa-text-muted">RERA Compliance:</span>
+                <span className="font-semibold text-casa-text-primary">
+                  {formData.reraRegistered === 'YES'
+                    ? `Registered (${formData.reraNumber}) - Pending Audit`
+                    : `Exempt (${formData.reraExemptionReason})`}
+                </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-casa-text-muted">Photos:</span>

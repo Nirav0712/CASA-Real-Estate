@@ -215,6 +215,45 @@ export async function deleteAdminProperty(id: string): Promise<{ success: boolea
   return result.data || { success: true, message: 'Property deleted successfully' };
 }
 
+export async function verifyPropertyRera(
+  id: string,
+  remarks?: string,
+): Promise<{ success: boolean; message: string; rera?: any }> {
+  const result = await fetchAdminApi<{ success: boolean; message: string; rera?: any }>(
+    `/admin/properties/${encodeURIComponent(id)}/rera-verify`,
+    {
+      method: 'POST',
+      body: JSON.stringify({ remarks }),
+    },
+  );
+
+  if (!result.isBackendAvailable || result.error) {
+    throw new Error(result.error || 'Failed to verify property RERA');
+  }
+
+  return result.data || { success: true, message: 'Property RERA verified successfully' };
+}
+
+export async function rejectPropertyRera(
+  id: string,
+  reason: string,
+  remarks?: string,
+): Promise<{ success: boolean; message: string; rera?: any }> {
+  const result = await fetchAdminApi<{ success: boolean; message: string; rera?: any }>(
+    `/admin/properties/${encodeURIComponent(id)}/rera-reject`,
+    {
+      method: 'POST',
+      body: JSON.stringify({ reason, remarks }),
+    },
+  );
+
+  if (!result.isBackendAvailable || result.error) {
+    throw new Error(result.error || 'Failed to reject property RERA');
+  }
+
+  return result.data || { success: true, message: 'Property RERA rejected' };
+}
+
 // ==========================================
 // PHASE 08: USER MANAGEMENT & GOVERNANCE APIs
 // ==========================================
