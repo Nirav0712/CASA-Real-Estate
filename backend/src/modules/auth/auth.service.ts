@@ -1173,61 +1173,45 @@ export class AuthService implements OnModuleInit {
         const existingByEmail = await this.userModel.findOne({ email: normalizedEmail });
 
         if (existingByEmail) {
-          if (existingByEmail.isEmailVerified && existingByEmail.passwordHash) {
-            throw new ConflictException('An account with this email address already exists. Please sign in.');
+          throw new ConflictException('An account with this email address already exists. Please sign in.');
+        }
+
+        // Check if mobile number is already in use by a different email
+        const existingByMobile = await this.userModel.findOne({ normalizedMobile });
+        if (existingByMobile) {
+          if (existingByMobile.email && existingByMobile.email !== normalizedEmail) {
+            throw new ConflictException('An account with this mobile number is already registered under a different email.');
           }
-          // Update unverified user record with new password & fresh verification token
-          existingByEmail.name = fullName;
-          existingByEmail.mobile = dto.mobile.trim();
-          existingByEmail.normalizedMobile = normalizedMobile;
-          existingByEmail.passwordHash = passwordHash;
-          existingByEmail.accountType = finalAccountType;
-          existingByEmail.role = finalRole;
-          existingByEmail.permissions = finalPermissions;
-          existingByEmail.agencyName = dto.agencyName?.trim() || undefined;
-          existingByEmail.isEmailVerified = false;
-          existingByEmail.status = AccountStatus.PENDING_VERIFICATION;
-          existingByEmail.emailVerificationTokenHash = verificationTokenHash;
-          existingByEmail.emailVerificationExpiresAt = verificationExpiresAt;
-          await existingByEmail.save();
-          user = existingByEmail;
+          if (existingByMobile.passwordHash) {
+            throw new ConflictException('An account with this mobile number already exists. Please sign in.');
+          }
+          // Attach email and password to existing mobile-verified account
+          existingByMobile.email = normalizedEmail;
+          existingByMobile.name = fullName;
+          existingByMobile.passwordHash = passwordHash;
+          existingByMobile.isEmailVerified = true;
+          existingByMobile.status = AccountStatus.ACTIVE;
+          existingByMobile.emailVerificationTokenHash = undefined;
+          existingByMobile.emailVerificationExpiresAt = undefined;
+          await existingByMobile.save();
+          user = existingByMobile;
         } else {
-          // Check if mobile number is already in use by a different email
-          const existingByMobile = await this.userModel.findOne({ normalizedMobile });
-          if (existingByMobile) {
-            if (existingByMobile.email && existingByMobile.email !== normalizedEmail) {
-              throw new ConflictException('An account with this mobile number is already registered under a different email.');
-            }
-            // Attach email, password & verification token
-            existingByMobile.email = normalizedEmail;
-            existingByMobile.name = fullName;
-            existingByMobile.passwordHash = passwordHash;
-            existingByMobile.isEmailVerified = false;
-            existingByMobile.status = AccountStatus.PENDING_VERIFICATION;
-            existingByMobile.emailVerificationTokenHash = verificationTokenHash;
-            existingByMobile.emailVerificationExpiresAt = verificationExpiresAt;
-            await existingByMobile.save();
-            user = existingByMobile;
-          } else {
-            // Create brand new pending user
-            user = await this.userModel.create({
-              name: fullName,
-              email: normalizedEmail,
-              mobile: dto.mobile.trim(),
-              normalizedMobile,
-              passwordHash,
-              isEmailVerified: false,
-              isMobileVerified: false,
-              platformRole: finalPlatformRole,
-              accountType: finalAccountType,
-              role: finalRole,
-              permissions: finalPermissions,
-              status: AccountStatus.PENDING_VERIFICATION,
-              emailVerificationTokenHash: verificationTokenHash,
-              emailVerificationExpiresAt: verificationExpiresAt,
-              agencyName: dto.agencyName?.trim() || undefined,
-            });
-          }
+          // Create brand new active user directly without requiring email verification
+          user = await this.userModel.create({
+            name: fullName,
+            email: normalizedEmail,
+            mobile: dto.mobile.trim(),
+            normalizedMobile,
+            passwordHash,
+            isEmailVerified: true,
+            isMobileVerified: false,
+            platformRole: finalPlatformRole,
+            accountType: finalAccountType,
+            role: finalRole,
+            permissions: finalPermissions,
+            status: AccountStatus.ACTIVE,
+            agencyName: dto.agencyName?.trim() || undefined,
+          });
         }
       } catch (err: any) {
         if (err instanceof ConflictException || err instanceof BadRequestException) throw err;
@@ -1247,15 +1231,13 @@ export class AuthService implements OnModuleInit {
       mobile: dto.mobile.trim(),
       normalizedMobile,
       passwordHash,
-      isEmailVerified: false,
+      isEmailVerified: true,
       isMobileVerified: false,
       platformRole: finalPlatformRole,
       accountType: finalAccountType,
       role: finalRole,
       permissions: finalPermissions,
-      status: AccountStatus.PENDING_VERIFICATION,
-      emailVerificationTokenHash: verificationTokenHash,
-      emailVerificationExpiresAt: verificationExpiresAt,
+      status: AccountStatus.ACTIVE,
       isVerifiedAgent: false,
       agencyName: dto.agencyName?.trim() || undefined,
       createdAt: now,
@@ -1264,18 +1246,15 @@ export class AuthService implements OnModuleInit {
     this.memUsers.set(normalizedEmail, memUserObj);
     if (!user) user = memUserObj;
 
-    // Dispatch verification email with confirm button
-    try {
-      await this.mailService.sendVerificationEmail(normalizedEmail, fullName, rawVerificationToken);
-    } catch (mailErr: any) {
-      this.logger.warn(`Failed to dispatch registration verification email to ${normalizedEmail}: ${mailErr?.message}`);
-    }
+    const tokens = await this.generateTokens(user, metadata);
 
     return {
       success: true,
-      message: 'Registration successful! A verification email has been sent. Please check your inbox and confirm your email address to activate your account.',
+      message: 'Registration successful! Your account is active.',
       email: normalizedEmail,
-      isEmailVerified: false,
+      isEmailVerified: true,
+      user: this.sanitizeUser(user),
+      tokens,
     };
   }
 
@@ -1315,11 +1294,10 @@ export class AuthService implements OnModuleInit {
       throw new ForbiddenException('Your account has been deactivated. Please contact support.');
     }
 
-    // Require email verification before login
-    if (user.status === AccountStatus.PENDING_VERIFICATION || !user.isEmailVerified) {
-      throw new UnauthorizedException(
-        'Please verify your email address before logging in. We have sent a confirmation email to your inbox.',
-      );
+    // Auto-activate any legacy pending accounts upon login
+    if (user.status === AccountStatus.PENDING_VERIFICATION) {
+      user.status = AccountStatus.ACTIVE;
+      user.isEmailVerified = true;
     }
 
     user.lastLoginAt = new Date();

@@ -104,12 +104,25 @@ export class AuthController {
   @Post('register')
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Register a new user account with email and password' })
-  @ApiResponse({ status: 201, description: 'Account registered; verification email sent' })
+  @ApiResponse({ status: 201, description: 'Account registered and activated' })
   @ApiResponse({ status: 400, description: 'Invalid input or validation failure' })
   @ApiResponse({ status: 409, description: 'Account with email already exists' })
   @ApiResponse({ status: 429, description: 'Rate limit exceeded' })
-  async register(@Body() dto: RegisterDto) {
-    return this.authService.register(dto);
+  async register(
+    @Body() dto: RegisterDto,
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const ipAddress = req.ip || (req.headers['x-forwarded-for'] as string);
+    const userAgent = req.headers['user-agent'];
+    const result = await this.authService.register(dto, { ipAddress, userAgent });
+
+    if (result.tokens) {
+      this.setRefreshTokenCookie(res, result.tokens.refreshToken);
+      this.setAccessTokenCookie(res, result.tokens.accessToken);
+    }
+
+    return result;
   }
 
   @Public()

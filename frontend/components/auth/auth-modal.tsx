@@ -155,7 +155,10 @@ export function AuthModal() {
         agencyName: isProfessional ? agencyName.trim() || undefined : undefined,
       });
 
-      setRegisteredEmail(res.email || email.trim());
+      if (!(res as any).tokens?.accessToken) {
+        setMode('SIGN_IN');
+        setAuthModalMode('SIGN_IN');
+      }
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Registration failed. Please try again.';
       setErrorMsg(message);
