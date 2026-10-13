@@ -10,6 +10,8 @@ import { RefreshSession, RefreshSessionSchema } from '../auth/schemas/refresh-se
 import { AgentProfile, AgentProfileSchema } from '../agents/schemas/agent-profile.schema';
 import { AgentVerificationDocument, AgentVerificationDocumentSchema } from '../agents/schemas/agent-document.schema';
 import { Role, RoleSchema } from '../entitlements/schemas/role.schema';
+import { Lead, LeadSchema } from '../leads/schemas/lead.schema';
+import { Payment, PaymentSchema } from '../payments/schemas/payment.schema';
 import { AuthModule } from '../auth/auth.module';
 
 @Module({
@@ -23,6 +25,8 @@ import { AuthModule } from '../auth/auth.module';
       { name: AgentProfile.name, schema: AgentProfileSchema },
       { name: AgentVerificationDocument.name, schema: AgentVerificationDocumentSchema },
       { name: Role.name, schema: RoleSchema },
+      { name: Lead.name, schema: LeadSchema },
+      { name: Payment.name, schema: PaymentSchema },
     ]),
     AuthModule,
   ],

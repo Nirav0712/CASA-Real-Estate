@@ -52,6 +52,7 @@ import {
   Video,
   Film,
   AlertTriangle,
+  Users,
 } from 'lucide-react';
 import { parseYouTubeUrl } from '@/lib/video';
 
@@ -842,6 +843,69 @@ export function PropertyDetailView({
                     {property.specs?.constructionStatus?.replace(/_/g, ' ') || 'Ready'}
                   </span>
                 </div>
+
+                {/* Possession Status & Date (for Sale listings) */}
+                {property.listingType === 'SALE' && property.specs?.possessionStatus && (
+                  <div className="p-3.5 rounded-2xl bg-casa-canvas border border-casa-border-light">
+                    <div className="flex items-center gap-1.5 text-xs text-casa-text-muted mb-1">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                      <span>Possession</span>
+                    </div>
+                    <span className="text-sm font-bold text-casa-text-primary">
+                      {property.specs.possessionStatus.replace(/_/g, ' ')}
+                      {property.specs.possessionDate ? ` (${property.specs.possessionDate})` : ''}
+                    </span>
+                  </div>
+                )}
+
+                {/* Available From (for Rent / Lease listings) */}
+                {(property.listingType === 'RENT' ||
+                  property.listingType === 'LEASE' ||
+                  property.listingType === 'COMMERCIAL_LEASE' ||
+                  property.listingType === 'PG_COLIVING') && (property.specs?.availableFrom || (property.specs as any)?.possessionDate) && (
+                  <div className="p-3.5 rounded-2xl bg-casa-canvas border border-casa-border-light">
+                    <div className="flex items-center gap-1.5 text-xs text-casa-text-muted mb-1">
+                      <Calendar className="w-3.5 h-3.5 text-casa-brand" />
+                      <span>Available From</span>
+                    </div>
+                    <span className="text-sm font-bold text-casa-text-primary">
+                      {property.specs?.availableFrom || (property.specs as any)?.possessionDate}
+                    </span>
+                  </div>
+                )}
+
+                {/* Preferred Tenant Type */}
+                {(property.listingType === 'RENT' ||
+                  property.listingType === 'LEASE' ||
+                  property.listingType === 'COMMERCIAL_LEASE' ||
+                  property.listingType === 'PG_COLIVING') && property.price?.preferredTenantType && (
+                  <div className="p-3.5 rounded-2xl bg-casa-canvas border border-casa-border-light">
+                    <div className="flex items-center gap-1.5 text-xs text-casa-text-muted mb-1">
+                      <Users className="w-3.5 h-3.5 text-casa-brand" />
+                      <span>Preferred Tenant</span>
+                    </div>
+                    <span className="text-sm font-bold text-casa-text-primary">
+                      {property.price.preferredTenantType.replace(/_/g, ' ')}
+                    </span>
+                  </div>
+                )}
+
+                {/* Bachelor Preferences */}
+                {(property.listingType === 'RENT' ||
+                  property.listingType === 'LEASE' ||
+                  property.listingType === 'PG_COLIVING') &&
+                  property.price?.bachelorPreferences &&
+                  property.price.bachelorPreferences !== 'NOT_APPLICABLE' && (
+                  <div className="p-3.5 rounded-2xl bg-casa-canvas border border-casa-border-light">
+                    <div className="flex items-center gap-1.5 text-xs text-casa-text-muted mb-1">
+                      <Users className="w-3.5 h-3.5 text-casa-brand" />
+                      <span>Bachelor Preference</span>
+                    </div>
+                    <span className="text-sm font-bold text-casa-text-primary">
+                      {property.price.bachelorPreferences.replace(/_/g, ' ')}
+                    </span>
+                  </div>
+                )}
 
                 {property.specs?.furnishing && (
                   <div className="p-3.5 rounded-2xl bg-casa-canvas border border-casa-border-light">

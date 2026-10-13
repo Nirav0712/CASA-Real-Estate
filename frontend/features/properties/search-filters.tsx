@@ -25,6 +25,8 @@ import {
   Compass,
   DollarSign,
   ShieldCheck,
+  Users,
+  CheckCircle2,
 } from 'lucide-react';
 
 const POPULAR_CITIES = [
@@ -293,6 +295,87 @@ export function SearchFilters({
           ))}
         </select>
       </div>
+
+      {/* Dynamic Rental / Possession Filters */}
+      {(filters.listingType === 'RENT' ||
+        filters.listingType === 'LEASE' ||
+        filters.listingType === 'PG_COLIVING' ||
+        filters.listingType === 'COMMERCIAL_LEASE') && (
+        <div className="space-y-3 p-3 bg-casa-subtle/50 rounded-xl border border-casa-border-light">
+          <div className="space-y-1.5">
+            <label className="text-xs font-semibold text-casa-text-secondary flex items-center gap-1.5">
+              <Users className="w-3.5 h-3.5 text-casa-brand" />
+              Tenant Preference
+            </label>
+            <select
+              value={filters.preferredTenantType || 'all'}
+              onChange={(e) =>
+                onFilterChange({
+                  preferredTenantType: e.target.value === 'all' ? undefined : e.target.value,
+                  page: 1,
+                })
+              }
+              className="w-full px-3 py-2 text-xs rounded-xl bg-casa-surface border border-casa-border-light focus:outline-none focus:ring-2 focus:ring-casa-brand/20 text-casa-text-primary"
+            >
+              <option value="all">Any Tenant</option>
+              <option value="FAMILY">Family Only</option>
+              <option value="BACHELORS">Bachelors</option>
+              <option value="FAMILY_AND_BACHELORS">Family & Bachelors</option>
+              <option value="COMPANY_LEASE">Corporate Lease</option>
+            </select>
+          </div>
+
+          {(filters.preferredTenantType === 'BACHELORS' ||
+            filters.preferredTenantType === 'FAMILY_AND_BACHELORS') && (
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-casa-text-secondary flex items-center gap-1.5">
+                <Users className="w-3.5 h-3.5 text-casa-brand" />
+                Bachelor Preference
+              </label>
+              <select
+                value={filters.bachelorPreferences || 'all'}
+                onChange={(e) =>
+                  onFilterChange({
+                    bachelorPreferences: e.target.value === 'all' ? undefined : e.target.value,
+                    page: 1,
+                  })
+                }
+                className="w-full px-3 py-2 text-xs rounded-xl bg-casa-surface border border-casa-border-light focus:outline-none focus:ring-2 focus:ring-casa-brand/20 text-casa-text-primary"
+              >
+                <option value="all">All Bachelors</option>
+                <option value="BOYS">Boys Only</option>
+                <option value="GIRLS">Girls Only</option>
+                <option value="BOYS_AND_GIRLS">Boys & Girls</option>
+              </select>
+            </div>
+          )}
+        </div>
+      )}
+
+      {filters.listingType === 'SALE' && (
+        <div className="space-y-1.5">
+          <label className="text-xs font-semibold text-casa-text-secondary flex items-center gap-1.5">
+            <CheckCircle2 className="w-3.5 h-3.5 text-casa-brand" />
+            Possession Status
+          </label>
+          <select
+            value={filters.possessionStatus || 'all'}
+            onChange={(e) =>
+              onFilterChange({
+                possessionStatus: e.target.value === 'all' ? undefined : e.target.value,
+                page: 1,
+              })
+            }
+            className="w-full px-3 py-2 text-xs rounded-xl bg-casa-surface border border-casa-border-light focus:outline-none focus:ring-2 focus:ring-casa-brand/20 text-casa-text-primary"
+          >
+            <option value="all">All Possession Timelines</option>
+            <option value="READY_TO_MOVE">Ready to Move</option>
+            <option value="UNDER_CONSTRUCTION">Under Construction</option>
+            <option value="RESALE">Resale</option>
+            <option value="NEW_LAUNCH">New Launch</option>
+          </select>
+        </div>
+      )}
 
       {/* 4. Location: Dynamic Autocomplete & Quick City */}
       <div className="space-y-2">

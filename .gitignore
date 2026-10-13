@@ -52,3 +52,9 @@ coverage/
 .nyc_output/
 cypress/videos/
 cypress/screenshots/
+
+# Backups & Data Dumps
+backup-real-data/
+backend/backup-real-data/
+*.dump
+*.bson

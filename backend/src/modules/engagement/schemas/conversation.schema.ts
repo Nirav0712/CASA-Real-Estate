@@ -5,8 +5,8 @@ export type ConversationDocument = Conversation & Document;
 
 @Schema({ _id: false })
 export class ConversationPropertyContext {
-  @Prop({ type: Types.ObjectId, ref: 'Property' })
-  propertyId: Types.ObjectId;
+  @Prop({ type: String })
+  propertyId: string;
 
   @Prop({ type: String })
   title: string;

@@ -167,6 +167,21 @@ export class SearchPropertiesDto {
   @IsString()
   constructionStatus?: string;
 
+  @ApiPropertyOptional({ description: 'Possession status (READY_TO_MOVE, UNDER_CONSTRUCTION)' })
+  @IsOptional()
+  @IsString()
+  possessionStatus?: string;
+
+  @ApiPropertyOptional({ description: 'Preferred tenant type (FAMILY, BACHELORS, FAMILY_AND_BACHELORS, COMPANY_LEASE, ANY)' })
+  @IsOptional()
+  @IsString()
+  preferredTenantType?: string;
+
+  @ApiPropertyOptional({ description: 'Bachelor preferences (BOYS, GIRLS, BOYS_AND_GIRLS, NOT_APPLICABLE)' })
+  @IsOptional()
+  @IsString()
+  bachelorPreferences?: string;
+
   @ApiPropertyOptional({ description: 'Property age range (0-1 years, 1-5 years, etc.)' })
   @IsOptional()
   @IsString()

@@ -250,6 +250,7 @@ export interface Property {
     lockInPeriodMonths?: number;
     rentEscalationPercentage?: number;
     preferredTenantType?: string;
+    bachelorPreferences?: string;
     brokerageAmount?: number;
     pgPricingModel?: 'PER_BED' | 'PER_ROOM';
     occupancyType?: string;
@@ -367,6 +368,9 @@ export interface SearchPropertiesParams {
   bedrooms?: number | string;
   bathrooms?: number | string;
   constructionStatus?: string;
+  possessionStatus?: string;
+  preferredTenantType?: string;
+  bachelorPreferences?: string;
   propertyAge?: string;
   furnishing?: string;
   facing?: string;

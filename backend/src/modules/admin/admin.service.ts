@@ -19,6 +19,9 @@ import {
   AgentVerificationDocumentDocument,
 } from '../agents/schemas/agent-document.schema';
 import { Role, RoleDocument } from '../entitlements/schemas/role.schema';
+import { Lead, LeadDocument } from '../leads/schemas/lead.schema';
+import { Payment, PaymentDocument } from '../payments/schemas/payment.schema';
+import { PaymentStatus } from '../payments/enums/payment.enums';
 import { AdminUserQueryDto } from './dto/admin-user-query.dto';
 import { UpdateUserStatusDto } from './dto/update-user-status.dto';
 import { UpdateUserRoleDto } from './dto/update-user-role.dto';
@@ -256,6 +259,8 @@ export class AdminService implements OnModuleInit {
     @InjectModel(AgentProfile.name) private readonly agentProfileModel: Model<AgentProfileDocument>,
     @InjectModel(AgentVerificationDocument.name) private readonly agentDocumentModel: Model<AgentVerificationDocumentDocument>,
     @InjectModel(Role.name) private readonly roleModel: Model<RoleDocument>,
+    @InjectModel(Lead.name) private readonly leadModel: Model<LeadDocument>,
+    @InjectModel(Payment.name) private readonly paymentModel: Model<PaymentDocument>,
     private readonly authService: AuthService,
   ) {}
 
@@ -265,12 +270,17 @@ export class AdminService implements OnModuleInit {
 
   private async ensureInitialPendingFixtures() {
     try {
+      // Never auto-inject mock fixtures into production unless explicitly enabled
+      if (process.env.NODE_ENV !== 'test' && process.env.SEED_DEV_FIXTURES !== 'true') {
+        return;
+      }
+
       const pendingCount = await this.propertyModel.countDocuments({
         status: { $in: ['PENDING_REVIEW', 'PENDING_APPROVAL'] },
       });
 
       if (pendingCount === 0) {
-        this.logger.log('Checking if moderation queue fixtures are needed in MongoDB Atlas...');
+        this.logger.log('Seeding initial pending moderation fixtures for test/dev environment...');
         for (const fixture of INITIAL_PENDING_FIXTURES) {
           const exists = await this.propertyModel.findOne({ id: fixture.id });
           if (!exists) {
@@ -355,11 +365,18 @@ export class AdminService implements OnModuleInit {
   }
 
   async getDashboardStats() {
+    const startOfMonth = new Date();
+    startOfMonth.setDate(1);
+    startOfMonth.setHours(0, 0, 0, 0);
+
     const [
       pendingApprovalsCount,
       activeListingsCount,
       totalPropertiesCount,
       rejectedCount,
+      registeredAgentsCount,
+      totalEnquiriesThisMonth,
+      monthlyPaymentsAgg,
     ] = await Promise.all([
       this.propertyModel.countDocuments({
         status: { $in: ['PENDING_REVIEW', 'PENDING_APPROVAL'] },
@@ -370,16 +387,45 @@ export class AdminService implements OnModuleInit {
       }),
       this.propertyModel.countDocuments(),
       this.propertyModel.countDocuments({ status: 'REJECTED' }),
+      this.userModel.countDocuments({
+        $or: [
+          { accountType: { $in: ['AGENT', 'BROKER', 'DEVELOPER'] } },
+          { role: { $in: ['AGENT', 'BROKER', 'DEVELOPER'] } },
+          { platformRole: { $in: ['AGENT', 'BROKER', 'DEVELOPER'] } },
+        ],
+      }),
+      this.leadModel.countDocuments({
+        createdAt: { $gte: startOfMonth },
+      }),
+      this.paymentModel.aggregate([
+        {
+          $match: {
+            status: PaymentStatus.PAID,
+            createdAt: { $gte: startOfMonth },
+          },
+        },
+        {
+          $group: {
+            _id: null,
+            totalRevenue: { $sum: '$amount' },
+          },
+        },
+      ]),
     ]);
+
+    const monthlyRevenueEstimate =
+      monthlyPaymentsAgg && monthlyPaymentsAgg.length > 0
+        ? monthlyPaymentsAgg[0].totalRevenue
+        : 0;
 
     return {
       pendingApprovalsCount,
       activeListingsCount,
       totalPropertiesCount,
       rejectedCount,
-      registeredAgentsCount: 384,
-      totalEnquiriesThisMonth: 5920,
-      monthlyRevenueEstimate: 245000,
+      registeredAgentsCount,
+      totalEnquiriesThisMonth,
+      monthlyRevenueEstimate,
     };
   }
 
@@ -411,7 +457,11 @@ export class AdminService implements OnModuleInit {
     const filter: any = {};
 
     if (filterQuery?.status && filterQuery.status !== 'ALL') {
-      if (filterQuery.status === 'PUBLISHED' || filterQuery.status === 'ACTIVE') {
+      if (
+        filterQuery.status === 'PUBLISHED' ||
+        filterQuery.status === 'ACTIVE' ||
+        filterQuery.status === 'APPROVED'
+      ) {
         filter.status = { $in: ['PUBLISHED', 'ACTIVE', 'APPROVED'] };
       } else if (filterQuery.status === 'PENDING_REVIEW' || filterQuery.status === 'PENDING_APPROVAL') {
         filter.status = { $in: ['PENDING_REVIEW', 'PENDING_APPROVAL'] };

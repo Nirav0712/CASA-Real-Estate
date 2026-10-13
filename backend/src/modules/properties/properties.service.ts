@@ -286,16 +286,13 @@ export class PropertiesService implements OnModuleInit {
       }
 
       const propCount = await this.propertyModel.countDocuments();
-      if (propCount === 0) {
-        this.logger.log('Seeding initial verified properties into MongoDB Atlas...');
+      if (
+        propCount === 0 &&
+        (process.env.NODE_ENV === 'test' || process.env.SEED_DEV_PROPERTIES === 'true')
+      ) {
+        this.logger.log('Seeding initial verified properties into MongoDB Atlas for test environment...');
         await this.propertyModel.insertMany(INITIAL_SEED_PROPERTIES);
         this.logger.log('✅ Verified properties seeded successfully into MongoDB Atlas.');
-      } else {
-        // Ensure any existing ACTIVE seed items also have isPublished=true
-        await this.propertyModel.updateMany(
-          { status: { $in: ['ACTIVE', 'PUBLISHED'] }, isPublished: { $ne: true } },
-          { $set: { isPublished: true, status: 'PUBLISHED' } },
-        );
       }
     } catch (err: any) {
       this.logger.warn(`Database seeding note: ${err?.message}`);
@@ -544,6 +541,18 @@ export class PropertiesService implements OnModuleInit {
         filter['specs.constructionStatus'] = new RegExp(`^${dto.constructionStatus.trim()}$`, 'i');
       }
 
+      if (dto.possessionStatus && dto.possessionStatus !== 'all') {
+        filter['specs.possessionStatus'] = new RegExp(`^${dto.possessionStatus.trim()}$`, 'i');
+      }
+
+      if (dto.preferredTenantType && dto.preferredTenantType !== 'all') {
+        filter['price.preferredTenantType'] = new RegExp(`^${dto.preferredTenantType.trim()}$`, 'i');
+      }
+
+      if (dto.bachelorPreferences && dto.bachelorPreferences !== 'all') {
+        filter['price.bachelorPreferences'] = new RegExp(`^${dto.bachelorPreferences.trim()}$`, 'i');
+      }
+
       if (dto.furnishing && dto.furnishing !== 'all') {
         filter['specs.furnishing'] = new RegExp(`^${dto.furnishing.trim()}$`, 'i');
       }
@@ -783,6 +792,7 @@ export class PropertiesService implements OnModuleInit {
             lockInPeriodMonths: dto.price?.lockInPeriodMonths ? Number(dto.price.lockInPeriodMonths) : undefined,
             rentEscalationPercentage: dto.price?.rentEscalationPercentage ? Number(dto.price.rentEscalationPercentage) : undefined,
             preferredTenantType: dto.price?.preferredTenantType,
+            bachelorPreferences: dto.price?.bachelorPreferences,
             brokerageAmount: dto.price?.brokerageAmount ? Number(dto.price.brokerageAmount) : undefined,
             pgPricingModel: dto.price?.pgPricingModel,
             occupancyType: dto.price?.occupancyType,

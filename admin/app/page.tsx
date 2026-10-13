@@ -10,6 +10,8 @@ import { useToast } from '@/contexts/toast-context';
 import {
   getAdminDashboardStats,
   getPendingModerationQueue,
+  approveModerationProperty,
+  rejectModerationProperty,
 } from '@/services/admin-service';
 import { formatPrice } from '@/lib/utils';
 import { AdminDashboardStats, AdminPropertyItem } from '@/types';
@@ -30,6 +32,7 @@ export default function AdminDashboardPage() {
   const [stats, setStats] = React.useState<AdminDashboardStats | null>(null);
   const [queue, setQueue] = React.useState<AdminPropertyItem[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
+  const [isProcessing, setIsProcessing] = React.useState(false);
   const [isFallback, setIsFallback] = React.useState(false);
   const [activeTab, setActiveTab] = React.useState('pending');
   const [filterQuery, setFilterQuery] = React.useState('');
@@ -54,28 +57,50 @@ export default function AdminDashboardPage() {
     loadData();
   }, []);
 
-  const handleApprove = () => {
-    if (!selectedListing) return;
-    setQueue((prev) => prev.filter((item) => item.id !== selectedListing.id));
-    toast.success(
-      'Listing Approved & Published',
-      `"${selectedListing.title}" is now active in public search index.`,
-    );
-    setIsApproveModalOpen(false);
-    setSelectedListing(null);
-    setAdminNote('');
+  const handleApprove = async () => {
+    if (!selectedListing || isProcessing) return;
+    setIsProcessing(true);
+    try {
+      await approveModerationProperty(selectedListing.id, adminNote || 'Approved and published by administrator');
+      setQueue((prev) => prev.filter((item) => item.id !== selectedListing.id));
+      toast.success(
+        'Listing Approved & Published',
+        `"${selectedListing.title}" is now active in public search index.`,
+      );
+      const statsRes = await getAdminDashboardStats();
+      if (statsRes.stats) setStats(statsRes.stats);
+      setIsApproveModalOpen(false);
+      setSelectedListing(null);
+      setAdminNote('');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Approval failed';
+      toast.error('Action Failed', msg);
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
-  const handleReject = () => {
-    if (!selectedListing) return;
-    setQueue((prev) => prev.filter((item) => item.id !== selectedListing.id));
-    toast.warning(
-      'Listing Rejected',
-      `"${selectedListing.title}" moved to rejected queue (Reason: ${rejectionReason}).`,
-    );
-    setIsRejectModalOpen(false);
-    setSelectedListing(null);
-    setAdminNote('');
+  const handleReject = async () => {
+    if (!selectedListing || isProcessing) return;
+    setIsProcessing(true);
+    try {
+      await rejectModerationProperty(selectedListing.id, rejectionReason, adminNote || undefined);
+      setQueue((prev) => prev.filter((item) => item.id !== selectedListing.id));
+      toast.warning(
+        'Listing Rejected',
+        `"${selectedListing.title}" moved to rejected queue (Reason: ${rejectionReason}).`,
+      );
+      const statsRes = await getAdminDashboardStats();
+      if (statsRes.stats) setStats(statsRes.stats);
+      setIsRejectModalOpen(false);
+      setSelectedListing(null);
+      setAdminNote('');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Rejection failed';
+      toast.error('Action Failed', msg);
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   const filteredQueue = queue.filter(
@@ -362,13 +387,14 @@ export default function AdminDashboardPage() {
             <Button
               variant="outline"
               size="sm"
+              disabled={isProcessing}
               onClick={() => setIsApproveModalOpen(false)}
             >
               Cancel
             </Button>
-            <Button variant="success" size="sm" onClick={handleApprove}>
+            <Button variant="success" size="sm" disabled={isProcessing} onClick={handleApprove}>
               <CheckCircle className="w-3.5 h-3.5" />
-              <span>Confirm & Publish</span>
+              <span>{isProcessing ? 'Publishing...' : 'Confirm & Publish'}</span>
             </Button>
           </div>
         </div>
@@ -420,13 +446,14 @@ export default function AdminDashboardPage() {
             <Button
               variant="outline"
               size="sm"
+              disabled={isProcessing}
               onClick={() => setIsRejectModalOpen(false)}
             >
               Cancel
             </Button>
-            <Button variant="danger" size="sm" onClick={handleReject}>
+            <Button variant="danger" size="sm" disabled={isProcessing} onClick={handleReject}>
               <XCircle className="w-3.5 h-3.5" />
-              <span>Reject Listing</span>
+              <span>{isProcessing ? 'Rejecting...' : 'Reject Listing'}</span>
             </Button>
           </div>
         </div>

@@ -63,7 +63,10 @@ export class PropertyPrice {
   rentEscalationPercentage?: number;
 
   @Prop()
-  preferredTenantType?: string; // Family, Bachelors, Company Lease, Any
+  preferredTenantType?: string; // Family, Bachelors, Family and Bachelors, Company/Corporate Lease, Any
+
+  @Prop()
+  bachelorPreferences?: string; // Boys, Girls, Boys and Girls, Not applicable
 
   @Prop()
   brokerageAmount?: number;

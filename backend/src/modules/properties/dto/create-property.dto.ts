@@ -112,6 +112,11 @@ export class PropertyPriceDto {
 
   @ApiPropertyOptional()
   @IsOptional()
+  @IsString()
+  bachelorPreferences?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
   @IsNumber()
   brokerageAmount?: number;
 

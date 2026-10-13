@@ -149,7 +149,8 @@ export default function EditPropertyPage() {
     noticePeriodMonths: '1',
     lockInPeriodMonths: '3',
     rentEscalationPercentage: '5',
-    preferredTenantType: 'ANY',
+    preferredTenantType: 'FAMILY',
+    bachelorPreferences: 'NOT_APPLICABLE',
     brokerageAmount: '0',
 
     // PG / Co-living Specifics
@@ -283,7 +284,8 @@ export default function EditPropertyPage() {
         noticePeriodMonths: String((priceObj as any).noticePeriodMonths ?? '1'),
         lockInPeriodMonths: String((priceObj as any).lockInPeriodMonths ?? '3'),
         rentEscalationPercentage: String((priceObj as any).rentEscalationPercentage ?? '5'),
-        preferredTenantType: (priceObj as any).preferredTenantType || 'ANY',
+        preferredTenantType: (priceObj as any).preferredTenantType || 'FAMILY',
+        bachelorPreferences: (priceObj as any).bachelorPreferences || 'NOT_APPLICABLE',
         brokerageAmount: String((priceObj as any).brokerageAmount ?? '0'),
 
         // PG
@@ -392,6 +394,11 @@ export default function EditPropertyPage() {
         lockInPeriodMonths: formData.lockInPeriodMonths ? Number(formData.lockInPeriodMonths) : undefined,
         rentEscalationPercentage: formData.rentEscalationPercentage ? Number(formData.rentEscalationPercentage) : undefined,
         preferredTenantType: formData.preferredTenantType,
+        bachelorPreferences:
+          formData.preferredTenantType === 'BACHELORS' ||
+          formData.preferredTenantType === 'FAMILY_AND_BACHELORS'
+            ? formData.bachelorPreferences
+            : 'NOT_APPLICABLE',
         brokerageAmount: formData.brokerageAmount ? Number(formData.brokerageAmount) : undefined,
         pgPricingModel: formData.listingType === 'PG_COLIVING' ? formData.pgPricingModel : undefined,
         occupancyType: formData.listingType === 'PG_COLIVING' ? formData.occupancyType : undefined,
@@ -949,6 +956,98 @@ export default function EditPropertyPage() {
               />
             </div>
           </div>
+
+          {/* Rental / Lease Tenant Preferences & Availability */}
+          {(formData.listingType === 'RENT' ||
+            formData.listingType === 'LEASE' ||
+            formData.listingType === 'COMMERCIAL_LEASE' ||
+            formData.listingType === 'PG_COLIVING') && (
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2 p-3 bg-casa-subtle/50 rounded-xl border border-casa-border-light">
+              <div>
+                <label className="text-xs font-semibold text-casa-text-primary block mb-1">Preferred Tenant Type</label>
+                <select
+                  value={formData.preferredTenantType}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setFormData({
+                      ...formData,
+                      preferredTenantType: val,
+                      bachelorPreferences:
+                        val === 'BACHELORS' || val === 'FAMILY_AND_BACHELORS'
+                          ? formData.bachelorPreferences || 'BOYS_AND_GIRLS'
+                          : 'NOT_APPLICABLE',
+                    });
+                  }}
+                  className="w-full px-3 py-2 text-xs bg-casa-canvas border border-casa-border-light rounded-xl text-casa-text-primary"
+                >
+                  <option value="FAMILY">Family</option>
+                  <option value="BACHELORS">Bachelors</option>
+                  <option value="FAMILY_AND_BACHELORS">Family and Bachelors</option>
+                  <option value="COMPANY_LEASE">Company/Corporate Lease</option>
+                  <option value="ANY">Any</option>
+                </select>
+              </div>
+
+              {(formData.preferredTenantType === 'BACHELORS' ||
+                formData.preferredTenantType === 'FAMILY_AND_BACHELORS') && (
+                <div>
+                  <label className="text-xs font-semibold text-casa-text-primary block mb-1">Bachelor Preferences</label>
+                  <select
+                    value={formData.bachelorPreferences}
+                    onChange={(e) => setFormData({ ...formData, bachelorPreferences: e.target.value })}
+                    className="w-full px-3 py-2 text-xs bg-casa-canvas border border-casa-border-light rounded-xl text-casa-text-primary"
+                  >
+                    <option value="BOYS">Boys</option>
+                    <option value="GIRLS">Girls</option>
+                    <option value="BOYS_AND_GIRLS">Boys and Girls</option>
+                    <option value="NOT_APPLICABLE">Not applicable</option>
+                  </select>
+                </div>
+              )}
+
+              <div>
+                <label className="text-xs font-semibold text-casa-text-primary block mb-1">
+                  Available From (Tenant Availability Date)
+                </label>
+                <input
+                  type="date"
+                  value={formData.availableFrom}
+                  onChange={(e) => setFormData({ ...formData, availableFrom: e.target.value })}
+                  className="w-full px-3 py-2 text-xs bg-casa-canvas border border-casa-border-light rounded-xl text-casa-text-primary"
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Possession Status & Date for Sale */}
+          {formData.listingType === 'SALE' && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 p-3 bg-casa-subtle/50 rounded-xl border border-casa-border-light">
+              <div>
+                <label className="text-xs font-semibold text-casa-text-primary block mb-1">Possession Status</label>
+                <select
+                  value={formData.possessionStatus}
+                  onChange={(e) => setFormData({ ...formData, possessionStatus: e.target.value })}
+                  className="w-full px-3 py-2 text-xs bg-casa-canvas border border-casa-border-light rounded-xl text-casa-text-primary"
+                >
+                  <option value="READY_TO_MOVE">Ready to Move</option>
+                  <option value="UNDER_CONSTRUCTION">Under Construction</option>
+                  <option value="RESALE">Resale</option>
+                  <option value="NEW_LAUNCH">New Launch</option>
+                </select>
+              </div>
+              {formData.possessionStatus === 'UNDER_CONSTRUCTION' && (
+                <div>
+                  <label className="text-xs font-semibold text-casa-text-primary block mb-1">Expected Possession Date</label>
+                  <input
+                    type="date"
+                    value={formData.possessionDate}
+                    onChange={(e) => setFormData({ ...formData, possessionDate: e.target.value })}
+                    className="w-full px-3 py-2 text-xs bg-casa-canvas border border-casa-border-light rounded-xl text-casa-text-primary"
+                  />
+                </div>
+              )}
+            </div>
+          )}
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>

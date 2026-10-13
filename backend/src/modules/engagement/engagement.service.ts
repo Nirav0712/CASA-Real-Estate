@@ -839,12 +839,18 @@ export class EngagementService {
     });
 
     let propContext: any = null;
-    if (dto.propertyId && Types.ObjectId.isValid(dto.propertyId)) {
-      const property = await this.propertyModel.findById(dto.propertyId);
+    if (dto.propertyId) {
+      const property = await this.propertyModel.findOne({
+        $or: [
+          ...(Types.ObjectId.isValid(dto.propertyId) ? [{ _id: new Types.ObjectId(dto.propertyId) }] : []),
+          { id: dto.propertyId },
+          { slug: dto.propertyId },
+        ],
+      });
       if (property) {
         const titleEn = typeof property.title === 'string' ? property.title : property.title?.en || 'Property';
         propContext = {
-          propertyId: property._id,
+          propertyId: property.id || property._id?.toString(),
           title: titleEn,
           price: property.price?.amount,
           image: property.media?.thumbnailUrl || property.media?.coverImage,
@@ -862,6 +868,9 @@ export class EngagementService {
         lastSenderId: currentUserId,
         unreadCounts: new Map([[recipientId.toString(), dto.initialMessage ? 1 : 0]]),
       });
+    } else if (propContext && !conversation.propertyContext) {
+      conversation.propertyContext = propContext;
+      await conversation.save();
     }
 
     // If initial message provided, create message document
