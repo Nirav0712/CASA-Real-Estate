@@ -542,6 +542,27 @@ export class EntitlementsService implements OnModuleInit {
     return rolesWithCounts;
   }
 
+  async getPublicMarketplaceRoles(): Promise<any[]> {
+    const roles = await this.roleModel
+      .find({
+        isActive: true,
+        platformRole: PlatformRole.USER,
+      })
+      .sort({ isSystemRole: -1, name: 1 })
+      .lean()
+      .exec();
+
+    return roles.map((r) => ({
+      id: r._id.toString(),
+      name: r.name,
+      slug: r.slug,
+      description: r.description,
+      accountType: r.accountType,
+      isSystemRole: r.isSystemRole,
+      isActive: r.isActive,
+    }));
+  }
+
   async getRoleById(id: string): Promise<any> {
     let query: any = { slug: id };
     if (isValidObjectId(id)) {

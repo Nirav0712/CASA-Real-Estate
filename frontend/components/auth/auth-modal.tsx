@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { UserRole } from '@/types';
 import * as authService from '@/services/auth-service';
+import { getPublicRoles, PublicRoleItem } from '@/services/entitlements-service';
 
 export function AuthModal() {
   const {
@@ -43,7 +44,8 @@ export function AuthModal() {
   const [fullName, setFullName] = React.useState('');
   const [mobile, setMobile] = React.useState('');
   const [countryCode, setCountryCode] = React.useState('+91');
-  const [selectedRole, setSelectedRole] = React.useState<UserRole>('BUYER');
+  const [availableRoles, setAvailableRoles] = React.useState<PublicRoleItem[]>([]);
+  const [selectedRole, setSelectedRole] = React.useState<string>('buyer');
   const [agencyName, setAgencyName] = React.useState('');
   const [agreeTerms, setAgreeTerms] = React.useState(true);
 
@@ -83,6 +85,25 @@ export function AuthModal() {
       setShowPassword(false);
       setShowConfirmPassword(false);
     }
+  }, [isAuthModalOpen]);
+
+  // Load available marketplace roles (including custom roles created by admin)
+  React.useEffect(() => {
+    async function loadRoles() {
+      try {
+        const roles = await getPublicRoles();
+        if (roles && roles.length > 0) {
+          setAvailableRoles(roles);
+          // If selectedRole not set, initialize with first role or buyer
+          if (!selectedRole) {
+            setSelectedRole(roles[0].slug || roles[0].accountType || 'buyer');
+          }
+        }
+      } catch (err) {
+        console.error('Failed to load marketplace roles:', err);
+      }
+    }
+    loadRoles();
   }, [isAuthModalOpen]);
 
   const handleSignIn = async (e: React.FormEvent) => {
@@ -143,7 +164,14 @@ export function AuthModal() {
     setLoading(true);
     try {
       const fullMobile = `${countryCode}${cleanMobile}`;
-      const isProfessional = ['AGENT', 'BROKER', 'DEVELOPER'].includes(selectedRole);
+      const selectedRoleObj = availableRoles.find(
+        (r) =>
+          r.slug?.toLowerCase() === selectedRole?.toLowerCase() ||
+          r.accountType?.toLowerCase() === selectedRole?.toLowerCase() ||
+          r.id === selectedRole,
+      );
+      const accType = (selectedRoleObj?.accountType || selectedRole || '').toUpperCase();
+      const isProfessional = ['AGENT', 'BROKER', 'DEVELOPER'].includes(accType);
 
       const res = await register({
         fullName: fullName.trim(),
@@ -151,7 +179,8 @@ export function AuthModal() {
         mobile: fullMobile,
         password,
         confirmPassword,
-        role: selectedRole,
+        role: selectedRoleObj?.slug || selectedRole,
+        accountType: (selectedRoleObj?.accountType as any) || undefined,
         agencyName: isProfessional ? agencyName.trim() || undefined : undefined,
       });
 
@@ -210,6 +239,31 @@ export function AuthModal() {
     BROKER: 'Manage brokerage portfolio, commercial mandates, and verified commission deals.',
     DEVELOPER: 'Manage builder townships, project phases, digital floor plans, and direct buyer leads.',
   };
+
+  const getRoleEmoji = (slug?: string, accountType?: string | null) => {
+    const key = (slug || accountType || '').toLowerCase();
+    if (key.includes('tenant') || key.includes('renter')) return '🔑';
+    if (key.includes('owner') || key.includes('seller') || key.includes('host')) return '🏢';
+    if (key.includes('agent')) return '🤝';
+    if (key.includes('broker')) return '💼';
+    if (key.includes('developer') || key.includes('builder')) return '🏗️';
+    if (key.includes('investor') || key.includes('nri') || key.includes('buyer')) return '🏠';
+    if (key.includes('partner') || key.includes('channel')) return '🌐';
+    if (key.includes('advisor') || key.includes('consultant')) return '🧭';
+    return '✨';
+  };
+
+  const selectedRoleObj = availableRoles.find(
+    (r) =>
+      r.slug?.toLowerCase() === selectedRole?.toLowerCase() ||
+      r.accountType?.toLowerCase() === selectedRole?.toLowerCase() ||
+      r.id === selectedRole,
+  );
+  const activeRoleDescription =
+    selectedRoleObj?.description ||
+    roleDescriptions[selectedRole?.toUpperCase()] ||
+    roleDescriptions[selectedRoleObj?.accountType?.toUpperCase() || ''] ||
+    'Standard marketplace account with verified access.';
 
   return (
     <Modal
@@ -555,18 +609,32 @@ export function AuthModal() {
               </label>
               <select
                 value={selectedRole}
-                onChange={(e) => setSelectedRole(e.target.value as UserRole)}
+                onChange={(e) => setSelectedRole(e.target.value)}
                 className="w-full bg-casa-surface border border-casa-border-medium rounded-xl px-3 py-2.5 text-xs font-semibold text-casa-text-primary outline-none focus:ring-2 focus:ring-casa-brand/20 transition-all cursor-pointer"
               >
-                <option value="BUYER">🏠 Property Buyer (Buy Homes, Plots & Commercial)</option>
-                <option value="TENANT">🔑 Tenant (Rent Flats, Houses & Commercial Spaces)</option>
-                <option value="PROPERTY_OWNER">🏢 Property Owner / Seller (Sell or Lease Property)</option>
-                <option value="AGENT">🤝 Real Estate Agent (Independent Certified Agent)</option>
-                <option value="BROKER">💼 Real Estate Broker (Brokerage Firm / Mandates)</option>
-                <option value="DEVELOPER">🏗️ Property Developer / Builder (Townships & Projects)</option>
+                {availableRoles.length > 0 ? (
+                  availableRoles.map((r) => {
+                    const val = r.slug || r.accountType || r.id;
+                    const emoji = getRoleEmoji(r.slug, r.accountType);
+                    return (
+                      <option key={r.id || r.slug} value={val}>
+                        {emoji} {r.name} {!r.isSystemRole ? '★ (Custom Role)' : ''}
+                      </option>
+                    );
+                  })
+                ) : (
+                  <>
+                    <option value="buyer">🏠 Property Buyer (Buy Homes, Plots & Commercial)</option>
+                    <option value="tenant">🔑 Tenant (Rent Flats, Houses & Commercial Spaces)</option>
+                    <option value="property-owner">🏢 Property Owner / Seller (Sell or Lease Property)</option>
+                    <option value="agent">🤝 Real Estate Agent (Independent Certified Agent)</option>
+                    <option value="broker">💼 Real Estate Broker (Brokerage Firm / Mandates)</option>
+                    <option value="developer">🏗️ Property Developer / Builder (Townships & Projects)</option>
+                  </>
+                )}
               </select>
               <p className="text-[11px] text-casa-text-muted leading-relaxed">
-                {roleDescriptions[selectedRole] || ''}
+                {activeRoleDescription}
               </p>
             </div>
 

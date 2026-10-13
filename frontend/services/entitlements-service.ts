@@ -94,6 +94,30 @@ export async function getActivePackages(): Promise<PackagePlan[]> {
   return Array.isArray(result.data) ? result.data : [];
 }
 
+export interface PublicRoleItem {
+  id: string;
+  name: string;
+  slug: string;
+  description?: string;
+  accountType?: string | null;
+  isSystemRole?: boolean;
+}
+
+export async function getPublicRoles(): Promise<PublicRoleItem[]> {
+  const result = await fetchApi<PublicRoleItem[]>('/entitlements/roles');
+  if (!result.isBackendAvailable || result.error || !result.data) {
+    return [
+      { id: 'buyer', name: 'Property Buyer', slug: 'buyer', description: 'Buy Homes, Plots & Commercial', accountType: 'BUYER', isSystemRole: true },
+      { id: 'tenant', name: 'Tenant', slug: 'tenant', description: 'Rent Flats, Houses & Commercial Spaces', accountType: 'TENANT', isSystemRole: true },
+      { id: 'property-owner', name: 'Property Owner / Seller', slug: 'property-owner', description: 'Sell or Lease Property', accountType: 'PROPERTY_OWNER', isSystemRole: true },
+      { id: 'agent', name: 'Real Estate Agent', slug: 'agent', description: 'Independent Certified Agent', accountType: 'AGENT', isSystemRole: true },
+      { id: 'broker', name: 'Real Estate Broker', slug: 'broker', description: 'Brokerage Firm / Mandates', accountType: 'BROKER', isSystemRole: true },
+      { id: 'developer', name: 'Property Developer / Builder', slug: 'developer', description: 'Townships & Projects', accountType: 'DEVELOPER', isSystemRole: true },
+    ];
+  }
+  return Array.isArray(result.data) ? result.data : [];
+}
+
 export async function startTrial(packageId: string): Promise<{
   success: boolean;
   message: string;

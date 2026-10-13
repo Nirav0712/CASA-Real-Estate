@@ -52,62 +52,20 @@ export class RegisterDto {
   confirmPassword: string;
 
   @ApiPropertyOptional({
-    description: 'Public account category / role intent',
-    enum: [
-      UserRole.BUYER,
-      UserRole.TENANT,
-      UserRole.PROPERTY_OWNER,
-      UserRole.AGENT,
-      UserRole.BROKER,
-      UserRole.DEVELOPER,
-    ],
-    example: UserRole.BUYER,
+    description: 'Public account category / role intent or custom role slug',
+    example: 'buyer',
   })
   @IsOptional()
-  @IsEnum(
-    [
-      UserRole.BUYER,
-      UserRole.TENANT,
-      UserRole.PROPERTY_OWNER,
-      UserRole.AGENT,
-      UserRole.BROKER,
-      UserRole.DEVELOPER,
-    ],
-    {
-      message:
-        'Public registration allows only BUYER, TENANT, PROPERTY_OWNER, AGENT, BROKER, or DEVELOPER roles.',
-    },
-  )
-  role?: UserRole;
+  @IsString({ message: 'Role must be a valid role identifier' })
+  role?: string;
 
   @ApiPropertyOptional({
-    description: 'Alternative account type field',
-    enum: [
-      AccountType.BUYER,
-      AccountType.TENANT,
-      AccountType.PROPERTY_OWNER,
-      AccountType.AGENT,
-      AccountType.BROKER,
-      AccountType.DEVELOPER,
-    ],
-    example: AccountType.BUYER,
+    description: 'Alternative account type field or custom role identifier',
+    example: 'BUYER',
   })
   @IsOptional()
-  @IsEnum(
-    [
-      AccountType.BUYER,
-      AccountType.TENANT,
-      AccountType.PROPERTY_OWNER,
-      AccountType.AGENT,
-      AccountType.BROKER,
-      AccountType.DEVELOPER,
-    ],
-    {
-      message:
-        'Account category must be BUYER, TENANT, PROPERTY_OWNER, AGENT, BROKER, or DEVELOPER.',
-    },
-  )
-  accountType?: AccountType;
+  @IsString({ message: 'Account type must be a valid identifier' })
+  accountType?: string;
 
   @ApiPropertyOptional({
     description: 'Agency or company name (for Agents, Brokers, and Developers)',

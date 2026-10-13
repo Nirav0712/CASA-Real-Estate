@@ -1145,8 +1145,47 @@ export class AuthService implements OnModuleInit {
     const fullName = dto.fullName.trim();
     const now = new Date();
 
-    // Security: Do not allow public registration to set administrative roles
-    const safeRole = dto.role || (dto.accountType as any) || UserRole.BUYER;
+    // Security & Role mapping: Support both standard system roles and dynamic custom roles
+    const rawRole = dto.role || (dto.accountType as any) || UserRole.BUYER;
+    let safeRole = rawRole;
+    let customRoleId: string | null = null;
+    let dynamicPermissions: string[] = [];
+    let customAccountType: AccountType | null = null;
+
+    if (this.isDbConnected()) {
+      try {
+        const rolesCol = this.userModel.db.collection('roles');
+        const matchedRole = await rolesCol.findOne({
+          $or: [
+            { slug: String(rawRole).toLowerCase().trim() },
+            { name: new RegExp(`^${String(rawRole).trim()}$`, 'i') },
+          ],
+          isActive: true,
+        });
+
+        if (matchedRole) {
+          if (
+            ['SUPER_ADMIN', 'ADMIN', 'MODERATOR'].includes(matchedRole.platformRole) ||
+            ['SUPER_ADMIN', 'ADMIN', 'MODERATOR'].includes(matchedRole.slug?.toUpperCase())
+          ) {
+            throw new BadRequestException('Administrative roles cannot be registered through public endpoints.');
+          }
+
+          if (!matchedRole.isSystemRole) {
+            customRoleId = matchedRole._id.toString();
+            customAccountType = matchedRole.accountType || AccountType.BUYER;
+            safeRole = matchedRole.accountType || UserRole.BUYER;
+            dynamicPermissions = Array.isArray(matchedRole.permissions) ? matchedRole.permissions : [];
+          } else {
+            safeRole = matchedRole.accountType || matchedRole.slug?.toUpperCase() || UserRole.BUYER;
+          }
+        }
+      } catch (err: any) {
+        if (err instanceof BadRequestException) throw err;
+        this.logger.warn(`Could not resolve role from DB: ${err.message}`);
+      }
+    }
+
     if (
       [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.MODERATOR, 'SUPER_ADMIN', 'ADMIN', 'MODERATOR'].includes(
         safeRole as any,
@@ -1155,11 +1194,14 @@ export class AuthService implements OnModuleInit {
       throw new BadRequestException('Administrative roles cannot be registered through public endpoints.');
     }
 
-    const norm = normalizeUserRoleModel({ role: safeRole });
+    const norm = normalizeUserRoleModel({ role: safeRole, accountType: customAccountType });
     const finalPlatformRole = PlatformRole.USER;
-    const finalAccountType = norm.accountType;
+    const finalAccountType = customAccountType || norm.accountType;
     const finalRole = norm.role;
-    const finalPermissions = this.getDefaultPermissions(finalPlatformRole, finalAccountType);
+    const finalPermissions =
+      dynamicPermissions.length > 0
+        ? dynamicPermissions
+        : this.getDefaultPermissions(finalPlatformRole, finalAccountType);
 
     // Generate single-use email verification token
     const rawVerificationToken = crypto.randomBytes(32).toString('hex');
@@ -1191,6 +1233,11 @@ export class AuthService implements OnModuleInit {
           existingByMobile.passwordHash = passwordHash;
           existingByMobile.isEmailVerified = true;
           existingByMobile.status = AccountStatus.ACTIVE;
+          existingByMobile.platformRole = finalPlatformRole;
+          existingByMobile.accountType = finalAccountType;
+          existingByMobile.role = finalRole;
+          existingByMobile.permissions = finalPermissions;
+          existingByMobile.customRoleId = customRoleId || null;
           existingByMobile.emailVerificationTokenHash = undefined;
           existingByMobile.emailVerificationExpiresAt = undefined;
           await existingByMobile.save();
@@ -1209,6 +1256,7 @@ export class AuthService implements OnModuleInit {
             accountType: finalAccountType,
             role: finalRole,
             permissions: finalPermissions,
+            customRoleId: customRoleId || null,
             status: AccountStatus.ACTIVE,
             agencyName: dto.agencyName?.trim() || undefined,
           });

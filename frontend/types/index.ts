@@ -20,7 +20,8 @@ export type UserRole =
   | 'TENANT'
   | 'PURCHASER'
   | 'VERIFIED_AGENT'
-  | 'GUEST';
+  | 'GUEST'
+  | (string & {});
 
 export type AccountStatus =
   | 'ACTIVE'
@@ -67,8 +68,8 @@ export interface RegisterData {
   mobile: string;
   password: string;
   confirmPassword: string;
-  role?: UserRole;
-  accountType?: AccountType;
+  role?: UserRole | string;
+  accountType?: AccountType | string;
   agencyName?: string;
 }
 

@@ -24,6 +24,12 @@ export class EntitlementsClientController {
     return all.filter((p) => p.isActive);
   }
 
+  @Get('roles')
+  @ApiOperation({ summary: 'Get active marketplace account roles for registration' })
+  async getPublicRoles(): Promise<any[]> {
+    return this.entitlementsService.getPublicMarketplaceRoles();
+  }
+
   @Get('me')
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Get current user entitlements, permissions, limits, and usage' })
