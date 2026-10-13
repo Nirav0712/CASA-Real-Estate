@@ -59,10 +59,17 @@ export class EntitlementsAdminController {
   }
 
   @Delete('roles/:id')
-  @Roles(UserRole.SUPER_ADMIN)
-  @ApiOperation({ summary: 'Delete custom role (protected for system roles)' })
+  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN)
+  @ApiOperation({ summary: 'Delete role (protected for core super admin)' })
   deleteRole(@Param('id') id: string, @Req() req: any): Promise<any> {
     return this.entitlementsService.deleteRole(id, req.user);
+  }
+
+  @Post('roles/bulk-delete')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN)
+  @ApiOperation({ summary: 'Bulk delete selected roles' })
+  bulkDeleteRoles(@Body('ids') ids: string[], @Req() req: any): Promise<any> {
+    return this.entitlementsService.bulkDeleteRoles(ids, req.user);
   }
 
   @Post('roles/:id/duplicate')

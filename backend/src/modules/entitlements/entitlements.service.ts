@@ -178,6 +178,126 @@ export class EntitlementsService implements OnModuleInit {
           },
           permissions: [Permission.PROPERTY_CREATE, Permission.PROPERTY_EDIT, Permission.PROPERTY_PUBLISH, Permission.PROPERTY_FEATURE, Permission.PROPERTY_CONTACT_VIEW, Permission.LEAD_VIEW, Permission.LEAD_EDIT, Permission.LEAD_EXPORT, Permission.CRM_VIEW, Permission.CRM_CREATE, Permission.CRM_EDIT, Permission.ANALYTICS_ADVANCED, Permission.PROMOTION_CREATE, Permission.CHAT_START],
         },
+        {
+          name: '1 Month Standard Plan',
+          slug: 'plan-1-month',
+          description: 'Full marketplace access for 30 days. Perfect for monthly active brokers and agents.',
+          targetAccountTypes: [AccountType.AGENT, AccountType.BROKER, AccountType.PROPERTY_OWNER, AccountType.BUYER],
+          price: 499,
+          currency: 'INR',
+          billingPeriod: BillingPeriod.ONE_MONTH,
+          durationDays: 30,
+          isActive: true,
+          isDefault: false,
+          features: ['30 Days Full Access', '25 Active Listings', '100 Verified Buyer Leads', 'Unlimited Property Views', 'Standard CRM Pipeline', 'Direct Buyer Dialing'],
+          limits: {
+            propertyViews: -1,
+            propertyListings: 25,
+            savedProperties: -1,
+            savedSearches: -1,
+            monthlyLeads: 100,
+            enquiries: -1,
+            chats: -1,
+            teamMembers: 1,
+          },
+          permissions: [Permission.PROPERTY_CREATE, Permission.PROPERTY_EDIT, Permission.PROPERTY_PUBLISH, Permission.PROPERTY_CONTACT_VIEW, Permission.LEAD_VIEW, Permission.CHAT_START],
+        },
+        {
+          name: '60 Days Bi-Monthly Plan',
+          slug: 'plan-60-days',
+          description: 'Extended 60-day campaign plan with priority discovery and lead generation.',
+          targetAccountTypes: [AccountType.AGENT, AccountType.BROKER, AccountType.DEVELOPER, AccountType.PROPERTY_OWNER],
+          price: 899,
+          currency: 'INR',
+          billingPeriod: BillingPeriod.SIXTY_DAYS,
+          durationDays: 60,
+          isActive: true,
+          isDefault: false,
+          features: ['60 Days Full Access', '50 Active Listings', '250 Buyer Leads', 'Unlimited Property Views', 'Featured Listings Boost', 'Priority Support Desk'],
+          limits: {
+            propertyViews: -1,
+            propertyListings: 50,
+            savedProperties: -1,
+            savedSearches: -1,
+            monthlyLeads: 250,
+            enquiries: -1,
+            chats: -1,
+            teamMembers: 2,
+          },
+          permissions: [Permission.PROPERTY_CREATE, Permission.PROPERTY_EDIT, Permission.PROPERTY_PUBLISH, Permission.PROPERTY_FEATURE, Permission.PROPERTY_CONTACT_VIEW, Permission.LEAD_VIEW, Permission.CHAT_START],
+        },
+        {
+          name: '90 Days Quarterly Plan',
+          slug: 'plan-90-days',
+          description: 'Quarterly deal closing accelerator with 90 days continuous marketing.',
+          targetAccountTypes: [AccountType.AGENT, AccountType.BROKER, AccountType.DEVELOPER],
+          price: 1299,
+          currency: 'INR',
+          billingPeriod: BillingPeriod.NINETY_DAYS,
+          durationDays: 90,
+          isActive: true,
+          isDefault: false,
+          features: ['90 Days Full Access', '75 Active Listings', '400 Buyer Leads', 'Unlimited Views & Saves', 'CRM Leads Export (CSV)', 'Priority Search Ranking'],
+          limits: {
+            propertyViews: -1,
+            propertyListings: 75,
+            savedProperties: -1,
+            savedSearches: -1,
+            monthlyLeads: 400,
+            enquiries: -1,
+            chats: -1,
+            teamMembers: 3,
+          },
+          permissions: [Permission.PROPERTY_CREATE, Permission.PROPERTY_EDIT, Permission.PROPERTY_PUBLISH, Permission.PROPERTY_FEATURE, Permission.PROPERTY_CONTACT_VIEW, Permission.LEAD_VIEW, Permission.LEAD_EXPORT, Permission.CHAT_START],
+        },
+        {
+          name: '6 Months Half-Yearly Plan',
+          slug: 'plan-6-months',
+          description: 'Heavy duty 180-day growth package for professional real estate businesses.',
+          targetAccountTypes: [AccountType.AGENT, AccountType.BROKER, AccountType.DEVELOPER],
+          price: 2399,
+          currency: 'INR',
+          billingPeriod: BillingPeriod.SIX_MONTHS,
+          durationDays: 180,
+          isActive: true,
+          isDefault: false,
+          features: ['180 Days Full Access', '150 Active Listings', '1,000 Verified Leads', 'Unlimited Property Views', 'Team Collaboration (5 Seats)', 'Advanced BI Analytics'],
+          limits: {
+            propertyViews: -1,
+            propertyListings: 150,
+            savedProperties: -1,
+            savedSearches: -1,
+            monthlyLeads: 1000,
+            enquiries: -1,
+            chats: -1,
+            teamMembers: 5,
+          },
+          permissions: [Permission.PROPERTY_CREATE, Permission.PROPERTY_EDIT, Permission.PROPERTY_PUBLISH, Permission.PROPERTY_FEATURE, Permission.PROPERTY_CONTACT_VIEW, Permission.LEAD_VIEW, Permission.LEAD_EXPORT, Permission.ANALYTICS_ADVANCED, Permission.CHAT_START],
+        },
+        {
+          name: '1 Year Annual Enterprise Plan',
+          slug: 'plan-1-year',
+          description: 'Full 365-day annual corporate package with maximum inventory and unlimited discovery.',
+          targetAccountTypes: [AccountType.AGENT, AccountType.BROKER, AccountType.DEVELOPER],
+          price: 4499,
+          currency: 'INR',
+          billingPeriod: BillingPeriod.ONE_YEAR,
+          durationDays: 365,
+          isActive: true,
+          isDefault: false,
+          features: ['365 Days Full Access', 'Unlimited Active Listings', '3,000 Verified Leads', 'Unlimited Views & Enquiries', '10 Team Sub-Accounts', 'Dedicated Relationship Manager'],
+          limits: {
+            propertyViews: -1,
+            propertyListings: -1,
+            savedProperties: -1,
+            savedSearches: -1,
+            monthlyLeads: 3000,
+            enquiries: -1,
+            chats: -1,
+            teamMembers: 10,
+          },
+          permissions: [Permission.PROPERTY_CREATE, Permission.PROPERTY_EDIT, Permission.PROPERTY_PUBLISH, Permission.PROPERTY_FEATURE, Permission.PROPERTY_CONTACT_VIEW, Permission.LEAD_VIEW, Permission.LEAD_EXPORT, Permission.ANALYTICS_ADVANCED, Permission.PROMOTION_CREATE, Permission.CHAT_START],
+        },
       ];
 
       for (const pkg of defaultPackages) {
@@ -530,13 +650,8 @@ export class EntitlementsService implements OnModuleInit {
       throw new NotFoundException(`Role with ID "${id}" was not found.`);
     }
 
-    if (role.isSystemRole) {
-      throw new ForbiddenException('Protected system roles cannot be deleted.');
-    }
-
-    const assignedCount = await this.userModel.countDocuments({ customRoleId: id });
-    if (assignedCount > 0) {
-      throw new BadRequestException(`Cannot delete role: ${assignedCount} active users are currently assigned to this role.`);
+    if (role.slug === 'super-admin' || role.permissions.includes('*')) {
+      throw new ForbiddenException('Core Super Admin role is protected and cannot be deleted.');
     }
 
     await this.roleModel.findByIdAndDelete(id);
@@ -550,9 +665,50 @@ export class EntitlementsService implements OnModuleInit {
       targetEntityId: id,
       metadata: { roleId: id, name: role.name },
       timestamp: new Date(),
-    });
+    }).catch(() => {});
 
     return { success: true, message: `Role "${role.name}" deleted successfully.` };
+  }
+
+  async bulkDeleteRoles(ids: string[], actorUser: any): Promise<any> {
+    if (!Array.isArray(ids) || ids.length === 0) {
+      throw new BadRequestException('No role IDs provided for deletion.');
+    }
+
+    let deletedCount = 0;
+    const errors: string[] = [];
+
+    for (const id of ids) {
+      try {
+        const role = await this.roleModel.findById(id);
+        if (!role) continue;
+        if (role.slug === 'super-admin' || role.permissions.includes('*')) {
+          errors.push(`Role "${role.name}" is protected and cannot be deleted.`);
+          continue;
+        }
+        await this.roleModel.findByIdAndDelete(id);
+        deletedCount++;
+        await this.auditLogModel.create({
+          action: 'ROLE_DELETED',
+          actorUserId: actorUser?.id || 'SYSTEM',
+          actorName: actorUser?.name || 'Administrator',
+          actorRole: actorUser?.platformRole || actorUser?.role || 'SUPER_ADMIN',
+          targetEntity: 'ROLE',
+          targetEntityId: id,
+          metadata: { roleId: id, name: role.name },
+          timestamp: new Date(),
+        }).catch(() => {});
+      } catch (err: any) {
+        errors.push(`Role ${id}: ${err.message}`);
+      }
+    }
+
+    return {
+      success: true,
+      message: `Deleted ${deletedCount} role(s) successfully.${errors.length ? ' Some protected roles were skipped.' : ''}`,
+      deletedCount,
+      errors,
+    };
   }
 
   async duplicateRole(id: string, actorUser: any): Promise<any> {
@@ -876,6 +1032,15 @@ export class EntitlementsService implements OnModuleInit {
       dashboardConfig: finalDashboardConfig,
       package: packageDoc ? { id: packageDoc._id.toString(), name: packageDoc.name, slug: packageDoc.slug, price: packageDoc.price, billingPeriod: packageDoc.billingPeriod } : null,
       subscription: subscriptionDoc ? { id: subscriptionDoc._id.toString(), status: subscriptionDoc.status, endDate: subscriptionDoc.endDate } : null,
+      trial: {
+        isTrialActive: Boolean(user.trialExpiresAt && new Date() <= new Date(user.trialExpiresAt)),
+        isTrialExpired: Boolean(user.trialExpiresAt && new Date() > new Date(user.trialExpiresAt)),
+        trialExpiresAt: user.trialExpiresAt || null,
+        daysRemaining: user.trialExpiresAt
+          ? Math.max(0, Math.ceil((new Date(user.trialExpiresAt).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
+          : 0,
+        trialPackageId: user.trialPackageId || null,
+      },
     };
   }
 
@@ -1239,4 +1404,68 @@ export class EntitlementsService implements OnModuleInit {
       contactMessage: 'Login or upgrade package to view owner and agent contact details.',
     };
   }
+
+  // ==========================================
+  // 9. THREE-DAY PLAN TRIAL ACTIVATION
+  // ==========================================
+
+  async startTrial(userId: string, packageId: string) {
+    const user = await this.userModel.findById(userId);
+    if (!user) throw new NotFoundException('User not found.');
+
+    const pkg = await this.packageModel.findById(packageId);
+    if (!pkg) throw new NotFoundException('Selected pricing plan was not found.');
+    if (!pkg.isActive) throw new BadRequestException('This plan is currently not active.');
+
+    const trialDays = 3;
+    const now = new Date();
+    const trialExpiresAt = new Date(now.getTime() + trialDays * 24 * 60 * 60 * 1000);
+
+    user.activePackageId = pkg._id.toString();
+    user.trialPackageId = pkg._id.toString();
+    user.trialStartedAt = now;
+    user.trialExpiresAt = trialExpiresAt;
+    user.isTrialActive = true;
+    await user.save();
+
+    // Create or update 3-day active trial subscription record
+    await this.subscriptionModel.findOneAndUpdate(
+      { userId },
+      {
+        userId,
+        plan: pkg.name || 'FREE_TRIAL',
+        status: 'TRIAL',
+        startDate: now,
+        endDate: trialExpiresAt,
+        metadata: {
+          packageId: pkg._id.toString(),
+          packageName: pkg.name,
+          trialDays,
+          isTrial: true,
+        },
+      },
+      { upsert: true, new: true },
+    );
+
+    this.logger.log(
+      `🎉 3-Day Free Trial activated for user ${user.name} (${user.mobile}) on package "${pkg.name}". Expires: ${trialExpiresAt.toISOString()}`,
+    );
+
+    const entitlements = await this.resolveUserEntitlements(user);
+
+    return {
+      success: true,
+      message: `3-Day Free Trial activated for "${pkg.name}". You now have full platform access!`,
+      trialExpiresAt: trialExpiresAt.toISOString(),
+      daysRemaining: 3,
+      package: {
+        id: pkg._id.toString(),
+        name: pkg.name,
+        price: pkg.price,
+        limits: pkg.limits,
+      },
+      entitlements,
+    };
+  }
 }
+

@@ -34,6 +34,7 @@ import {
   activateAdminLocation,
   deactivateAdminLocation,
   deleteAdminLocation,
+  seedWorldLocations,
 } from '@/services/location-service';
 
 export default function AdminLocationsPage() {
@@ -43,7 +44,9 @@ export default function AdminLocationsPage() {
   const [viewMode, setViewMode] = React.useState<'tree' | 'table'>('tree');
   const [searchQuery, setSearchQuery] = React.useState<string>('');
   const [selectedType, setSelectedType] = React.useState<string>('ALL');
+  const [selectedCountry, setSelectedCountry] = React.useState<string>('ALL');
   const [selectedStatus, setSelectedStatus] = React.useState<string>('ALL');
+  const [syncingWorld, setSyncingWorld] = React.useState<boolean>(false);
 
   // Expanded nodes set for tree
   const [expandedNodes, setExpandedNodes] = React.useState<Set<string>>(new Set());
@@ -89,6 +92,7 @@ export default function AdminLocationsPage() {
         getAdminLocations({
           q: searchQuery || undefined,
           type: selectedType !== 'ALL' ? (selectedType as LocationType) : undefined,
+          countryCode: selectedCountry !== 'ALL' ? selectedCountry : undefined,
           isActive: selectedStatus !== 'ALL' ? selectedStatus === 'ACTIVE' : undefined,
           limit: 100,
         }),
@@ -103,12 +107,15 @@ export default function AdminLocationsPage() {
 
       if (treeRes.tree && treeRes.tree.length > 0) {
         setTree(treeRes.tree);
-        // Expand root and state nodes by default
+        // Expand root countries, states, and cities by default for rich visibility
         const autoExpanded = new Set<string>();
         treeRes.tree.forEach((country) => {
           autoExpanded.add(country.id || (country as any)._id);
           country.children?.forEach((st) => {
             autoExpanded.add(st.id || (st as any)._id);
+            st.children?.forEach((city) => {
+              autoExpanded.add(city.id || (city as any)._id);
+            });
           });
         });
         setExpandedNodes(autoExpanded);
@@ -118,7 +125,7 @@ export default function AdminLocationsPage() {
     } finally {
       setLoading(false);
     }
-  }, [searchQuery, selectedType, selectedStatus]);
+  }, [searchQuery, selectedType, selectedCountry, selectedStatus]);
 
   React.useEffect(() => {
     loadData();
@@ -335,6 +342,38 @@ export default function AdminLocationsPage() {
     }
   };
 
+  // Memoized tree filtered by Country
+  const displayedTree = React.useMemo(() => {
+    if (selectedCountry === 'ALL') return tree;
+    return tree.filter(
+      (node) =>
+        node.countryCode === selectedCountry ||
+        node.slug?.toLowerCase().includes(selectedCountry.toLowerCase()),
+    );
+  }, [tree, selectedCountry]);
+
+  // Level Icon Helper
+  const getLevelIcon = (type: LocationType) => {
+    switch (type) {
+      case 'COUNTRY':
+        return '🌐';
+      case 'STATE':
+        return '🏛️';
+      case 'DISTRICT':
+        return '🗺️';
+      case 'CITY':
+        return '🏙️';
+      case 'LOCALITY':
+        return '📍';
+      case 'SUB_LOCALITY':
+        return '🧭';
+      case 'PINCODE':
+        return '📮';
+      default:
+        return '📍';
+    }
+  };
+
   // Render Tree Node recursively
   const renderTreeNode = (node: LocationRecord, depth = 0) => {
     const id = node.id || (node as any)._id;
@@ -365,7 +404,9 @@ export default function AdminLocationsPage() {
               <span className="w-6 inline-block" />
             )}
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center flex-wrap gap-2">
+              <span className="text-base select-none">{getLevelIcon(node.type)}</span>
+
               <span className="text-sm font-bold text-casa-text-primary tracking-tight">
                 {node.name}
               </span>
@@ -384,9 +425,16 @@ export default function AdminLocationsPage() {
                 {node.type}
               </span>
 
+              {node.countryCode && node.type === 'COUNTRY' && (
+                <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-600 dark:text-purple-300 border border-purple-500/20">
+                  {node.countryCode}
+                </span>
+              )}
+
               {node.pincode && (
-                <span className="text-[10px] font-mono font-medium px-2 py-0.5 rounded bg-casa-subtle text-casa-text-secondary border border-casa-border-light">
-                  📮 {node.pincode}
+                <span className="text-[11px] font-mono font-bold px-2.5 py-0.5 rounded-lg bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/25 flex items-center gap-1">
+                  <span>📮 Pincode:</span>
+                  <span className="underline decoration-emerald-500/40">{node.pincode}</span>
                 </span>
               )}
 
@@ -490,7 +538,7 @@ export default function AdminLocationsPage() {
           </div>
         </div>
 
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center flex-wrap gap-2.5">
           <button
             type="button"
             onClick={() => loadData()}
@@ -498,6 +546,34 @@ export default function AdminLocationsPage() {
           >
             <RotateCcw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
             Refresh
+          </button>
+
+          <button
+            type="button"
+            disabled={syncingWorld}
+            onClick={async () => {
+              try {
+                setSyncingWorld(true);
+                setActionError(null);
+                const res = await seedWorldLocations();
+                if (res.error) {
+                  setActionError(res.error);
+                } else {
+                  setActionSuccess(
+                    `Worldwide locations successfully synchronized! ${res.data?.totalNodes ?? ''} locations active across global real estate markets.`
+                  );
+                  await loadData();
+                }
+              } catch (err: any) {
+                setActionError(err.message || 'Failed to sync world locations.');
+              } finally {
+                setSyncingWorld(false);
+              }
+            }}
+            className="px-3.5 py-2 text-xs font-bold rounded-xl bg-purple-600 hover:bg-purple-700 text-white shadow-xs transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+          >
+            <Globe2 className={`w-3.5 h-3.5 ${syncingWorld ? 'animate-spin' : ''}`} />
+            {syncingWorld ? 'Syncing World...' : 'Sync World Locations'}
           </button>
 
           <button
@@ -545,14 +621,32 @@ export default function AdminLocationsPage() {
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search by city, locality, alias, or pincode (e.g. Satellite, Amdavad, 380015)..."
+              placeholder="Search worldwide by city, locality, alias, or pincode (e.g. Satellite, Beverly Hills, 380015, 90210)..."
               className="w-full pl-9 pr-3 py-2 text-xs bg-casa-canvas border border-casa-border-light rounded-xl text-casa-text-primary focus:outline-none focus:ring-2 focus:ring-casa-brand/20 focus:border-casa-brand"
             />
             <Search className="w-4 h-4 text-casa-text-muted absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
           </div>
 
-          {/* Level Filter */}
-          <div className="flex items-center gap-2">
+          {/* Filter Dropdowns */}
+          <div className="flex items-center flex-wrap gap-2">
+            {/* Country Filter */}
+            <select
+              value={selectedCountry}
+              onChange={(e) => setSelectedCountry(e.target.value)}
+              className="px-3 py-2 text-xs bg-casa-canvas border border-casa-border-light rounded-xl text-casa-text-primary font-medium"
+            >
+              <option value="ALL">🌐 All Countries (World)</option>
+              <option value="IN">🇮🇳 India (IN)</option>
+              <option value="AE">🇦🇪 United Arab Emirates (AE)</option>
+              <option value="US">🇺🇸 United States (US)</option>
+              <option value="GB">🇬🇧 United Kingdom (GB)</option>
+              <option value="CA">🇨🇦 Canada (CA)</option>
+              <option value="SA">🇸🇦 Saudi Arabia (SA)</option>
+              <option value="SG">🇸🇬 Singapore (SG)</option>
+              <option value="AU">🇦🇺 Australia (AU)</option>
+            </select>
+
+            {/* Level Filter */}
             <select
               value={selectedType}
               onChange={(e) => setSelectedType(e.target.value)}
@@ -622,7 +716,7 @@ export default function AdminLocationsPage() {
           <div className="flex items-center justify-between pb-3 border-b border-casa-border-light">
             <h2 className="text-sm font-bold text-casa-text-primary flex items-center gap-2">
               <Layers className="w-4 h-4 text-casa-brand" />
-              <span>Geographic Hierarchy Structure ({tree.length} Root Nodes)</span>
+              <span>Geographic Hierarchy Structure ({displayedTree.length} Countries / Roots)</span>
             </h2>
             <div className="flex items-center gap-2">
               <button
@@ -635,7 +729,7 @@ export default function AdminLocationsPage() {
                       if (n.children) collect(n.children);
                     });
                   };
-                  collect(tree);
+                  collect(displayedTree);
                   setExpandedNodes(all);
                 }}
                 className="text-[11px] font-semibold text-casa-brand hover:underline cursor-pointer"
@@ -653,12 +747,27 @@ export default function AdminLocationsPage() {
             </div>
           </div>
 
-          {tree.length === 0 ? (
-            <div className="py-12 text-center text-casa-text-muted text-xs">
-              No location hierarchy found. Click "Add New Location" to seed the root country node.
+          {displayedTree.length === 0 ? (
+            <div className="py-12 text-center text-casa-text-muted text-xs space-y-2">
+              <p>No location hierarchy matching your current filter.</p>
+              <button
+                type="button"
+                onClick={async () => {
+                  setSyncingWorld(true);
+                  try {
+                    await seedWorldLocations();
+                    await loadData();
+                  } finally {
+                    setSyncingWorld(false);
+                  }
+                }}
+                className="px-3 py-1.5 rounded-lg bg-purple-600 text-white text-xs font-bold hover:bg-purple-700 cursor-pointer"
+              >
+                Seed Worldwide Locations
+              </button>
             </div>
           ) : (
-            <div className="space-y-1 pt-1">{tree.map((rootNode) => renderTreeNode(rootNode, 0))}</div>
+            <div className="space-y-1 pt-1">{displayedTree.map((rootNode) => renderTreeNode(rootNode, 0))}</div>
           )}
         </Card>
       ) : (

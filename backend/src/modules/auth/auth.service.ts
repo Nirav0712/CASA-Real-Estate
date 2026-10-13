@@ -1724,6 +1724,10 @@ export class AuthService implements OnModuleInit {
       hasPassword: !!user.passwordHash,
       agencyName: user.agencyName,
       avatar: user.avatar,
+      trialStartedAt: user.trialStartedAt || null,
+      trialExpiresAt: user.trialExpiresAt || null,
+      trialPackageId: user.trialPackageId || null,
+      isTrialActive: Boolean(user.trialExpiresAt && new Date() <= new Date(user.trialExpiresAt)),
     };
   }
 }

@@ -38,11 +38,19 @@ export class LocationsService implements OnModuleInit {
   ) {}
 
   async onModuleInit() {
-    try {
-      await this.seedInitialLocations();
-    } catch (err: any) {
-      this.logger.warn(`Initial location seed skipped or deferred: ${err.message}`);
-    }
+    // Run initial location sync non-blocking so NestJS opens port 5000 immediately
+    setImmediate(async () => {
+      try {
+        const count = await this.locationModel.countDocuments();
+        if (count >= 40) {
+          this.logger.log(`Location hierarchy already populated (${count} nodes). Boot seed skipped.`);
+          return;
+        }
+        await this.seedWorldLocations();
+      } catch (err: any) {
+        this.logger.warn(`Initial location seed deferred: ${err.message}`);
+      }
+    });
   }
 
   // ---------------------------------------------------------------------------
@@ -562,7 +570,7 @@ export class LocationsService implements OnModuleInit {
     }
 
     const page = Number(dto.page) || 1;
-    const limit = Math.min(Number(dto.limit) || 20, 100);
+    const limit = Math.min(Number(dto.limit) || 20, 500);
     const skip = (page - 1) * limit;
 
     const [items, total] = await Promise.all([
@@ -752,11 +760,10 @@ export class LocationsService implements OnModuleInit {
   // SEED INITIAL LOCATIONS (IDEMPOTENT)
   // ---------------------------------------------------------------------------
   async seedInitialLocations(): Promise<void> {
-    const hasAhmedabad = await this.locationModel.findOne({ slug: 'ahmedabad' });
-    if (hasAhmedabad) {
-      return; // Already populated
-    }
+    await this.seedWorldLocations();
+  }
 
+  private async legacySeed(): Promise<void> {
     this.logger.log('Seeding initial location hierarchy (India, Gujarat, UP, Maharashtra, Karnataka)...');
 
     // 1. Country: India
@@ -1386,6 +1393,1310 @@ export class LocationsService implements OnModuleInit {
     }
 
     this.logger.log('Initial location hierarchy seeded successfully with global micro-markets.');
+  }
+
+  // ---------------------------------------------------------------------------
+  // HELPER TO SAFELY ENSURE LOCATION NODE (IDEMPOTENT & RETRY-SAFE)
+  // ---------------------------------------------------------------------------
+  private async ensureLocationNode(data: {
+    name: string;
+    slug: string;
+    type: LocationType;
+    parentId?: any;
+    ancestorIds?: any[];
+    countryCode?: string;
+    stateCode?: string;
+    districtCode?: string;
+    cityCode?: string;
+    pincode?: string;
+    latitude?: number;
+    longitude?: number;
+    localizedNames?: Record<string, string>;
+    aliases?: string[];
+    isActive?: boolean;
+    isFeatured?: boolean;
+    sortOrder?: number;
+  }): Promise<LocationDocument> {
+    const orConditions: any[] = [{ slug: data.slug }];
+    if (data.type === LocationType.COUNTRY) {
+      if (data.countryCode) orConditions.push({ countryCode: data.countryCode.toUpperCase() });
+      orConditions.push({ name: new RegExp(`^${data.name.trim()}$`, 'i'), type: LocationType.COUNTRY });
+    } else {
+      orConditions.push({
+        name: new RegExp(`^${data.name.trim()}$`, 'i'),
+        parentId: data.parentId || null,
+        type: data.type,
+      });
+    }
+
+    let existing = await this.locationModel.findOne({ $or: orConditions });
+    if (existing) {
+      const updates: any = {};
+      if (data.pincode && existing.pincode !== data.pincode) updates.pincode = data.pincode;
+      if (data.countryCode && !existing.countryCode) updates.countryCode = data.countryCode;
+      if (data.stateCode && !existing.stateCode) updates.stateCode = data.stateCode;
+      if (data.cityCode && !existing.cityCode) updates.cityCode = data.cityCode;
+      if (data.localizedNames && (!existing.localizedNames || Object.keys(existing.localizedNames).length === 0)) {
+        updates.localizedNames = data.localizedNames;
+      }
+      if (data.aliases && data.aliases.length > 0 && (!existing.aliases || existing.aliases.length === 0)) {
+        updates.aliases = data.aliases;
+      }
+      if (Object.keys(updates).length > 0) {
+        await this.locationModel.updateOne({ _id: existing._id }, { $set: updates });
+        existing = await this.locationModel.findById(existing._id);
+      }
+      return existing!;
+    }
+
+    const geo =
+      data.latitude !== undefined && data.longitude !== undefined
+        ? { type: 'Point', coordinates: [data.longitude, data.latitude] }
+        : undefined;
+
+    return await this.locationModel.create({
+      name: data.name,
+      slug: data.slug,
+      type: data.type,
+      parentId: data.parentId || undefined,
+      ancestorIds: data.ancestorIds || [],
+      countryCode: data.countryCode?.toUpperCase(),
+      stateCode: data.stateCode?.toUpperCase(),
+      districtCode: data.districtCode,
+      cityCode: data.cityCode,
+      pincode: data.pincode?.trim(),
+      latitude: data.latitude,
+      longitude: data.longitude,
+      geo,
+      aliases: data.aliases || [],
+      localizedNames: data.localizedNames || { en: data.name },
+      isActive: data.isActive !== undefined ? data.isActive : true,
+      isFeatured: data.isFeatured !== undefined ? data.isFeatured : false,
+      sortOrder: data.sortOrder || 0,
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // SEED COMPREHENSIVE WORLDWIDE LOCATIONS
+  // Countries -> States -> Cities -> Localities (with detailed Pincodes)
+  // ---------------------------------------------------------------------------
+  async seedWorldLocations(): Promise<{ totalNodes: number; countries: string[] }> {
+    this.logger.log('Syncing comprehensive worldwide locations (India, UAE, USA, UK, Canada, Saudi Arabia, Singapore, Australia)...');
+
+    // 1. INDIA (IN)
+    const india = await this.ensureLocationNode({
+      name: 'India',
+      slug: 'india',
+      type: LocationType.COUNTRY,
+      countryCode: 'IN',
+      ancestorIds: [],
+      localizedNames: { en: 'India', hi: 'भारत', ar: 'الهند', ur: 'ہندوستان' },
+      aliases: ['Bharat', 'Hindustan'],
+      isFeatured: true,
+      sortOrder: 1,
+    });
+
+    // 1.1 Gujarat
+    const gujarat = await this.ensureLocationNode({
+      name: 'Gujarat',
+      slug: 'gujarat',
+      type: LocationType.STATE,
+      parentId: india._id,
+      ancestorIds: [india._id],
+      countryCode: 'IN',
+      stateCode: 'GJ',
+      localizedNames: { en: 'Gujarat', hi: 'गुजरात' },
+      isFeatured: true,
+      sortOrder: 1,
+    });
+
+    const ahmedabadDist = await this.ensureLocationNode({
+      name: 'Ahmedabad',
+      slug: 'ahmedabad-district',
+      type: LocationType.DISTRICT,
+      parentId: gujarat._id,
+      ancestorIds: [india._id, gujarat._id],
+      countryCode: 'IN',
+      stateCode: 'GJ',
+      districtCode: 'AHM',
+      sortOrder: 1,
+    });
+
+    const ahmedabadCity = await this.ensureLocationNode({
+      name: 'Ahmedabad',
+      slug: 'ahmedabad',
+      type: LocationType.CITY,
+      parentId: ahmedabadDist._id,
+      ancestorIds: [india._id, gujarat._id, ahmedabadDist._id],
+      countryCode: 'IN',
+      stateCode: 'GJ',
+      districtCode: 'AHM',
+      cityCode: 'AMD',
+      localizedNames: { en: 'Ahmedabad', hi: 'अहमदाबाद' },
+      aliases: ['Amdavad', 'Karnavati'],
+      latitude: 23.0225,
+      longitude: 72.5714,
+      isFeatured: true,
+      sortOrder: 1,
+    });
+
+    const ahmLocalities = [
+      { name: 'Satellite', slug: 'satellite-ahmedabad', pincode: '380015', lat: 23.03, lng: 72.51 },
+      { name: 'Bodakdev', slug: 'bodakdev-ahmedabad', pincode: '380054', lat: 23.04, lng: 72.50 },
+      { name: 'Vastrapur', slug: 'vastrapur-ahmedabad', pincode: '380015', lat: 23.03, lng: 72.52 },
+      { name: 'SG Highway', slug: 'sg-highway-ahmedabad', pincode: '380051', lat: 23.05, lng: 72.51 },
+      { name: 'Prahlad Nagar', slug: 'prahlad-nagar-ahmedabad', pincode: '380015', lat: 23.01, lng: 72.50 },
+      { name: 'Thaltej', slug: 'thaltej-ahmedabad', pincode: '380059', lat: 23.05, lng: 72.51 },
+      { name: 'Navrangpura', slug: 'navrangpura-ahmedabad', pincode: '380009', lat: 23.03, lng: 72.55 },
+      { name: 'Maninagar', slug: 'maninagar-ahmedabad', pincode: '380008', lat: 22.99, lng: 72.60 },
+    ];
+    for (const loc of ahmLocalities) {
+      await this.ensureLocationNode({
+        name: loc.name,
+        slug: loc.slug,
+        type: LocationType.LOCALITY,
+        parentId: ahmedabadCity._id,
+        ancestorIds: [india._id, gujarat._id, ahmedabadDist._id, ahmedabadCity._id],
+        countryCode: 'IN',
+        stateCode: 'GJ',
+        districtCode: 'AHM',
+        cityCode: 'AMD',
+        pincode: loc.pincode,
+        latitude: loc.lat,
+        longitude: loc.lng,
+      });
+    }
+
+    const gandhinagarCity = await this.ensureLocationNode({
+      name: 'Gandhinagar',
+      slug: 'gandhinagar',
+      type: LocationType.CITY,
+      parentId: gujarat._id,
+      ancestorIds: [india._id, gujarat._id],
+      countryCode: 'IN',
+      stateCode: 'GJ',
+      cityCode: 'GNR',
+      latitude: 23.2156,
+      longitude: 72.6369,
+      isFeatured: true,
+      sortOrder: 2,
+    });
+    const gnrLocalities = [
+      { name: 'GIFT City', slug: 'gift-city-gandhinagar', pincode: '382355', lat: 23.16, lng: 72.68 },
+      { name: 'Kudasan', slug: 'kudasan-gandhinagar', pincode: '382421', lat: 23.18, lng: 72.62 },
+      { name: 'Sector 11', slug: 'sector-11-gandhinagar', pincode: '382011', lat: 23.22, lng: 72.65 },
+    ];
+    for (const loc of gnrLocalities) {
+      await this.ensureLocationNode({
+        name: loc.name,
+        slug: loc.slug,
+        type: LocationType.LOCALITY,
+        parentId: gandhinagarCity._id,
+        ancestorIds: [india._id, gujarat._id, gandhinagarCity._id],
+        countryCode: 'IN',
+        stateCode: 'GJ',
+        cityCode: 'GNR',
+        pincode: loc.pincode,
+        latitude: loc.lat,
+        longitude: loc.lng,
+      });
+    }
+
+    const suratCity = await this.ensureLocationNode({
+      name: 'Surat',
+      slug: 'surat',
+      type: LocationType.CITY,
+      parentId: gujarat._id,
+      ancestorIds: [india._id, gujarat._id],
+      countryCode: 'IN',
+      stateCode: 'GJ',
+      cityCode: 'SUR',
+      latitude: 21.1702,
+      longitude: 72.8311,
+      sortOrder: 3,
+    });
+    const suratLocalities = [
+      { name: 'Vesu', slug: 'vesu-surat', pincode: '395007', lat: 21.14, lng: 72.77 },
+      { name: 'Adajan', slug: 'adajan-surat', pincode: '395009', lat: 21.19, lng: 72.79 },
+    ];
+    for (const loc of suratLocalities) {
+      await this.ensureLocationNode({
+        name: loc.name,
+        slug: loc.slug,
+        type: LocationType.LOCALITY,
+        parentId: suratCity._id,
+        ancestorIds: [india._id, gujarat._id, suratCity._id],
+        countryCode: 'IN',
+        stateCode: 'GJ',
+        cityCode: 'SUR',
+        pincode: loc.pincode,
+        latitude: loc.lat,
+        longitude: loc.lng,
+      });
+    }
+
+    // 1.2 Maharashtra
+    const maharashtra = await this.ensureLocationNode({
+      name: 'Maharashtra',
+      slug: 'maharashtra',
+      type: LocationType.STATE,
+      parentId: india._id,
+      ancestorIds: [india._id],
+      countryCode: 'IN',
+      stateCode: 'MH',
+      localizedNames: { en: 'Maharashtra', hi: 'महाराष्ट्र' },
+      isFeatured: true,
+      sortOrder: 2,
+    });
+
+    const mumbaiCity = await this.ensureLocationNode({
+      name: 'Mumbai',
+      slug: 'mumbai',
+      type: LocationType.CITY,
+      parentId: maharashtra._id,
+      ancestorIds: [india._id, maharashtra._id],
+      countryCode: 'IN',
+      stateCode: 'MH',
+      cityCode: 'BOM',
+      localizedNames: { en: 'Mumbai', hi: 'मुंबई' },
+      aliases: ['Bombay'],
+      latitude: 19.076,
+      longitude: 72.8777,
+      isFeatured: true,
+      sortOrder: 1,
+    });
+    const mumLocalities = [
+      { name: 'Bandra West', slug: 'bandra-west-mumbai', pincode: '400050', lat: 19.05, lng: 72.83 },
+      { name: 'Andheri West', slug: 'andheri-west-mumbai', pincode: '400053', lat: 19.13, lng: 72.82 },
+      { name: 'Worli', slug: 'worli-mumbai', pincode: '400018', lat: 19.01, lng: 72.81 },
+      { name: 'Juhu', slug: 'juhu-mumbai', pincode: '400049', lat: 19.10, lng: 72.82 },
+      { name: 'Powai', slug: 'powai-mumbai', pincode: '400076', lat: 19.11, lng: 72.90 },
+      { name: 'Lower Parel', slug: 'lower-parel-mumbai', pincode: '400013', lat: 18.99, lng: 72.82 },
+    ];
+    for (const loc of mumLocalities) {
+      await this.ensureLocationNode({
+        name: loc.name,
+        slug: loc.slug,
+        type: LocationType.LOCALITY,
+        parentId: mumbaiCity._id,
+        ancestorIds: [india._id, maharashtra._id, mumbaiCity._id],
+        countryCode: 'IN',
+        stateCode: 'MH',
+        cityCode: 'BOM',
+        pincode: loc.pincode,
+        latitude: loc.lat,
+        longitude: loc.lng,
+      });
+    }
+
+    const puneCity = await this.ensureLocationNode({
+      name: 'Pune',
+      slug: 'pune',
+      type: LocationType.CITY,
+      parentId: maharashtra._id,
+      ancestorIds: [india._id, maharashtra._id],
+      countryCode: 'IN',
+      stateCode: 'MH',
+      cityCode: 'PNQ',
+      latitude: 18.5204,
+      longitude: 73.8567,
+      sortOrder: 2,
+    });
+    const puneLocalities = [
+      { name: 'Hinjewadi', slug: 'hinjewadi-pune', pincode: '411057', lat: 18.59, lng: 73.73 },
+      { name: 'Koregaon Park', slug: 'koregaon-park-pune', pincode: '411001', lat: 18.53, lng: 73.89 },
+      { name: 'Baner', slug: 'baner-pune', pincode: '411045', lat: 18.55, lng: 73.78 },
+      { name: 'Wakad', slug: 'wakad-pune', pincode: '411057', lat: 18.59, lng: 73.76 },
+    ];
+    for (const loc of puneLocalities) {
+      await this.ensureLocationNode({
+        name: loc.name,
+        slug: loc.slug,
+        type: LocationType.LOCALITY,
+        parentId: puneCity._id,
+        ancestorIds: [india._id, maharashtra._id, puneCity._id],
+        countryCode: 'IN',
+        stateCode: 'MH',
+        cityCode: 'PNQ',
+        pincode: loc.pincode,
+        latitude: loc.lat,
+        longitude: loc.lng,
+      });
+    }
+
+    // 1.3 Karnataka
+    const karnataka = await this.ensureLocationNode({
+      name: 'Karnataka',
+      slug: 'karnataka',
+      type: LocationType.STATE,
+      parentId: india._id,
+      ancestorIds: [india._id],
+      countryCode: 'IN',
+      stateCode: 'KA',
+      localizedNames: { en: 'Karnataka', hi: 'कर्नाटक' },
+      isFeatured: true,
+      sortOrder: 3,
+    });
+
+    const blrCity = await this.ensureLocationNode({
+      name: 'Bengaluru',
+      slug: 'bengaluru',
+      type: LocationType.CITY,
+      parentId: karnataka._id,
+      ancestorIds: [india._id, karnataka._id],
+      countryCode: 'IN',
+      stateCode: 'KA',
+      cityCode: 'BLR',
+      localizedNames: { en: 'Bengaluru', hi: 'बेंगलुरु' },
+      aliases: ['Bangalore'],
+      latitude: 12.9716,
+      longitude: 77.5946,
+      isFeatured: true,
+      sortOrder: 1,
+    });
+    const blrLocalities = [
+      { name: 'Indiranagar', slug: 'indiranagar-bangalore', pincode: '560038', lat: 12.97, lng: 77.64 },
+      { name: 'Whitefield', slug: 'whitefield-bangalore', pincode: '560066', lat: 12.96, lng: 77.74 },
+      { name: 'Koramangala', slug: 'koramangala-bangalore', pincode: '560034', lat: 12.93, lng: 77.62 },
+      { name: 'HSR Layout', slug: 'hsr-layout-bangalore', pincode: '560102', lat: 12.91, lng: 77.63 },
+      { name: 'Electronic City', slug: 'electronic-city-bangalore', pincode: '560100', lat: 12.84, lng: 77.66 },
+    ];
+    for (const loc of blrLocalities) {
+      await this.ensureLocationNode({
+        name: loc.name,
+        slug: loc.slug,
+        type: LocationType.LOCALITY,
+        parentId: blrCity._id,
+        ancestorIds: [india._id, karnataka._id, blrCity._id],
+        countryCode: 'IN',
+        stateCode: 'KA',
+        cityCode: 'BLR',
+        pincode: loc.pincode,
+        latitude: loc.lat,
+        longitude: loc.lng,
+      });
+    }
+
+    // 1.4 Delhi NCR
+    const delhiNcr = await this.ensureLocationNode({
+      name: 'Delhi NCR',
+      slug: 'delhi-ncr',
+      type: LocationType.STATE,
+      parentId: india._id,
+      ancestorIds: [india._id],
+      countryCode: 'IN',
+      stateCode: 'DL',
+      localizedNames: { en: 'Delhi NCR', hi: 'दिल्ली एनसीआर' },
+      isFeatured: true,
+      sortOrder: 4,
+    });
+
+    const newDelhiCity = await this.ensureLocationNode({
+      name: 'New Delhi',
+      slug: 'new-delhi',
+      type: LocationType.CITY,
+      parentId: delhiNcr._id,
+      ancestorIds: [india._id, delhiNcr._id],
+      countryCode: 'IN',
+      stateCode: 'DL',
+      cityCode: 'DEL',
+      latitude: 28.6139,
+      longitude: 77.209,
+      isFeatured: true,
+      sortOrder: 1,
+    });
+    const delLocalities = [
+      { name: 'Connaught Place', slug: 'connaught-place-delhi', pincode: '110001', lat: 28.63, lng: 77.21 },
+      { name: 'South Extension', slug: 'south-extension-delhi', pincode: '110049', lat: 28.56, lng: 77.22 },
+      { name: 'Vasant Kunj', slug: 'vasant-kunj-delhi', pincode: '110070', lat: 28.52, lng: 77.15 },
+      { name: 'Saket', slug: 'saket-delhi', pincode: '110017', lat: 28.52, lng: 77.21 },
+    ];
+    for (const loc of delLocalities) {
+      await this.ensureLocationNode({
+        name: loc.name,
+        slug: loc.slug,
+        type: LocationType.LOCALITY,
+        parentId: newDelhiCity._id,
+        ancestorIds: [india._id, delhiNcr._id, newDelhiCity._id],
+        countryCode: 'IN',
+        stateCode: 'DL',
+        cityCode: 'DEL',
+        pincode: loc.pincode,
+        latitude: loc.lat,
+        longitude: loc.lng,
+      });
+    }
+
+    const gurugramCity = await this.ensureLocationNode({
+      name: 'Gurugram',
+      slug: 'gurugram',
+      type: LocationType.CITY,
+      parentId: delhiNcr._id,
+      ancestorIds: [india._id, delhiNcr._id],
+      countryCode: 'IN',
+      stateCode: 'HR',
+      cityCode: 'GGN',
+      aliases: ['Gurgaon'],
+      latitude: 28.4595,
+      longitude: 77.0266,
+      sortOrder: 2,
+    });
+    const ggnLocalities = [
+      { name: 'DLF Phase 5', slug: 'dlf-phase-5-gurugram', pincode: '122009', lat: 28.45, lng: 77.09 },
+      { name: 'Cyber City', slug: 'cyber-city-gurugram', pincode: '122002', lat: 28.49, lng: 77.08 },
+      { name: 'Golf Course Road', slug: 'golf-course-road-gurugram', pincode: '122002', lat: 28.46, lng: 77.10 },
+    ];
+    for (const loc of ggnLocalities) {
+      await this.ensureLocationNode({
+        name: loc.name,
+        slug: loc.slug,
+        type: LocationType.LOCALITY,
+        parentId: gurugramCity._id,
+        ancestorIds: [india._id, delhiNcr._id, gurugramCity._id],
+        countryCode: 'IN',
+        stateCode: 'HR',
+        cityCode: 'GGN',
+        pincode: loc.pincode,
+        latitude: loc.lat,
+        longitude: loc.lng,
+      });
+    }
+
+    // 1.5 Uttar Pradesh
+    const uttarPradesh = await this.ensureLocationNode({
+      name: 'Uttar Pradesh',
+      slug: 'uttar-pradesh',
+      type: LocationType.STATE,
+      parentId: india._id,
+      ancestorIds: [india._id],
+      countryCode: 'IN',
+      stateCode: 'UP',
+      localizedNames: { en: 'Uttar Pradesh', hi: 'उत्तर प्रदेश' },
+      sortOrder: 5,
+    });
+
+    const noidaCity = await this.ensureLocationNode({
+      name: 'Noida',
+      slug: 'noida',
+      type: LocationType.CITY,
+      parentId: uttarPradesh._id,
+      ancestorIds: [india._id, uttarPradesh._id],
+      countryCode: 'IN',
+      stateCode: 'UP',
+      cityCode: 'NOI',
+      latitude: 28.5355,
+      longitude: 77.391,
+      isFeatured: true,
+      sortOrder: 1,
+    });
+    const noidaLocalities = [
+      { name: 'Sector 62', slug: 'sector-62-noida', pincode: '201309', lat: 28.62, lng: 77.36 },
+      { name: 'Sector 150', slug: 'sector-150-noida', pincode: '201310', lat: 28.44, lng: 77.48 },
+      { name: 'Sector 18', slug: 'sector-18-noida', pincode: '201301', lat: 28.57, lng: 77.32 },
+      { name: 'Sector 137', slug: 'sector-137-noida', pincode: '201305', lat: 28.51, lng: 77.40 },
+    ];
+    for (const loc of noidaLocalities) {
+      await this.ensureLocationNode({
+        name: loc.name,
+        slug: loc.slug,
+        type: LocationType.LOCALITY,
+        parentId: noidaCity._id,
+        ancestorIds: [india._id, uttarPradesh._id, noidaCity._id],
+        countryCode: 'IN',
+        stateCode: 'UP',
+        districtCode: 'GBN',
+        cityCode: 'NOI',
+        pincode: loc.pincode,
+        latitude: loc.lat,
+        longitude: loc.lng,
+      });
+    }
+
+    const lucknowCity = await this.ensureLocationNode({
+      name: 'Lucknow',
+      slug: 'lucknow',
+      type: LocationType.CITY,
+      parentId: uttarPradesh._id,
+      ancestorIds: [india._id, uttarPradesh._id],
+      countryCode: 'IN',
+      stateCode: 'UP',
+      cityCode: 'LKO',
+      latitude: 26.8467,
+      longitude: 80.9462,
+      sortOrder: 2,
+    });
+    const lkoLocalities = [
+      { name: 'Gomti Nagar', slug: 'gomti-nagar-lucknow', pincode: '226010', lat: 26.85, lng: 81.0 },
+      { name: 'Hazratganj', slug: 'hazratganj-lucknow', pincode: '226001', lat: 26.84, lng: 80.94 },
+    ];
+    for (const loc of lkoLocalities) {
+      await this.ensureLocationNode({
+        name: loc.name,
+        slug: loc.slug,
+        type: LocationType.LOCALITY,
+        parentId: lucknowCity._id,
+        ancestorIds: [india._id, uttarPradesh._id, lucknowCity._id],
+        countryCode: 'IN',
+        stateCode: 'UP',
+        cityCode: 'LKO',
+        pincode: loc.pincode,
+        latitude: loc.lat,
+        longitude: loc.lng,
+      });
+    }
+
+    // 2. UNITED ARAB EMIRATES (AE)
+    const uae = await this.ensureLocationNode({
+      name: 'United Arab Emirates',
+      slug: 'united-arab-emirates',
+      type: LocationType.COUNTRY,
+      countryCode: 'AE',
+      ancestorIds: [],
+      localizedNames: { en: 'United Arab Emirates', ar: 'الإمارات العربية المتحدة', hi: 'संयुक्त अरब अमीरात', ur: 'متحدہ عرب امارات' },
+      aliases: ['UAE', 'Emirates'],
+      isFeatured: true,
+      sortOrder: 2,
+    });
+
+    const dubaiState = await this.ensureLocationNode({
+      name: 'Dubai',
+      slug: 'dubai-emirate',
+      type: LocationType.STATE,
+      parentId: uae._id,
+      ancestorIds: [uae._id],
+      countryCode: 'AE',
+      stateCode: 'DXB',
+      localizedNames: { en: 'Dubai', ar: 'دبي', hi: 'दुबई' },
+      isFeatured: true,
+      sortOrder: 1,
+    });
+
+    const dubaiCity = await this.ensureLocationNode({
+      name: 'Dubai City',
+      slug: 'dubai',
+      type: LocationType.CITY,
+      parentId: dubaiState._id,
+      ancestorIds: [uae._id, dubaiState._id],
+      countryCode: 'AE',
+      stateCode: 'DXB',
+      cityCode: 'DXB',
+      localizedNames: { en: 'Dubai', ar: 'دبي', hi: 'दुबई', ur: 'دبئی' },
+      latitude: 25.2048,
+      longitude: 55.2708,
+      isFeatured: true,
+      sortOrder: 1,
+    });
+
+    const dxbLocalities = [
+      { name: 'Downtown Dubai', slug: 'downtown-dubai', pincode: '337-1500', lat: 25.1972, lng: 55.2744 },
+      { name: 'Dubai Marina', slug: 'dubai-marina', pincode: '393-234', lat: 25.0805, lng: 55.1403 },
+      { name: 'Palm Jumeirah', slug: 'palm-jumeirah', pincode: '393-541', lat: 25.1124, lng: 55.139 },
+      { name: 'Business Bay', slug: 'business-bay', pincode: '337-124', lat: 25.1837, lng: 55.2666 },
+      { name: 'Jumeirah Village Circle', slug: 'jvc-dubai', pincode: '393-782', lat: 25.055, lng: 55.205 },
+      { name: 'Dubai Hills Estate', slug: 'dubai-hills-estate', pincode: '337-440', lat: 25.11, lng: 55.24 },
+      { name: 'DIFC', slug: 'difc-dubai', pincode: '337-111', lat: 25.21, lng: 55.28 },
+    ];
+    for (const loc of dxbLocalities) {
+      await this.ensureLocationNode({
+        name: loc.name,
+        slug: loc.slug,
+        type: LocationType.LOCALITY,
+        parentId: dubaiCity._id,
+        ancestorIds: [uae._id, dubaiState._id, dubaiCity._id],
+        countryCode: 'AE',
+        stateCode: 'DXB',
+        cityCode: 'DXB',
+        pincode: loc.pincode,
+        latitude: loc.lat,
+        longitude: loc.lng,
+      });
+    }
+
+    const abuDhabiState = await this.ensureLocationNode({
+      name: 'Abu Dhabi',
+      slug: 'abu-dhabi-emirate',
+      type: LocationType.STATE,
+      parentId: uae._id,
+      ancestorIds: [uae._id],
+      countryCode: 'AE',
+      stateCode: 'AUH',
+      localizedNames: { en: 'Abu Dhabi', ar: 'أبو ظبي', hi: 'अबू धाबी' },
+      sortOrder: 2,
+    });
+    const abuDhabiCity = await this.ensureLocationNode({
+      name: 'Abu Dhabi City',
+      slug: 'abu-dhabi',
+      type: LocationType.CITY,
+      parentId: abuDhabiState._id,
+      ancestorIds: [uae._id, abuDhabiState._id],
+      countryCode: 'AE',
+      stateCode: 'AUH',
+      cityCode: 'AUH',
+      latitude: 24.4539,
+      longitude: 54.3773,
+      sortOrder: 1,
+    });
+    const auhLocalities = [
+      { name: 'Al Reem Island', slug: 'al-reem-island-abu-dhabi', pincode: '00000', lat: 24.49, lng: 54.40 },
+      { name: 'Yas Island', slug: 'yas-island-abu-dhabi', pincode: '00000', lat: 24.50, lng: 54.60 },
+      { name: 'Saadiyat Island', slug: 'saadiyat-island-abu-dhabi', pincode: '00000', lat: 24.53, lng: 54.43 },
+    ];
+    for (const loc of auhLocalities) {
+      await this.ensureLocationNode({
+        name: loc.name,
+        slug: loc.slug,
+        type: LocationType.LOCALITY,
+        parentId: abuDhabiCity._id,
+        ancestorIds: [uae._id, abuDhabiState._id, abuDhabiCity._id],
+        countryCode: 'AE',
+        stateCode: 'AUH',
+        cityCode: 'AUH',
+        pincode: loc.pincode,
+        latitude: loc.lat,
+        longitude: loc.lng,
+      });
+    }
+
+    // 3. UNITED STATES (US)
+    const usa = await this.ensureLocationNode({
+      name: 'United States',
+      slug: 'united-states',
+      type: LocationType.COUNTRY,
+      countryCode: 'US',
+      ancestorIds: [],
+      localizedNames: { en: 'United States', hi: 'संयुक्त राज्य अमेरिका', ar: 'الولايات المتحدة', ur: 'ریاستہائے متحدہ امریکہ' },
+      aliases: ['USA', 'America'],
+      isFeatured: true,
+      sortOrder: 3,
+    });
+
+    const california = await this.ensureLocationNode({
+      name: 'California',
+      slug: 'california',
+      type: LocationType.STATE,
+      parentId: usa._id,
+      ancestorIds: [usa._id],
+      countryCode: 'US',
+      stateCode: 'CA',
+      isFeatured: true,
+      sortOrder: 1,
+    });
+
+    const losAngelesCity = await this.ensureLocationNode({
+      name: 'Los Angeles',
+      slug: 'los-angeles',
+      type: LocationType.CITY,
+      parentId: california._id,
+      ancestorIds: [usa._id, california._id],
+      countryCode: 'US',
+      stateCode: 'CA',
+      cityCode: 'LAX',
+      latitude: 34.0522,
+      longitude: -118.2437,
+      isFeatured: true,
+      sortOrder: 1,
+    });
+    const laLocalities = [
+      { name: 'Beverly Hills', slug: 'beverly-hills-ca', pincode: '90210', lat: 34.0736, lng: -118.4004 },
+      { name: 'Santa Monica', slug: 'santa-monica-ca', pincode: '90401', lat: 34.0195, lng: -118.4912 },
+      { name: 'Downtown Los Angeles', slug: 'downtown-la-ca', pincode: '90012', lat: 34.0537, lng: -118.2427 },
+      { name: 'Hollywood', slug: 'hollywood-ca', pincode: '90028', lat: 34.0928, lng: -118.3287 },
+    ];
+    for (const loc of laLocalities) {
+      await this.ensureLocationNode({
+        name: loc.name,
+        slug: loc.slug,
+        type: LocationType.LOCALITY,
+        parentId: losAngelesCity._id,
+        ancestorIds: [usa._id, california._id, losAngelesCity._id],
+        countryCode: 'US',
+        stateCode: 'CA',
+        cityCode: 'LAX',
+        pincode: loc.pincode,
+        latitude: loc.lat,
+        longitude: loc.lng,
+      });
+    }
+
+    const sanFranciscoCity = await this.ensureLocationNode({
+      name: 'San Francisco',
+      slug: 'san-francisco',
+      type: LocationType.CITY,
+      parentId: california._id,
+      ancestorIds: [usa._id, california._id],
+      countryCode: 'US',
+      stateCode: 'CA',
+      cityCode: 'SFO',
+      latitude: 37.7749,
+      longitude: -122.4194,
+      sortOrder: 2,
+    });
+    const sfoLocalities = [
+      { name: 'Financial District', slug: 'financial-district-sfo', pincode: '94104', lat: 37.79, lng: -122.40 },
+      { name: 'SoMa', slug: 'soma-sfo', pincode: '94103', lat: 37.77, lng: -122.41 },
+    ];
+    for (const loc of sfoLocalities) {
+      await this.ensureLocationNode({
+        name: loc.name,
+        slug: loc.slug,
+        type: LocationType.LOCALITY,
+        parentId: sanFranciscoCity._id,
+        ancestorIds: [usa._id, california._id, sanFranciscoCity._id],
+        countryCode: 'US',
+        stateCode: 'CA',
+        cityCode: 'SFO',
+        pincode: loc.pincode,
+        latitude: loc.lat,
+        longitude: loc.lng,
+      });
+    }
+
+    const newYorkState = await this.ensureLocationNode({
+      name: 'New York',
+      slug: 'new-york-state',
+      type: LocationType.STATE,
+      parentId: usa._id,
+      ancestorIds: [usa._id],
+      countryCode: 'US',
+      stateCode: 'NY',
+      isFeatured: true,
+      sortOrder: 2,
+    });
+
+    const nycCity = await this.ensureLocationNode({
+      name: 'New York City',
+      slug: 'new-york-city',
+      type: LocationType.CITY,
+      parentId: newYorkState._id,
+      ancestorIds: [usa._id, newYorkState._id],
+      countryCode: 'US',
+      stateCode: 'NY',
+      cityCode: 'NYC',
+      aliases: ['NYC', 'Big Apple'],
+      latitude: 40.7128,
+      longitude: -74.006,
+      isFeatured: true,
+      sortOrder: 1,
+    });
+    const nycLocalities = [
+      { name: 'Manhattan Midtown', slug: 'manhattan-midtown-nyc', pincode: '10001', lat: 40.7484, lng: -73.9857 },
+      { name: 'Upper East Side', slug: 'upper-east-side-nyc', pincode: '10021', lat: 40.7736, lng: -73.9566 },
+      { name: 'Tribeca', slug: 'tribeca-nyc', pincode: '10013', lat: 40.7163, lng: -74.0086 },
+      { name: 'Brooklyn Heights', slug: 'brooklyn-heights-nyc', pincode: '11201', lat: 40.696, lng: -73.9933 },
+    ];
+    for (const loc of nycLocalities) {
+      await this.ensureLocationNode({
+        name: loc.name,
+        slug: loc.slug,
+        type: LocationType.LOCALITY,
+        parentId: nycCity._id,
+        ancestorIds: [usa._id, newYorkState._id, nycCity._id],
+        countryCode: 'US',
+        stateCode: 'NY',
+        cityCode: 'NYC',
+        pincode: loc.pincode,
+        latitude: loc.lat,
+        longitude: loc.lng,
+      });
+    }
+
+    const texasState = await this.ensureLocationNode({
+      name: 'Texas',
+      slug: 'texas-state',
+      type: LocationType.STATE,
+      parentId: usa._id,
+      ancestorIds: [usa._id],
+      countryCode: 'US',
+      stateCode: 'TX',
+      sortOrder: 3,
+    });
+    const austinCity = await this.ensureLocationNode({
+      name: 'Austin',
+      slug: 'austin-tx',
+      type: LocationType.CITY,
+      parentId: texasState._id,
+      ancestorIds: [usa._id, texasState._id],
+      countryCode: 'US',
+      stateCode: 'TX',
+      cityCode: 'ATX',
+      latitude: 30.2672,
+      longitude: -97.7431,
+      sortOrder: 1,
+    });
+    const atxLocalities = [
+      { name: 'Downtown Austin', slug: 'downtown-austin-tx', pincode: '78701', lat: 30.27, lng: -97.74 },
+      { name: 'The Domain', slug: 'the-domain-austin-tx', pincode: '78758', lat: 30.40, lng: -97.72 },
+    ];
+    for (const loc of atxLocalities) {
+      await this.ensureLocationNode({
+        name: loc.name,
+        slug: loc.slug,
+        type: LocationType.LOCALITY,
+        parentId: austinCity._id,
+        ancestorIds: [usa._id, texasState._id, austinCity._id],
+        countryCode: 'US',
+        stateCode: 'TX',
+        cityCode: 'ATX',
+        pincode: loc.pincode,
+        latitude: loc.lat,
+        longitude: loc.lng,
+      });
+    }
+
+    const floridaState = await this.ensureLocationNode({
+      name: 'Florida',
+      slug: 'florida-state',
+      type: LocationType.STATE,
+      parentId: usa._id,
+      ancestorIds: [usa._id],
+      countryCode: 'US',
+      stateCode: 'FL',
+      sortOrder: 4,
+    });
+    const miamiCity = await this.ensureLocationNode({
+      name: 'Miami',
+      slug: 'miami-fl',
+      type: LocationType.CITY,
+      parentId: floridaState._id,
+      ancestorIds: [usa._id, floridaState._id],
+      countryCode: 'US',
+      stateCode: 'FL',
+      cityCode: 'MIA',
+      latitude: 25.7617,
+      longitude: -80.1918,
+      sortOrder: 1,
+    });
+    const miaLocalities = [
+      { name: 'Brickell', slug: 'brickell-miami-fl', pincode: '33131', lat: 25.76, lng: -80.19 },
+      { name: 'Miami Beach', slug: 'miami-beach-fl', pincode: '33139', lat: 25.79, lng: -80.13 },
+    ];
+    for (const loc of miaLocalities) {
+      await this.ensureLocationNode({
+        name: loc.name,
+        slug: loc.slug,
+        type: LocationType.LOCALITY,
+        parentId: miamiCity._id,
+        ancestorIds: [usa._id, floridaState._id, miamiCity._id],
+        countryCode: 'US',
+        stateCode: 'FL',
+        cityCode: 'MIA',
+        pincode: loc.pincode,
+        latitude: loc.lat,
+        longitude: loc.lng,
+      });
+    }
+
+    // 4. UNITED KINGDOM (GB)
+    const uk = await this.ensureLocationNode({
+      name: 'United Kingdom',
+      slug: 'united-kingdom',
+      type: LocationType.COUNTRY,
+      countryCode: 'GB',
+      ancestorIds: [],
+      localizedNames: { en: 'United Kingdom', hi: 'यूनाइटेड किंगडम', ar: 'المملكة المتحدة', ur: 'برطانیہ' },
+      aliases: ['UK', 'Britain', 'Great Britain'],
+      isFeatured: true,
+      sortOrder: 4,
+    });
+
+    const england = await this.ensureLocationNode({
+      name: 'England',
+      slug: 'england',
+      type: LocationType.STATE,
+      parentId: uk._id,
+      ancestorIds: [uk._id],
+      countryCode: 'GB',
+      stateCode: 'ENG',
+      sortOrder: 1,
+    });
+
+    const londonCity = await this.ensureLocationNode({
+      name: 'London',
+      slug: 'london',
+      type: LocationType.CITY,
+      parentId: england._id,
+      ancestorIds: [uk._id, england._id],
+      countryCode: 'GB',
+      stateCode: 'ENG',
+      cityCode: 'LON',
+      latitude: 51.5074,
+      longitude: -0.1278,
+      isFeatured: true,
+      sortOrder: 1,
+    });
+    const lonLocalities = [
+      { name: 'Westminster & Mayfair', slug: 'westminster-mayfair-london', pincode: 'SW1A 1AA', lat: 51.50, lng: -0.14 },
+      { name: 'Kensington & Chelsea', slug: 'kensington-chelsea-london', pincode: 'W8 5TT', lat: 51.50, lng: -0.19 },
+      { name: 'Canary Wharf', slug: 'canary-wharf-london', pincode: 'E14 5HP', lat: 51.505, lng: -0.02 },
+      { name: 'City of London', slug: 'city-of-london', pincode: 'EC2N 2DB', lat: 51.51, lng: -0.09 },
+    ];
+    for (const loc of lonLocalities) {
+      await this.ensureLocationNode({
+        name: loc.name,
+        slug: loc.slug,
+        type: LocationType.LOCALITY,
+        parentId: londonCity._id,
+        ancestorIds: [uk._id, england._id, londonCity._id],
+        countryCode: 'GB',
+        stateCode: 'ENG',
+        cityCode: 'LON',
+        pincode: loc.pincode,
+        latitude: loc.lat,
+        longitude: loc.lng,
+      });
+    }
+
+    const manchesterCity = await this.ensureLocationNode({
+      name: 'Manchester',
+      slug: 'manchester',
+      type: LocationType.CITY,
+      parentId: england._id,
+      ancestorIds: [uk._id, england._id],
+      countryCode: 'GB',
+      stateCode: 'ENG',
+      cityCode: 'MAN',
+      latitude: 53.4808,
+      longitude: -2.2426,
+      sortOrder: 2,
+    });
+    const manLocalities = [
+      { name: 'Manchester City Centre', slug: 'manchester-city-centre', pincode: 'M1 1AD', lat: 53.48, lng: -2.24 },
+      { name: 'Salford Quays', slug: 'salford-quays-manchester', pincode: 'M50 3AZ', lat: 53.47, lng: -2.28 },
+    ];
+    for (const loc of manLocalities) {
+      await this.ensureLocationNode({
+        name: loc.name,
+        slug: loc.slug,
+        type: LocationType.LOCALITY,
+        parentId: manchesterCity._id,
+        ancestorIds: [uk._id, england._id, manchesterCity._id],
+        countryCode: 'GB',
+        stateCode: 'ENG',
+        cityCode: 'MAN',
+        pincode: loc.pincode,
+        latitude: loc.lat,
+        longitude: loc.lng,
+      });
+    }
+
+    // 5. CANADA (CA)
+    const canada = await this.ensureLocationNode({
+      name: 'Canada',
+      slug: 'canada',
+      type: LocationType.COUNTRY,
+      countryCode: 'CA',
+      ancestorIds: [],
+      localizedNames: { en: 'Canada', fr: 'Canada' },
+      sortOrder: 5,
+    });
+
+    const ontario = await this.ensureLocationNode({
+      name: 'Ontario',
+      slug: 'ontario',
+      type: LocationType.STATE,
+      parentId: canada._id,
+      ancestorIds: [canada._id],
+      countryCode: 'CA',
+      stateCode: 'ON',
+      sortOrder: 1,
+    });
+
+    const torontoCity = await this.ensureLocationNode({
+      name: 'Toronto',
+      slug: 'toronto',
+      type: LocationType.CITY,
+      parentId: ontario._id,
+      ancestorIds: [canada._id, ontario._id],
+      countryCode: 'CA',
+      stateCode: 'ON',
+      cityCode: 'YTO',
+      latitude: 43.6532,
+      longitude: -79.3832,
+      isFeatured: true,
+      sortOrder: 1,
+    });
+    const ytoLocalities = [
+      { name: 'Downtown Toronto', slug: 'downtown-toronto', pincode: 'M5V 2T6', lat: 43.65, lng: -79.38 },
+      { name: 'Yorkville', slug: 'yorkville-toronto', pincode: 'M4W 1A1', lat: 43.67, lng: -79.39 },
+    ];
+    for (const loc of ytoLocalities) {
+      await this.ensureLocationNode({
+        name: loc.name,
+        slug: loc.slug,
+        type: LocationType.LOCALITY,
+        parentId: torontoCity._id,
+        ancestorIds: [canada._id, ontario._id, torontoCity._id],
+        countryCode: 'CA',
+        stateCode: 'ON',
+        cityCode: 'YTO',
+        pincode: loc.pincode,
+        latitude: loc.lat,
+        longitude: loc.lng,
+      });
+    }
+
+    const bc = await this.ensureLocationNode({
+      name: 'British Columbia',
+      slug: 'british-columbia',
+      type: LocationType.STATE,
+      parentId: canada._id,
+      ancestorIds: [canada._id],
+      countryCode: 'CA',
+      stateCode: 'BC',
+      sortOrder: 2,
+    });
+    const vancouverCity = await this.ensureLocationNode({
+      name: 'Vancouver',
+      slug: 'vancouver',
+      type: LocationType.CITY,
+      parentId: bc._id,
+      ancestorIds: [canada._id, bc._id],
+      countryCode: 'CA',
+      stateCode: 'BC',
+      cityCode: 'YVR',
+      latitude: 49.2827,
+      longitude: -123.1207,
+      sortOrder: 1,
+    });
+    const yvrLocalities = [
+      { name: 'Downtown Vancouver', slug: 'downtown-vancouver', pincode: 'V6B 1A1', lat: 49.28, lng: -123.12 },
+      { name: 'Yaletown', slug: 'yaletown-vancouver', pincode: 'V6Z 1Y6', lat: 49.27, lng: -123.12 },
+    ];
+    for (const loc of yvrLocalities) {
+      await this.ensureLocationNode({
+        name: loc.name,
+        slug: loc.slug,
+        type: LocationType.LOCALITY,
+        parentId: vancouverCity._id,
+        ancestorIds: [canada._id, bc._id, vancouverCity._id],
+        countryCode: 'CA',
+        stateCode: 'BC',
+        cityCode: 'YVR',
+        pincode: loc.pincode,
+        latitude: loc.lat,
+        longitude: loc.lng,
+      });
+    }
+
+    // 6. SAUDI ARABIA (SA)
+    const saudiArabia = await this.ensureLocationNode({
+      name: 'Saudi Arabia',
+      slug: 'saudi-arabia',
+      type: LocationType.COUNTRY,
+      countryCode: 'SA',
+      ancestorIds: [],
+      localizedNames: { en: 'Saudi Arabia', ar: 'المملكة العربية السعودية', hi: 'सऊदी अरब' },
+      aliases: ['KSA', 'Saudi'],
+      sortOrder: 6,
+    });
+
+    const riyadhRegion = await this.ensureLocationNode({
+      name: 'Riyadh Region',
+      slug: 'riyadh-region',
+      type: LocationType.STATE,
+      parentId: saudiArabia._id,
+      ancestorIds: [saudiArabia._id],
+      countryCode: 'SA',
+      stateCode: 'RUH',
+      sortOrder: 1,
+    });
+    const riyadhCity = await this.ensureLocationNode({
+      name: 'Riyadh',
+      slug: 'riyadh',
+      type: LocationType.CITY,
+      parentId: riyadhRegion._id,
+      ancestorIds: [saudiArabia._id, riyadhRegion._id],
+      countryCode: 'SA',
+      stateCode: 'RUH',
+      cityCode: 'RUH',
+      latitude: 24.7136,
+      longitude: 46.6753,
+      isFeatured: true,
+      sortOrder: 1,
+    });
+    const ruhLocalities = [
+      { name: 'Al Olaya', slug: 'al-olaya-riyadh', pincode: '12211', lat: 24.70, lng: 46.68 },
+      { name: 'Al Malqa', slug: 'al-malqa-riyadh', pincode: '13524', lat: 24.81, lng: 46.61 },
+      { name: 'Al Nakheel', slug: 'al-nakheel-riyadh', pincode: '12384', lat: 24.74, lng: 46.63 },
+    ];
+    for (const loc of ruhLocalities) {
+      await this.ensureLocationNode({
+        name: loc.name,
+        slug: loc.slug,
+        type: LocationType.LOCALITY,
+        parentId: riyadhCity._id,
+        ancestorIds: [saudiArabia._id, riyadhRegion._id, riyadhCity._id],
+        countryCode: 'SA',
+        stateCode: 'RUH',
+        cityCode: 'RUH',
+        pincode: loc.pincode,
+        latitude: loc.lat,
+        longitude: loc.lng,
+      });
+    }
+
+    // 7. SINGAPORE (SG)
+    const singapore = await this.ensureLocationNode({
+      name: 'Singapore',
+      slug: 'singapore',
+      type: LocationType.COUNTRY,
+      countryCode: 'SG',
+      ancestorIds: [],
+      localizedNames: { en: 'Singapore', zh: '新加坡', ms: 'Singapura' },
+      sortOrder: 7,
+    });
+
+    const singaporeCentral = await this.ensureLocationNode({
+      name: 'Central Region',
+      slug: 'singapore-central-region',
+      type: LocationType.STATE,
+      parentId: singapore._id,
+      ancestorIds: [singapore._id],
+      countryCode: 'SG',
+      stateCode: 'SIN',
+      sortOrder: 1,
+    });
+    const singaporeCity = await this.ensureLocationNode({
+      name: 'Singapore City',
+      slug: 'singapore-city',
+      type: LocationType.CITY,
+      parentId: singaporeCentral._id,
+      ancestorIds: [singapore._id, singaporeCentral._id],
+      countryCode: 'SG',
+      stateCode: 'SIN',
+      cityCode: 'SIN',
+      latitude: 1.3521,
+      longitude: 103.8198,
+      isFeatured: true,
+      sortOrder: 1,
+    });
+    const sgLocalities = [
+      { name: 'Marina Bay', slug: 'marina-bay-singapore', pincode: '018956', lat: 1.28, lng: 103.85 },
+      { name: 'Orchard Road', slug: 'orchard-road-singapore', pincode: '238897', lat: 1.30, lng: 103.83 },
+      { name: 'Raffles Place & CBD', slug: 'raffles-place-singapore', pincode: '048616', lat: 1.28, lng: 103.85 },
+      { name: 'Sentosa Cove', slug: 'sentosa-cove-singapore', pincode: '098269', lat: 1.24, lng: 103.83 },
+    ];
+    for (const loc of sgLocalities) {
+      await this.ensureLocationNode({
+        name: loc.name,
+        slug: loc.slug,
+        type: LocationType.LOCALITY,
+        parentId: singaporeCity._id,
+        ancestorIds: [singapore._id, singaporeCentral._id, singaporeCity._id],
+        countryCode: 'SG',
+        stateCode: 'SIN',
+        cityCode: 'SIN',
+        pincode: loc.pincode,
+        latitude: loc.lat,
+        longitude: loc.lng,
+      });
+    }
+
+    // 8. AUSTRALIA (AU)
+    const australia = await this.ensureLocationNode({
+      name: 'Australia',
+      slug: 'australia',
+      type: LocationType.COUNTRY,
+      countryCode: 'AU',
+      ancestorIds: [],
+      sortOrder: 8,
+    });
+
+    const nsw = await this.ensureLocationNode({
+      name: 'New South Wales',
+      slug: 'new-south-wales',
+      type: LocationType.STATE,
+      parentId: australia._id,
+      ancestorIds: [australia._id],
+      countryCode: 'AU',
+      stateCode: 'NSW',
+      sortOrder: 1,
+    });
+    const sydneyCity = await this.ensureLocationNode({
+      name: 'Sydney',
+      slug: 'sydney',
+      type: LocationType.CITY,
+      parentId: nsw._id,
+      ancestorIds: [australia._id, nsw._id],
+      countryCode: 'AU',
+      stateCode: 'NSW',
+      cityCode: 'SYD',
+      latitude: -33.8688,
+      longitude: 151.2093,
+      isFeatured: true,
+      sortOrder: 1,
+    });
+    const sydLocalities = [
+      { name: 'Sydney CBD', slug: 'sydney-cbd', pincode: '2000', lat: -33.86, lng: 151.20 },
+      { name: 'Bondi Beach', slug: 'bondi-beach-sydney', pincode: '2026', lat: -33.89, lng: 151.27 },
+      { name: 'Parramatta', slug: 'parramatta-sydney', pincode: '2150', lat: -33.81, lng: 151.00 },
+    ];
+    for (const loc of sydLocalities) {
+      await this.ensureLocationNode({
+        name: loc.name,
+        slug: loc.slug,
+        type: LocationType.LOCALITY,
+        parentId: sydneyCity._id,
+        ancestorIds: [australia._id, nsw._id, sydneyCity._id],
+        countryCode: 'AU',
+        stateCode: 'NSW',
+        cityCode: 'SYD',
+        pincode: loc.pincode,
+        latitude: loc.lat,
+        longitude: loc.lng,
+      });
+    }
+
+    const victoria = await this.ensureLocationNode({
+      name: 'Victoria',
+      slug: 'victoria-state',
+      type: LocationType.STATE,
+      parentId: australia._id,
+      ancestorIds: [australia._id],
+      countryCode: 'AU',
+      stateCode: 'VIC',
+      sortOrder: 2,
+    });
+    const melbourneCity = await this.ensureLocationNode({
+      name: 'Melbourne',
+      slug: 'melbourne',
+      type: LocationType.CITY,
+      parentId: victoria._id,
+      ancestorIds: [australia._id, victoria._id],
+      countryCode: 'AU',
+      stateCode: 'VIC',
+      cityCode: 'MEL',
+      latitude: -37.8136,
+      longitude: 144.9631,
+      sortOrder: 1,
+    });
+    const melLocalities = [
+      { name: 'Melbourne CBD', slug: 'melbourne-cbd', pincode: '3000', lat: -37.81, lng: 144.96 },
+      { name: 'Southbank', slug: 'southbank-melbourne', pincode: '3006', lat: -37.82, lng: 144.96 },
+      { name: 'Docklands', slug: 'docklands-melbourne', pincode: '3008', lat: -37.81, lng: 144.94 },
+    ];
+    for (const loc of melLocalities) {
+      await this.ensureLocationNode({
+        name: loc.name,
+        slug: loc.slug,
+        type: LocationType.LOCALITY,
+        parentId: melbourneCity._id,
+        ancestorIds: [australia._id, victoria._id, melbourneCity._id],
+        countryCode: 'AU',
+        stateCode: 'VIC',
+        cityCode: 'MEL',
+        pincode: loc.pincode,
+        latitude: loc.lat,
+        longitude: loc.lng,
+      });
+    }
+
+    const totalCount = await this.locationModel.countDocuments();
+    this.logger.log(`Worldwide location hierarchy synced successfully. Total nodes in DB: ${totalCount}`);
+    return {
+      totalNodes: totalCount,
+      countries: ['India', 'United Arab Emirates', 'United States', 'United Kingdom', 'Canada', 'Saudi Arabia', 'Singapore', 'Australia'],
+    };
   }
 
   // ---------------------------------------------------------------------------

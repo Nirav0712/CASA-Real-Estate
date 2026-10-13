@@ -80,7 +80,6 @@ export function AdminSidebar() {
       items: [
         { label: 'Enquiries & Leads', href: '/enquiries', icon: MessageSquare },
         { label: 'Customer Reviews', href: '/reviews', icon: FileText },
-        { label: 'Subscriptions', href: '/subscriptions', icon: CreditCard },
         { label: 'Payments & Invoices', href: '/payments', icon: Receipt },
       ],
     },

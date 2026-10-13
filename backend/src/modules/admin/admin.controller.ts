@@ -364,10 +364,13 @@ export class AdminController {
 
   @Get('purchasers')
   @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN, UserRole.MODERATOR)
-  @ApiOperation({ summary: 'List registered buyers and purchasers' })
+  @ApiOperation({ summary: 'List plan purchasers, free trial users and subscribers' })
   @ApiResponse({ status: 200, description: 'Purchaser list returned' })
-  getPurchasers(@Query() query: AdminUserQueryDto) {
-    return this.adminService.getPurchasers(query);
+  getPurchasers(
+    @Query() query: AdminUserQueryDto,
+    @Query('category') category?: string,
+  ) {
+    return this.adminService.getPurchasers({ ...query, category });
   }
 
   // ==========================================
@@ -381,4 +384,45 @@ export class AdminController {
   getAuditLogs(@Query() query: AdminAuditQueryDto) {
     return this.adminService.getAuditLogs(query);
   }
+
+  // ==========================================
+  // REAL-TIME NOTIFICATIONS & ALERTS
+  // ==========================================
+
+  @Get('notifications')
+  @ApiOperation({ summary: 'List real-time consolidated governance alerts and enquiries' })
+  @ApiResponse({ status: 200, description: 'Live alerts stream returned' })
+  getNotifications(@Query() query: { limit?: number; type?: string; unreadOnly?: boolean }) {
+    return this.adminService.getAdminNotifications(query);
+  }
+
+  @Patch('notifications/mark-all-read')
+  @ApiOperation({ summary: 'Mark all governance alerts and enquiries as read' })
+  markAllNotificationsRead() {
+    return this.adminService.markAllAdminNotificationsRead();
+  }
+
+  @Patch('notifications/:id/read')
+  @ApiOperation({ summary: 'Mark single alert as read' })
+  markNotificationRead(@Param('id') id: string) {
+    return this.adminService.markAdminNotificationRead(id);
+  }
+
+  // ==========================================
+  // PLATFORM & COMPANY CONTACT SETTINGS
+  // ==========================================
+
+  @Get('settings')
+  @ApiOperation({ summary: 'Get current system settings and company hotlines' })
+  getSettings() {
+    return this.adminService.getSystemSettings();
+  }
+
+  @Patch('settings')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN)
+  @ApiOperation({ summary: 'Update system settings and company hotlines' })
+  updateSettings(@Body() body: any) {
+    return this.adminService.updateSystemSettings(body);
+  }
 }
+

@@ -565,12 +565,14 @@ export async function getAdminPurchasers(params?: {
   limit?: number;
   q?: string;
   status?: string;
+  category?: string;
 }): Promise<PaginatedResponse<PurchaserRecord>> {
   const searchParams = new URLSearchParams();
   if (params?.page) searchParams.set('page', String(params.page));
   if (params?.limit) searchParams.set('limit', String(params.limit));
   if (params?.q && params.q.trim()) searchParams.set('q', params.q.trim());
   if (params?.status && params.status !== 'ALL') searchParams.set('status', params.status);
+  if (params?.category && params.category !== 'ALL') searchParams.set('category', params.category);
 
   const queryStr = searchParams.toString() ? `?${searchParams.toString()}` : '';
   const result = await fetchAdminApi<PaginatedResponse<PurchaserRecord>>(`/admin/purchasers${queryStr}`);

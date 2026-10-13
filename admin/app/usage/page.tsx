@@ -31,10 +31,16 @@ export default function UsageMonitoringPage() {
     try {
       setLoading(true);
       const res = await getUsageMetrics({ search });
-      setMetrics(res.data);
+      const records = Array.isArray(res)
+        ? res
+        : Array.isArray(res?.data)
+        ? res.data
+        : [];
+      setMetrics(records);
       setError(null);
     } catch (err: any) {
       setError(err.message || 'Failed to load usage data');
+      setMetrics([]);
     } finally {
       setLoading(false);
     }
@@ -152,28 +158,32 @@ export default function UsageMonitoringPage() {
               </thead>
               <tbody className="divide-y divide-casa-border-light">
                 {metrics.map((m) => {
+                  const pViews = m.propertyViews || { used: 0, limit: 10, bonus: 0, remaining: 10 };
+                  const pListings = m.propertyListings || { used: 0, limit: 0, bonus: 0, remaining: 0 };
+                  const pLeads = m.leads || { used: 0, limit: 0, bonus: 0, remaining: 0 };
+
                   const viewsPercent =
-                    m.propertyViews.limit > 0
+                    pViews.limit > 0
                       ? Math.min(
                           100,
                           Math.round(
-                            (m.propertyViews.used /
-                              (m.propertyViews.limit + m.propertyViews.bonus)) *
+                            (pViews.used /
+                              (pViews.limit + (pViews.bonus || 0))) *
                               100,
                           ),
                         )
                       : 0;
 
                   const isViewsExhausted =
-                    m.propertyViews.limit !== -1 && m.propertyViews.remaining <= 0;
+                    pViews.limit !== -1 && pViews.remaining <= 0;
 
                   return (
-                    <tr key={m.userId} className="hover:bg-casa-canvas/50 transition-colors">
+                    <tr key={m.userId || Math.random()} className="hover:bg-casa-canvas/50 transition-colors">
                       <td className="p-3.5">
-                        <div className="font-bold text-casa-text-primary">{m.userName}</div>
-                        <div className="text-[11px] text-casa-text-muted font-mono">{m.userMobile}</div>
+                        <div className="font-bold text-casa-text-primary">{m.userName || 'User'}</div>
+                        <div className="text-[11px] text-casa-text-muted font-mono">{m.userMobile || '—'}</div>
                         <div className="text-[10px] text-casa-brand font-mono uppercase">
-                          {m.accountType || m.role}
+                          {m.accountType || m.role || 'USER'}
                         </div>
                       </td>
 
@@ -187,8 +197,8 @@ export default function UsageMonitoringPage() {
                       <td className="p-3.5">
                         <div className="flex items-center justify-between mb-1">
                           <span className="font-bold text-casa-text-primary font-mono">
-                            {m.propertyViews.used} /{' '}
-                            {m.propertyViews.limit === -1 ? '∞' : m.propertyViews.limit + m.propertyViews.bonus}
+                            {pViews.used} /{' '}
+                            {pViews.limit === -1 ? '∞' : pViews.limit + (pViews.bonus || 0)}
                           </span>
                           {isViewsExhausted && (
                             <span className="text-[10px] font-bold text-red-600 bg-red-100 dark:bg-red-950 px-1 rounded">
@@ -196,7 +206,7 @@ export default function UsageMonitoringPage() {
                             </span>
                           )}
                         </div>
-                        {m.propertyViews.limit !== -1 && (
+                        {pViews.limit !== -1 && (
                           <div className="w-full bg-casa-canvas rounded-full h-1.5 overflow-hidden">
                             <div
                               className={`h-full rounded-full ${
@@ -210,31 +220,31 @@ export default function UsageMonitoringPage() {
                             />
                           </div>
                         )}
-                        {m.propertyViews.bonus > 0 && (
+                        {(pViews.bonus || 0) > 0 && (
                           <span className="text-[10px] text-emerald-600 font-semibold block mt-0.5">
-                            +{m.propertyViews.bonus} bonus views added
+                            +{pViews.bonus} bonus views added
                           </span>
                         )}
                       </td>
 
                       {/* Listings */}
                       <td className="p-3.5 font-mono">
-                        <span className="font-bold text-casa-text-primary">{m.propertyListings.used}</span> /{' '}
-                        <span>{m.propertyListings.limit === -1 ? '∞' : m.propertyListings.limit + m.propertyListings.bonus}</span>
-                        {m.propertyListings.bonus > 0 && (
+                        <span className="font-bold text-casa-text-primary">{pListings.used}</span> /{' '}
+                        <span>{pListings.limit === -1 ? '∞' : pListings.limit + (pListings.bonus || 0)}</span>
+                        {(pListings.bonus || 0) > 0 && (
                           <span className="text-[10px] text-emerald-600 font-semibold block">
-                            +{m.propertyListings.bonus} bonus
+                            +{pListings.bonus} bonus
                           </span>
                         )}
                       </td>
 
                       {/* Leads */}
                       <td className="p-3.5 font-mono">
-                        <span className="font-bold text-casa-text-primary">{m.leads.used}</span> /{' '}
-                        <span>{m.leads.limit === -1 ? '∞' : m.leads.limit + m.leads.bonus}</span>
-                        {m.leads.bonus > 0 && (
+                        <span className="font-bold text-casa-text-primary">{pLeads.used}</span> /{' '}
+                        <span>{pLeads.limit === -1 ? '∞' : pLeads.limit + (pLeads.bonus || 0)}</span>
+                        {(pLeads.bonus || 0) > 0 && (
                           <span className="text-[10px] text-emerald-600 font-semibold block">
-                            +{m.leads.bonus} bonus
+                            +{pLeads.bonus} bonus
                           </span>
                         )}
                       </td>
@@ -244,7 +254,7 @@ export default function UsageMonitoringPage() {
                         <div className="flex items-center justify-end gap-1.5">
                           <button
                             onClick={() => setSelectedUser(m)}
-                            className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-casa-brand text-white shadow-2xs hover:bg-casa-brand/90"
+                            className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-casa-brand text-white shadow-xs hover:bg-casa-brand/90"
                           >
                             <Sparkles className="w-3 h-3" />
                             <span>Bonus</span>

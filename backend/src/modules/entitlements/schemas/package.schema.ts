@@ -5,6 +5,11 @@ export type PackageDocument = Package & Document;
 
 export enum BillingPeriod {
   FREE = 'FREE',
+  ONE_MONTH = '1_MONTH',
+  SIXTY_DAYS = '60_DAYS',
+  NINETY_DAYS = '90_DAYS',
+  SIX_MONTHS = '6_MONTHS',
+  ONE_YEAR = '1_YEAR',
   MONTHLY = 'MONTHLY',
   QUARTERLY = 'QUARTERLY',
   YEARLY = 'YEARLY',
@@ -60,6 +65,9 @@ export class Package {
 
   @Prop({ required: true, enum: Object.values(BillingPeriod), default: BillingPeriod.FREE })
   billingPeriod: BillingPeriod;
+
+  @Prop({ default: 30 })
+  durationDays: number;
 
   @Prop({ default: true, index: true })
   isActive: boolean;

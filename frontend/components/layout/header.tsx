@@ -38,6 +38,7 @@ import {
   ExternalLink,
   Shield,
   MapPin,
+  PhoneCall,
 } from 'lucide-react';
 
 const ADMIN_PORTAL_URL = process.env.NEXT_PUBLIC_ADMIN_URL || 'http://localhost:3001';
@@ -46,7 +47,17 @@ export function Header() {
   const router = useRouter();
   const { locale, setLocale, t, isRtl } = useLanguage();
   const { theme, resolvedTheme, setTheme } = useTheme();
-  const { user, isAuthenticated, openAuthModal, logout } = useAuth();
+  const {
+    user,
+    isAuthenticated,
+    openAuthModal,
+    logout,
+    openPlanSelectionModal,
+    openTrialExpiredModal,
+    isTrialActive,
+    isTrialExpired,
+    trialDaysRemaining,
+  } = useAuth();
   const [isLangModalOpen, setIsLangModalOpen] = React.useState(false);
   const [isLocationModalOpen, setIsLocationModalOpen] = React.useState(false);
   const [headerLocation, setHeaderLocation] = React.useState<SelectedLocationData>({
@@ -163,6 +174,31 @@ export function Header() {
                 <span className="uppercase">{locale}</span>
               </button>
 
+              {/* 3-Day Trial Status Pill (Active or Expired) */}
+              {isAuthenticated && isTrialActive && (
+                <button
+                  type="button"
+                  onClick={openPlanSelectionModal}
+                  className="hidden md:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30 text-xs font-bold transition-all cursor-pointer"
+                  title="3-Day Free Trial Active. Click to view all plans."
+                >
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                  <span>3-Day Trial: {trialDaysRemaining}d Left</span>
+                </button>
+              )}
+
+              {isAuthenticated && isTrialExpired && (
+                <button
+                  type="button"
+                  onClick={openTrialExpiredModal}
+                  className="hidden md:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-700 dark:text-red-400 border border-red-500/30 text-xs font-bold transition-all animate-pulse cursor-pointer"
+                  title="3-Day Trial Expired. Click to call our sales department to activate."
+                >
+                  <PhoneCall className="w-3.5 h-3.5 text-red-500 animate-bounce" />
+                  <span>Trial Ended • Call Sales</span>
+                </button>
+              )}
+
               {/* Login / Authenticated User Profile */}
               {isAuthenticated && user ? (
                 <div className="relative hidden sm:block">
@@ -187,7 +223,7 @@ export function Header() {
                   {/* Dropdown Menu */}
                   {isUserMenuOpen && (
                     <div
-                      className="absolute right-0 mt-2 w-56 bg-casa-surface rounded-2xl shadow-elevated border border-casa-border-light py-2 z-50 animate-in fade-in slide-in-from-top-2 text-start"
+                      className="absolute right-0 mt-2 w-60 bg-casa-surface rounded-2xl shadow-elevated border border-casa-border-light py-2 z-50 animate-in fade-in slide-in-from-top-2 text-start"
                       onClick={() => setIsUserMenuOpen(false)}
                     >
                       {/* User Header Profile */}
@@ -203,6 +239,64 @@ export function Header() {
                             {user.normalizedMobile}
                           </span>
                         </div>
+                      </div>
+
+                      {/* Trial & Membership Card in Dropdown */}
+                      <div className="px-3.5 py-2 border-b border-casa-border-light bg-casa-canvas/50">
+                        {isTrialActive ? (
+                          <div className="space-y-1">
+                            <div className="flex items-center justify-between text-[11px]">
+                              <span className="font-bold text-emerald-600 flex items-center gap-1">
+                                <Sparkles className="w-3 h-3" /> 3-Day Trial Active
+                              </span>
+                              <span className="font-mono text-casa-text-muted">{trialDaysRemaining}d remaining</span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setIsUserMenuOpen(false);
+                                openPlanSelectionModal();
+                              }}
+                              className="text-[10px] text-casa-brand hover:underline font-semibold block text-start"
+                            >
+                              View all membership tiers →
+                            </button>
+                          </div>
+                        ) : isTrialExpired ? (
+                          <div className="space-y-1.5">
+                            <div className="text-[11px] font-bold text-red-600 flex items-center gap-1">
+                              <PhoneCall className="w-3 h-3 text-red-500 animate-bounce" /> 3-Day Trial Expired
+                            </div>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setIsUserMenuOpen(false);
+                                openTrialExpiredModal();
+                              }}
+                              className="w-full py-1.5 px-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-[11px] text-center shadow-sm flex items-center justify-center gap-1.5"
+                            >
+                              <PhoneCall className="w-3 h-3" />
+                              <span>Call Sales Desk to Renew</span>
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setIsUserMenuOpen(false);
+                              openPlanSelectionModal();
+                            }}
+                            className="w-full flex items-center justify-between text-xs text-casa-brand font-bold hover:underline"
+                          >
+                            <span className="flex items-center gap-1">
+                              <Sparkles className="w-3 h-3" /> Membership Plans
+                            </span>
+                            <span>→</span>
+                          </button>
+                        )}
                       </div>
 
                       {/* 1. Admin / Super Admin Portal Link */}
@@ -640,6 +734,41 @@ export function Header() {
                 <span className="text-[10px] text-casa-brand font-medium uppercase block mb-2">
                   {user?.role}
                 </span>
+
+                {/* Mobile Trial Pill */}
+                {isTrialActive && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsMobileMenuOpen(false);
+                      openPlanSelectionModal();
+                    }}
+                    className="w-full mb-2.5 px-2.5 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-700 dark:text-emerald-400 text-xs font-bold flex items-center justify-between cursor-pointer"
+                  >
+                    <span className="flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                      3-Day Trial Active
+                    </span>
+                    <span>{trialDaysRemaining}d left →</span>
+                  </button>
+                )}
+
+                {isTrialExpired && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsMobileMenuOpen(false);
+                      openTrialExpiredModal();
+                    }}
+                    className="w-full mb-2.5 px-2.5 py-1.5 rounded-lg bg-red-500/10 border border-red-500/30 text-red-700 dark:text-red-300 text-xs font-bold flex items-center justify-between animate-pulse cursor-pointer"
+                  >
+                    <span className="flex items-center gap-1.5">
+                      <PhoneCall className="w-3.5 h-3.5 text-red-500" />
+                      Trial Expired
+                    </span>
+                    <span className="underline">Call Sales Desk →</span>
+                  </button>
+                )}
 
                 {/* Role-Specific Workspace Mobile Links */}
                 <div className="space-y-1 mb-3 pt-2 border-t border-casa-border-light">

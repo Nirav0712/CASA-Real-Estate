@@ -16,12 +16,13 @@ import {
   Sparkles,
   Lock,
 } from 'lucide-react';
-import { getRoles, deleteRole, duplicateRole } from '@/services/entitlements-service';
+import { getRoles, deleteRole, duplicateRole, bulkDeleteRoles } from '@/services/entitlements-service';
 import { RoleRecord } from '@/types';
 
 export default function RolesManagementPage() {
   const router = useRouter();
   const [roles, setRoles] = useState<RoleRecord[]>([]);
+  const [selectedRoleIds, setSelectedRoleIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [filterType, setFilterType] = useState<string>('ALL');
@@ -46,13 +47,49 @@ export default function RolesManagementPage() {
     fetchRolesList();
   }, []);
 
+  const toggleSelectRole = (id: string) => {
+    setSelectedRoleIds((prev) =>
+      prev.includes(id) ? prev.filter((rId) => rId !== id) : [...prev, id],
+    );
+  };
+
+  const handleSelectAll = (selectableIds: string[]) => {
+    if (selectedRoleIds.length === selectableIds.length) {
+      setSelectedRoleIds([]);
+    } else {
+      setSelectedRoleIds(selectableIds);
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedRoleIds.length === 0) return;
+    if (
+      !window.confirm(
+        `Are you sure you want to delete ${selectedRoleIds.length} selected role(s)? This action cannot be undone.`,
+      )
+    ) {
+      return;
+    }
+    try {
+      setActionLoading('bulk');
+      await bulkDeleteRoles(selectedRoleIds);
+      setSelectedRoleIds([]);
+      await fetchRolesList();
+    } catch (err: any) {
+      alert(err.message || 'Failed to delete selected roles');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
   const handleDelete = async (id: string, name: string) => {
-    if (!window.confirm(`Are you sure you want to delete custom role "${name}"? This action cannot be undone.`)) {
+    if (!window.confirm(`Are you sure you want to delete role "${name}"? This action cannot be undone.`)) {
       return;
     }
     try {
       setActionLoading(id);
       await deleteRole(id);
+      setSelectedRoleIds((prev) => prev.filter((rId) => rId !== id));
       await fetchRolesList();
     } catch (err: any) {
       alert(err.message || 'Failed to delete role');
@@ -136,6 +173,34 @@ export default function RolesManagementPage() {
         </div>
 
         <div className="flex items-center gap-2 w-full md:w-auto overflow-x-auto pb-1">
+          {/* Select All Toggle Button */}
+          {filteredRoles.filter((r) => r.slug !== 'super-admin').length > 0 && (
+            <button
+              onClick={() =>
+                handleSelectAll(
+                  filteredRoles
+                    .filter((r) => r.slug !== 'super-admin')
+                    .map((r) => r.id || r._id || ''),
+                )
+              }
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors shrink-0 flex items-center gap-1.5 ${
+                selectedRoleIds.length > 0 &&
+                selectedRoleIds.length ===
+                  filteredRoles.filter((r) => r.slug !== 'super-admin').length
+                  ? 'bg-red-600 text-white'
+                  : 'bg-casa-canvas text-casa-text-primary border border-casa-border-light hover:bg-casa-subtle'
+              }`}
+            >
+              <span>
+                {selectedRoleIds.length > 0 &&
+                selectedRoleIds.length ===
+                  filteredRoles.filter((r) => r.slug !== 'super-admin').length
+                  ? 'Deselect All'
+                  : 'Select All Roles'}
+              </span>
+            </button>
+          )}
+
           {['ALL', 'SYSTEM', 'CUSTOM', 'PLATFORM', 'MARKETPLACE'].map((tab) => (
             <button
               key={tab}
@@ -151,6 +216,31 @@ export default function RolesManagementPage() {
           ))}
         </div>
       </div>
+
+      {/* Bulk Delete Bar */}
+      {selectedRoleIds.length > 0 && (
+        <div className="p-4 bg-red-500/10 border-2 border-red-500/30 rounded-2xl flex items-center justify-between gap-3 animate-in fade-in shadow-sm">
+          <div className="flex items-center gap-3">
+            <span className="text-xs font-bold text-red-700 dark:text-red-400">
+              {selectedRoleIds.length} Role(s) Selected
+            </span>
+            <button
+              onClick={() => setSelectedRoleIds([])}
+              className="text-xs text-casa-text-muted hover:underline"
+            >
+              Clear Selection
+            </button>
+          </div>
+          <button
+            onClick={handleBulkDelete}
+            disabled={actionLoading === 'bulk'}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-xs shadow-md transition-all cursor-pointer"
+          >
+            <Trash2 className="w-4 h-4" />
+            <span>{actionLoading === 'bulk' ? 'Deleting Roles...' : `Delete Selected Roles (${selectedRoleIds.length})`}</span>
+          </button>
+        </div>
+      )}
 
       {/* Error state */}
       {error && (
@@ -171,28 +261,50 @@ export default function RolesManagementPage() {
           {filteredRoles.map((role) => {
             const roleId = role.id || role._id || '';
             const isSuperAdmin = role.slug === 'super-admin' || role.permissions.includes('*');
+            const isSelected = selectedRoleIds.includes(roleId);
 
             return (
               <div
                 key={roleId}
-                className="bg-casa-surface rounded-2xl border border-casa-border-light p-5 flex flex-col justify-between hover:shadow-subtle transition-all"
+                className={`bg-casa-surface rounded-2xl border p-5 flex flex-col justify-between hover:shadow-subtle transition-all ${
+                  isSelected
+                    ? 'border-red-500 ring-2 ring-red-500/20 bg-red-50/10'
+                    : 'border-casa-border-light'
+                }`}
               >
                 <div>
                   <div className="flex items-start justify-between gap-2 mb-3">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-bold text-sm text-casa-text-primary">{role.name}</span>
-                        {role.isSystemRole ? (
-                          <span className="px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300">
-                            SYSTEM
-                          </span>
-                        ) : (
-                          <span className="px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-300">
-                            CUSTOM
-                          </span>
-                        )}
+                    <div className="flex items-center gap-2.5">
+                      {/* Checkbox for Bulk/Single Select */}
+                      {!isSuperAdmin ? (
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => toggleSelectRole(roleId)}
+                          aria-label={`Select ${role.name}`}
+                          className="w-4 h-4 rounded text-red-600 focus:ring-red-500 cursor-pointer"
+                        />
+                      ) : (
+                        <span title="Core Protected Role">
+                          <Lock className="w-3.5 h-3.5 text-casa-text-muted" />
+                        </span>
+                      )}
+
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-sm text-casa-text-primary">{role.name}</span>
+                          {role.isSystemRole ? (
+                            <span className="px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300">
+                              SYSTEM
+                            </span>
+                          ) : (
+                            <span className="px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-300">
+                              CUSTOM
+                            </span>
+                          )}
+                        </div>
+                        <span className="text-[11px] text-casa-text-muted font-mono">{role.slug}</span>
                       </div>
-                      <span className="text-[11px] text-casa-text-muted font-mono">{role.slug}</span>
                     </div>
 
                     <span
@@ -265,11 +377,12 @@ export default function RolesManagementPage() {
                       <Edit2 className="w-3.5 h-3.5" />
                     </Link>
 
-                    {!role.isSystemRole && (
+                    {/* Single Delete Button */}
+                    {!isSuperAdmin && (
                       <button
                         onClick={() => handleDelete(roleId, role.name)}
                         disabled={actionLoading === roleId}
-                        title="Delete Custom Role"
+                        title="Delete Role"
                         className="p-1.5 rounded-lg text-casa-text-muted hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950 transition-colors"
                       >
                         <Trash2 className="w-3.5 h-3.5" />

@@ -12,7 +12,12 @@ import { AgentVerificationDocument, AgentVerificationDocumentSchema } from '../a
 import { Role, RoleSchema } from '../entitlements/schemas/role.schema';
 import { Lead, LeadSchema } from '../leads/schemas/lead.schema';
 import { Payment, PaymentSchema } from '../payments/schemas/payment.schema';
+import { SystemSetting, SystemSettingSchema } from './schemas/system-setting.schema';
+import { Package, PackageSchema } from '../entitlements/schemas/package.schema';
+import { Subscription, SubscriptionSchema } from '../payments/schemas/subscription.schema';
 import { AuthModule } from '../auth/auth.module';
+
+import { SettingsPublicController } from './settings-public.controller';
 
 @Module({
   imports: [
@@ -27,10 +32,13 @@ import { AuthModule } from '../auth/auth.module';
       { name: Role.name, schema: RoleSchema },
       { name: Lead.name, schema: LeadSchema },
       { name: Payment.name, schema: PaymentSchema },
+      { name: SystemSetting.name, schema: SystemSettingSchema },
+      { name: Package.name, schema: PackageSchema },
+      { name: Subscription.name, schema: SubscriptionSchema },
     ]),
     AuthModule,
   ],
-  controllers: [AdminController],
+  controllers: [AdminController, SettingsPublicController],
   providers: [AdminService],
   exports: [AdminService],
 })

@@ -212,10 +212,13 @@ export default function CreatePackagePage() {
               onChange={(e) => setBillingPeriod(e.target.value as BillingPeriod)}
               className="w-full px-3 py-2 text-xs bg-casa-canvas border border-casa-border-light rounded-xl text-casa-text-primary focus:border-casa-brand focus:outline-hidden font-mono"
             >
-              <option value="MONTHLY">MONTHLY (Every 30 days)</option>
-              <option value="QUARTERLY">QUARTERLY (Every 90 days)</option>
-              <option value="ANNUALLY">ANNUALLY (365 days)</option>
-              <option value="LIFETIME">LIFETIME (Non-expiring)</option>
+              <option value="1_MONTH">1 Month (30 Days)</option>
+              <option value="60_DAYS">60 Days (2 Months)</option>
+              <option value="90_DAYS">90 Days (3 Months / Quarter)</option>
+              <option value="6_MONTHS">6 Months (Half-Yearly)</option>
+              <option value="1_YEAR">1 Year (365 Days Annual)</option>
+              <option value="MONTHLY">Monthly Standard (30 Days)</option>
+              <option value="FREE">Free Trial / Community</option>
             </select>
           </div>
         </div>

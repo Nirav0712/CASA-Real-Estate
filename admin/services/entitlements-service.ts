@@ -84,6 +84,18 @@ export async function deleteRole(id: string): Promise<{ success: boolean; messag
   return json;
 }
 
+export async function bulkDeleteRoles(ids: string[]): Promise<{ success: boolean; message: string; deletedCount: number }> {
+  const res = await fetch(`${API_BASE_URL}/admin/entitlements/roles/bulk-delete`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    credentials: 'include',
+    body: JSON.stringify({ ids }),
+  });
+  const json = await res.json().catch(() => null);
+  if (!res.ok) throw new Error(json?.message || json?.error || 'Failed to bulk delete roles');
+  return json?.data || json;
+}
+
 export async function duplicateRole(id: string): Promise<RoleRecord> {
   const res = await fetch(`${API_BASE_URL}/admin/entitlements/roles/${id}/duplicate`, {
     method: 'POST',
@@ -185,7 +197,21 @@ export async function getUsageMetrics(params?: { search?: string; page?: number;
   });
   const json = await res.json().catch(() => null);
   if (!res.ok) throw new Error(json?.message || json?.error || 'Failed to fetch usage metrics');
-  return json?.data !== undefined ? json : { data: [], pagination: { total: 0, page: 1, limit: 10, totalPages: 0 } };
+
+  const payload = json?.data !== undefined ? json.data : json;
+  const list = Array.isArray(payload)
+    ? payload
+    : Array.isArray(payload?.data)
+    ? payload.data
+    : [];
+  const pagination = payload?.pagination || json?.pagination || {
+    total: list.length,
+    page: 1,
+    limit: 20,
+    totalPages: 1,
+  };
+
+  return { data: list, pagination };
 }
 
 export async function getUserOverrides(userId: string): Promise<UserOverrides> {

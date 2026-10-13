@@ -3,6 +3,7 @@ import {
   Get,
   Post,
   Param,
+  Body,
   Req,
   Ip,
   UseGuards,
@@ -52,5 +53,13 @@ export class EntitlementsClientController {
     const userId = req.user?.id || null;
     const propertyId = req.body?.propertyId || req.body?.id;
     return this.entitlementsService.trackAndValidatePropertyView(userId, propertyId, ip);
+  }
+
+  @Post('start-trial')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Activate 3-day full access free trial for selected package' })
+  @ApiResponse({ status: 200, description: '3-day trial activated' })
+  startTrial(@Body() body: { packageId: string }, @Req() req: any): Promise<any> {
+    return this.entitlementsService.startTrial(req.user.id, body.packageId);
   }
 }

@@ -22,6 +22,9 @@ import { Role, RoleDocument } from '../entitlements/schemas/role.schema';
 import { Lead, LeadDocument } from '../leads/schemas/lead.schema';
 import { Payment, PaymentDocument } from '../payments/schemas/payment.schema';
 import { PaymentStatus } from '../payments/enums/payment.enums';
+import { SystemSetting, SystemSettingDocument } from './schemas/system-setting.schema';
+import { Package, PackageDocument } from '../entitlements/schemas/package.schema';
+import { Subscription, SubscriptionDocument } from '../payments/schemas/subscription.schema';
 import { AdminUserQueryDto } from './dto/admin-user-query.dto';
 import { UpdateUserStatusDto } from './dto/update-user-status.dto';
 import { UpdateUserRoleDto } from './dto/update-user-role.dto';
@@ -261,6 +264,9 @@ export class AdminService implements OnModuleInit {
     @InjectModel(Role.name) private readonly roleModel: Model<RoleDocument>,
     @InjectModel(Lead.name) private readonly leadModel: Model<LeadDocument>,
     @InjectModel(Payment.name) private readonly paymentModel: Model<PaymentDocument>,
+    @InjectModel(SystemSetting.name) private readonly systemSettingModel: Model<SystemSettingDocument>,
+    @InjectModel(Package.name) private readonly packageModel: Model<PackageDocument>,
+    @InjectModel(Subscription.name) private readonly subscriptionModel: Model<SubscriptionDocument>,
     private readonly authService: AuthService,
   ) {}
 
@@ -2288,23 +2294,48 @@ export class AdminService implements OnModuleInit {
     };
   }
 
-  async getPurchasers(dto: AdminUserQueryDto) {
-    const filter: any = {
-      role: UserRole.PURCHASER,
-    };
+  async getPurchasers(dto: AdminUserQueryDto & { category?: string }) {
+    const filter: any = {};
+    const now = new Date();
+
+    // Category filtering
+    if (dto.category === 'FREE_TRIAL') {
+      filter.$or = [
+        { trialStartedAt: { $ne: null } },
+        { trialPackageId: { $ne: null } },
+      ];
+    } else if (dto.category === 'PAID') {
+      filter.activePackageId = { $ne: null };
+    } else if (dto.category === 'EXPIRED') {
+      filter.trialExpiresAt = { $lt: now };
+    } else if (dto.category === 'BUYER') {
+      filter.role = { $in: [UserRole.BUYER, UserRole.PURCHASER] };
+    } else {
+      // By default show purchasers, trial users, subscribers, or buyers
+      filter.$or = [
+        { role: { $in: [UserRole.PURCHASER, UserRole.BUYER] } },
+        { trialPackageId: { $ne: null } },
+        { trialStartedAt: { $ne: null } },
+        { activePackageId: { $ne: null } },
+      ];
+    }
 
     if (dto.q && dto.q.trim()) {
       const q = dto.q.trim();
       const regex = new RegExp(q, 'i');
-      filter.$or = [
-        { name: regex },
-        { mobile: regex },
-        { normalizedMobile: regex },
-        { email: regex },
+      filter.$and = [
+        {
+          $or: [
+            { name: regex },
+            { mobile: regex },
+            { normalizedMobile: regex },
+            { email: regex },
+          ],
+        },
       ];
     }
 
-    if (dto.status) {
+    if (dto.status && (dto.status as any) !== 'ALL') {
       filter.status = dto.status;
     }
 
@@ -2312,25 +2343,71 @@ export class AdminService implements OnModuleInit {
     const limit = Math.min(50, Math.max(1, Number(dto.limit) || 20));
     const skip = (page - 1) * limit;
 
-    const [total, purchasers] = await Promise.all([
+    const [total, users] = await Promise.all([
       this.userModel.countDocuments(filter),
       this.userModel.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
     ]);
 
-    const data = purchasers.map((p: any) => ({
-      id: p._id.toString(),
-      _id: p._id.toString(),
-      name: p.name || 'Purchaser',
-      mobile: p.mobile,
-      normalizedMobile: p.normalizedMobile,
-      email: p.email,
-      role: p.role,
-      status: p.status || 'ACTIVE',
-      savedProperties: 0,
-      totalEnquiries: 0,
-      lastLoginAt: p.lastLoginAt || p.updatedAt || p.createdAt,
-      createdAt: p.createdAt,
-    }));
+    // Collect package IDs to bulk fetch plan details
+    const pkgIds = new Set<string>();
+    users.forEach((u: any) => {
+      if (u.trialPackageId) pkgIds.add(u.trialPackageId.toString());
+      if (u.activePackageId) pkgIds.add(u.activePackageId.toString());
+    });
+
+    const packages = await this.packageModel.find({ _id: { $in: Array.from(pkgIds) } }).lean();
+    const pkgMap = new Map<string, any>();
+    packages.forEach((pkg: any) => {
+      pkgMap.set(pkg._id.toString(), pkg);
+    });
+
+    const currentTime = Date.now();
+
+    const data = users.map((p: any) => {
+      const trialPkg = p.trialPackageId ? pkgMap.get(p.trialPackageId.toString()) : null;
+      const activePkg = p.activePackageId ? pkgMap.get(p.activePackageId.toString()) : null;
+      const currentPkg = activePkg || trialPkg;
+
+      const isTrial = Boolean(p.trialExpiresAt || p.trialPackageId || p.trialStartedAt);
+      const expiresAt = p.trialExpiresAt ? new Date(p.trialExpiresAt) : null;
+      const isExpired = expiresAt ? currentTime > expiresAt.getTime() : false;
+      const daysRemaining =
+        expiresAt && !isExpired
+          ? Math.max(1, Math.ceil((expiresAt.getTime() - currentTime) / (1000 * 60 * 60 * 24)))
+          : 0;
+
+      let planCategory = 'FREE_PLAN';
+      if (activePkg) planCategory = 'PAID_PLAN';
+      else if (isTrial && isExpired) planCategory = 'TRIAL_EXPIRED';
+      else if (isTrial) planCategory = 'FREE_TRIAL';
+
+      return {
+        id: p._id.toString(),
+        _id: p._id.toString(),
+        name: p.name || 'CASA User',
+        mobile: p.mobile,
+        normalizedMobile: p.normalizedMobile,
+        email: p.email,
+        role: p.role,
+        accountType: p.accountType || null,
+        status: p.status || 'ACTIVE',
+        // Plan & Package details
+        planName: currentPkg ? currentPkg.name : (isTrial ? '3-Day Free Trial' : 'Free Buyer Plan'),
+        planSlug: currentPkg ? currentPkg.slug : (isTrial ? 'trial-3-day' : 'free-buyer'),
+        planPrice: currentPkg ? currentPkg.price : 0,
+        billingPeriod: currentPkg ? currentPkg.billingPeriod : (isTrial ? '3_DAYS_TRIAL' : 'FREE'),
+        planCategory,
+        isTrial,
+        isExpired,
+        trialStartedAt: p.trialStartedAt || null,
+        trialExpiresAt: p.trialExpiresAt || null,
+        daysRemaining,
+        savedProperties: 0,
+        totalEnquiries: 0,
+        lastLoginAt: p.lastLoginAt || p.updatedAt || p.createdAt,
+        createdAt: p.createdAt,
+      };
+    });
 
     const totalPages = Math.ceil(total / limit) || 1;
 
@@ -2409,4 +2486,212 @@ export class AdminService implements OnModuleInit {
       },
     };
   }
+
+  // =========================================================================
+  // REAL-TIME NOTIFICATIONS & ENQUIRY DISPATCHER
+  // =========================================================================
+
+  async getAdminNotifications(query: { limit?: number; type?: string; unreadOnly?: boolean } = {}) {
+    const limit = Math.max(1, Math.min(100, Number(query.limit) || 40));
+
+    // 1. Fetch Inquiries / Leads from MongoDB
+    const leadFilter: any = {};
+    if (query.unreadOnly) {
+      leadFilter.status = 'NEW';
+    }
+    const recentLeads = await this.leadModel
+      .find(leadFilter)
+      .sort({ createdAt: -1 })
+      .limit(limit)
+      .lean()
+      .exec();
+
+    // 2. Fetch Pending Property Moderations
+    const pendingProperties = await this.propertyModel
+      .find({ status: { $in: ['PENDING_REVIEW', 'PENDING_APPROVAL'] } })
+      .sort({ createdAt: -1 })
+      .limit(20)
+      .lean()
+      .exec();
+
+    // 3. Fetch Pending KYC Submissions
+    const pendingKycs = await this.agentDocumentModel
+      .find({ status: 'PENDING' })
+      .sort({ createdAt: -1 })
+      .limit(20)
+      .lean()
+      .exec();
+
+    // 4. Fetch Recent Paid Transactions / Subscriptions
+    const recentPayments = await this.paymentModel
+      .find({ status: PaymentStatus.PAID })
+      .sort({ createdAt: -1 })
+      .limit(15)
+      .lean()
+      .exec();
+
+    // Build normalized notification items
+    const notifications: any[] = [];
+
+    // Map Inquiries / Leads
+    for (const lead of recentLeads) {
+      notifications.push({
+        id: `lead_${lead._id}`,
+        rawId: lead._id.toString(),
+        type: 'INQUIRY',
+        badgeLabel: 'Buyer Enquiry',
+        title: `Property Enquiry from ${lead.name || lead.contactName || 'Buyer'}`,
+        desc: lead.message || (lead as any).subject || 'Expressed purchase/rental interest',
+        time: lead.createdAt ? new Date(lead.createdAt).toISOString() : new Date().toISOString(),
+        senderName: lead.name || lead.contactName || 'Buyer',
+        senderPhone: lead.mobile || lead.contactPhone || '',
+        senderEmail: lead.email || (lead as any).contactEmail || '',
+        propertyTitle: (lead as any).propertyTitle || 'Listing Inquiry',
+        propertyId: lead.propertyId || '',
+        priority: lead.priority || 'MEDIUM',
+        status: lead.status || 'NEW',
+        isRead: lead.status !== 'NEW',
+        link: `/enquiries`,
+      });
+    }
+
+    // Map Pending Property Moderation
+    for (const prop of pendingProperties) {
+      const propTitle = typeof prop.title === 'string' ? prop.title : (prop as any).title?.en || 'New Property';
+      notifications.push({
+        id: `prop_${prop._id}`,
+        rawId: prop._id.toString(),
+        type: 'MODERATION',
+        badgeLabel: 'Property Review',
+        title: `New Property Listing Submitted: ${propTitle}`,
+        desc: `${(prop as any).location?.locality || ''}, ${(prop as any).location?.city || ''} (Price: ₹${(prop as any).price?.amount?.toLocaleString('en-IN') || '0'})`,
+        time: (prop as any).createdAt ? new Date((prop as any).createdAt).toISOString() : new Date().toISOString(),
+        senderName: (prop as any).advertiser?.name || 'Property Owner',
+        senderPhone: (prop as any).advertiser?.phone || '',
+        propertyTitle: propTitle,
+        propertyId: prop._id.toString(),
+        status: (prop as any).status || 'PENDING_REVIEW',
+        isRead: false,
+        link: `/moderation`,
+      });
+    }
+
+    // Map KYC Submissions
+    for (const kyc of pendingKycs) {
+      const k = kyc as any;
+      notifications.push({
+        id: `kyc_${k._id}`,
+        rawId: k._id.toString(),
+        type: 'KYC',
+        badgeLabel: 'Agent KYC',
+        title: `Agent Verification Document Uploaded: ${k.documentType || 'RERA/ID'}`,
+        desc: `Document: ${k.documentNumber || k.fileName || 'Pending agent identity validation'}`,
+        time: k.createdAt ? new Date(k.createdAt).toISOString() : new Date().toISOString(),
+        senderName: `Agent (${k.agentId?.toString().slice(-6) || 'KYC'})`,
+        status: 'PENDING',
+        isRead: false,
+        link: `/agents`,
+      });
+    }
+
+    // Map Payments
+    for (const pay of recentPayments) {
+      const p = pay as any;
+      notifications.push({
+        id: `pay_${p._id}`,
+        rawId: p._id.toString(),
+        type: 'BILLING',
+        badgeLabel: 'Subscription Billing',
+        title: `Payment Processed: ₹${p.amount?.toLocaleString('en-IN') || 0}`,
+        desc: `Purpose: ${p.purpose || 'Subscription'} | Gateway Ref: ${p.gatewayOrderId || p.razorpayPaymentId || 'Verified'}`,
+        time: p.createdAt ? new Date(p.createdAt).toISOString() : new Date().toISOString(),
+        status: 'PAID',
+        isRead: true,
+        link: `/payments`,
+      });
+    }
+
+    // Sort by timestamp descending
+    notifications.sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime());
+
+    // Filter by type if requested
+    let filtered = notifications;
+    if (query.type && query.type !== 'ALL') {
+      filtered = filtered.filter((n) => n.type === query.type);
+    }
+
+    const unreadCount = notifications.filter((n) => !n.isRead).length;
+
+    return {
+      success: true,
+      data: filtered.slice(0, limit),
+      unreadCount,
+      total: notifications.length,
+      timestamp: new Date().toISOString(),
+    };
+  }
+
+  async markAdminNotificationRead(id: string) {
+    if (id.startsWith('lead_')) {
+      const rawId = id.replace('lead_', '');
+      if (isValidObjectId(rawId)) {
+        await this.leadModel.updateOne({ _id: rawId, status: 'NEW' }, { $set: { status: 'CONTACTED' } });
+      }
+    }
+    return { success: true, message: 'Notification marked as read' };
+  }
+
+  async markAllAdminNotificationsRead() {
+    await this.leadModel.updateMany({ status: 'NEW' }, { $set: { status: 'CONTACTED' } });
+    return { success: true, message: 'All notifications marked as read' };
+  }
+
+  // =========================================================================
+  // SYSTEM & COMPANY HOTLINE SETTINGS
+  // =========================================================================
+
+  async getSystemSettings(): Promise<SystemSettingDocument> {
+    let settings = await this.systemSettingModel.findOne().exec();
+    if (!settings) {
+      settings = await this.systemSettingModel.create({
+        appName: 'CASA Real Estate Marketplace',
+        companySalesNumber: '+91 98765 43210',
+        companyServiceNumber: '+91 98765 43211',
+        companySalesEmail: 'sales@casarealestate.com',
+        companySupportEmail: 'support@casarealestate.com',
+        companyAddress: 'Vibhuti Khand, Gomti Nagar, Lucknow, Uttar Pradesh, 226010',
+        trialDays: 3,
+        smsProvider: 'msg91',
+        smsSenderId: 'CASARE',
+        otpExpiryMinutes: 5,
+      });
+    }
+    return settings;
+  }
+
+  async updateSystemSettings(dto: Partial<SystemSetting>): Promise<SystemSettingDocument> {
+    let settings = await this.systemSettingModel.findOne().exec();
+    if (!settings) {
+      settings = await this.systemSettingModel.create(dto);
+    } else {
+      Object.assign(settings, dto);
+      await settings.save();
+    }
+    this.logger.log('⚙️ Platform Governance and Company Contact settings updated successfully.');
+    return settings;
+  }
+
+  async getPublicSettings() {
+    const settings = await this.getSystemSettings();
+    return {
+      appName: settings.appName || 'CASA Real Estate',
+      companySalesNumber: settings.companySalesNumber || '+91 98765 43210',
+      companyServiceNumber: settings.companyServiceNumber || '+91 98765 43211',
+      companySalesEmail: settings.companySalesEmail || 'sales@casarealestate.com',
+      companySupportEmail: settings.companySupportEmail || 'support@casarealestate.com',
+      companyAddress: settings.companyAddress || 'Vibhuti Khand, Gomti Nagar, Lucknow, UP',
+      trialDays: settings.trialDays || 3,
+    };
+  }
 }
+

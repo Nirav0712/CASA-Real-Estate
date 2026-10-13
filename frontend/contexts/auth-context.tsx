@@ -33,6 +33,18 @@ interface AuthContextType {
     role?: string,
     agencyName?: string,
   ) => Promise<void>;
+
+  // Pricing Plan & 3-Day Trial Modals
+  isPlanSelectionModalOpen: boolean;
+  openPlanSelectionModal: () => void;
+  closePlanSelectionModal: () => void;
+  isTrialExpiredModalOpen: boolean;
+  openTrialExpiredModal: () => void;
+  closeTrialExpiredModal: () => void;
+  refreshUser: () => Promise<void>;
+  isTrialActive: boolean;
+  isTrialExpired: boolean;
+  trialDaysRemaining: number;
 }
 
 const AuthContext = React.createContext<AuthContextType | undefined>(undefined);
@@ -43,6 +55,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = React.useState<boolean>(true);
   const [isAuthModalOpen, setIsAuthModalOpen] = React.useState<boolean>(false);
   const [authModalMode, setAuthModalMode] = React.useState<AuthModalMode>('SIGN_IN');
+  const [isPlanSelectionModalOpen, setIsPlanSelectionModalOpen] = React.useState<boolean>(false);
+  const [isTrialExpiredModalOpen, setIsTrialExpiredModalOpen] = React.useState<boolean>(false);
   const toast = useToast();
 
   // Instantly restore cached session from localStorage on mount, then silently refresh
@@ -95,6 +109,67 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       isMounted = false;
     };
   }, []);
+
+  const openPlanSelectionModal = React.useCallback(() => {
+    setIsPlanSelectionModalOpen(true);
+  }, []);
+
+  const closePlanSelectionModal = React.useCallback(() => {
+    setIsPlanSelectionModalOpen(false);
+  }, []);
+
+  const openTrialExpiredModal = React.useCallback(() => {
+    setIsTrialExpiredModalOpen(true);
+  }, []);
+
+  const closeTrialExpiredModal = React.useCallback(() => {
+    setIsTrialExpiredModalOpen(false);
+  }, []);
+
+  const refreshUser = React.useCallback(async () => {
+    try {
+      const currentToken =
+        token ||
+        (typeof window !== 'undefined' ? localStorage.getItem('casa_access_token') : null);
+      if (!currentToken) return;
+      const res = await authService.getCurrentUser(currentToken);
+      if (res && res.user) {
+        setUser(res.user);
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('casa_user', JSON.stringify(res.user));
+        }
+      }
+    } catch (err) {
+      console.warn('Silent refresh user error:', err);
+    }
+  }, [token]);
+
+  // Compute trial status dynamically
+  const trialStatus = React.useMemo(() => {
+    if (!user || !user.trialExpiresAt) {
+      return { isTrialActive: false, isTrialExpired: false, daysRemaining: 0 };
+    }
+    const expires = new Date(user.trialExpiresAt).getTime();
+    const now = Date.now();
+    const isExpired = now > expires;
+    const daysRemaining = isExpired
+      ? 0
+      : Math.max(1, Math.ceil((expires - now) / (1000 * 60 * 60 * 24)));
+    return {
+      isTrialActive: !isExpired,
+      isTrialExpired: isExpired,
+      daysRemaining,
+    };
+  }, [user]);
+
+  // Auto-prompt trial expired modal once per session if trial has passed
+  const hasPromptedExpiryRef = React.useRef(false);
+  React.useEffect(() => {
+    if (user && trialStatus.isTrialExpired && !hasPromptedExpiryRef.current) {
+      hasPromptedExpiryRef.current = true;
+      setIsTrialExpiredModalOpen(true);
+    }
+  }, [user, trialStatus.isTrialExpired]);
 
   const openAuthModal = React.useCallback((initialMode?: any) => {
     if (initialMode && typeof initialMode === 'string') {
@@ -158,7 +233,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             'Account Created',
             `Welcome to CASA, ${(res as any).user.name || (res as any).user.email}!`,
           );
+        } else {
+          setIsAuthModalOpen(false);
         }
+
+        // Open pricing plan selection popup for 3-day trial activation immediately after signup
+        setIsPlanSelectionModalOpen(true);
+
         return res;
       } catch (err: unknown) {
         const message = err instanceof Error ? err.message : 'Registration failed. Please try again.';
@@ -214,6 +295,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           'Welcome to CASA',
           `Signed in as ${res.user.name || res.user.normalizedMobile}${roleLabel}`,
         );
+
+        // If user has not started their 3-day trial yet, present plan selection popup
+        if (!res.user.trialStartedAt && !res.user.trialPackageId) {
+          setIsPlanSelectionModalOpen(true);
+        }
       } catch (err: unknown) {
         const message = err instanceof Error ? err.message : 'Invalid or expired OTP.';
         toast.error('Authentication Failed', message);
@@ -254,6 +340,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         logout,
         requestOtp,
         verifyOtp,
+        isPlanSelectionModalOpen,
+        openPlanSelectionModal,
+        closePlanSelectionModal,
+        isTrialExpiredModalOpen,
+        openTrialExpiredModal,
+        closeTrialExpiredModal,
+        refreshUser,
+        isTrialActive: trialStatus.isTrialActive,
+        isTrialExpired: trialStatus.isTrialExpired,
+        trialDaysRemaining: trialStatus.daysRemaining,
       }}
     >
       {children}

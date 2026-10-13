@@ -39,6 +39,10 @@ export interface AuthenticatedUser {
   hasPassword?: boolean;
   agencyName?: string;
   avatar?: string;
+  trialStartedAt?: Date | string | null;
+  trialExpiresAt?: Date | string | null;
+  trialPackageId?: string | null;
+  isTrialActive?: boolean;
 }
 
 export interface AuthTokens {

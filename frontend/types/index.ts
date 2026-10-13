@@ -42,6 +42,10 @@ export interface User {
   isVerifiedAgent: boolean;
   avatar?: string;
   agencyName?: string;
+  trialStartedAt?: string | null;
+  trialExpiresAt?: string | null;
+  trialPackageId?: string | null;
+  isTrialActive?: boolean;
 }
 
 export interface AuthTokens {

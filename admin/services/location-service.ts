@@ -141,3 +141,20 @@ export async function getPublicLocationChildren(parentId?: string): Promise<{
   const result = await fetchAdminApi<LocationRecord[]>(endpoint);
   return { children: result.data || [], error: result.error };
 }
+
+export async function seedWorldLocations(): Promise<{
+  success: boolean;
+  message?: string;
+  data?: { totalNodes: number; countries: string[] };
+  error: string | null;
+}> {
+  const result = await fetchAdminApi<any>('/admin/locations/seed-world', {
+    method: 'POST',
+  });
+  return {
+    success: !result.error,
+    message: result.data?.message || 'Worldwide location hierarchy synced successfully.',
+    data: result.data?.data,
+    error: result.error,
+  };
+}

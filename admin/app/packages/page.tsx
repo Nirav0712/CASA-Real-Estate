@@ -13,7 +13,7 @@ import {
   Layers,
   Search,
 } from 'lucide-react';
-import { getPackages, deletePackage } from '@/services/entitlements-service';
+import { getPackages, deletePackage, updatePackage } from '@/services/entitlements-service';
 import { PackageRecord } from '@/types';
 
 export default function PackagesManagementPage() {
@@ -39,6 +39,21 @@ export default function PackagesManagementPage() {
   useEffect(() => {
     fetchPackagesList();
   }, []);
+
+  const handleToggleActive = async (pkg: PackageRecord) => {
+    const pkgId = pkg.id || pkg._id || '';
+    try {
+      setActionLoading(pkgId);
+      await updatePackage(pkgId, { isActive: !pkg.isActive });
+      setPackages((prev) =>
+        prev.map((p) => ((p.id || p._id) === pkgId ? { ...p, isActive: !p.isActive } : p)),
+      );
+    } catch (err: any) {
+      alert(err.message || 'Failed to update package status');
+    } finally {
+      setActionLoading(null);
+    }
+  };
 
   const handleDelete = async (id: string, name: string) => {
     if (!window.confirm(`Are you sure you want to delete package "${name}"?`)) return;
@@ -153,32 +168,44 @@ export default function PackagesManagementPage() {
                       <span className="text-[10px] text-casa-text-muted font-mono">{pkg.slug}</span>
                     </div>
 
-                    <span
-                      className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                    <button
+                      onClick={() => handleToggleActive(pkg)}
+                      disabled={actionLoading === pkgId}
+                      title={`Click to ${pkg.isActive ? 'Deactivate' : 'Activate'} plan`}
+                      className={`text-[10px] font-bold px-2.5 py-1 rounded-full border transition-all cursor-pointer flex items-center gap-1.5 shadow-2xs ${
                         pkg.isActive
-                          ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950 dark:text-emerald-300'
-                          : 'bg-zinc-100 text-zinc-600 border-zinc-200'
+                          ? 'bg-emerald-50 text-emerald-700 border-emerald-300 hover:bg-emerald-100 dark:bg-emerald-950 dark:text-emerald-300'
+                          : 'bg-zinc-100 text-zinc-600 border-zinc-300 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-400'
                       }`}
                     >
-                      {pkg.isActive ? 'ACTIVE' : 'DISABLED'}
-                    </span>
+                      <span className={`w-1.5 h-1.5 rounded-full ${pkg.isActive ? 'bg-emerald-500 animate-pulse' : 'bg-zinc-400'}`} />
+                      <span>{pkg.isActive ? 'ACTIVE' : 'INACTIVE'}</span>
+                    </button>
                   </div>
 
                   <p className="text-xs text-casa-text-secondary line-clamp-2 mb-3">
                     {pkg.description || 'Standard plan tier for marketplace members.'}
                   </p>
 
-                  {/* Price */}
+                  {/* Price & Billing Cycle */}
                   <div className="mb-4">
                     <span className="text-2xl font-bold text-casa-text-primary">
                       {pkg.price === 0 ? 'FREE' : `₹${pkg.price.toLocaleString('en-IN')}`}
                     </span>
-                    {pkg.price > 0 && (
-                      <span className="text-xs text-casa-text-muted font-medium">
-                        {' '}
-                        / {pkg.billingPeriod.toLowerCase()}
-                      </span>
-                    )}
+                    <span className="text-xs text-casa-text-muted font-medium ml-1">
+                      /{' '}
+                      {pkg.billingPeriod === '1_MONTH'
+                        ? '1 Month (30 Days)'
+                        : pkg.billingPeriod === '60_DAYS'
+                        ? '60 Days'
+                        : pkg.billingPeriod === '90_DAYS'
+                        ? '90 Days'
+                        : pkg.billingPeriod === '6_MONTHS'
+                        ? '6 Months'
+                        : pkg.billingPeriod === '1_YEAR'
+                        ? '1 Year'
+                        : pkg.billingPeriod.toLowerCase().replace('_', ' ')}
+                    </span>
                   </div>
 
                   {/* Limits Checklist */}

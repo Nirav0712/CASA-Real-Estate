@@ -68,6 +68,18 @@ export class AdminLocationsController {
     };
   }
 
+  @Post('seed-world')
+  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
+  @ApiOperation({ summary: 'Seed or synchronize comprehensive worldwide location hierarchy' })
+  async seedWorldLocations() {
+    const data = await this.locationsService.seedWorldLocations();
+    return {
+      success: true,
+      message: 'Worldwide location hierarchy synced successfully.',
+      data,
+    };
+  }
+
   @Post()
   @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'Create new location in hierarchy' })

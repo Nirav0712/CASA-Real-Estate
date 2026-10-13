@@ -1,5 +1,42 @@
 import { fetchApi } from '@/lib/api-client';
 
+export interface PackagePlan {
+  _id?: string;
+  id?: string;
+  name: string;
+  slug: string;
+  description?: string;
+  targetAccountTypes: string[];
+  price: number;
+  currency: string;
+  billingPeriod: string;
+  isActive: boolean;
+  isDefault: boolean;
+  isPopular?: boolean;
+  features: string[];
+  limits: {
+    propertyViewsMonthly?: number;
+    propertyListingsMax?: number;
+    featuredListingsMax?: number;
+    leadsMonthly?: number;
+    enquiriesMax?: number;
+    chatsMax?: number;
+    savedPropertiesMax?: number;
+    savedSearchesMax?: number;
+    teamMembersMax?: number;
+  };
+}
+
+export interface CompanySettings {
+  appName: string;
+  companySalesNumber: string;
+  companyServiceNumber: string;
+  companySalesEmail: string;
+  companySupportEmail: string;
+  companyAddress: string;
+  trialDays: number;
+}
+
 export interface UserEntitlementResponse {
   user: {
     id: string;
@@ -24,6 +61,13 @@ export interface UserEntitlementResponse {
     dashboardConfig: Record<string, boolean>;
     package: { id: string; name: string; slug: string; price: number; billingPeriod: string } | null;
     subscription: { id: string; status: string; endDate?: string } | null;
+    trial?: {
+      isTrialActive: boolean;
+      isTrialExpired: boolean;
+      trialExpiresAt: string | null;
+      daysRemaining: number;
+      trialPackageId?: string | null;
+    };
   };
   usage: {
     propertyViews: number;
@@ -38,6 +82,55 @@ export async function getMyEntitlements(): Promise<UserEntitlementResponse | nul
   const result = await fetchApi<UserEntitlementResponse>('/entitlements/me');
   if (!result.isBackendAvailable || result.error || !result.data) {
     return null;
+  }
+  return result.data;
+}
+
+export async function getActivePackages(): Promise<PackagePlan[]> {
+  const result = await fetchApi<PackagePlan[]>('/entitlements/packages');
+  if (!result.isBackendAvailable || result.error || !result.data) {
+    return [];
+  }
+  return Array.isArray(result.data) ? result.data : [];
+}
+
+export async function startTrial(packageId: string): Promise<{
+  success: boolean;
+  message: string;
+  trialExpiresAt: string;
+  daysRemaining: number;
+  package: any;
+}> {
+  const result = await fetchApi<{
+    success: boolean;
+    message: string;
+    trialExpiresAt: string;
+    daysRemaining: number;
+    package: any;
+  }>('/entitlements/start-trial', {
+    method: 'POST',
+    body: JSON.stringify({ packageId }),
+  });
+
+  if (!result.isBackendAvailable || result.error || !result.data) {
+    throw new Error(result.error || 'Failed to activate free trial');
+  }
+
+  return result.data;
+}
+
+export async function getPublicCompanySettings(): Promise<CompanySettings> {
+  const result = await fetchApi<CompanySettings>('/settings/public');
+  if (!result.isBackendAvailable || result.error || !result.data) {
+    return {
+      appName: 'CASA Real Estate Marketplace',
+      companySalesNumber: '+91 98765 43210',
+      companyServiceNumber: '+91 98765 43211',
+      companySalesEmail: 'sales@casarealestate.com',
+      companySupportEmail: 'support@casarealestate.com',
+      companyAddress: 'Vibhuti Khand, Gomti Nagar, Lucknow, UP',
+      trialDays: 3,
+    };
   }
   return result.data;
 }

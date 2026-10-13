@@ -297,7 +297,18 @@ export interface PurchaserRecord {
   normalizedMobile: string;
   email?: string;
   role: UserRole;
+  accountType?: AccountType | null;
   status: AccountStatus;
+  planName?: string;
+  planSlug?: string;
+  planPrice?: number;
+  billingPeriod?: string;
+  planCategory?: 'FREE_TRIAL' | 'PAID_PLAN' | 'TRIAL_EXPIRED' | 'FREE_PLAN' | string;
+  isTrial?: boolean;
+  isExpired?: boolean;
+  trialStartedAt?: string | null;
+  trialExpiresAt?: string | null;
+  daysRemaining?: number;
   savedProperties: number;
   totalEnquiries: number;
   lastLoginAt?: string;
@@ -631,7 +642,19 @@ export interface RoleRecord {
   updatedAt?: string;
 }
 
-export type BillingPeriod = 'MONTHLY' | 'QUARTERLY' | 'ANNUALLY' | 'LIFETIME';
+export type BillingPeriod =
+  | '1_MONTH'
+  | '60_DAYS'
+  | '90_DAYS'
+  | '6_MONTHS'
+  | '1_YEAR'
+  | 'FREE'
+  | 'MONTHLY'
+  | 'QUARTERLY'
+  | 'ANNUALLY'
+  | 'YEARLY'
+  | 'LIFETIME'
+  | 'CUSTOM';
 
 export interface PackageLimits {
   propertyListingsMax: number;
