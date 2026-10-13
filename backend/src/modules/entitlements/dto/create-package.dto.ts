@@ -89,4 +89,6 @@ export class CreatePackageDto {
   permissions?: string[];
 }
 
-export class UpdatePackageDto extends CreatePackageDto {}
+import { PartialType } from '@nestjs/swagger';
+
+export class UpdatePackageDto extends PartialType(CreatePackageDto) {}
