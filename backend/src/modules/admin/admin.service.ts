@@ -367,6 +367,16 @@ export class AdminService implements OnModuleInit {
       amenities: raw.amenities,
       rera: raw.rera,
       reraNumber: raw.reraNumber || raw.rera?.reraNumber || raw.advertiser?.reraNumber || undefined,
+      structureType: raw.structureType || 'INDEPENDENT',
+      isParentProject: Boolean(raw.isParentProject),
+      isChildUnit: Boolean(raw.isChildUnit),
+      parentPropertyId: raw.parentPropertyId,
+      parentSlug: raw.parentSlug,
+      projectDetails: raw.projectDetails,
+      unitDetails: raw.unitDetails,
+      units: raw.units || [],
+      totalUnits: raw.totalUnits || (raw.units ? raw.units.length : 0),
+      availableUnits: raw.availableUnits !== undefined ? raw.availableUnits : (raw.units ? raw.units.filter((u: any) => u.availabilityStatus === 'AVAILABLE').length : 0),
     };
   }
 
@@ -383,6 +393,9 @@ export class AdminService implements OnModuleInit {
       registeredAgentsCount,
       totalEnquiriesThisMonth,
       monthlyPaymentsAgg,
+      parentProjectsCount,
+      childUnitsCount,
+      independentPropertiesCount,
     ] = await Promise.all([
       this.propertyModel.countDocuments({
         status: { $in: ['PENDING_REVIEW', 'PENDING_APPROVAL'] },
@@ -417,6 +430,12 @@ export class AdminService implements OnModuleInit {
           },
         },
       ]),
+      this.propertyModel.countDocuments({ isParentProject: true }),
+      this.propertyModel.countDocuments({ isChildUnit: true }),
+      this.propertyModel.countDocuments({
+        isParentProject: { $ne: true },
+        isChildUnit: { $ne: true },
+      }),
     ]);
 
     const monthlyRevenueEstimate =
@@ -432,6 +451,9 @@ export class AdminService implements OnModuleInit {
       registeredAgentsCount,
       totalEnquiriesThisMonth,
       monthlyRevenueEstimate,
+      parentProjectsCount,
+      childUnitsCount,
+      independentPropertiesCount,
     };
   }
 
@@ -459,8 +481,23 @@ export class AdminService implements OnModuleInit {
     limit?: number;
     skip?: number;
     page?: number;
+    structureType?: string;
+    viewScope?: string;
   }) {
     const filter: any = {};
+
+    if (filterQuery?.structureType && filterQuery.structureType !== 'ALL') {
+      filter.structureType = filterQuery.structureType;
+    }
+
+    if (filterQuery?.viewScope === 'PROJECTS') {
+      filter.isParentProject = true;
+    } else if (filterQuery?.viewScope === 'UNITS') {
+      filter.isChildUnit = true;
+    } else if (filterQuery?.viewScope === 'INDEPENDENT') {
+      filter.isParentProject = { $ne: true };
+      filter.isChildUnit = { $ne: true };
+    }
 
     if (filterQuery?.status && filterQuery.status !== 'ALL') {
       if (
@@ -496,6 +533,9 @@ export class AdminService implements OnModuleInit {
         { id: regex },
         { referenceId: regex },
         { slug: regex },
+        { 'projectDetails.projectName': regex },
+        { 'projectDetails.buildingName': regex },
+        { 'unitDetails.unitNumber': regex },
         { 'location.locality': regex },
         { 'location.city': regex },
         { 'advertiser.name': regex },
@@ -603,6 +643,13 @@ export class AdminService implements OnModuleInit {
 
     await property.save();
 
+    if (property.isParentProject) {
+      await this.propertyModel.updateMany(
+        { parentPropertyId: property.id, status: { $ne: 'SOLD_OR_RENTED' } },
+        { $set: { status: 'PUBLISHED', isPublished: true, publishedAt: new Date() } },
+      );
+    }
+
     this.logger.log(`✅ Property "${property.id}" successfully APPROVED & PUBLISHED by ${adminIdentifier}.`);
 
     return {
@@ -664,6 +711,13 @@ export class AdminService implements OnModuleInit {
 
     await property.save();
 
+    if (property.isParentProject) {
+      await this.propertyModel.updateMany(
+        { parentPropertyId: property.id },
+        { $set: { status: 'REJECTED', isPublished: false } },
+      );
+    }
+
     this.logger.log(`⚠️ Property "${property.id}" REJECTED by ${adminIdentifier}. Reason: ${reasonCode}`);
 
     return {
@@ -707,6 +761,14 @@ export class AdminService implements OnModuleInit {
     };
 
     await property.save();
+
+    if (property.isParentProject) {
+      await this.propertyModel.updateMany(
+        { parentPropertyId: property.id, status: { $ne: 'SOLD_OR_RENTED' } },
+        { $set: { status: 'PUBLISHED', isPublished: true, publishedAt: new Date() } },
+      );
+    }
+
     return {
       success: true,
       message: 'Property published live to CASA marketplace.',
@@ -747,6 +809,14 @@ export class AdminService implements OnModuleInit {
     };
 
     await property.save();
+
+    if (property.isParentProject) {
+      await this.propertyModel.updateMany(
+        { parentPropertyId: property.id },
+        { $set: { status: 'UNPUBLISHED', isPublished: false, unpublishedAt: new Date() } },
+      );
+    }
+
     return {
       success: true,
       message: 'Property has been unpublished and hidden from public search.',
@@ -787,6 +857,13 @@ export class AdminService implements OnModuleInit {
     };
 
     await property.save();
+
+    if (property.isParentProject) {
+      await this.propertyModel.updateMany(
+        { parentPropertyId: property.id },
+        { $set: { status: 'ARCHIVED', isPublished: false, archivedAt: new Date() } },
+      );
+    }
     return {
       success: true,
       message: 'Property has been permanently archived.',

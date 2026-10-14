@@ -19,6 +19,12 @@ import {
   getCategoryFieldVisibility,
   validateReraNumber,
 } from '@/lib/property-categories';
+import { PropertyUnitsManager } from '@/components/property/property-units-manager';
+import {
+  PropertyStructureType,
+  PropertyUnitDetails,
+  ProjectBuildingDetails,
+} from '@/types';
 import {
   ArrowLeft,
   Save,
@@ -76,6 +82,11 @@ export default function EditPropertyPage() {
   const [isLoading, setIsLoading] = React.useState(true);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [property, setProperty] = React.useState<Property | null>(null);
+
+  // Multi-unit states
+  const [structureType, setStructureType] = React.useState<PropertyStructureType>('INDEPENDENT');
+  const [projectDetails, setProjectDetails] = React.useState<ProjectBuildingDetails>({});
+  const [units, setUnits] = React.useState<PropertyUnitDetails[]>([]);
 
   const [formData, setFormData] = React.useState({
     // Step 1: Category & Basic
@@ -307,6 +318,11 @@ export default function EditPropertyPage() {
         amenities: data.amenities || [],
         uploadedImages: data.media?.images || (data.media?.thumbnailUrl ? [data.media.thumbnailUrl] : []),
       });
+
+      // Hydrate multi-unit states
+      setStructureType(data.structureType || 'INDEPENDENT');
+      setProjectDetails(data.projectDetails || {});
+      setUnits(data.units || []);
     } catch {
       toast.error('Not Found', 'Could not load property for editing.');
       router.push('/dashboard/properties');
@@ -370,14 +386,28 @@ export default function EditPropertyPage() {
         ? formData.uploadedImages[0]
         : 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=800&q=80';
 
+    const isMultiUnit = structureType !== 'INDEPENDENT';
+    const computedPrice =
+      Number(formData.priceAmount) > 0
+        ? Number(formData.priceAmount)
+        : units.length > 0
+        ? Math.min(...units.map((u) => u.price || u.monthlyRent || 0).filter((p) => p > 0)) || 0
+        : 0;
+
     return {
       title: { en: formData.titleEn },
       description: { en: formData.descriptionEn },
       category: formData.category,
       subcategory: formData.subcategory,
       listingType: formData.listingType,
+      structureType: structureType,
+      isParentProject: isMultiUnit,
+      projectDetails: isMultiUnit ? projectDetails : undefined,
+      units: isMultiUnit ? units : undefined,
+      totalUnits: isMultiUnit ? units.length : undefined,
+      availableUnits: isMultiUnit ? units.filter((u) => u.availabilityStatus === 'AVAILABLE').length : undefined,
       price: {
-        amount: Number(formData.priceAmount) || 0,
+        amount: computedPrice,
         currency: formData.currency,
         priceUnit: formData.priceUnit,
         isNegotiable: formData.isNegotiable,
@@ -701,10 +731,20 @@ export default function EditPropertyPage() {
               required
               value={formData.descriptionEn}
               onChange={(e) => setFormData({ ...formData, descriptionEn: e.target.value })}
-              className="w-full px-3 py-2 text-xs bg-casa-canvas border border-casa-border-light rounded-xl text-casa-text-primary"
+              className="w-full px-3.5 py-2 text-xs bg-casa-canvas border border-casa-border-light rounded-xl text-casa-text-primary"
             />
           </div>
         </div>
+
+        {/* Multi-Unit & Plotted Hierarchy Manager */}
+        <PropertyUnitsManager
+          structureType={structureType}
+          onStructureTypeChange={setStructureType}
+          projectDetails={projectDetails}
+          onProjectDetailsChange={setProjectDetails}
+          units={units}
+          onUnitsChange={setUnits}
+        />
 
         {/* Dynamic Specifications */}
         <div className="space-y-4">

@@ -53,6 +53,7 @@ import {
   Film,
   AlertTriangle,
   Users,
+  Search,
 } from 'lucide-react';
 import { parseYouTubeUrl } from '@/lib/video';
 
@@ -134,6 +135,29 @@ export function PropertyDetailView({
   const [reviewComment, setReviewComment] = React.useState('');
   const [isSubmittingReview, setIsSubmittingReview] = React.useState(false);
   const [reviewSubmitted, setReviewSubmitted] = React.useState(false);
+
+  // Multi-unit directory filter state
+  const [directoryFloorFilter, setDirectoryFloorFilter] = React.useState('ALL');
+  const [directorySearch, setDirectorySearch] = React.useState('');
+
+  const unitsList = property.units || [];
+  const distinctFloors = React.useMemo(() => {
+    const set = new Set<string>();
+    unitsList.forEach((u) => {
+      if (u.floorNumber) set.add(u.floorNumber);
+    });
+    return Array.from(set).sort((a, b) => Number(a) - Number(b));
+  }, [unitsList]);
+
+  const filteredDirectoryUnits = React.useMemo(() => {
+    return unitsList.filter((u) => {
+      const idMatch = (u.unitNumber || u.plotNumber || '').toLowerCase().includes(directorySearch.toLowerCase());
+      const typeMatch = (u.unitType || u.plotType || '').toLowerCase().includes(directorySearch.toLowerCase());
+      const searchOk = !directorySearch.trim() || idMatch || typeMatch;
+      const floorOk = directoryFloorFilter === 'ALL' || u.floorNumber === directoryFloorFilter;
+      return searchOk && floorOk;
+    });
+  }, [unitsList, directorySearch, directoryFloorFilter]);
 
   // Auto-record recently viewed on mount
   React.useEffect(() => {
@@ -438,11 +462,70 @@ export function PropertyDetailView({
           >
             {localizedCategory}
           </Link>
+          {property.isChildUnit && (
+            <>
+              <ChevronRight className={`w-3.5 h-3.5 flex-shrink-0 ${isRtl ? 'rtl-flip' : ''}`} />
+              <Link
+                href={`/property/${property.parentSlug || (property as any).parentProject?.slug || ''}`}
+                className="hover:text-casa-brand transition-colors text-casa-brand font-medium truncate max-w-xs"
+              >
+                {property.projectDetails?.projectName || (property as any).parentProject?.projectName || (property as any).parentProject?.title?.en || 'Parent Complex'}
+              </Link>
+            </>
+          )}
           <ChevronRight className={`w-3.5 h-3.5 flex-shrink-0 ${isRtl ? 'rtl-flip' : ''}`} />
           <span className="text-casa-text-primary font-medium truncate max-w-xs sm:max-w-md">
             {localizedTitle}
           </span>
         </nav>
+
+        {/* Child Unit Parent Navigation Banner */}
+        {property.isChildUnit && (
+          <div className="mb-6 p-4 rounded-2xl bg-casa-brand-subtle/40 border border-casa-brand/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-subtle">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-casa-brand text-white flex items-center justify-center flex-shrink-0 font-bold">
+                <Building className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-sm font-bold text-casa-text-primary font-mono">
+                    {property.unitDetails?.plotNumber ? `Plot ${property.unitDetails.plotNumber}` : `Unit ${property.unitDetails?.unitNumber || ''}`}
+                  </span>
+                  {property.unitDetails?.floorNumber && (
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-casa-surface border border-casa-border-light text-casa-text-secondary">
+                      Floor {property.unitDetails.floorNumber}
+                    </span>
+                  )}
+                  {property.unitDetails?.unitType && (
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-casa-surface border border-casa-border-light text-casa-brand">
+                      {property.unitDetails.unitType}
+                    </span>
+                  )}
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30">
+                    {property.unitDetails?.availabilityStatus || 'AVAILABLE'}
+                  </span>
+                </div>
+                <p className="text-xs text-casa-text-secondary mt-0.5">
+                  Located within:{' '}
+                  <strong className="text-casa-text-primary">
+                    {property.projectDetails?.projectName || (property as any).parentProject?.projectName || (property as any).parentProject?.title?.en || 'Parent Complex'}
+                  </strong>
+                  {property.projectDetails?.buildingName ? ` • ${property.projectDetails.buildingName}` : ''}
+                </p>
+              </div>
+            </div>
+
+            {(property.parentSlug || (property as any).parentProject?.slug) && (
+              <Link
+                href={`/property/${property.parentSlug || (property as any).parentProject?.slug}`}
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-casa-brand hover:bg-casa-brand-hover text-white text-xs font-semibold transition-colors shadow-2xs w-fit"
+              >
+                <span>View Master Project &amp; All Units</span>
+                <ChevronRight className="w-4 h-4" />
+              </Link>
+            )}
+          </div>
+        )}
 
         {/* Main Grid: Gallery & Details on left (2 cols), Sticky Contact Sidebar on right (1 col) */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -1015,6 +1098,176 @@ export function PropertyDetailView({
                       <span>{amenity}</span>
                     </div>
                   ))}
+                </div>
+              </Card>
+            )}
+
+            {/* Units & Floor Directory (Parent Project / Plotted Layout) */}
+            {(property.isParentProject || unitsList.length > 0) && (
+              <Card className="p-6 border-casa-border-light space-y-5">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-casa-border-light pb-4">
+                  <div>
+                    <h2 className="text-base font-bold text-casa-text-primary flex items-center gap-2">
+                      <Layers className="w-5 h-5 text-casa-brand" />
+                      <span>{property.structureType === 'PLOTTED_DEVELOPMENT' ? 'Plotted Layout Inventory Matrix' : 'Building & Floor Inventory Directory'}</span>
+                    </h2>
+                    <p className="text-xs text-casa-text-muted mt-0.5">
+                      Explore floor-wise units, exact carpet areas, availability status, and individual pricing.
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold px-3 py-1 rounded-full bg-casa-brand-subtle text-casa-brand">
+                      {unitsList.length} Total Units
+                    </span>
+                    <span className="text-xs font-bold px-3 py-1 rounded-full bg-emerald-500/15 text-emerald-700 dark:text-emerald-300">
+                      {unitsList.filter((u) => u.availabilityStatus === 'AVAILABLE').length} Available
+                    </span>
+                  </div>
+                </div>
+
+                {/* Filter Tabs & Search */}
+                <div className="flex flex-col sm:flex-row items-center gap-2">
+                  <div className="relative flex-1 w-full">
+                    <Search className="w-3.5 h-3.5 text-casa-text-muted absolute start-3 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="text"
+                      placeholder="Filter by unit/plot number or type..."
+                      value={directorySearch}
+                      onChange={(e) => setDirectorySearch(e.target.value)}
+                      className="w-full ps-8 pe-3 py-1.5 text-xs bg-casa-canvas border border-casa-border-light rounded-xl text-casa-text-primary font-medium"
+                    />
+                  </div>
+
+                  {distinctFloors.length > 0 && property.structureType !== 'PLOTTED_DEVELOPMENT' && (
+                    <div className="flex items-center gap-1 overflow-x-auto max-w-full py-1">
+                      <button
+                        type="button"
+                        onClick={() => setDirectoryFloorFilter('ALL')}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer whitespace-nowrap ${
+                          directoryFloorFilter === 'ALL'
+                            ? 'bg-casa-brand text-white shadow-2xs'
+                            : 'bg-casa-canvas text-casa-text-secondary hover:bg-casa-subtle'
+                        }`}
+                      >
+                        All Floors
+                      </button>
+                      {distinctFloors.map((floor) => (
+                        <button
+                          type="button"
+                          key={floor}
+                          onClick={() => setDirectoryFloorFilter(floor)}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer whitespace-nowrap ${
+                            directoryFloorFilter === floor
+                              ? 'bg-casa-brand text-white shadow-2xs'
+                              : 'bg-casa-canvas text-casa-text-secondary hover:bg-casa-subtle'
+                          }`}
+                        >
+                          Floor {floor}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Directory Table */}
+                <div className="overflow-x-auto rounded-xl border border-casa-border-light">
+                  <table className="w-full text-start text-xs border-collapse">
+                    <thead className="bg-casa-subtle/60 text-casa-text-muted font-bold uppercase text-[10px] tracking-wider border-b border-casa-border-light">
+                      <tr>
+                        <th className="py-2.5 px-3 text-start">{property.structureType === 'PLOTTED_DEVELOPMENT' ? 'Plot No.' : 'Unit / Flat'}</th>
+                        {property.structureType !== 'PLOTTED_DEVELOPMENT' && <th className="py-2.5 px-3 text-start">Floor</th>}
+                        <th className="py-2.5 px-3 text-start">Type</th>
+                        <th className="py-2.5 px-3 text-start">Carpet / Area</th>
+                        <th className="py-2.5 px-3 text-start">Price / Rent</th>
+                        <th className="py-2.5 px-3 text-start">Status</th>
+                        <th className="py-2.5 px-3 text-end">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-casa-border-light bg-casa-surface">
+                      {filteredDirectoryUnits.length === 0 ? (
+                        <tr>
+                          <td colSpan={7} className="py-8 text-center text-xs text-casa-text-muted">
+                            No units found matching your search filter.
+                          </td>
+                        </tr>
+                      ) : (
+                        filteredDirectoryUnits.map((u) => {
+                          const isRent = u.listingType === 'RENT' || u.listingType === 'COMMERCIAL_LEASE';
+                          const statusClass =
+                            u.availabilityStatus === 'AVAILABLE'
+                              ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30'
+                              : u.availabilityStatus === 'UNDER_OFFER'
+                              ? 'bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30'
+                              : 'bg-rose-500/15 text-rose-700 dark:text-rose-300 border-rose-500/30';
+                          return (
+                            <tr key={u.unitId} className="hover:bg-casa-canvas/50 transition-colors">
+                              <td className="py-3 px-3 font-bold font-mono text-casa-text-primary">
+                                {u.unitNumber || u.plotNumber}
+                              </td>
+                              {property.structureType !== 'PLOTTED_DEVELOPMENT' && (
+                                <td className="py-3 px-3 text-casa-text-secondary font-medium">
+                                  Floor {u.floorNumber || '0'} {u.towerName ? `• ${u.towerName}` : ''}
+                                </td>
+                              )}
+                              <td className="py-3 px-3">
+                                <span className="px-2 py-0.5 rounded-md bg-casa-subtle text-casa-text-primary text-[11px] font-semibold">
+                                  {u.unitType || u.plotType || 'Standard'}
+                                </span>
+                              </td>
+                              <td className="py-3 px-3 text-casa-text-secondary">
+                                {u.plotArea ? (
+                                  <div>
+                                    <span className="font-semibold text-casa-text-primary">{u.plotArea} sq.ft</span>
+                                    {u.plotLength && u.plotWidth && (
+                                      <span className="text-[10px] text-casa-text-muted block">
+                                        {u.plotLength} × {u.plotWidth} ft
+                                      </span>
+                                    )}
+                                  </div>
+                                ) : (
+                                  <div>
+                                    <span className="font-semibold text-casa-text-primary">{u.carpetArea || u.builtUpArea || 0} sq.ft</span>
+                                    {u.builtUpArea && (
+                                      <span className="text-[10px] text-casa-text-muted block">
+                                        Built-up: {u.builtUpArea} sq.ft
+                                      </span>
+                                    )}
+                                  </div>
+                                )}
+                              </td>
+                              <td className="py-3 px-3 font-semibold text-casa-brand">
+                                {isRent ? (
+                                  <span>₹{(u.monthlyRent || 0).toLocaleString()}/mo</span>
+                                ) : (
+                                  <span>{formatPrice(u.price)}</span>
+                                )}
+                              </td>
+                              <td className="py-3 px-3">
+                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${statusClass}`}>
+                                  {u.availabilityStatus}
+                                </span>
+                              </td>
+                              <td className="py-3 px-3 text-end">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setShowSiteVisitModal(true);
+                                    setSiteVisitNotes(
+                                      `Enquiry for Unit/Plot ${u.unitNumber || u.plotNumber} (${u.unitType || u.plotType || 'Unit'}, Floor ${u.floorNumber || 'N/A'})`
+                                    );
+                                  }}
+                                  className="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-bold rounded-lg bg-casa-subtle hover:bg-casa-brand hover:text-white transition-colors cursor-pointer text-casa-text-primary"
+                                >
+                                  <span>Enquire Unit</span>
+                                  <ChevronRight className="w-3 h-3" />
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })
+                      )}
+                    </tbody>
+                  </table>
                 </div>
               </Card>
             )}

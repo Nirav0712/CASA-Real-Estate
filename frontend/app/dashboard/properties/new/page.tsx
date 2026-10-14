@@ -16,6 +16,12 @@ import {
   getCategoryFieldVisibility,
   validateReraNumber,
 } from '@/lib/property-categories';
+import { PropertyUnitsManager } from '@/components/property/property-units-manager';
+import {
+  PropertyStructureType,
+  PropertyUnitDetails,
+  ProjectBuildingDetails,
+} from '@/types';
 import {
   Home,
   ArrowRight,
@@ -77,6 +83,19 @@ export default function NewPropertyWizardPage() {
 
   const [currentStep, setCurrentStep] = React.useState(1);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
+
+  // Multi-Unit & Plotted Hierarchy State
+  const [structureType, setStructureType] = React.useState<PropertyStructureType>('INDEPENDENT');
+  const [projectDetails, setProjectDetails] = React.useState<ProjectBuildingDetails>({
+    projectName: '',
+    buildingName: '',
+    buildingNumber: '',
+    towerName: '',
+    totalFloors: undefined,
+    developerName: '',
+    projectAddress: '',
+  });
+  const [units, setUnits] = React.useState<PropertyUnitDetails[]>([]);
 
   // Wizard Form State
   const [formData, setFormData] = React.useState({
@@ -304,11 +323,16 @@ export default function NewPropertyWizardPage() {
         toast.warning('Subcategory Required', 'Please select a specific property subcategory.');
         return false;
       }
+      if (structureType !== 'INDEPENDENT' && !projectDetails.projectName?.trim()) {
+        toast.warning('Project Name Required', 'Please specify the project or complex name in the Property Structure section.');
+        return false;
+      }
     }
 
     if (step === 2) {
-      // Area is always required
-      if (!formData.area || Number(formData.area) <= 0) {
+      // Area is always required unless multi-unit specifies unit areas
+      const effectiveArea = Number(formData.area) > 0 ? Number(formData.area) : units.length > 0 ? 1000 : 0;
+      if (effectiveArea <= 0) {
         toast.warning('Area Required', 'Please provide a valid property area.');
         return false;
       }
@@ -332,7 +356,8 @@ export default function NewPropertyWizardPage() {
     }
 
     if (step === 3) {
-      if (!formData.priceAmount || Number(formData.priceAmount) <= 0) {
+      const effectivePrice = Number(formData.priceAmount) > 0 ? Number(formData.priceAmount) : units.length > 0 ? 1 : 0;
+      if (effectivePrice <= 0) {
         toast.warning('Price Required', 'Please enter a valid price/rent amount.');
         return false;
       }
@@ -372,14 +397,35 @@ export default function NewPropertyWizardPage() {
         ? formData.uploadedImages[0]
         : 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=800&q=80';
 
+    const isMultiUnit = structureType !== 'INDEPENDENT';
+    const computedPrice =
+      Number(formData.priceAmount) > 0
+        ? Number(formData.priceAmount)
+        : units.length > 0
+        ? Math.min(...units.map((u) => u.price || u.monthlyRent || 0).filter((p) => p > 0)) || 0
+        : 0;
+
+    const computedArea =
+      Number(formData.area) > 0
+        ? Number(formData.area)
+        : units.length > 0
+        ? Math.min(...units.map((u) => u.carpetArea || u.plotArea || 0).filter((a) => a > 0)) || 1000
+        : 1000;
+
     return {
       title: { en: formData.titleEn },
       description: { en: formData.descriptionEn },
       category: formData.category,
       subcategory: formData.subcategory,
       listingType: formData.listingType,
+      structureType: structureType,
+      isParentProject: isMultiUnit,
+      projectDetails: isMultiUnit ? projectDetails : undefined,
+      units: isMultiUnit ? units : undefined,
+      totalUnits: isMultiUnit ? units.length : undefined,
+      availableUnits: isMultiUnit ? units.filter((u) => u.availabilityStatus === 'AVAILABLE').length : undefined,
       price: {
-        amount: Number(formData.priceAmount) || 0,
+        amount: computedPrice,
         currency: formData.currency,
         priceUnit: formData.priceUnit,
         isNegotiable: formData.isNegotiable,
@@ -754,6 +800,54 @@ export default function NewPropertyWizardPage() {
                 className="w-full px-3.5 py-2.5 text-xs bg-casa-canvas border border-casa-border-light rounded-xl focus:ring-2 focus:ring-casa-brand/30 text-casa-text-primary leading-relaxed"
               />
             </div>
+
+            {/* Property Structure & Multi-Unit Inventory Section */}
+            <PropertyUnitsManager
+              structureType={structureType}
+              onStructureTypeChange={(newType) => {
+                setStructureType(newType);
+                if (newType === 'PLOTTED_DEVELOPMENT') {
+                  setFormData((prev) => ({
+                    ...prev,
+                    categoryGroup: 'PLOTS_LAND',
+                    category: 'Plot / Land',
+                    subcategory: 'Residential Plot',
+                  }));
+                } else if (newType === 'COMMERCIAL_BUILDING') {
+                  setFormData((prev) => ({
+                    ...prev,
+                    categoryGroup: 'COMMERCIAL',
+                    category: 'Commercial',
+                    subcategory: 'Office Space',
+                  }));
+                } else if (newType === 'RESIDENTIAL_BUILDING') {
+                  setFormData((prev) => ({
+                    ...prev,
+                    categoryGroup: 'RESIDENTIAL',
+                    category: 'Apartment',
+                    subcategory: 'Flat/Apartment',
+                  }));
+                }
+              }}
+              projectDetails={projectDetails}
+              onProjectDetailsChange={(newDetails) => {
+                setProjectDetails(newDetails);
+                if (newDetails.projectName && !formData.titleEn) {
+                  setFormData((prev) => ({
+                    ...prev,
+                    titleEn: `${newDetails.projectName} - Prime Real Estate Development`,
+                  }));
+                }
+                if (newDetails.projectAddress && !formData.locality) {
+                  setFormData((prev) => ({
+                    ...prev,
+                    locality: newDetails.projectAddress || '',
+                  }));
+                }
+              }}
+              units={units}
+              onUnitsChange={setUnits}
+            />
           </div>
         )}
 

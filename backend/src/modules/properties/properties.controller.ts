@@ -183,6 +183,28 @@ export class PropertiesController {
     return this.propertiesService.updateProperty(id, updateDto, user);
   }
 
+  @Get(':id/units')
+  @ApiOperation({ summary: 'Get all units/plots under a parent project/building' })
+  @ApiResponse({ status: 200, description: 'Units directory returned' })
+  findUnits(@Param('id') id: string) {
+    return this.propertiesService.findUnitsByParentId(id);
+  }
+
+  @Patch(':id/units/:unitId/availability')
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @RequirePermissions(Permission.PROPERTY_EDIT)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Update availability status of a specific unit/plot' })
+  @ApiResponse({ status: 200, description: 'Unit availability updated' })
+  updateUnitAvailability(
+    @Param('id') id: string,
+    @Param('unitId') unitId: string,
+    @Body('status') status: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.propertiesService.updateUnitAvailability(id, unitId, status, user);
+  }
+
   @Delete(':id')
   @UseGuards(JwtAuthGuard, PermissionsGuard)
   @RequirePermissions(Permission.PROPERTY_DELETE)

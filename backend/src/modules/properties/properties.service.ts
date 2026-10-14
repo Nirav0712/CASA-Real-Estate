@@ -8,7 +8,7 @@ import {
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, isValidObjectId } from 'mongoose';
-import { Property, PropertyDocument } from './schemas/property.schema';
+import { Property, PropertyDocument, PropertyStructureType } from './schemas/property.schema';
 import { Category, CategoryDocument } from './schemas/category.schema';
 import { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
 import { UserRole } from '../auth/enums/auth.enums';
@@ -297,6 +297,310 @@ export class PropertiesService implements OnModuleInit {
     } catch (err: any) {
       this.logger.warn(`Database seeding note: ${err?.message}`);
     }
+  }
+
+  // ==========================================
+  // MULTI-UNIT & PLOTTED DEVELOPMENT HELPERS
+  // ==========================================
+
+  validatePropertyUnits(structureType?: string, units?: any[]) {
+    if (!units || !Array.isArray(units) || units.length === 0) {
+      return;
+    }
+
+    if (structureType === PropertyStructureType.PLOTTED_DEVELOPMENT || structureType === 'PLOTTED_DEVELOPMENT') {
+      const seenPlots = new Set<string>();
+      for (const [index, unit] of units.entries()) {
+        const plotNo = (unit.plotNumber || unit.unitNumber || '').toString().trim().toLowerCase();
+        if (!plotNo) {
+          throw new BadRequestException(`Plot at index ${index + 1} is missing a plot number.`);
+        }
+        if (seenPlots.has(plotNo)) {
+          throw new BadRequestException(
+            `Duplicate plot number "${unit.plotNumber || unit.unitNumber}" detected in this plotted project. Plot numbers must be unique within the layout.`,
+          );
+        }
+        seenPlots.add(plotNo);
+
+        if (unit.price !== undefined && Number(unit.price) < 0) {
+          throw new BadRequestException(`Plot "${unit.plotNumber || unit.unitNumber}" cannot have a negative price.`);
+        }
+      }
+    } else {
+      // Building / Complex units with floor numbers
+      const seenUnits = new Set<string>();
+      for (const [index, unit] of units.entries()) {
+        const unitNo = (unit.unitNumber || '').toString().trim().toLowerCase();
+        if (!unitNo) {
+          throw new BadRequestException(`Unit at index ${index + 1} is missing a unit number.`);
+        }
+        const floor = (unit.floorNumber !== undefined && unit.floorNumber !== null)
+          ? String(unit.floorNumber).trim().toLowerCase()
+          : 'default';
+        const tower = (unit.towerName || '').toString().trim().toLowerCase();
+        const key = `${tower}:${floor}:${unitNo}`;
+        if (seenUnits.has(key)) {
+          throw new BadRequestException(
+            `Duplicate unit number "${unit.unitNumber}" detected on floor "${unit.floorNumber || 'G'}". Units on the same floor and tower must have unique unit numbers.`,
+          );
+        }
+        seenUnits.add(key);
+
+        if (unit.price !== undefined && Number(unit.price) < 0) {
+          throw new BadRequestException(`Unit "${unit.unitNumber}" cannot have a negative price.`);
+        }
+      }
+    }
+  }
+
+  async syncChildUnits(parent: any, user?: AuthenticatedUser) {
+    if (!parent || !parent.isParentProject || !Array.isArray(parent.units) || parent.units.length === 0) {
+      return;
+    }
+
+    const currentUnitIds = new Set<string>();
+
+    for (let i = 0; i < parent.units.length; i++) {
+      const unit = parent.units[i];
+      const unitId = unit.unitId || `unit-${i + 1}-${Date.now()}`;
+      unit.unitId = unitId;
+      currentUnitIds.add(unitId);
+
+      const childId = `${parent.id}-${unitId}`;
+      const childReferenceId = `${parent.referenceId || 'CASA'}-${(unit.unitNumber || unit.plotNumber || `U${i + 1}`).toString().replace(/[^a-zA-Z0-9]/g, '')}`;
+      const unitIdentifier = (unit.unitNumber || unit.plotNumber || `unit-${i + 1}`)
+        .toString()
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '');
+      const childSlug = `${parent.slug}-${unitIdentifier}`;
+
+      const titleEn = unit.unitNumber || unit.plotNumber
+        ? `${unit.unitType || 'Unit'} ${unit.unitNumber || unit.plotNumber} at ${parent.projectDetails?.projectName || parent.title?.en || 'Complex'}`
+        : `Unit ${i + 1} at ${parent.projectDetails?.projectName || parent.title?.en || 'Complex'}`;
+
+      const descEn = `${unit.unitType || 'Unit'} ${unit.unitNumber || unit.plotNumber || ''} on floor ${unit.floorNumber || 'G'} in ${parent.projectDetails?.projectName || parent.title?.en || ''}. ${parent.description?.en || ''}`;
+
+      const isRental = unit.listingType === 'RENT' || unit.listingType === 'COMMERCIAL_LEASE';
+      const priceAmount = isRental ? (Number(unit.monthlyRent) || Number(unit.price) || 0) : (Number(unit.price) || 0);
+
+      const isAvail = unit.availabilityStatus === 'AVAILABLE' || unit.availabilityStatus === 'UNDER_OFFER' || unit.availabilityStatus === 'RESERVED';
+      const childStatus = unit.availabilityStatus === 'SOLD' || unit.availabilityStatus === 'RENTED'
+        ? 'SOLD_OR_RENTED'
+        : (parent.status || 'DRAFT');
+      const childIsPublished = Boolean(parent.isPublished && isAvail);
+
+      const childDoc: any = {
+        id: childId,
+        referenceId: childReferenceId,
+        slug: childSlug,
+        ownerId: parent.ownerId,
+        advertiserId: parent.advertiserId,
+        createdBy: parent.createdBy || user?.id || 'system',
+        updatedBy: user?.id || parent.updatedBy || 'system',
+        title: { en: titleEn },
+        description: { en: descEn },
+        category: parent.category,
+        subcategory: unit.unitType || parent.subcategory,
+        listingType: unit.listingType || parent.listingType,
+        price: {
+          amount: priceAmount,
+          currency: 'INR',
+          priceUnit: isRental ? 'PER_MONTH' : 'TOTAL',
+          isNegotiable: true,
+          pricePerSqFt: unit.pricePerSqFt,
+          monthlyRent: unit.monthlyRent,
+          securityDeposit: unit.securityDeposit,
+          maintenance: unit.maintenanceCharges || 0,
+          preferredTenantType: unit.preferredTenantType,
+          bachelorPreferences: unit.bachelorPreferences,
+        },
+        location: parent.location,
+        specs: {
+          area: unit.carpetArea || unit.builtUpArea || unit.plotArea || parent.specs?.area,
+          areaUnit: unit.areaUnit || parent.specs?.areaUnit || 'SQ_FT',
+          carpetArea: unit.carpetArea || unit.plotArea,
+          carpetAreaSqFt: unit.carpetArea || unit.plotArea,
+          builtUpArea: unit.builtUpArea,
+          superBuiltUpArea: unit.superBuiltUpArea,
+          bedrooms: unit.bedrooms,
+          bathrooms: unit.bathrooms,
+          balconies: unit.balconies,
+          facing: unit.facing || parent.specs?.facing,
+          furnishing: unit.furnishing || parent.specs?.furnishing,
+          floorNumber: unit.floorNumber,
+          floorLevel: unit.floorNumber ? `Floor ${unit.floorNumber}` : undefined,
+          totalFloors: parent.projectDetails?.totalFloors || parent.specs?.totalFloors,
+          possessionStatus: unit.possessionStatus || parent.specs?.possessionStatus,
+          availableFrom: unit.availableFrom,
+          // Plots
+          plotDimensions: unit.plotLength && unit.plotWidth ? `${unit.plotLength} x ${unit.plotWidth} ft` : undefined,
+          plotLength: unit.plotLength,
+          plotBreadth: unit.plotWidth,
+          cornerPlot: unit.cornerPlot,
+          openSides: unit.openSides,
+          roadWidthFt: unit.roadWidth,
+        },
+        amenities: Array.isArray(unit.amenities) && unit.amenities.length > 0 ? unit.amenities : (parent.amenities || []),
+        media: {
+          thumbnailUrl: unit.photos && unit.photos.length > 0 ? unit.photos[0] : (parent.media?.thumbnailUrl || 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=800&q=80'),
+          coverImage: unit.photos && unit.photos.length > 0 ? unit.photos[0] : parent.media?.coverImage,
+          images: unit.photos && unit.photos.length > 0 ? unit.photos : (parent.media?.images || []),
+          videos: parent.media?.videos || [],
+        },
+        advertiser: parent.advertiser,
+        rera: unit.unitRera?.reraNumber ? unit.unitRera : (parent.projectDetails?.projectRera || parent.rera),
+        reraNumber: unit.unitRera?.reraNumber || parent.projectDetails?.projectRera?.reraNumber || parent.reraNumber,
+        structureType: parent.structureType || 'INDEPENDENT',
+        isParentProject: false,
+        isChildUnit: true,
+        parentPropertyId: parent.id,
+        parentSlug: parent.slug,
+        unitDetails: unit,
+        status: childStatus,
+        isPublished: childIsPublished,
+        publishedAt: childIsPublished ? (parent.publishedAt || new Date()) : undefined,
+      };
+
+      await this.propertyModel.findOneAndUpdate(
+        { $or: [{ id: childId }, { parentPropertyId: parent.id, 'unitDetails.unitId': unitId }] },
+        { $set: childDoc },
+        { upsert: true, new: true },
+      );
+    }
+
+    // Remove any child units that were deleted from parent's unit list
+    await this.propertyModel.deleteMany({
+      parentPropertyId: parent.id,
+      'unitDetails.unitId': { $nin: Array.from(currentUnitIds) },
+    });
+
+    this.logger.log(`✅ Synchronized ${currentUnitIds.size} child units for parent project "${parent.slug}" (${parent.id})`);
+  }
+
+  async updateUnitAvailability(
+    propertyId: string,
+    unitId: string,
+    availabilityStatus: string,
+    user?: AuthenticatedUser,
+  ) {
+    const validStatuses = ['AVAILABLE', 'UNDER_OFFER', 'SOLD', 'RENTED', 'RESERVED'];
+    const normalizedStatus = (availabilityStatus || '').toUpperCase();
+    if (!validStatuses.includes(normalizedStatus)) {
+      throw new BadRequestException(
+        `Invalid availability status "${availabilityStatus}". Allowed: ${validStatuses.join(', ')}`,
+      );
+    }
+
+    const parent = await this.propertyModel.findOne({
+      $or: [{ id: propertyId }, { slug: propertyId }, { 'units.unitId': unitId }],
+    });
+
+    if (!parent) {
+      throw new NotFoundException(`Parent property for unit "${unitId}" not found.`);
+    }
+
+    const isPrivileged =
+      user?.role === UserRole.ADMIN || user?.role === UserRole.SUPER_ADMIN;
+    if (user && !isPrivileged) {
+      const isOwner =
+        parent.ownerId === user.id ||
+        parent.advertiserId === user.id ||
+        parent.createdBy === user.id;
+      if (!isOwner) {
+        throw new ForbiddenException('You do not have permission to update this unit availability.');
+      }
+    }
+
+    // Update inside parent.units array
+    let matchedUnit: any = null;
+    if (Array.isArray(parent.units)) {
+      for (const u of parent.units) {
+        if (u.unitId === unitId || u.unitNumber === unitId) {
+          u.availabilityStatus = normalizedStatus;
+          matchedUnit = u;
+          break;
+        }
+      }
+      parent.availableUnits = parent.units.filter((u) => u.availabilityStatus === 'AVAILABLE').length;
+      parent.markModified('units');
+      await parent.save();
+    }
+
+    // Update child unit document if exists
+    const isAvail = normalizedStatus === 'AVAILABLE' || normalizedStatus === 'UNDER_OFFER' || normalizedStatus === 'RESERVED';
+    const childStatus = normalizedStatus === 'SOLD' || normalizedStatus === 'RENTED'
+      ? 'SOLD_OR_RENTED'
+      : (parent.status || 'DRAFT');
+    const childIsPublished = Boolean(parent.isPublished && isAvail);
+
+    await this.propertyModel.updateOne(
+      {
+        $or: [
+          { id: `${parent.id}-${unitId}` },
+          { parentPropertyId: parent.id, 'unitDetails.unitId': unitId },
+          { parentPropertyId: parent.id, 'unitDetails.unitNumber': unitId },
+        ],
+      },
+      {
+        $set: {
+          'unitDetails.availabilityStatus': normalizedStatus,
+          status: childStatus,
+          isPublished: childIsPublished,
+        },
+      },
+    );
+
+    this.logger.log(`✅ Unit "${unitId}" availability updated to ${normalizedStatus} in project "${parent.id}"`);
+
+    return {
+      success: true,
+      message: `Unit availability set to ${normalizedStatus}`,
+      unit: matchedUnit,
+      parentPropertyId: parent.id,
+      availableUnits: parent.availableUnits,
+      totalUnits: parent.totalUnits,
+    };
+  }
+
+  async findUnitsByParentId(parentId: string) {
+    const parent = await this.propertyModel.findOne({
+      $or: [{ id: parentId }, { slug: parentId }],
+    }).lean();
+
+    if (!parent) {
+      throw new NotFoundException(`Property with ID "${parentId}" not found.`);
+    }
+
+    if (parent.units && parent.units.length > 0) {
+      return {
+        parent: {
+          id: parent.id,
+          slug: parent.slug,
+          title: parent.title,
+          projectDetails: parent.projectDetails,
+          structureType: parent.structureType,
+        },
+        units: parent.units,
+        totalUnits: parent.units.length,
+        availableUnits: parent.units.filter((u: any) => u.availabilityStatus === 'AVAILABLE').length,
+      };
+    }
+
+    // Fallback: query child units
+    const childUnits = await this.propertyModel.find({ parentPropertyId: parent.id }).lean();
+    return {
+      parent: {
+        id: parent.id,
+        slug: parent.slug,
+        title: parent.title,
+        projectDetails: parent.projectDetails,
+        structureType: parent.structureType,
+      },
+      units: childUnits.map((c) => c.unitDetails || c),
+      totalUnits: childUnits.length,
+      availableUnits: childUnits.filter((c: any) => c.unitDetails?.availabilityStatus === 'AVAILABLE' || c.isPublished).length,
+    };
   }
 
   // ==========================================
@@ -616,6 +920,35 @@ export class PropertiesService implements OnModuleInit {
         filter['rera.verificationStatus'] = dto.reraStatus.toUpperCase();
       }
 
+      // 11c. Multi-Unit & Structure Filters
+      if (dto.structureType && dto.structureType !== 'all') {
+        filter.structureType = dto.structureType.toUpperCase();
+      }
+      if (dto.isParentProject !== undefined) {
+        filter.isParentProject = dto.isParentProject;
+      }
+      if (dto.isChildUnit !== undefined) {
+        filter.isChildUnit = dto.isChildUnit;
+      }
+      if (dto.parentPropertyId) {
+        filter.parentPropertyId = dto.parentPropertyId;
+      }
+      if (dto.floorNumber && dto.floorNumber !== 'all') {
+        filter.$or = [
+          ...(filter.$or || []),
+          { 'specs.floorNumber': dto.floorNumber },
+          { 'unitDetails.floorNumber': dto.floorNumber },
+        ];
+      }
+      if (dto.unitType && dto.unitType !== 'all') {
+        const uTypeRegex = new RegExp(dto.unitType.trim(), 'i');
+        filter.$or = [
+          ...(filter.$or || []),
+          { 'unitDetails.unitType': uTypeRegex },
+          { subcategory: uTypeRegex },
+        ];
+      }
+
       // 12. Sorting Options
       let sortObj: any = { isFeatured: -1, publishedAt: -1, createdAt: -1 };
       switch (dto.sort) {
@@ -710,6 +1043,26 @@ export class PropertiesService implements OnModuleInit {
         throw new NotFoundException(`Property with identifier "${slug}" not found`);
       }
 
+      let resultProperty: any = { ...property };
+
+      if (property.isChildUnit && property.parentPropertyId) {
+        const parent = await this.propertyModel
+          .findOne({ $or: [{ id: property.parentPropertyId }, { slug: property.parentPropertyId }] })
+          .select('id slug referenceId title location projectDetails advertiser rera isPublished status structureType')
+          .lean();
+        if (parent) {
+          resultProperty.parentProject = parent;
+        }
+      } else if (property.isParentProject) {
+        if (!resultProperty.units || resultProperty.units.length === 0) {
+          const childUnits = await this.propertyModel
+            .find({ parentPropertyId: property.id })
+            .select('id slug referenceId title price specs unitDetails status isPublished listingType')
+            .lean();
+          resultProperty.units = childUnits.map((c) => c.unitDetails || c);
+        }
+      }
+
       // Check contact visibility via entitlements
       let hasContactPermission = false;
       if (user) {
@@ -726,10 +1079,10 @@ export class PropertiesService implements OnModuleInit {
       }
 
       if (this.entitlementsService) {
-        return this.entitlementsService.redactContactData(property, hasContactPermission);
+        return this.entitlementsService.redactContactData(resultProperty, hasContactPermission);
       }
 
-      return property;
+      return resultProperty;
     } catch (err: any) {
       if (err instanceof NotFoundException) throw err;
       throw new NotFoundException(`Property with identifier "${slug}" not found`);
@@ -889,6 +1242,22 @@ export class PropertiesService implements OnModuleInit {
       ],
     };
 
+    const structureType = dto.structureType || PropertyStructureType.INDEPENDENT;
+    const hasUnits = Array.isArray(dto.units) && dto.units.length > 0;
+    const isParentProject = dto.isParentProject !== undefined
+      ? Boolean(dto.isParentProject)
+      : (structureType !== PropertyStructureType.INDEPENDENT && hasUnits);
+    const isChildUnit = Boolean(dto.isChildUnit);
+
+    if (hasUnits) {
+      this.validatePropertyUnits(structureType, dto.units);
+    }
+
+    const totalUnits = hasUnits ? dto.units.length : (dto.totalUnits || 0);
+    const availableUnits = hasUnits
+      ? dto.units.filter((u: any) => u.availabilityStatus === 'AVAILABLE').length
+      : (dto.availableUnits || totalUnits);
+
     const propertyRecord = {
       id,
       referenceId,
@@ -914,6 +1283,16 @@ export class PropertiesService implements OnModuleInit {
       isPublished,
       publishedAt: isPublished ? new Date() : undefined,
       isFeatured: isDirectAdmin && dto.isFeatured ? true : false,
+      structureType,
+      isParentProject,
+      isChildUnit,
+      parentPropertyId: dto.parentPropertyId,
+      parentSlug: dto.parentSlug,
+      projectDetails: dto.projectDetails || {},
+      unitDetails: dto.unitDetails,
+      units: hasUnits ? dto.units : [],
+      totalUnits,
+      availableUnits,
       moderation: {
         riskScore: 'LOW',
         history: [
@@ -930,6 +1309,10 @@ export class PropertiesService implements OnModuleInit {
 
     const created = await this.propertyModel.create(propertyRecord);
     this.logger.log(`✅ Property created in MongoDB Atlas: ${created.slug} (${created.id}) by ${ownerId}`);
+
+    if (isParentProject && hasUnits) {
+      await this.syncChildUnits(created, user);
+    }
 
     // Update category listing count
     await this.categoryModel
@@ -1035,6 +1418,17 @@ export class PropertiesService implements OnModuleInit {
       }
     }
 
+    // Multi-unit validation & statistics
+    if (updateDto.units || updateDto.structureType) {
+      const targetStructure = updateDto.structureType || existing.structureType || PropertyStructureType.INDEPENDENT;
+      const targetUnits = updateDto.units || existing.units || [];
+      this.validatePropertyUnits(targetStructure, targetUnits);
+      if (updateDto.units) {
+        updateDto.totalUnits = updateDto.units.length;
+        updateDto.availableUnits = updateDto.units.filter((u: any) => u.availabilityStatus === 'AVAILABLE').length;
+      }
+    }
+
     // Set updatedBy
     if (user) {
       updateDto.updatedBy = user.id;
@@ -1043,6 +1437,10 @@ export class PropertiesService implements OnModuleInit {
     const updated = await this.propertyModel
       .findOneAndUpdate(query, { $set: updateDto }, { new: true })
       .lean();
+
+    if (updated && updated.isParentProject && Array.isArray(updated.units)) {
+      await this.syncChildUnits(updated, user);
+    }
 
     return updated;
   }
@@ -1159,11 +1557,23 @@ export class PropertiesService implements OnModuleInit {
         existing.isPublished = false;
         existing.archivedAt = new Date();
         await existing.save();
+
+        if (existing.isParentProject) {
+          await this.propertyModel.updateMany(
+            { parentPropertyId: existing.id },
+            { $set: { status: 'ARCHIVED', isPublished: false, archivedAt: new Date() } },
+          );
+        }
+
         return { success: true, message: 'Published property has been archived safely.' };
       }
     }
 
     // Hard delete draft or admin deletion
+    if (existing.isParentProject) {
+      await this.propertyModel.deleteMany({ parentPropertyId: existing.id });
+    }
+
     await this.propertyModel.findOneAndDelete(query);
     return { success: true, message: 'Property deleted successfully from database.' };
   }

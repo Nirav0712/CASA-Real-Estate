@@ -25,6 +25,7 @@ import {
   MessageSquare,
   TrendingUp,
   Search,
+  Layers,
 } from 'lucide-react';
 
 export default function AdminDashboardPage() {
@@ -122,8 +123,14 @@ export default function AdminDashboardPage() {
         {
           title: 'Active Marketplace Listings',
           value: stats.activeListingsCount.toLocaleString(),
-          change: '+14% this week',
+          change: `${stats.independentPropertiesCount || stats.activeListingsCount} independent • ${stats.childUnitsCount || 0} units`,
           icon: Building,
+        },
+        {
+          title: 'Parent Projects & Layouts',
+          value: (stats.parentProjectsCount || 0).toLocaleString(),
+          change: `${stats.childUnitsCount || 0} floor/plot units registered`,
+          icon: Layers,
         },
         {
           title: 'Registered Brokers & Agencies',

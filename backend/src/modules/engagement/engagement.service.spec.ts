@@ -180,6 +180,10 @@ describe('EngagementService', () => {
 
   const mockPropertyModel = {
     findById: jest.fn().mockResolvedValue(mockPropertyDoc),
+    findOne: jest.fn().mockReturnValue({
+      lean: jest.fn().mockResolvedValue(mockPropertyDoc),
+      exec: jest.fn().mockResolvedValue(mockPropertyDoc),
+    }),
     find: jest.fn().mockReturnValue({
       populate: jest.fn().mockReturnThis(),
       sort: jest.fn().mockReturnThis(),

@@ -97,6 +97,8 @@ describe('AdminService Moderation & User Governance (Phase 08)', () => {
       countDocuments: jest.fn().mockResolvedValue(1),
       create: jest.fn().mockResolvedValue(getMockPropertyDoc()),
       aggregate: jest.fn().mockResolvedValue([]),
+      updateMany: jest.fn().mockResolvedValue({ modifiedCount: 0 }),
+      deleteMany: jest.fn().mockResolvedValue({ deletedCount: 0 }),
     };
 
     mockCategoryModel = {
@@ -234,6 +236,26 @@ describe('AdminService Moderation & User Governance (Phase 08)', () => {
           useValue: mockRoleModel,
         },
         {
+          provide: getModelToken('Lead'),
+          useValue: { countDocuments: jest.fn().mockResolvedValue(0) },
+        },
+        {
+          provide: getModelToken('Payment'),
+          useValue: { aggregate: jest.fn().mockResolvedValue([]) },
+        },
+        {
+          provide: getModelToken('SystemSetting'),
+          useValue: { findOne: jest.fn().mockResolvedValue(null) },
+        },
+        {
+          provide: getModelToken('Package'),
+          useValue: { find: jest.fn().mockReturnValue({ lean: jest.fn().mockResolvedValue([]) }) },
+        },
+        {
+          provide: getModelToken('Subscription'),
+          useValue: { find: jest.fn().mockReturnValue({ lean: jest.fn().mockResolvedValue([]) }) },
+        },
+        {
           provide: AuthService,
           useValue: mockAuthService,
         },
@@ -283,6 +305,43 @@ describe('AdminService Moderation & User Governance (Phase 08)', () => {
       expect(docToApprove.save).toHaveBeenCalled();
       expect(result.success).toBe(true);
       expect(result.property.status).toBe('PUBLISHED');
+    });
+
+    it('should cascade PUBLISHED status to child units when parent project is approved', async () => {
+      const parentDoc: any = getMockPropertyDoc();
+      parentDoc.isParentProject = true;
+      parentDoc.save = jest.fn().mockResolvedValue(true);
+      parentDoc.toObject = jest.fn().mockReturnValue(parentDoc);
+
+      mockPropertyModel.findOne.mockReturnValue({
+        exec: jest.fn().mockResolvedValue(parentDoc),
+      });
+
+      await service.approve('mod-101', 'Approved', { name: 'Admin', role: 'ADMIN' });
+
+      expect(mockPropertyModel.updateMany).toHaveBeenCalledWith(
+        { parentPropertyId: parentDoc.id, status: { $ne: 'SOLD_OR_RENTED' } },
+        expect.objectContaining({
+          $set: expect.objectContaining({ status: 'PUBLISHED', isPublished: true }),
+        }),
+      );
+    });
+
+    it('should distinguish parent projects, child units, and independent properties in dashboard counts', async () => {
+      mockPropertyModel.countDocuments
+        .mockResolvedValueOnce(3) // pendingApprovals
+        .mockResolvedValueOnce(12) // activeListings
+        .mockResolvedValueOnce(18) // totalProperties
+        .mockResolvedValueOnce(2) // rejected
+        .mockResolvedValueOnce(4) // parentProjectsCount
+        .mockResolvedValueOnce(8) // childUnitsCount
+        .mockResolvedValueOnce(6); // independentPropertiesCount
+
+      const stats = await service.getDashboardStats();
+
+      expect(stats.parentProjectsCount).toBe(4);
+      expect(stats.childUnitsCount).toBe(8);
+      expect(stats.independentPropertiesCount).toBe(6);
     });
 
     it('should throw NotFoundException if property does not exist', async () => {

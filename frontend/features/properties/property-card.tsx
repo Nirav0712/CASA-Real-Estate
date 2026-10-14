@@ -152,6 +152,17 @@ export function PropertyCard({ property }: { property: Property }) {
               </span>
             </Badge>
           )}
+          {property.isChildUnit && (
+            <Badge variant="default" size="sm" className="bg-casa-brand/95 backdrop-blur-sm text-white font-bold text-[10px] border-0 shadow-subtle flex items-center gap-1">
+              <span>{property.unitDetails?.plotNumber ? `Plot ${property.unitDetails.plotNumber}` : `Unit ${property.unitDetails?.unitNumber || ''}`}</span>
+              {property.unitDetails?.floorNumber && <span>• Fl {property.unitDetails.floorNumber}</span>}
+            </Badge>
+          )}
+          {property.isParentProject && (
+            <Badge variant="default" size="sm" className="bg-purple-600/95 backdrop-blur-sm text-white font-bold text-[10px] border-0 shadow-subtle flex items-center gap-1">
+              <span>🏢 {property.availableUnits ?? property.totalUnits ?? property.units?.length ?? 0} Units Avail.</span>
+            </Badge>
+          )}
           {property.advertiser.isVerifiedAgent ? (
             <Badge variant="verified" size="sm">
               <ShieldCheck className="w-3 h-3 inline me-1" />
@@ -234,10 +245,17 @@ export function PropertyCard({ property }: { property: Property }) {
 
         {/* Title */}
         <Link href={`/property/${property.slug}`}>
-          <h3 className="font-bold text-casa-text-primary line-clamp-2 text-sm leading-snug mb-2.5 group-hover:text-casa-brand transition-colors cursor-pointer">
+          <h3 className="font-bold text-casa-text-primary line-clamp-2 text-sm leading-snug mb-1.5 group-hover:text-casa-brand transition-colors cursor-pointer">
             {localizedTitle}
           </h3>
         </Link>
+
+        {/* Parent Project Context if Child Unit */}
+        {property.isChildUnit && (property.projectDetails?.projectName || (property as any).parentProject?.title?.en) && (
+          <div className="text-[11px] text-casa-brand font-medium truncate mb-1.5">
+            Project: {property.projectDetails?.projectName || (property as any).parentProject?.title?.en}
+          </div>
+        )}
 
         {/* Location */}
         <div className="flex items-center gap-1.5 text-xs text-casa-text-secondary mb-3">
@@ -249,31 +267,47 @@ export function PropertyCard({ property }: { property: Property }) {
 
         {/* Specs Strip */}
         <div className="grid grid-cols-3 gap-2 py-2.5 border-y border-casa-border-light text-xs text-casa-text-secondary mb-4 bg-casa-canvas/50 rounded-xl px-2.5">
-          {property.specs?.bedrooms ? (
-            <div className="flex items-center gap-1 truncate">
-              <Bed className="w-3.5 h-3.5 text-casa-text-muted flex-shrink-0" />
-              <span>{property.specs.bedrooms} {t('beds')}</span>
-            </div>
+          {property.isParentProject ? (
+            <>
+              <div className="flex items-center gap-1 truncate font-medium">
+                <span>🏢 {property.totalUnits || property.units?.length || 0} Units</span>
+              </div>
+              <div className="flex items-center gap-1 truncate text-emerald-600 dark:text-emerald-400 font-medium">
+                <span>✓ {property.availableUnits ?? 0} Avail.</span>
+              </div>
+              <div className="flex items-center gap-1 truncate text-casa-text-muted">
+                <span>{property.projectDetails?.totalFloors ? `${property.projectDetails.totalFloors} Floors` : 'Complex'}</span>
+              </div>
+            </>
           ) : (
-            <div className="flex items-center gap-1 truncate text-casa-text-muted text-[11px]">
-              <span>{property.specs?.constructionStatus?.replace('_', ' ') || 'Ready'}</span>
-            </div>
-          )}
-          {property.specs?.bathrooms ? (
-            <div className="flex items-center gap-1 truncate">
-              <Bath className="w-3.5 h-3.5 text-casa-text-muted flex-shrink-0" />
-              <span>{property.specs.bathrooms} {t('baths')}</span>
-            </div>
-          ) : (
-            <div className="flex items-center gap-1 truncate text-casa-text-muted text-[11px]">
-              <span>{property.specs?.furnishing ? property.specs.furnishing.replace('_', ' ') : 'Standard'}</span>
-            </div>
-          )}
-          {property.specs?.carpetAreaSqFt && (
-            <div className="flex items-center gap-1 truncate">
-              <Maximize className="w-3.5 h-3.5 text-casa-text-muted flex-shrink-0" />
-              <span>{property.specs.carpetAreaSqFt.toLocaleString()} {t('sqft')}</span>
-            </div>
+            <>
+              {property.specs?.bedrooms ? (
+                <div className="flex items-center gap-1 truncate">
+                  <Bed className="w-3.5 h-3.5 text-casa-text-muted flex-shrink-0" />
+                  <span>{property.specs.bedrooms} {t('beds')}</span>
+                </div>
+              ) : (
+                <div className="flex items-center gap-1 truncate text-casa-text-muted text-[11px]">
+                  <span>{property.specs?.constructionStatus?.replace('_', ' ') || 'Ready'}</span>
+                </div>
+              )}
+              {property.specs?.bathrooms ? (
+                <div className="flex items-center gap-1 truncate">
+                  <Bath className="w-3.5 h-3.5 text-casa-text-muted flex-shrink-0" />
+                  <span>{property.specs.bathrooms} {t('baths')}</span>
+                </div>
+              ) : (
+                <div className="flex items-center gap-1 truncate text-casa-text-muted text-[11px]">
+                  <span>{property.specs?.furnishing ? property.specs.furnishing.replace('_', ' ') : 'Standard'}</span>
+                </div>
+              )}
+              {property.specs?.carpetAreaSqFt && (
+                <div className="flex items-center gap-1 truncate">
+                  <Maximize className="w-3.5 h-3.5 text-casa-text-muted flex-shrink-0" />
+                  <span>{property.specs.carpetAreaSqFt.toLocaleString()} {t('sqft')}</span>
+                </div>
+              )}
+            </>
           )}
         </div>
 

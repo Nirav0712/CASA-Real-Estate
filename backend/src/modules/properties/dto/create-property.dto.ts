@@ -524,6 +524,247 @@ export class PropertyReraDto {
   exemptionReason?: string;
 }
 
+export class ProjectBuildingDetailsDto {
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  projectName?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  buildingName?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  buildingNumber?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  towerName?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber()
+  totalFloors?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber()
+  totalTowers?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  projectAddress?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  developerName?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => PropertyReraDto)
+  projectRera?: PropertyReraDto;
+}
+
+export class PropertyUnitDetailsDto {
+  @ApiProperty({ description: 'Unique unit ID' })
+  @IsString()
+  @IsNotEmpty()
+  unitId: string;
+
+  @ApiProperty({ description: 'Unit number / Shop number / Plot number' })
+  @IsString()
+  @IsNotEmpty()
+  unitNumber: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  floorNumber?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  towerName?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  unitType?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber()
+  carpetArea?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber()
+  builtUpArea?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber()
+  superBuiltUpArea?: number;
+
+  @ApiPropertyOptional({ default: 'SQ_FT' })
+  @IsOptional()
+  @IsString()
+  areaUnit?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber()
+  bedrooms?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber()
+  bathrooms?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber()
+  balconies?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  facing?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  furnishing?: string;
+
+  @ApiPropertyOptional({ type: [String] })
+  @IsOptional()
+  @IsArray()
+  amenities?: string[];
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  possessionStatus?: string;
+
+  @ApiPropertyOptional({ default: 'AVAILABLE' })
+  @IsOptional()
+  @IsString()
+  availabilityStatus?: string;
+
+  @ApiPropertyOptional({ default: 'SALE' })
+  @IsOptional()
+  @IsString()
+  listingType?: string;
+
+  @ApiProperty({ description: 'Price or monthly rent' })
+  @IsNumber()
+  price: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber()
+  pricePerSqFt?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber()
+  monthlyRent?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber()
+  securityDeposit?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber()
+  maintenanceCharges?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  preferredTenantType?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  bachelorPreferences?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  availableFrom?: string;
+
+  @ApiPropertyOptional({ type: [String] })
+  @IsOptional()
+  @IsArray()
+  photos?: string[];
+
+  @ApiPropertyOptional({ type: [String] })
+  @IsOptional()
+  @IsArray()
+  documents?: string[];
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => PropertyReraDto)
+  unitRera?: PropertyReraDto;
+
+  // Plotted development fields
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  plotNumber?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  plotType?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber()
+  plotArea?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber()
+  plotLength?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber()
+  plotWidth?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber()
+  frontage?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber()
+  roadWidth?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsBoolean()
+  cornerPlot?: boolean;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber()
+  openSides?: number;
+}
+
 export class CreatePropertyDto {
   @ApiPropertyOptional()
   @IsOptional()
@@ -611,4 +852,60 @@ export class CreatePropertyDto {
   @IsOptional()
   @IsBoolean()
   isFeatured?: boolean;
+
+  @ApiPropertyOptional({
+    description: 'Structure Type',
+    enum: [
+      'INDEPENDENT',
+      'MULTIPLE_UNITS_BUILDING',
+      'COMMERCIAL_BUILDING',
+      'RESIDENTIAL_BUILDING',
+      'PLOTTED_DEVELOPMENT',
+      'PROJECT_UNITS',
+    ],
+    default: 'INDEPENDENT',
+  })
+  @IsOptional()
+  @IsString()
+  structureType?: string;
+
+  @ApiPropertyOptional({ default: false })
+  @IsOptional()
+  @IsBoolean()
+  isParentProject?: boolean;
+
+  @ApiPropertyOptional({ default: false })
+  @IsOptional()
+  @IsBoolean()
+  isChildUnit?: boolean;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  parentPropertyId?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  parentSlug?: string;
+
+  @ApiPropertyOptional({ description: 'Parent project / complex / building details' })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => ProjectBuildingDetailsDto)
+  projectDetails?: ProjectBuildingDetailsDto;
+
+  @ApiPropertyOptional({ description: 'Individual unit / plot details for child unit' })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => PropertyUnitDetailsDto)
+  unitDetails?: PropertyUnitDetailsDto;
+
+  @ApiPropertyOptional({ description: 'List of units / plots under parent project', type: [PropertyUnitDetailsDto] })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => PropertyUnitDetailsDto)
+  units?: PropertyUnitDetailsDto[];
 }
+

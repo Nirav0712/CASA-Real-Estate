@@ -38,6 +38,8 @@ export async function getAllAdminProperties(params?: {
   listingType?: string;
   isFeatured?: string;
   search?: string;
+  structureType?: string;
+  viewScope?: string;
   page?: number;
   limit?: number;
 }): Promise<AdminPropertyItem[]> {
@@ -46,6 +48,8 @@ export async function getAllAdminProperties(params?: {
   if (params?.category && params.category !== 'ALL') searchParams.set('category', params.category);
   if (params?.listingType && params.listingType !== 'ALL') searchParams.set('listingType', params.listingType);
   if (params?.isFeatured && params.isFeatured !== 'ALL') searchParams.set('isFeatured', params.isFeatured);
+  if (params?.structureType && params.structureType !== 'ALL') searchParams.set('structureType', params.structureType);
+  if (params?.viewScope && params.viewScope !== 'ALL') searchParams.set('viewScope', params.viewScope);
   if (params?.search && params.search.trim()) searchParams.set('search', params.search.trim());
   if (params?.page) searchParams.set('page', String(params.page));
   if (params?.limit) searchParams.set('limit', String(params.limit));

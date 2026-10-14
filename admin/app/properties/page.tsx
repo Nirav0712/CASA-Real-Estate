@@ -72,6 +72,8 @@ export default function AdminPropertiesPage() {
   const [selectedType, setSelectedType] = React.useState('ALL');
   const [selectedFeatured, setSelectedFeatured] = React.useState('ALL');
   const [selectedReraStatus, setSelectedReraStatus] = React.useState('ALL');
+  const [selectedStructure, setSelectedStructure] = React.useState('ALL');
+  const [selectedScope, setSelectedScope] = React.useState('ALL');
 
   // Bulk Selection State
   const [selectedIds, setSelectedIds] = React.useState<string[]>([]);
@@ -180,6 +182,8 @@ export default function AdminPropertiesPage() {
           category: selectedCategory,
           listingType: selectedType,
           isFeatured: selectedFeatured,
+          structureType: selectedStructure,
+          viewScope: selectedScope,
           search: searchQuery,
         }),
         fetch(`${API_BASE}/properties/categories/all`).then((r) => r.json()).catch(() => []),
@@ -198,7 +202,7 @@ export default function AdminPropertiesPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [selectedStatus, selectedCategory, selectedType, selectedFeatured, searchQuery, toast]);
+  }, [selectedStatus, selectedCategory, selectedType, selectedFeatured, selectedStructure, selectedScope, searchQuery, toast]);
 
   React.useEffect(() => {
     loadData();
@@ -929,7 +933,7 @@ export default function AdminPropertiesPage() {
 
       {/* Filter Bar */}
       <Card className="p-4 bg-casa-surface border border-casa-border-light shadow-subtle space-y-3">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-7 gap-3">
           {/* Search */}
           <div className="relative">
             <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-casa-text-muted" />
@@ -941,6 +945,18 @@ export default function AdminPropertiesPage() {
               className="w-full pl-9 pr-3 py-2 text-xs bg-casa-canvas border border-casa-border-light rounded-xl focus:outline-none focus:ring-2 focus:ring-casa-brand/30 text-casa-text-primary"
             />
           </div>
+
+          {/* Structure / Hierarchy Filter */}
+          <select
+            value={selectedScope}
+            onChange={(e) => setSelectedScope(e.target.value)}
+            className="px-3 py-2 text-xs bg-casa-canvas border border-casa-border-light rounded-xl focus:outline-none focus:ring-2 focus:ring-casa-brand/30 text-casa-text-primary font-medium"
+          >
+            <option value="ALL">All Hierarchy</option>
+            <option value="PROJECTS">🏢 Projects Only</option>
+            <option value="UNITS">📦 Units / Plots Only</option>
+            <option value="INDEPENDENT">🏡 Independent Only</option>
+          </select>
 
           {/* Category Filter */}
           <select
@@ -1154,6 +1170,17 @@ export default function AdminPropertiesPage() {
                               <span className="font-mono text-[10px] text-casa-brand font-bold">
                                 {item.referenceId || item.id}
                               </span>
+                              {item.isParentProject && (
+                                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-purple-50 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
+                                  🏢 Project ({item.totalUnits || item.units?.length || 0} Units)
+                                </span>
+                              )}
+                              {item.isChildUnit && (
+                                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
+                                  {item.unitDetails?.plotNumber ? `Plot ${item.unitDetails.plotNumber}` : `Unit ${item.unitDetails?.unitNumber || ''}`}
+                                  {item.unitDetails?.floorNumber ? ` (Fl ${item.unitDetails.floorNumber})` : ''}
+                                </span>
+                              )}
                               {(item.reraNumber || item.advertiser?.reraNumber) && (
                                 <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
                                   RERA: {item.reraNumber || item.advertiser?.reraNumber}

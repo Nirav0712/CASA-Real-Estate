@@ -228,6 +228,76 @@ export interface PropertyRera {
   auditHistory?: any[];
 }
 
+export type PropertyStructureType =
+  | 'INDEPENDENT'
+  | 'MULTIPLE_UNITS_BUILDING'
+  | 'COMMERCIAL_BUILDING'
+  | 'RESIDENTIAL_BUILDING'
+  | 'PLOTTED_DEVELOPMENT'
+  | 'PROJECT_UNITS';
+
+export type UnitAvailabilityStatus =
+  | 'AVAILABLE'
+  | 'UNDER_OFFER'
+  | 'SOLD'
+  | 'RENTED'
+  | 'RESERVED';
+
+export interface ProjectBuildingDetails {
+  projectName?: string;
+  buildingName?: string;
+  buildingNumber?: string;
+  towerName?: string;
+  totalFloors?: number;
+  totalTowers?: number;
+  projectAddress?: string;
+  developerName?: string;
+  projectRera?: PropertyRera;
+}
+
+export interface PropertyUnitDetails {
+  unitId: string;
+  unitNumber: string;
+  floorNumber?: string;
+  towerName?: string;
+  unitType?: string;
+  carpetArea?: number;
+  builtUpArea?: number;
+  superBuiltUpArea?: number;
+  areaUnit?: string;
+  bedrooms?: number;
+  bathrooms?: number;
+  balconies?: number;
+  facing?: string;
+  furnishing?: string;
+  amenities?: string[];
+  possessionStatus?: string;
+  availabilityStatus: UnitAvailabilityStatus;
+  listingType: ListingType;
+  price: number;
+  pricePerSqFt?: number;
+  monthlyRent?: number;
+  securityDeposit?: number;
+  maintenanceCharges?: number;
+  preferredTenantType?: string;
+  bachelorPreferences?: string;
+  availableFrom?: string;
+  photos?: string[];
+  documents?: string[];
+  unitRera?: PropertyRera;
+
+  // Plotted development fields
+  plotNumber?: string;
+  plotType?: string;
+  plotArea?: number;
+  plotLength?: number;
+  plotWidth?: number;
+  frontage?: number;
+  roadWidth?: number;
+  cornerPlot?: boolean;
+  openSides?: number;
+}
+
 export interface Property {
   id: string;
   referenceId?: string;
@@ -301,6 +371,18 @@ export interface Property {
   publishedAt?: string;
   isFeatured?: boolean;
   moderation?: ModerationMetadata;
+  structureType?: PropertyStructureType;
+  isParentProject?: boolean;
+  isChildUnit?: boolean;
+  parentPropertyId?: string;
+  parentSlug?: string;
+  projectDetails?: ProjectBuildingDetails;
+  unitDetails?: PropertyUnitDetails;
+  units?: PropertyUnitDetails[];
+  totalUnits?: number;
+  availableUnits?: number;
+  parentProject?: Partial<Property>;
+  childUnitsList?: Partial<Property>[];
   createdAt?: string;
   updatedAt?: string;
 }

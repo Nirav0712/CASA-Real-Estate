@@ -89,6 +89,7 @@ describe('PropertiesService (Phase 06 Lifecycle & Security)', () => {
       create: jest.fn(),
       updateMany: jest.fn().mockResolvedValue({ modifiedCount: 0 }),
       updateOne: jest.fn().mockResolvedValue({ modifiedCount: 1 }),
+      deleteMany: jest.fn().mockResolvedValue({ deletedCount: 0 }),
     };
 
     mockCategoryModel = {
@@ -413,6 +414,143 @@ describe('PropertiesService (Phase 06 Lifecycle & Security)', () => {
 
       expect(result.pagination.limit).toBe(50);
       expect(queryMock.limit).toHaveBeenCalledWith(50);
+    });
+  });
+
+  describe('Multi-Unit & Plotted Developments', () => {
+    it('should reject duplicate unit numbers on the same floor in a building', () => {
+      const units = [
+        { unitId: 'u-1', unitNumber: '101', floorNumber: '1', price: 4500000 },
+        { unitId: 'u-2', unitNumber: '101', floorNumber: '1', price: 5000000 },
+      ];
+
+      expect(() => {
+        service.validatePropertyUnits('COMMERCIAL_BUILDING', units);
+      }).toThrow(BadRequestException);
+    });
+
+    it('should allow identical unit numbers on different floors', () => {
+      const units = [
+        { unitId: 'u-1', unitNumber: '101', floorNumber: '1', price: 4500000 },
+        { unitId: 'u-2', unitNumber: '101', floorNumber: '2', price: 4700000 },
+      ];
+
+      expect(() => {
+        service.validatePropertyUnits('COMMERCIAL_BUILDING', units);
+      }).not.toThrow();
+    });
+
+    it('should reject duplicate plot numbers in a plotted development', () => {
+      const plots = [
+        { unitId: 'p-1', plotNumber: 'A-01', price: 2500000 },
+        { unitId: 'p-2', plotNumber: 'A-01', price: 2800000 },
+      ];
+
+      expect(() => {
+        service.validatePropertyUnits('PLOTTED_DEVELOPMENT', plots);
+      }).toThrow(BadRequestException);
+    });
+
+    it('should reject negative unit or plot prices', () => {
+      const plots = [
+        { unitId: 'p-1', plotNumber: 'A-01', price: -500 },
+      ];
+
+      expect(() => {
+        service.validatePropertyUnits('PLOTTED_DEVELOPMENT', plots);
+      }).toThrow(BadRequestException);
+    });
+
+    it('should create child units when a parent project is saved', async () => {
+      const parentDoc = {
+        id: 'proj-sunrise-1',
+        slug: 'sunrise-business-centre',
+        referenceId: 'CASA-SUNRISE',
+        title: { en: 'Sunrise Business Centre' },
+        description: { en: 'Commercial complex' },
+        category: 'Lease',
+        structureType: 'COMMERCIAL_BUILDING',
+        isParentProject: true,
+        units: [
+          { unitId: 'off-101', unitNumber: '101', floorNumber: '1', carpetArea: 350, price: 35000, listingType: 'COMMERCIAL_LEASE', availabilityStatus: 'AVAILABLE' },
+          { unitId: 'off-102', unitNumber: '102', floorNumber: '1', carpetArea: 500, price: 50000, listingType: 'COMMERCIAL_LEASE', availabilityStatus: 'AVAILABLE' },
+        ],
+        media: { thumbnailUrl: 'https://example.com/thumb.jpg', images: [] },
+        location: { locality: 'Gomti Nagar', city: 'Lucknow' },
+      };
+
+      mockPropertyModel.findOneAndUpdate.mockResolvedValue({});
+      mockPropertyModel.deleteMany.mockResolvedValue({ deletedCount: 0 });
+
+      await service.syncChildUnits(parentDoc, mockAgentUser);
+
+      expect(mockPropertyModel.findOneAndUpdate).toHaveBeenCalledTimes(2);
+      expect(mockPropertyModel.deleteMany).toHaveBeenCalledWith({
+        parentPropertyId: 'proj-sunrise-1',
+        'unitDetails.unitId': { $nin: ['off-101', 'off-102'] },
+      });
+    });
+
+    it('should update unit availability status and reflect on child record', async () => {
+      const mockParent = {
+        id: 'proj-sunrise-1',
+        slug: 'sunrise-business-centre',
+        ownerId: mockAgentUser.id,
+        isParentProject: true,
+        isPublished: true,
+        status: 'PUBLISHED',
+        units: [
+          { unitId: 'off-101', unitNumber: '101', availabilityStatus: 'AVAILABLE' },
+          { unitId: 'off-102', unitNumber: '102', availabilityStatus: 'AVAILABLE' },
+        ],
+        availableUnits: 2,
+        totalUnits: 2,
+        markModified: jest.fn(),
+        save: jest.fn().mockResolvedValue(true),
+      };
+
+      mockPropertyModel.findOne.mockResolvedValue(mockParent);
+      mockPropertyModel.updateOne.mockResolvedValue({ modifiedCount: 1 });
+
+      const result = await service.updateUnitAvailability('proj-sunrise-1', 'off-101', 'SOLD', mockAgentUser);
+
+      expect(result.success).toBe(true);
+      expect(mockParent.units[0].availabilityStatus).toBe('SOLD');
+      expect(mockParent.availableUnits).toBe(1);
+      expect(mockParent.save).toHaveBeenCalled();
+      expect(mockPropertyModel.updateOne).toHaveBeenCalledWith(
+        expect.any(Object),
+        expect.objectContaining({
+          $set: expect.objectContaining({
+            'unitDetails.availabilityStatus': 'SOLD',
+            status: 'SOLD_OR_RENTED',
+            isPublished: false,
+          }),
+        }),
+      );
+    });
+
+    it('should filter properties by structureType in search', async () => {
+      const queryMock = {
+        sort: jest.fn().mockReturnThis(),
+        skip: jest.fn().mockReturnThis(),
+        limit: jest.fn().mockReturnThis(),
+        select: jest.fn().mockReturnThis(),
+        lean: jest.fn().mockResolvedValue([]),
+      };
+      mockPropertyModel.find.mockReturnValue(queryMock);
+      mockPropertyModel.countDocuments.mockResolvedValue(0);
+
+      await service.search({
+        structureType: 'PLOTTED_DEVELOPMENT',
+      });
+
+      expect(mockPropertyModel.find).toHaveBeenCalledWith(
+        expect.objectContaining({
+          structureType: 'PLOTTED_DEVELOPMENT',
+        }),
+        expect.any(Object),
+      );
     });
   });
 });

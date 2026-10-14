@@ -235,6 +235,39 @@ export class SearchPropertiesDto {
   @IsString()
   postedBy?: string;
 
+  @ApiPropertyOptional({ description: 'Filter by property structure type' })
+  @IsOptional()
+  @IsString()
+  structureType?: string;
+
+  @ApiPropertyOptional({ description: 'Filter by floor number' })
+  @IsOptional()
+  @IsString()
+  floorNumber?: string;
+
+  @ApiPropertyOptional({ description: 'Filter by unit type (e.g. Office, Shop, Flat, Apartment, Plot)' })
+  @IsOptional()
+  @IsString()
+  unitType?: string;
+
+  @ApiPropertyOptional({ description: 'Filter only parent projects' })
+  @IsOptional()
+  @Transform(({ value }) => value === 'true' || value === true || value === '1')
+  @IsBoolean()
+  isParentProject?: boolean;
+
+  @ApiPropertyOptional({ description: 'Filter only individual child units' })
+  @IsOptional()
+  @Transform(({ value }) => value === 'true' || value === true || value === '1')
+  @IsBoolean()
+  isChildUnit?: boolean;
+
+  @ApiPropertyOptional({ description: 'Filter by parent property ID' })
+  @IsOptional()
+  @IsString()
+  parentPropertyId?: string;
+
+
   @ApiPropertyOptional({ description: 'Latitude for geospatial proximity' })
   @IsOptional()
   @Type(() => Number)

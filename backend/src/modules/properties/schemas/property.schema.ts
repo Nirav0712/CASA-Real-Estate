@@ -469,6 +469,169 @@ export class PropertyRera {
   auditHistory?: PropertyReraAuditEntry[];
 }
 
+export enum PropertyStructureType {
+  INDEPENDENT = 'INDEPENDENT',
+  MULTIPLE_UNITS_BUILDING = 'MULTIPLE_UNITS_BUILDING',
+  COMMERCIAL_BUILDING = 'COMMERCIAL_BUILDING',
+  RESIDENTIAL_BUILDING = 'RESIDENTIAL_BUILDING',
+  PLOTTED_DEVELOPMENT = 'PLOTTED_DEVELOPMENT',
+  PROJECT_UNITS = 'PROJECT_UNITS',
+}
+
+@Schema({ _id: false })
+export class ProjectBuildingDetails {
+  @Prop()
+  projectName?: string;
+
+  @Prop()
+  buildingName?: string;
+
+  @Prop()
+  buildingNumber?: string;
+
+  @Prop()
+  towerName?: string;
+
+  @Prop()
+  totalFloors?: number;
+
+  @Prop()
+  totalTowers?: number;
+
+  @Prop()
+  projectAddress?: string;
+
+  @Prop()
+  developerName?: string;
+
+  @Prop({ type: PropertyRera })
+  projectRera?: PropertyRera;
+}
+
+@Schema({ _id: false })
+export class PropertyUnitDetails {
+  @Prop({ required: true })
+  unitId: string;
+
+  @Prop({ required: true })
+  unitNumber: string;
+
+  @Prop()
+  floorNumber?: string;
+
+  @Prop()
+  towerName?: string;
+
+  @Prop()
+  unitType?: string; // Office, Shop, Apartment, Flat, Penthouse, Plot, Villa, Showroom, Warehouse
+
+  @Prop()
+  carpetArea?: number;
+
+  @Prop()
+  builtUpArea?: number;
+
+  @Prop()
+  superBuiltUpArea?: number;
+
+  @Prop({ default: 'SQ_FT' })
+  areaUnit?: string;
+
+  @Prop()
+  bedrooms?: number;
+
+  @Prop()
+  bathrooms?: number;
+
+  @Prop()
+  balconies?: number;
+
+  @Prop()
+  facing?: string;
+
+  @Prop()
+  furnishing?: string;
+
+  @Prop({ type: [String], default: [] })
+  amenities?: string[];
+
+  @Prop()
+  possessionStatus?: string;
+
+  @Prop({
+    default: 'AVAILABLE',
+    enum: ['AVAILABLE', 'UNDER_OFFER', 'SOLD', 'RENTED', 'RESERVED'],
+  })
+  availabilityStatus: string;
+
+  @Prop({
+    default: 'SALE',
+    enum: ['SALE', 'RENT', 'LEASE', 'COMMERCIAL_LEASE'],
+  })
+  listingType: string;
+
+  @Prop({ required: true })
+  price: number;
+
+  @Prop()
+  pricePerSqFt?: number;
+
+  @Prop()
+  monthlyRent?: number;
+
+  @Prop()
+  securityDeposit?: number;
+
+  @Prop()
+  maintenanceCharges?: number;
+
+  @Prop()
+  preferredTenantType?: string;
+
+  @Prop()
+  bachelorPreferences?: string;
+
+  @Prop()
+  availableFrom?: string;
+
+  @Prop({ type: [String], default: [] })
+  photos?: string[];
+
+  @Prop({ type: [String], default: [] })
+  documents?: string[];
+
+  @Prop({ type: PropertyRera })
+  unitRera?: PropertyRera;
+
+  // Plotted development fields
+  @Prop()
+  plotNumber?: string;
+
+  @Prop()
+  plotType?: string;
+
+  @Prop()
+  plotArea?: number;
+
+  @Prop()
+  plotLength?: number;
+
+  @Prop()
+  plotWidth?: number;
+
+  @Prop()
+  frontage?: number;
+
+  @Prop()
+  roadWidth?: number;
+
+  @Prop()
+  cornerPlot?: boolean;
+
+  @Prop()
+  openSides?: number;
+}
+
 @Schema({ timestamps: true })
 export class Property {
   @Prop({ required: true, unique: true, index: true })
@@ -584,6 +747,40 @@ export class Property {
   @Prop({ type: PropertySeo, default: () => ({}) })
   seo?: PropertySeo;
 
+  @Prop({
+    default: PropertyStructureType.INDEPENDENT,
+    enum: Object.values(PropertyStructureType),
+    index: true,
+  })
+  structureType: string;
+
+  @Prop({ default: false, index: true })
+  isParentProject: boolean;
+
+  @Prop({ default: false, index: true })
+  isChildUnit: boolean;
+
+  @Prop({ index: true })
+  parentPropertyId?: string;
+
+  @Prop({ index: true })
+  parentSlug?: string;
+
+  @Prop({ type: ProjectBuildingDetails, default: () => ({}) })
+  projectDetails?: ProjectBuildingDetails;
+
+  @Prop({ type: PropertyUnitDetails })
+  unitDetails?: PropertyUnitDetails;
+
+  @Prop({ type: [PropertyUnitDetails], default: [] })
+  units?: PropertyUnitDetails[];
+
+  @Prop({ default: 0 })
+  totalUnits?: number;
+
+  @Prop({ default: 0 })
+  availableUnits?: number;
+
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -607,6 +804,11 @@ PropertySchema.index({ status: 1, isPublished: 1, 'price.amount': 1 });
 PropertySchema.index({ status: 1, isPublished: 1, publishedAt: -1 });
 PropertySchema.index({ status: 1, isPublished: 1, 'specs.bedrooms': 1 });
 PropertySchema.index({ status: 1, isPublished: 1, 'specs.carpetAreaSqFt': 1 });
+PropertySchema.index({ structureType: 1, status: 1 });
+PropertySchema.index({ isParentProject: 1, status: 1 });
+PropertySchema.index({ isChildUnit: 1, parentPropertyId: 1, status: 1 });
+PropertySchema.index({ 'unitDetails.floorNumber': 1, parentPropertyId: 1 });
+PropertySchema.index({ 'unitDetails.unitNumber': 1, parentPropertyId: 1 });
 PropertySchema.index(
   {
     'title.en': 'text',
@@ -615,12 +817,18 @@ PropertySchema.index(
     'location.locality': 'text',
     'location.city': 'text',
     referenceId: 'text',
+    'projectDetails.projectName': 'text',
+    'projectDetails.buildingName': 'text',
+    'unitDetails.unitNumber': 'text',
   },
   {
     name: 'PropertyTextSearchIndex',
     weights: {
       'title.en': 10,
       'title.hi': 10,
+      'projectDetails.projectName': 8,
+      'projectDetails.buildingName': 6,
+      'unitDetails.unitNumber': 8,
       'location.locality': 6,
       'location.city': 5,
       referenceId: 8,
@@ -628,3 +836,4 @@ PropertySchema.index(
     },
   },
 );
+
