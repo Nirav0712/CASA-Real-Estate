@@ -89,10 +89,16 @@ export interface MessageItem {
 
 export interface Review {
   _id: string;
-  userId: any;
+  authorId?: any;
+  authorName?: string;
+  authorAvatar?: string;
+  userId?: any;
+  targetType?: 'PROPERTY' | 'AGENT';
+  targetId?: any;
   propertyId?: any;
   agentId?: any;
   rating: number;
+  title?: string;
   comment?: string;
   status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'HIDDEN';
   createdAt: string;
@@ -282,13 +288,38 @@ export const EngagementService = {
   // 15.9 Reviews
   async getPropertyReviews(propertyId: string) {
     const res = await fetchApi<any>(`/reviews/property/${propertyId}`);
-    return { success: !res.error, data: (res.data?.items || res.data || []) as Review[] };
+    const items = res.data?.reviews || (Array.isArray(res.data) ? res.data : (res.data?.items || []));
+    return {
+      success: !res.error,
+      data: items as Review[],
+      stats: res.data?.stats || { totalReviews: items.length, averageRating: 5.0 },
+      error: res.error,
+    };
   },
 
-  async submitReview(payload: { propertyId?: string; agentId?: string; rating: number; comment?: string }) {
+  async submitReview(payload: {
+    propertyId?: string;
+    agentId?: string;
+    targetId?: string;
+    targetType?: 'PROPERTY' | 'AGENT';
+    rating: number;
+    title?: string;
+    comment: string;
+  }) {
+    const targetType = payload.targetType || (payload.propertyId ? 'PROPERTY' : 'AGENT');
+    const targetId = payload.targetId || payload.propertyId || payload.agentId;
+    const body = {
+      targetType,
+      targetId,
+      propertyId: payload.propertyId,
+      agentId: payload.agentId,
+      rating: payload.rating,
+      title: payload.title || (payload.comment ? (payload.comment.length > 50 ? `${payload.comment.slice(0, 50).trim()}...` : payload.comment.trim()) : 'Verified Review'),
+      comment: payload.comment,
+    };
     const res = await fetchApi<any>('/reviews', {
       method: 'POST',
-      body: JSON.stringify(payload),
+      body: JSON.stringify(body),
     });
     return { success: !res.error, data: res.data, error: res.error };
   },

@@ -86,7 +86,7 @@ export function PropertyDetailView({
   const isYouTube = hasVideo && (property.media?.videoType === 'YOUTUBE' || videoUrl?.includes('youtu'));
   const parsedYouTube = isYouTube && videoUrl ? parseYouTubeUrl(videoUrl) : null;
 
-  const propertyId = property.id || (property as any)._id;
+  const propertyId = (property as any)._id || property.id;
   const saved = isSaved(propertyId);
   const compared = isCompared(propertyId);
 
@@ -124,8 +124,13 @@ export function PropertyDetailView({
 
   // Reviews state
   const [reviews, setReviews] = React.useState<Review[]>([]);
+  const [reviewStats, setReviewStats] = React.useState<{ totalReviews: number; averageRating: number }>({
+    totalReviews: 0,
+    averageRating: 5.0,
+  });
   const [loadingReviews, setLoadingReviews] = React.useState(true);
   const [ratingInput, setRatingInput] = React.useState(5);
+  const [reviewTitle, setReviewTitle] = React.useState('');
   const [reviewComment, setReviewComment] = React.useState('');
   const [isSubmittingReview, setIsSubmittingReview] = React.useState(false);
   const [reviewSubmitted, setReviewSubmitted] = React.useState(false);
@@ -139,19 +144,23 @@ export function PropertyDetailView({
 
   // Load reviews
   const fetchReviews = React.useCallback(async () => {
-    if (!propertyId) return;
+    const idToFetch = (property as any)._id || property.id || property.slug;
+    if (!idToFetch) return;
     try {
       setLoadingReviews(true);
-      const res = await EngagementService.getPropertyReviews(propertyId);
+      const res = await EngagementService.getPropertyReviews(idToFetch);
       if (res.success && res.data) {
-        setReviews(res.data);
+        setReviews(Array.isArray(res.data) ? res.data : []);
+        if (res.stats) {
+          setReviewStats(res.stats);
+        }
       }
     } catch {
       // Ignore
     } finally {
       setLoadingReviews(false);
     }
-  }, [propertyId]);
+  }, [property]);
 
   React.useEffect(() => {
     fetchReviews();
@@ -312,20 +321,31 @@ export function PropertyDetailView({
       return;
     }
 
+    if (!reviewComment.trim()) {
+      toast.warning('Review required', 'Please write a comment sharing your experience.');
+      return;
+    }
+
     try {
       setIsSubmittingReview(true);
+      const targetPropertyId = (property as any)._id || property.id || property.slug;
       const res = await EngagementService.submitReview({
-        propertyId,
-        agentId: (property.advertiser as any)?._id || (property.advertiser as any)?.id,
+        propertyId: targetPropertyId,
+        targetId: targetPropertyId,
+        targetType: 'PROPERTY',
         rating: ratingInput,
-        comment: reviewComment,
+        title: reviewTitle.trim() || (reviewComment.length > 40 ? `${reviewComment.slice(0, 40).trim()}...` : reviewComment.trim()),
+        comment: reviewComment.trim(),
       });
 
       if (res.success) {
         setReviewSubmitted(true);
         setReviewComment('');
-        toast.success('Review Submitted', 'Thank you! Your feedback has been sent for moderation and will appear once approved.');
-        fetchReviews();
+        setReviewTitle('');
+        toast.success('Review Posted', 'Thank you! Your feedback has been published.');
+        await fetchReviews();
+      } else {
+        toast.error('Submission failed', res.error || 'Could not submit review.');
       }
     } catch (err: any) {
       toast.error('Review failed', err.message || 'Could not submit review.');
@@ -1006,6 +1026,11 @@ export function PropertyDetailView({
                   <h2 className="text-base font-bold text-casa-text-primary flex items-center gap-2">
                     <Star className="w-5 h-5 text-amber-500 fill-amber-500" />
                     <span>Customer Reviews & Ratings</span>
+                    {reviews.length > 0 && (
+                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                        ★ {reviewStats.averageRating} ({reviews.length})
+                      </span>
+                    )}
                   </h2>
                   <p className="text-xs text-casa-text-muted mt-0.5">
                     Verified feedback from buyers and visitors for this listing and advertiser.
@@ -1034,11 +1059,11 @@ export function PropertyDetailView({
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
                           <div className="w-7 h-7 rounded-full bg-casa-brand/10 text-casa-brand font-bold text-xs flex items-center justify-center">
-                            {rev.userId?.name?.charAt(0) || 'U'}
+                            {rev.authorName?.charAt(0) || rev.userId?.name?.charAt(0) || 'U'}
                           </div>
                           <div>
                             <div className="text-xs font-semibold text-casa-text-primary">
-                              {rev.userId?.name || 'Verified User'}
+                              {rev.authorName || rev.userId?.name || 'Verified User'}
                             </div>
                             <div className="text-[10px] text-casa-text-muted">
                               {new Date(rev.createdAt).toLocaleDateString()}
@@ -1060,6 +1085,12 @@ export function PropertyDetailView({
                         </div>
                       </div>
 
+                      {rev.title && (
+                        <div className="text-xs font-bold text-casa-text-primary">
+                          {rev.title}
+                        </div>
+                      )}
+
                       {rev.comment && (
                         <p className="text-xs text-casa-text-secondary leading-relaxed">
                           {rev.comment}
@@ -1077,12 +1108,21 @@ export function PropertyDetailView({
                 </h3>
 
                 {reviewSubmitted ? (
-                  <div className="p-4 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 rounded-xl text-center space-y-1">
+                  <div className="p-4 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 rounded-xl text-center space-y-2">
                     <CheckCircle2 className="w-5 h-5 text-emerald-600 mx-auto" />
-                    <p className="text-xs font-bold text-emerald-900 dark:text-emerald-200">Review Submitted</p>
+                    <p className="text-xs font-bold text-emerald-900 dark:text-emerald-200">Review Published Successfully</p>
                     <p className="text-[11px] text-emerald-700 dark:text-emerald-300">
-                      Your rating is pending admin verification and will be published shortly.
+                      Thank you for sharing your experience. Your review is now visible to other buyers!
                     </p>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setReviewSubmitted(false)}
+                      className="text-xs mt-2"
+                    >
+                      Write another review
+                    </Button>
                   </div>
                 ) : (
                   <form onSubmit={handleReviewSubmit} className="space-y-3">
@@ -1109,6 +1149,13 @@ export function PropertyDetailView({
                     </div>
 
                     <div>
+                      <input
+                        type="text"
+                        value={reviewTitle}
+                        onChange={(e) => setReviewTitle(e.target.value)}
+                        placeholder="Review title (e.g. Great location & excellent apartment)"
+                        className="w-full px-3 py-2 bg-casa-canvas border border-casa-border-light rounded-xl text-xs focus:outline-hidden focus:ring-2 focus:ring-casa-brand mb-2"
+                      />
                       <textarea
                         rows={3}
                         required

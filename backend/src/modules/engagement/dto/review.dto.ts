@@ -3,15 +3,25 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { ReviewTargetType, ReviewStatus } from '../schemas/review.schema';
 
 export class CreateReviewDto {
-  @ApiProperty({ enum: ReviewTargetType, description: 'Target entity type (AGENT or PROPERTY)' })
-  @IsNotEmpty()
+  @ApiPropertyOptional({ enum: ReviewTargetType, description: 'Target entity type (AGENT or PROPERTY)' })
+  @IsOptional()
   @IsEnum(ReviewTargetType)
-  targetType: ReviewTargetType;
+  targetType?: ReviewTargetType;
 
-  @ApiProperty({ description: 'Target ObjectId (Agent User ID or Property ID)' })
-  @IsNotEmpty()
+  @ApiPropertyOptional({ description: 'Target ObjectId (Agent User ID or Property ID or slug)' })
+  @IsOptional()
   @IsString()
-  targetId: string;
+  targetId?: string;
+
+  @ApiPropertyOptional({ description: 'Property ID or slug' })
+  @IsOptional()
+  @IsString()
+  propertyId?: string;
+
+  @ApiPropertyOptional({ description: 'Agent User ID' })
+  @IsOptional()
+  @IsString()
+  agentId?: string;
 
   @ApiProperty({ description: 'Rating score from 1 to 5', minimum: 1, maximum: 5 })
   @IsNotEmpty()
@@ -20,10 +30,10 @@ export class CreateReviewDto {
   @Max(5)
   rating: number;
 
-  @ApiProperty({ description: 'Short title for review' })
-  @IsNotEmpty()
+  @ApiPropertyOptional({ description: 'Short title for review' })
+  @IsOptional()
   @IsString()
-  title: string;
+  title?: string;
 
   @ApiProperty({ description: 'Review body text' })
   @IsNotEmpty()

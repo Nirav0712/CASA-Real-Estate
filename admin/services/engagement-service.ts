@@ -44,15 +44,15 @@ export interface AdminReport {
 export const EngagementAdminService = {
   // Reviews
   async getAllReviews(status?: string, page = 1, limit = 50) {
-    const q = status ? `status=${status}&` : '';
-    const res = await fetchAdminApi<any>(`/reviews/admin/all?${q}page=${page}&limit=${limit}`);
+    const q = status && status !== 'ALL' ? `status=${status}&` : '';
+    const res = await fetchAdminApi<any>(`/reviews/admin?${q}page=${page}&limit=${limit}`);
     return { success: !res.error, data: (res.data?.items || res.data || []) as AdminReview[] };
   },
 
-  async updateReviewStatus(id: string, status: string) {
-    const res = await fetchAdminApi<any>(`/reviews/${id}/status`, {
+  async updateReviewStatus(id: string, status: string, reason?: string) {
+    const res = await fetchAdminApi<any>(`/reviews/${id}/moderate`, {
       method: 'PATCH',
-      body: JSON.stringify({ status }),
+      body: JSON.stringify({ status, reason }),
     });
     return { success: !res.error, data: res.data, error: res.error };
   },

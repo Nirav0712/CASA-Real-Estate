@@ -3,6 +3,7 @@ import {
   Get,
   Post,
   Patch,
+  Delete,
   Param,
   Body,
   Query,
@@ -29,20 +30,19 @@ export class ReviewsController {
   @Get('property/:propertyId')
   @ApiOperation({ summary: 'Get public approved reviews and rating statistics for a property' })
   @ApiResponse({ status: 200, description: 'Public property reviews' })
-  getPropertyReviews(@Param('propertyId') propertyId: string) {
+  getPropertyReviews(@Param('propertyId') propertyId: string): Promise<any> {
     return this.engagementService.getPublicReviews(ReviewTargetType.PROPERTY, propertyId);
   }
 
   @Get('agent/:agentId')
   @ApiOperation({ summary: 'Get public approved reviews and rating statistics for an agent' })
   @ApiResponse({ status: 200, description: 'Public agent reviews' })
-  getAgentReviews(@Param('agentId') agentId: string) {
+  getAgentReviews(@Param('agentId') agentId: string): Promise<any> {
     return this.engagementService.getPublicReviews(ReviewTargetType.AGENT, agentId);
   }
 
   @Post()
-  @UseGuards(JwtAuthGuard, PermissionsGuard)
-  @RequirePermissions(Permission.REVIEW_CREATE)
+  @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Submit a verified review for a property or agent' })
@@ -50,7 +50,7 @@ export class ReviewsController {
   createReview(
     @CurrentUser() user: AuthenticatedUser,
     @Body() dto: CreateReviewDto,
-  ) {
+  ): Promise<any> {
     return this.engagementService.createReview(user, dto);
   }
 
@@ -64,7 +64,20 @@ export class ReviewsController {
     @Query('status') status?: ReviewStatus,
     @Query('page') page?: number,
     @Query('limit') limit?: number,
-  ) {
+  ): Promise<any> {
+    return this.engagementService.getAdminReviews(status, page, limit);
+  }
+
+  @Get('admin/all')
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @RequirePermissions(Permission.REVIEW_MODERATE)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Admin get all reviews alias' })
+  getAdminReviewsAll(
+    @Query('status') status?: ReviewStatus,
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+  ): Promise<any> {
     return this.engagementService.getAdminReviews(status, page, limit);
   }
 
@@ -78,7 +91,32 @@ export class ReviewsController {
     @CurrentUser() user: AuthenticatedUser,
     @Param('id') id: string,
     @Body() dto: ModerateReviewDto,
-  ) {
+  ): Promise<any> {
     return this.engagementService.moderateReview(user, id, dto);
+  }
+
+  @Patch(':id/status')
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @RequirePermissions(Permission.REVIEW_MODERATE)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Admin update review status alias' })
+  updateReviewStatus(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+    @Body() dto: ModerateReviewDto,
+  ): Promise<any> {
+    return this.engagementService.moderateReview(user, id, dto);
+  }
+
+  @Delete(':id')
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @RequirePermissions(Permission.REVIEW_MODERATE)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Admin delete review' })
+  deleteReview(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+  ): Promise<any> {
+    return this.engagementService.deleteReview(user, id);
   }
 }

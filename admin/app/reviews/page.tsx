@@ -176,6 +176,12 @@ export default function AdminReviewsPage() {
                   </span>
                 </div>
 
+                {(rev as any).title && (
+                  <h4 className="text-xs font-bold text-casa-text-primary">
+                    {(rev as any).title}
+                  </h4>
+                )}
+
                 {rev.comment && (
                   <p className="text-xs text-casa-text-primary leading-relaxed bg-casa-canvas p-3 rounded-xl border border-casa-border-light">
                     &ldquo;{rev.comment}&rdquo;
@@ -185,12 +191,12 @@ export default function AdminReviewsPage() {
                 <div className="flex flex-wrap items-center gap-4 text-xs text-casa-text-secondary pt-1">
                   <span className="flex items-center gap-1">
                     <User className="w-3.5 h-3.5 text-casa-brand" />
-                    <strong>Reviewer:</strong> {rev.userId?.name || 'User'} ({rev.userId?.mobile || rev.userId?.email || 'N/A'})
+                    <strong>Reviewer:</strong> {(rev as any).authorName || rev.userId?.name || 'Verified User'} {rev.userId?.mobile || rev.userId?.email ? `(${rev.userId?.mobile || rev.userId?.email})` : ''}
                   </span>
                   {rev.propertyId && (
                     <span className="flex items-center gap-1 truncate max-w-xs">
                       <Building className="w-3.5 h-3.5 text-casa-brand" />
-                      <strong>Property:</strong> {typeof rev.propertyId.title === 'string' ? rev.propertyId.title : rev.propertyId.title?.en || 'Listing'}
+                      <strong>Property:</strong> {typeof rev.propertyId.title === 'string' ? rev.propertyId.title : rev.propertyId.title?.en || rev.propertyId.title?.gu || 'Listing'}
                     </span>
                   )}
                 </div>

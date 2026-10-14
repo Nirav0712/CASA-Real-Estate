@@ -1172,47 +1172,95 @@ export class EngagementService {
   // =========================================================================
 
   async createReview(user: AuthenticatedUser, dto: CreateReviewDto) {
-    if (!Types.ObjectId.isValid(dto.targetId)) {
-      throw new BadRequestException('Invalid target ID');
+    let targetType = dto.targetType;
+    let rawTargetId = dto.targetId || dto.propertyId || dto.agentId;
+
+    if (!targetType) {
+      if (dto.propertyId) {
+        targetType = ReviewTargetType.PROPERTY;
+      } else if (dto.agentId) {
+        targetType = ReviewTargetType.AGENT;
+      } else {
+        targetType = ReviewTargetType.PROPERTY;
+      }
+    }
+
+    if (!rawTargetId) {
+      throw new BadRequestException('Target ID or Property ID is required');
+    }
+
+    let targetId: Types.ObjectId;
+
+    if (Types.ObjectId.isValid(rawTargetId)) {
+      targetId = new Types.ObjectId(rawTargetId);
+    } else if (targetType === ReviewTargetType.PROPERTY) {
+      // Resolve property by custom id (e.g. prop-...) or slug
+      const property = await this.propertyModel
+        .findOne({
+          $or: [{ id: rawTargetId }, { slug: rawTargetId }],
+        })
+        .select('_id')
+        .lean();
+
+      if (!property) {
+        throw new NotFoundException(`Property "${rawTargetId}" not found`);
+      }
+      targetId = property._id as Types.ObjectId;
+    } else {
+      throw new BadRequestException('Invalid target ID format');
     }
 
     const authorId = new Types.ObjectId(user.id);
-    const targetId = new Types.ObjectId(dto.targetId);
 
     // Prevent self review for agent
-    if (dto.targetType === ReviewTargetType.AGENT && authorId.equals(targetId)) {
+    if (targetType === ReviewTargetType.AGENT && authorId.equals(targetId)) {
       throw new BadRequestException('You cannot review your own profile');
     }
 
-    // Prevent duplicate review by same author on same target
-    const existing = await this.reviewModel.findOne({
+    const reviewTitle =
+      dto.title?.trim() ||
+      (dto.comment ? (dto.comment.length > 50 ? `${dto.comment.slice(0, 50).trim()}...` : dto.comment.trim()) : 'Verified Review');
+
+    // Check if user already reviewed this target (upsert to allow edits)
+    let review = await this.reviewModel.findOne({
       authorId,
-      targetType: dto.targetType,
+      targetType,
       targetId,
     });
 
-    if (existing) {
-      throw new ConflictException('You have already submitted a review for this target');
+    if (review) {
+      review.rating = dto.rating;
+      review.title = reviewTitle;
+      review.comment = dto.comment;
+      review.authorName = user.name || review.authorName || 'Verified Buyer';
+      review.status = ReviewStatus.APPROVED;
+      await review.save();
+
+      return {
+        success: true,
+        message: 'Your review has been updated successfully',
+        data: review,
+      };
     }
 
-    const review = await this.reviewModel.create({
+    review = await this.reviewModel.create({
       authorId,
       authorName: user.name || 'Verified Buyer',
-      targetType: dto.targetType,
+      targetType,
       targetId,
       rating: dto.rating,
-      title: dto.title,
+      title: reviewTitle,
       comment: dto.comment,
       status: ReviewStatus.APPROVED,
     });
 
     // Notify target agent if applicable
-    if (dto.targetType === ReviewTargetType.AGENT) {
+    if (targetType === ReviewTargetType.AGENT) {
       await this.createNotification({
         recipientId: targetId,
         type: NotificationType.REVIEW_RECEIVED,
         title: 'New Rating & Review Received',
-        message: `${user.name || 'A client'} gave you a ${dto.rating}-star rating: "${dto.title}"`,
+        message: `${user.name || 'A client'} gave you a ${dto.rating}-star rating: "${reviewTitle}"`,
         data: { reviewId: review._id.toString() },
       });
     }
@@ -1225,13 +1273,38 @@ export class EngagementService {
   }
 
   async getPublicReviews(targetType: ReviewTargetType, targetIdStr: string) {
-    if (!Types.ObjectId.isValid(targetIdStr)) {
+    let targetId: Types.ObjectId;
+
+    if (Types.ObjectId.isValid(targetIdStr)) {
+      targetId = new Types.ObjectId(targetIdStr);
+    } else if (targetType === ReviewTargetType.PROPERTY) {
+      const property = await this.propertyModel
+        .findOne({
+          $or: [{ id: targetIdStr }, { slug: targetIdStr }],
+        })
+        .select('_id')
+        .lean();
+
+      if (!property) {
+        return {
+          success: true,
+          data: {
+            reviews: [],
+            stats: {
+              totalReviews: 0,
+              averageRating: 5.0,
+            },
+          },
+        };
+      }
+      targetId = property._id as Types.ObjectId;
+    } else {
       throw new BadRequestException('Invalid target ID');
     }
 
-    const targetId = new Types.ObjectId(targetIdStr);
     const reviews = await this.reviewModel
       .find({ targetType, targetId, status: ReviewStatus.APPROVED })
+      .populate('authorId', 'name mobile avatar')
       .sort({ createdAt: -1 })
       .lean();
 
@@ -1253,11 +1326,13 @@ export class EngagementService {
     };
   }
 
-  async getAdminReviews(status?: ReviewStatus, page = 1, limit = 20) {
+  async getAdminReviews(status?: ReviewStatus, page = 1, limit = 50): Promise<any> {
     const filter: any = {};
-    if (status) filter.status = status;
+    if (status && (status as any) !== 'ALL') {
+      filter.status = status;
+    }
 
-    const safeLimit = Math.min(Math.max(1, limit), 50);
+    const safeLimit = Math.min(Math.max(1, limit), 100);
     const skip = (Math.max(1, page) - 1) * safeLimit;
 
     const [items, total] = await Promise.all([
@@ -1271,10 +1346,33 @@ export class EngagementService {
       this.reviewModel.countDocuments(filter),
     ]);
 
+    // Populate property targets
+    const propIds = items
+      .filter((r) => r.targetType === ReviewTargetType.PROPERTY && r.targetId)
+      .map((r) => r.targetId);
+
+    const propMap = new Map<string, any>();
+    if (propIds.length > 0) {
+      const props = await this.propertyModel
+        .find({ _id: { $in: propIds } })
+        .select('title slug price location')
+        .lean();
+      props.forEach((p) => propMap.set(p._id.toString(), p));
+    }
+
+    const enriched = items.map((rev) => {
+      const prop = rev.targetType === ReviewTargetType.PROPERTY ? propMap.get(rev.targetId.toString()) : null;
+      return {
+        ...rev,
+        userId: rev.authorId || { name: rev.authorName },
+        propertyId: prop,
+      };
+    });
+
     return {
       success: true,
       data: {
-        items,
+        items: enriched,
         pagination: {
           total,
           page,
@@ -1300,6 +1398,17 @@ export class EngagementService {
       success: true,
       message: `Review marked as ${dto.status}`,
       data: review,
+    };
+  }
+
+  async deleteReview(user: AuthenticatedUser, id: string) {
+    if (!Types.ObjectId.isValid(id)) throw new BadRequestException('Invalid review ID');
+    const review = await this.reviewModel.findByIdAndDelete(id);
+    if (!review) throw new NotFoundException('Review not found');
+
+    return {
+      success: true,
+      message: 'Review permanently deleted',
     };
   }
 
