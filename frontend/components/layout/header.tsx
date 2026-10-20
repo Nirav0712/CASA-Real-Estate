@@ -39,6 +39,8 @@ import {
   Shield,
   MapPin,
   PhoneCall,
+  CreditCard,
+  Receipt,
 } from 'lucide-react';
 
 const ADMIN_PORTAL_URL = process.env.NEXT_PUBLIC_ADMIN_URL || 'http://localhost:3001';
@@ -513,6 +515,23 @@ export function Header() {
                           </Link>
                         </div>
                       )}
+
+                      <div className="py-1 border-b border-casa-border-light">
+                        <Link
+                          href="/dashboard/billing"
+                          className="flex items-center gap-2 px-3.5 py-1.5 text-xs text-casa-text-secondary hover:text-casa-text-primary hover:bg-casa-subtle transition-colors"
+                        >
+                          <CreditCard className="w-3.5 h-3.5 text-casa-brand" />
+                          <span>Billing & Plans</span>
+                        </Link>
+                        <Link
+                          href="/dashboard/payments"
+                          className="flex items-center gap-2 px-3.5 py-1.5 text-xs text-casa-text-secondary hover:text-casa-text-primary hover:bg-casa-subtle transition-colors"
+                        >
+                          <Receipt className="w-3.5 h-3.5 text-casa-text-muted" />
+                          <span>Payment Invoices</span>
+                        </Link>
+                      </div>
 
                       <div className="pt-1">
                         <button
