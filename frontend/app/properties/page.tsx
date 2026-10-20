@@ -43,6 +43,10 @@ function SearchPropertiesContent() {
       category: searchParams.get('category') || undefined,
       listingType: searchParams.get('listingType') || searchParams.get('type') || undefined,
       city: searchParams.get('city') || undefined,
+      area: searchParams.get('area') || undefined,
+      subArea: searchParams.get('subArea') || undefined,
+      society: searchParams.get('society') || undefined,
+      hasVideo: searchParams.get('hasVideo') ? searchParams.get('hasVideo') === 'true' : undefined,
       locality: searchParams.get('locality') || undefined,
       minPrice: searchParams.get('minPrice') || undefined,
       maxPrice: searchParams.get('maxPrice') || undefined,
@@ -123,7 +127,11 @@ function SearchPropertiesContent() {
     if (currentFilters.listingType)
       tags.push({ key: 'listingType', label: currentFilters.listingType === 'SALE' ? 'For Sale' : currentFilters.listingType === 'RENT' ? 'For Rent' : 'Lease' });
     if (currentFilters.city) tags.push({ key: 'city', label: currentFilters.city });
+    if (currentFilters.area) tags.push({ key: 'area', label: `Area: ${currentFilters.area}` });
+    if (currentFilters.subArea) tags.push({ key: 'subArea', label: `Sub-area: ${currentFilters.subArea}` });
+    if (currentFilters.society) tags.push({ key: 'society', label: `Society: ${currentFilters.society}` });
     if (currentFilters.locality) tags.push({ key: 'locality', label: currentFilters.locality });
+    if (currentFilters.hasVideo) tags.push({ key: 'hasVideo', label: 'With Video / Reel' });
     if (currentFilters.minPrice || currentFilters.maxPrice) {
       tags.push({
         key: 'minPrice',

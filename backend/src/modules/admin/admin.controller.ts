@@ -321,6 +321,56 @@ export class AdminController {
     return this.adminService.getAgentVerificationDetail(id);
   }
 
+  @Get('kyc')
+  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN, UserRole.MODERATOR)
+  @ApiOperation({ summary: 'List KYC verification queue with documents and status' })
+  @ApiResponse({ status: 200, description: 'KYC queue returned' })
+  getKycQueue(
+    @Query('status') status?: string,
+    @Query('accountType') accountType?: string,
+    @Query('search') search?: string,
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+  ) {
+    return this.adminService.getKycVerificationQueue({ status, accountType, search, page, limit });
+  }
+
+  @Post('kyc/:id/approve')
+  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
+  @ApiOperation({ summary: 'Approve KYC application and activate 3-day Free Trial' })
+  @ApiResponse({ status: 200, description: 'KYC approved and 3-day Free Trial started' })
+  approveKyc(
+    @Param('id') id: string,
+    @Body() body?: { notes?: string },
+    @CurrentUser() user?: AuthenticatedUser,
+  ) {
+    return this.adminService.verifyAgent(id, body?.notes, user);
+  }
+
+  @Post('kyc/:id/reject')
+  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
+  @ApiOperation({ summary: 'Reject KYC application with mandatory reason' })
+  @ApiResponse({ status: 200, description: 'KYC rejected and notification sent' })
+  rejectKyc(
+    @Param('id') id: string,
+    @Body() body: { reason: string },
+    @CurrentUser() user?: AuthenticatedUser,
+  ) {
+    return this.adminService.rejectAgentVerification(id, body?.reason, user);
+  }
+
+  @Post('users/:id/package')
+  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
+  @ApiOperation({ summary: 'Manually assign a package to a user' })
+  @ApiResponse({ status: 200, description: 'Package assigned to user' })
+  assignUserPackage(
+    @Param('id') id: string,
+    @Body() body: { packageId: string },
+    @CurrentUser() user?: AuthenticatedUser,
+  ) {
+    return this.adminService.assignUserPackage(id, body?.packageId, user);
+  }
+
   @Post('agents/:id/verify')
   @Post('agents/:id/approve')
   @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)

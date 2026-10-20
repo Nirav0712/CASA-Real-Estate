@@ -37,17 +37,21 @@ import {
   Tag,
   Building,
   RefreshCw,
+  ExternalLink,
+  MapPin,
 } from 'lucide-react';
 
 const STATUS_FILTERS: { label: string; value: string }[] = [
   { label: 'All Leads', value: 'ALL' },
   { label: 'New', value: 'NEW' },
   { label: 'Contacted', value: 'CONTACTED' },
+  { label: 'Interested', value: 'INTERESTED' },
   { label: 'Follow Up', value: 'FOLLOW_UP' },
   { label: 'Site Visit', value: 'SITE_VISIT' },
   { label: 'Negotiation', value: 'NEGOTIATION' },
   { label: 'Converted', value: 'CONVERTED' },
-  { label: 'Lost / Closed', value: 'LOST' },
+  { label: 'Closed', value: 'CLOSED' },
+  { label: 'Lost', value: 'LOST' },
 ];
 
 export default function EnquiriesPage() {
@@ -301,62 +305,124 @@ export default function EnquiriesPage() {
               key={lead.id}
               className="p-5 bg-casa-surface border border-casa-border-light shadow-subtle hover:border-casa-brand/40 transition-colors flex flex-col md:flex-row md:items-center justify-between gap-4"
             >
-              <div className="space-y-2 flex-1">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-casa-canvas border border-casa-border-light text-casa-text-secondary">
-                    {lead.id.slice(-6)}
-                  </span>
-                  <span
-                    className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full ${
-                      lead.status === 'NEW'
-                        ? 'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300'
-                        : lead.status === 'SITE_VISIT'
-                        ? 'bg-purple-50 text-purple-700 dark:bg-purple-950 dark:text-purple-300'
-                        : lead.status === 'CONVERTED'
-                        ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300'
-                        : lead.status === 'LOST' || lead.status === 'CANCELLED'
-                        ? 'bg-rose-50 text-rose-700 dark:bg-rose-950 dark:text-rose-300'
-                        : 'bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-300'
-                    }`}
-                  >
-                    {lead.status}
-                  </span>
-                  <span
-                    className={`text-[10px] font-bold px-2 py-0.5 rounded ${
-                      lead.priority === 'URGENT'
-                        ? 'bg-rose-100 text-rose-800'
-                        : lead.priority === 'HIGH'
-                        ? 'bg-amber-100 text-amber-800'
-                        : 'bg-slate-100 text-slate-700'
-                    }`}
-                  >
-                    {lead.priority} Priority
-                  </span>
-                  <span className="text-xs text-casa-text-muted flex items-center gap-1 ml-auto md:ml-0">
-                    <Clock className="w-3 h-3" /> {new Date(lead.createdAt).toLocaleDateString()}
-                  </span>
+              <div className="flex items-start gap-4 flex-1">
+                {/* Property Thumbnail */}
+                <div className="hidden sm:flex w-16 h-16 rounded-xl bg-casa-canvas border border-casa-border-light overflow-hidden flex-shrink-0 items-center justify-center relative">
+                  {lead.propertyImage ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={lead.propertyImage}
+                      alt={lead.propertyTitle || 'Property'}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <Building className="w-7 h-7 text-casa-text-muted" />
+                  )}
                 </div>
 
-                <div>
-                  <h3 className="text-sm font-bold text-casa-text-primary flex items-center gap-2">
-                    <Building className="w-3.5 h-3.5 text-casa-brand" />
-                    {lead.propertyTitle || 'Property Enquiry'}
-                  </h3>
-                  <p className="text-xs text-casa-text-secondary mt-1 bg-casa-canvas p-2.5 rounded-lg border border-casa-border-light line-clamp-2">
-                    &ldquo;{lead.message}&rdquo;
-                  </p>
-                </div>
+                <div className="space-y-2 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-casa-canvas border border-casa-border-light text-casa-text-secondary">
+                      LEAD: {lead.id.slice(-6)}
+                    </span>
+                    <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-casa-brand-subtle text-casa-brand border border-casa-border-light">
+                      PROP: {lead.propertyId ? lead.propertyId.slice(-6) : 'N/A'}
+                    </span>
+                    <span
+                      className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full ${
+                        lead.status === 'NEW'
+                          ? 'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300'
+                          : lead.status === 'INTERESTED'
+                          ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300'
+                          : lead.status === 'SITE_VISIT'
+                          ? 'bg-purple-50 text-purple-700 dark:bg-purple-950 dark:text-purple-300'
+                          : lead.status === 'CONVERTED'
+                          ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300'
+                          : lead.status === 'CLOSED' || lead.status === 'LOST' || lead.status === 'CANCELLED'
+                          ? 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
+                          : 'bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-300'
+                      }`}
+                    >
+                      {lead.status}
+                    </span>
+                    <span
+                      className={`text-[10px] font-bold px-2 py-0.5 rounded ${
+                        lead.priority === 'URGENT'
+                          ? 'bg-rose-100 text-rose-800'
+                          : lead.priority === 'HIGH'
+                          ? 'bg-amber-100 text-amber-800'
+                          : 'bg-slate-100 text-slate-700'
+                      }`}
+                    >
+                      {lead.priority} Priority
+                    </span>
+                    {lead.whatsappStatus && (
+                      <span
+                        className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${
+                          lead.whatsappStatus === 'SENT'
+                            ? 'bg-emerald-100 text-emerald-800'
+                            : lead.whatsappStatus === 'FAILED'
+                            ? 'bg-rose-100 text-rose-800'
+                            : 'bg-blue-100 text-blue-800'
+                        }`}
+                      >
+                        WA: {lead.whatsappStatus}
+                      </span>
+                    )}
+                    <span className="text-xs text-casa-text-muted flex items-center gap-1 ml-auto md:ml-0">
+                      <Clock className="w-3 h-3" /> {new Date(lead.createdAt).toLocaleDateString()}
+                    </span>
+                  </div>
 
-                <div className="flex flex-wrap items-center gap-4 text-xs text-casa-text-secondary pt-1">
-                  <span>
-                    Buyer: <strong className="text-casa-text-primary">{lead.name || lead.contactName}</strong>
-                  </span>
-                  <span className="flex items-center gap-1 font-mono text-casa-brand font-semibold">
-                    <Phone className="w-3 h-3" /> {lead.mobile || lead.contactPhone}
-                  </span>
-                  <span>
-                    Assigned: <strong className="text-casa-text-primary">{lead.assignedAgent?.name || 'Unassigned'}</strong>
-                  </span>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-sm font-bold text-casa-text-primary">
+                        {lead.propertyTitle || 'Property Enquiry'}
+                      </h3>
+                      {lead.propertyPrice && (
+                        <span className="text-xs font-bold text-casa-brand">
+                          ₹{lead.propertyPrice.toLocaleString()}
+                        </span>
+                      )}
+                      {(lead.propertySlug || lead.propertyId) && (
+                        <a
+                          href={`${process.env.NEXT_PUBLIC_FRONTEND_URL || 'http://localhost:3000'}/properties/${lead.propertySlug || lead.propertyId}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-casa-brand hover:underline inline-flex items-center text-xs"
+                          title="View property on public website"
+                        >
+                          <ExternalLink className="w-3 h-3" />
+                        </a>
+                      )}
+                    </div>
+                    {lead.propertyLocation && (
+                      <span className="text-[11px] text-casa-text-muted flex items-center gap-1 mt-0.5">
+                        <MapPin className="w-3 h-3" />
+                        {lead.propertyLocation}
+                      </span>
+                    )}
+                    <p className="text-xs text-casa-text-secondary mt-1 bg-casa-canvas p-2.5 rounded-lg border border-casa-border-light line-clamp-2">
+                      &ldquo;{lead.message}&rdquo;
+                    </p>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-4 text-xs text-casa-text-secondary pt-1">
+                    <span>
+                      Buyer: <strong className="text-casa-text-primary">{lead.name || lead.contactName}</strong>
+                    </span>
+                    <span className="flex items-center gap-1 font-mono text-casa-brand font-semibold">
+                      <Phone className="w-3 h-3" /> {lead.mobile || lead.contactPhone}
+                    </span>
+                    {lead.propertyAdvertiserName && (
+                      <span className="text-[11px] text-casa-text-muted">
+                        Broker/Agent: <strong className="text-casa-text-primary">{lead.propertyAdvertiserName}</strong>
+                      </span>
+                    )}
+                    <span>
+                      Assigned: <strong className="text-casa-text-primary">{lead.assignedAgent?.name || 'Unassigned'}</strong>
+                    </span>
+                  </div>
                 </div>
               </div>
 
@@ -451,10 +517,12 @@ export default function EnquiriesPage() {
                 >
                   <option value="NEW">NEW</option>
                   <option value="CONTACTED">CONTACTED</option>
+                  <option value="INTERESTED">INTERESTED</option>
                   <option value="FOLLOW_UP">FOLLOW_UP</option>
                   <option value="SITE_VISIT">SITE_VISIT</option>
                   <option value="NEGOTIATION">NEGOTIATION</option>
                   <option value="CONVERTED">CONVERTED</option>
+                  <option value="CLOSED">CLOSED</option>
                   <option value="LOST">LOST</option>
                   <option value="CANCELLED">CANCELLED</option>
                 </select>
@@ -488,10 +556,42 @@ export default function EnquiriesPage() {
               </div>
 
               <div className="p-4 bg-casa-surface border border-casa-border-light rounded-xl space-y-2">
-                <h4 className="text-xs font-bold text-casa-text-primary uppercase tracking-wider">Property Context</h4>
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-bold text-casa-text-primary uppercase tracking-wider">Property Context</h4>
+                  {(activeLead.propertySlug || activeLead.propertyId) && (
+                    <a
+                      href={`${process.env.NEXT_PUBLIC_FRONTEND_URL || 'http://localhost:3000'}/properties/${activeLead.propertySlug || activeLead.propertyId}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs text-casa-brand font-semibold hover:underline inline-flex items-center gap-1"
+                    >
+                      View Live <ExternalLink className="w-3 h-3" />
+                    </a>
+                  )}
+                </div>
+                {activeLead.propertyImage && (
+                  <div className="w-full h-28 rounded-lg overflow-hidden bg-casa-canvas border border-casa-border-light">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={activeLead.propertyImage}
+                      alt={activeLead.propertyTitle || 'Property'}
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                )}
                 <div className="text-xs space-y-1 text-casa-text-secondary">
-                  <p className="font-semibold text-casa-text-primary">{activeLead.propertyTitle}</p>
-                  <p><strong>Location:</strong> {activeLead.propertyLocation || 'Lucknow'}</p>
+                  <p className="font-bold text-casa-text-primary">{activeLead.propertyTitle || 'Property Enquiry'}</p>
+                  <p><strong>Property ID:</strong> <span className="font-mono text-casa-text-primary">{activeLead.propertyId}</span></p>
+                  {activeLead.propertyPrice && (
+                    <p><strong>Price:</strong> <span className="font-bold text-casa-brand">₹{activeLead.propertyPrice.toLocaleString()}</span></p>
+                  )}
+                  <p><strong>Location:</strong> {activeLead.propertyLocation || 'Location not specified'}</p>
+                  {activeLead.propertyAdvertiserName && (
+                    <p><strong>Advertiser:</strong> {activeLead.propertyAdvertiserName} {activeLead.propertyAdvertiserPhone ? `(${activeLead.propertyAdvertiserPhone})` : ''}</p>
+                  )}
+                  {activeLead.propertyAgencyName && (
+                    <p><strong>Agency:</strong> {activeLead.propertyAgencyName}</p>
+                  )}
                   <p><strong>Assigned Agent:</strong> {activeLead.assignedAgent?.name || 'Unassigned'}</p>
                 </div>
               </div>

@@ -90,3 +90,21 @@ export async function fetchLocationBySlug(slug: string): Promise<LocationItem | 
   }
   return res.data;
 }
+
+export async function addCustomLocation(payload: {
+  name: string;
+  type: string;
+  parentId?: string;
+  cityName?: string;
+  stateName?: string;
+}): Promise<LocationItem | null> {
+  const res = await fetchApi<LocationItem>('/locations/add-custom', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+  if (res.error || !res.data) {
+    return null;
+  }
+  return res.data;
+}
+

@@ -1,0 +1,882 @@
+'use client';
+
+import * as React from 'react';
+import Link from 'next/link';
+import { Container } from '@/components/ui/card';
+import { formatPrice } from '@/lib/utils';
+import { parseYouTubeUrl } from '@/lib/video';
+import { searchProperties } from '@/services/property-service';
+import { Property } from '@/types';
+import {
+  Play,
+  Pause,
+  MapPin,
+  Building,
+  Video,
+  ExternalLink,
+  ChevronRight,
+  Filter,
+  X,
+  Sparkles,
+  Maximize2,
+  Volume2,
+  VolumeX,
+} from 'lucide-react';
+
+const FALLBACK_VIDEO_PROPERTIES: Property[] = [
+  {
+    id: 'vid-reel-01',
+    slug: '4-bhk-luxury-villa-gomti-nagar-ext',
+    title: {
+      en: '4 BHK Luxury Independent Villa with Private Garden',
+      hi: 'गोमती नगर में 4 बीएचके लक्जरी विला',
+    },
+    category: 'House / Home',
+    listingType: 'SALE',
+    price: { amount: 18500000, currency: 'INR', priceUnit: 'TOTAL' },
+    location: {
+      state: 'Uttar Pradesh',
+      city: 'Lucknow',
+      area: 'Gomti Nagar',
+      subArea: 'Gomti Nagar Extension',
+      society: 'Omaxe Residency',
+      locality: 'Gomti Nagar Extension',
+    },
+    specs: { bedrooms: 4, bathrooms: 4, area: 3200, areaUnit: 'SQ_FT' },
+    media: {
+      thumbnailUrl:
+        'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=800&q=80',
+      images: [
+        'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=800&q=80',
+      ],
+      videoUrl: 'https://www.youtube.com/shorts/aqz-KE-bpKQ',
+      isReelFormat: true,
+    },
+    advertiser: {
+      name: 'Verma Luxury Estates',
+      phone: '+919925843589',
+      isVerifiedAgent: true,
+      role: 'VERIFIED_AGENT',
+    },
+    status: 'ACTIVE',
+    isPublished: true,
+  },
+  {
+    id: 'vid-reel-02',
+    slug: '3-bhk-high-rise-penthouse-satellite-ahmedabad',
+    title: {
+      en: '3 BHK High-Rise Penthouse with Sky Deck',
+      hi: 'अहमदाबाद में 3 बीएचके स्काई पेंटहाउस',
+    },
+    category: 'Apartment',
+    listingType: 'SALE',
+    price: { amount: 14500000, currency: 'INR', priceUnit: 'TOTAL' },
+    location: {
+      state: 'Gujarat',
+      city: 'Ahmedabad',
+      area: 'Satellite',
+      subArea: 'Jodhpur Cross Road',
+      society: 'Goyal Riviera',
+      locality: 'Satellite',
+    },
+    specs: { bedrooms: 3, bathrooms: 3, area: 2450, areaUnit: 'SQ_FT' },
+    media: {
+      thumbnailUrl:
+        'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=800&q=80',
+      images: [
+        'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=800&q=80',
+      ],
+      videoUrl: 'https://www.youtube.com/shorts/aqz-KE-bpKQ',
+      isReelFormat: true,
+    },
+    advertiser: {
+      name: 'Apex Gujarat Realty',
+      phone: '+919876543210',
+      isVerifiedAgent: true,
+      role: 'VERIFIED_AGENT',
+    },
+    status: 'ACTIVE',
+    isPublished: true,
+  },
+  {
+    id: 'vid-reel-03',
+    slug: 'sea-facing-luxury-condo-bandra-west',
+    title: {
+      en: 'Sea-Facing 2 BHK Designer Condo in Bandra',
+      hi: 'बांद्रा वेस्ट में सी-फेसिंग 2 बीएचके कॉन्डो',
+    },
+    category: 'Apartment',
+    listingType: 'RENT',
+    price: { amount: 125000, currency: 'INR', priceUnit: 'PER_MONTH' },
+    location: {
+      state: 'Maharashtra',
+      city: 'Mumbai',
+      area: 'Bandra West',
+      subArea: 'Carter Road',
+      society: 'Sea Spray Apartments',
+      locality: 'Bandra West',
+    },
+    specs: { bedrooms: 2, bathrooms: 2, area: 1350, areaUnit: 'SQ_FT' },
+    media: {
+      thumbnailUrl:
+        'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=800&q=80',
+      images: [
+        'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=800&q=80',
+      ],
+      videoUrl: 'https://www.youtube.com/shorts/aqz-KE-bpKQ',
+      isReelFormat: true,
+    },
+    advertiser: {
+      name: 'Mumbai Prime Realty',
+      phone: '+919925843531',
+      isVerifiedAgent: true,
+      role: 'VERIFIED_AGENT',
+    },
+    status: 'ACTIVE',
+    isPublished: true,
+  },
+  {
+    id: 'vid-reel-04',
+    slug: 'smart-villa-whitefield-bengaluru',
+    title: {
+      en: 'Ultra-Modern Smart Villa in Gated Community',
+      hi: 'व्हाइटफील्ड में अल्ट्रा-मॉडर्न स्मार्ट विला',
+    },
+    category: 'Villa',
+    listingType: 'SALE',
+    price: { amount: 26000000, currency: 'INR', priceUnit: 'TOTAL' },
+    location: {
+      state: 'Karnataka',
+      city: 'Bengaluru',
+      area: 'Whitefield',
+      subArea: 'ITPL Main Road',
+      society: 'Prestige Shantiniketan',
+      locality: 'Whitefield',
+    },
+    specs: { bedrooms: 4, bathrooms: 5, area: 3600, areaUnit: 'SQ_FT' },
+    media: {
+      thumbnailUrl:
+        'https://images.unsplash.com/photo-1613490493576-7fde63acd811?auto=format&fit=crop&w=800&q=80',
+      images: [
+        'https://images.unsplash.com/photo-1613490493576-7fde63acd811?auto=format&fit=crop&w=800&q=80',
+      ],
+      videoUrl: 'https://www.youtube.com/shorts/aqz-KE-bpKQ',
+      isReelFormat: true,
+    },
+    advertiser: {
+      name: 'Bengaluru Premier Spaces',
+      phone: '+919876543210',
+      isVerifiedAgent: true,
+      role: 'VERIFIED_AGENT',
+    },
+    status: 'ACTIVE',
+    isPublished: true,
+  },
+  {
+    id: 'vid-reel-05',
+    slug: 'modern-commercial-showroom-hazratganj',
+    title: {
+      en: 'Prime Road-Front Commercial Retail Showroom',
+      hi: 'हज़रतगंज में मुख्य मार्ग पर शोरूम',
+    },
+    category: 'Commercial',
+    listingType: 'RENT',
+    price: { amount: 95000, currency: 'INR', priceUnit: 'PER_MONTH' },
+    location: {
+      state: 'Uttar Pradesh',
+      city: 'Lucknow',
+      area: 'Hazratganj',
+      subArea: 'Main Market Square',
+      society: 'Hazratganj Royale',
+      locality: 'Hazratganj',
+    },
+    specs: { area: 1800, areaUnit: 'SQ_FT' },
+    media: {
+      thumbnailUrl:
+        'https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&w=800&q=80',
+      images: [
+        'https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&w=800&q=80',
+      ],
+      videoUrl: 'https://www.youtube.com/shorts/aqz-KE-bpKQ',
+      isReelFormat: true,
+    },
+    advertiser: {
+      name: 'Verma Luxury Estates',
+      phone: '+919925843589',
+      isVerifiedAgent: true,
+      role: 'VERIFIED_AGENT',
+    },
+    status: 'ACTIVE',
+    isPublished: true,
+  },
+  {
+    id: 'vid-reel-06',
+    slug: 'spacious-golf-view-apartment-sushant-golf-city',
+    title: {
+      en: 'Spacious 3 BHK Golf Course Facing Apartment',
+      hi: 'सुशांत गोल्फ सिटी में 3 बीएचके फ्लैट',
+    },
+    category: 'Apartment',
+    listingType: 'SALE',
+    price: { amount: 8800000, currency: 'INR', priceUnit: 'TOTAL' },
+    location: {
+      state: 'Uttar Pradesh',
+      city: 'Lucknow',
+      area: 'Sushant Golf City',
+      subArea: 'Amar Shaheed Path',
+      society: 'Celebrity Gardens',
+      locality: 'Sushant Golf City',
+    },
+    specs: { bedrooms: 3, bathrooms: 3, area: 1950, areaUnit: 'SQ_FT' },
+    media: {
+      thumbnailUrl:
+        'https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?auto=format&fit=crop&w=800&q=80',
+      images: [
+        'https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?auto=format&fit=crop&w=800&q=80',
+      ],
+      videoUrl: 'https://www.youtube.com/shorts/aqz-KE-bpKQ',
+      isReelFormat: true,
+    },
+    advertiser: {
+      name: 'Awadh Realtors',
+      phone: '+919925843599',
+      isVerifiedAgent: true,
+      role: 'VERIFIED_AGENT',
+    },
+    status: 'ACTIVE',
+    isPublished: true,
+  },
+  {
+    id: 'vid-reel-07',
+    slug: 'luxury-duplex-apartment-bodakdev-ahmedabad',
+    title: {
+      en: 'Duplex Penthouse on Sindhu Bhavan Road',
+      hi: 'सिंधु भवन रोड पर लक्जरी डुप्लेक्स पेंटहाउस',
+    },
+    category: 'Apartment',
+    listingType: 'SALE',
+    price: { amount: 21500000, currency: 'INR', priceUnit: 'TOTAL' },
+    location: {
+      state: 'Gujarat',
+      city: 'Ahmedabad',
+      area: 'Bodakdev',
+      subArea: 'Sindhu Bhavan Marg',
+      society: 'Iscon Platinum',
+      locality: 'Bodakdev',
+    },
+    specs: { bedrooms: 4, bathrooms: 4, area: 3100, areaUnit: 'SQ_FT' },
+    media: {
+      thumbnailUrl:
+        'https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?auto=format&fit=crop&w=800&q=80',
+      images: [
+        'https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?auto=format&fit=crop&w=800&q=80',
+      ],
+      videoUrl: 'https://www.youtube.com/shorts/aqz-KE-bpKQ',
+      isReelFormat: true,
+    },
+    advertiser: {
+      name: 'Apex Gujarat Realty',
+      phone: '+919876543210',
+      isVerifiedAgent: true,
+      role: 'VERIFIED_AGENT',
+    },
+    status: 'ACTIVE',
+    isPublished: true,
+  },
+  {
+    id: 'vid-reel-08',
+    slug: 'executive-studio-andheri-west-mumbai',
+    title: {
+      en: 'Fully Furnished Studio Apartment in Oshiwara',
+      hi: 'अंधेरी वेस्ट में फर्निश्ड स्टूडियो अपार्टमेंट',
+    },
+    category: 'Studio',
+    listingType: 'RENT',
+    price: { amount: 55000, currency: 'INR', priceUnit: 'PER_MONTH' },
+    location: {
+      state: 'Maharashtra',
+      city: 'Mumbai',
+      area: 'Andheri West',
+      subArea: 'Lokhandwala Complex',
+      society: 'Oberoi Springs',
+      locality: 'Andheri West',
+    },
+    specs: { bedrooms: 1, bathrooms: 1, area: 650, areaUnit: 'SQ_FT' },
+    media: {
+      thumbnailUrl:
+        'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=800&q=80',
+      images: [
+        'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=800&q=80',
+      ],
+      videoUrl: 'https://www.youtube.com/shorts/aqz-KE-bpKQ',
+      isReelFormat: true,
+    },
+    advertiser: {
+      name: 'Mumbai Prime Realty',
+      phone: '+919925843531',
+      isVerifiedAgent: true,
+      role: 'VERIFIED_AGENT',
+    },
+    status: 'ACTIVE',
+    isPublished: true,
+  },
+  {
+    id: 'vid-reel-09',
+    slug: 'lush-green-independent-bungalow-koramangala',
+    title: {
+      en: 'Private Garden Independent Bungalow',
+      hi: 'कोरमंगला में प्राइवेट गार्डन बंगला',
+    },
+    category: 'House / Home',
+    listingType: 'SALE',
+    price: { amount: 34000000, currency: 'INR', priceUnit: 'TOTAL' },
+    location: {
+      state: 'Karnataka',
+      city: 'Bengaluru',
+      area: 'Koramangala',
+      subArea: '3rd Block',
+      society: 'Raheja Residency',
+      locality: 'Koramangala',
+    },
+    specs: { bedrooms: 5, bathrooms: 5, area: 4200, areaUnit: 'SQ_FT' },
+    media: {
+      thumbnailUrl:
+        'https://images.unsplash.com/photo-1580587771525-78b9dba3b914?auto=format&fit=crop&w=800&q=80',
+      images: [
+        'https://images.unsplash.com/photo-1580587771525-78b9dba3b914?auto=format&fit=crop&w=800&q=80',
+      ],
+      videoUrl: 'https://www.youtube.com/shorts/aqz-KE-bpKQ',
+      isReelFormat: true,
+    },
+    advertiser: {
+      name: 'Bengaluru Premier Spaces',
+      phone: '+919876543210',
+      isVerifiedAgent: true,
+      role: 'VERIFIED_AGENT',
+    },
+    status: 'ACTIVE',
+    isPublished: true,
+  },
+  {
+    id: 'vid-reel-10',
+    slug: 'luxury-golf-estate-gurugram',
+    title: {
+      en: 'Iconic Golf Estate Residence with Panoramic Views',
+      hi: 'गुरुग्राम गोल्फ कोर्स में आइकोनिक लक्जरी विला',
+    },
+    category: 'Villa',
+    listingType: 'SALE',
+    price: { amount: 48000000, currency: 'INR', priceUnit: 'TOTAL' },
+    location: {
+      state: 'Delhi NCR',
+      city: 'Gurugram',
+      area: 'Golf Course Road',
+      subArea: 'Sector 42',
+      society: 'DLF The Camellias',
+      locality: 'Golf Course Road',
+    },
+    specs: { bedrooms: 5, bathrooms: 6, area: 5500, areaUnit: 'SQ_FT' },
+    media: {
+      thumbnailUrl:
+        'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?auto=format&fit=crop&w=800&q=80',
+      images: [
+        'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?auto=format&fit=crop&w=800&q=80',
+      ],
+      videoUrl: 'https://www.youtube.com/shorts/aqz-KE-bpKQ',
+      isReelFormat: true,
+    },
+    advertiser: {
+      name: 'Capital Elite Realty',
+      phone: '+919925843589',
+      isVerifiedAgent: true,
+      role: 'VERIFIED_AGENT',
+    },
+    status: 'ACTIVE',
+    isPublished: true,
+  },
+  {
+    id: 'vid-reel-11',
+    slug: 'lake-facing-modern-flat-vastrapur',
+    title: {
+      en: 'Lake-Facing 3 BHK Premium Apartment in Vastrapur',
+      hi: 'वस्त्रापुर लेक-फेसिंग 3 बीएचके फ्लैट',
+    },
+    category: 'Apartment',
+    listingType: 'RENT',
+    price: { amount: 42000, currency: 'INR', priceUnit: 'PER_MONTH' },
+    location: {
+      state: 'Gujarat',
+      city: 'Ahmedabad',
+      area: 'Vastrapur',
+      subArea: 'Vastrapur Lake Area',
+      society: 'Vastrapur Heights',
+      locality: 'Vastrapur',
+    },
+    specs: { bedrooms: 3, bathrooms: 3, area: 1800, areaUnit: 'SQ_FT' },
+    media: {
+      thumbnailUrl:
+        'https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?auto=format&fit=crop&w=800&q=80',
+      images: [
+        'https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?auto=format&fit=crop&w=800&q=80',
+      ],
+      videoUrl: 'https://www.youtube.com/shorts/aqz-KE-bpKQ',
+      isReelFormat: true,
+    },
+    advertiser: {
+      name: 'Apex Gujarat Realty',
+      phone: '+919876543210',
+      isVerifiedAgent: true,
+      role: 'VERIFIED_AGENT',
+    },
+    status: 'ACTIVE',
+    isPublished: true,
+  },
+  {
+    id: 'vid-reel-12',
+    slug: 'executive-office-tower-noida-sec-62',
+    title: {
+      en: 'Grade-A IT & Tech Park Furnished Office',
+      hi: 'नोएडा सेक्टर 62 में कॉर्पोरेट ऑफिस',
+    },
+    category: 'Office',
+    listingType: 'COMMERCIAL_LEASE',
+    price: { amount: 160000, currency: 'INR', priceUnit: 'PER_MONTH' },
+    location: {
+      state: 'Uttar Pradesh',
+      city: 'Noida',
+      area: 'Sector 62',
+      subArea: 'Electronic City',
+      society: 'Stellar Park',
+      locality: 'Sector 62',
+    },
+    specs: { area: 2400, areaUnit: 'SQ_FT' },
+    media: {
+      thumbnailUrl:
+        'https://images.unsplash.com/photo-1497215728101-856f4ea42174?auto=format&fit=crop&w=800&q=80',
+      images: [
+        'https://images.unsplash.com/photo-1497215728101-856f4ea42174?auto=format&fit=crop&w=800&q=80',
+      ],
+      videoUrl: 'https://www.youtube.com/shorts/aqz-KE-bpKQ',
+      isReelFormat: true,
+    },
+    advertiser: {
+      name: 'NCR Commercial Space',
+      phone: '+919925843599',
+      isVerifiedAgent: true,
+      role: 'VERIFIED_AGENT',
+    },
+    status: 'ACTIVE',
+    isPublished: true,
+  },
+];
+
+export function VideoPropertySection() {
+  const [properties, setProperties] = React.useState<Property[]>(FALLBACK_VIDEO_PROPERTIES);
+  const [isLoading, setIsLoading] = React.useState(false);
+  const [visibleCount, setVisibleCount] = React.useState(9);
+
+  // Filters State
+  const [locationFilter, setLocationFilter] = React.useState('ALL');
+  const [typeFilter, setTypeFilter] = React.useState('ALL');
+  const [priceFilter, setPriceFilter] = React.useState('ALL');
+
+  // Preview Modal State
+  const [activeVideoModal, setActiveVideoModal] = React.useState<Property | null>(null);
+
+  // Fetch real videos from API with fallback
+  React.useEffect(() => {
+    let isMounted = true;
+    async function loadVideos() {
+      setIsLoading(true);
+      try {
+        const res = await searchProperties({
+          hasVideo: true,
+          limit: 20,
+        });
+        if (isMounted && res.data && res.data.length > 0) {
+          // Merge API properties with fallback properties to ensure full dataset
+          const apiIds = new Set(res.data.map((p) => p.id));
+          const combined = [
+            ...res.data,
+            ...FALLBACK_VIDEO_PROPERTIES.filter((p) => !apiIds.has(p.id)),
+          ];
+          setProperties(combined);
+        }
+      } catch (_) {
+        // Retain fallback dataset
+      } finally {
+        if (isMounted) setIsLoading(false);
+      }
+    }
+    loadVideos();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  // Filter logic
+  const filteredProperties = React.useMemo(() => {
+    return properties.filter((p) => {
+      // 1. Location filter
+      if (locationFilter !== 'ALL') {
+        const cityMatch = p.location?.city?.toLowerCase() === locationFilter.toLowerCase();
+        const stateMatch = p.location?.state?.toLowerCase().includes(locationFilter.toLowerCase());
+        const areaMatch = p.location?.area?.toLowerCase().includes(locationFilter.toLowerCase());
+        if (!cityMatch && !stateMatch && !areaMatch) return false;
+      }
+
+      // 2. Type filter
+      if (typeFilter !== 'ALL') {
+        if (typeFilter === 'SALE' && p.listingType !== 'SALE') return false;
+        if (typeFilter === 'RENT' && !['RENT', 'LEASE', 'COMMERCIAL_LEASE'].includes(p.listingType))
+          return false;
+      }
+
+      // 3. Price filter
+      if (priceFilter !== 'ALL') {
+        const amt = p.price?.amount || 0;
+        if (priceFilter === 'UNDER_50L' && amt > 5000000) return false;
+        if (priceFilter === '50L_1CR' && (amt < 5000000 || amt > 10000000)) return false;
+        if (priceFilter === '1CR_2CR' && (amt < 10000000 || amt > 20000000)) return false;
+        if (priceFilter === '2CR_PLUS' && amt < 20000000) return false;
+      }
+
+      return true;
+    });
+  }, [properties, locationFilter, typeFilter, priceFilter]);
+
+  const displayedProperties = filteredProperties.slice(0, visibleCount);
+  const canLoadMore = visibleCount < filteredProperties.length;
+
+  const handleLoadMore = () => {
+    setVisibleCount((prev) => prev + 5);
+  };
+
+  return (
+    <section
+      id="video-properties"
+      className="py-16 bg-gradient-to-b from-casa-surface via-casa-canvas to-casa-surface border-b border-casa-border-light relative overflow-hidden"
+    >
+      {/* Decorative gradient glow */}
+      <div className="absolute top-0 right-1/4 w-96 h-96 bg-casa-brand/5 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute bottom-0 left-1/4 w-96 h-96 bg-amber-500/5 rounded-full blur-3xl pointer-events-none" />
+
+      <Container>
+        {/* Section Header */}
+        <div className="flex flex-col md:flex-row md:items-end justify-between mb-8 gap-4">
+          <div>
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-red-600/10 text-red-600 dark:text-red-400 text-xs font-bold uppercase tracking-wider mb-2">
+              <span className="w-2 h-2 rounded-full bg-red-600 animate-pulse" />
+              <span>9:16 Video Property Reels</span>
+            </div>
+            <h2 className="text-2xl sm:text-3xl font-extrabold text-casa-text-primary tracking-tight">
+              Watch Verified Property Walkthroughs
+            </h2>
+            <p className="text-xs sm:text-sm text-casa-text-secondary mt-1 max-w-2xl">
+              Experience dynamic vertical video tours, architectural walkthroughs, and society drone views before you visit in person.
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2 text-xs font-semibold text-casa-text-muted">
+            <Video className="w-4 h-4 text-casa-brand" />
+            <span>Showing {displayedProperties.length} of {filteredProperties.length} Video Properties</span>
+          </div>
+        </div>
+
+        {/* Working Filter Bar: Location, Property Type, Price Range */}
+        <div className="p-3 bg-casa-surface border border-casa-border-light rounded-2xl shadow-subtle mb-8 flex flex-wrap items-center gap-3">
+          <div className="flex items-center gap-1.5 text-xs font-bold text-casa-text-primary px-2">
+            <Filter className="w-3.5 h-3.5 text-casa-brand" />
+            <span>Filter Videos:</span>
+          </div>
+
+          {/* Location Filter */}
+          <div className="flex-1 min-w-[140px]">
+            <select
+              value={locationFilter}
+              onChange={(e) => {
+                setLocationFilter(e.target.value);
+                setVisibleCount(9);
+              }}
+              className="w-full px-3 py-2 text-xs font-medium bg-casa-canvas border border-casa-border-light rounded-xl text-casa-text-primary focus:outline-none focus:border-casa-brand"
+            >
+              <option value="ALL">All Locations</option>
+              <option value="Lucknow">Lucknow, UP</option>
+              <option value="Ahmedabad">Ahmedabad, Gujarat</option>
+              <option value="Mumbai">Mumbai, Maharashtra</option>
+              <option value="Bengaluru">Bengaluru, Karnataka</option>
+              <option value="Gurugram">Gurugram / Delhi NCR</option>
+            </select>
+          </div>
+
+          {/* Property Type Filter */}
+          <div className="flex-1 min-w-[130px]">
+            <select
+              value={typeFilter}
+              onChange={(e) => {
+                setTypeFilter(e.target.value);
+                setVisibleCount(9);
+              }}
+              className="w-full px-3 py-2 text-xs font-medium bg-casa-canvas border border-casa-border-light rounded-xl text-casa-text-primary focus:outline-none focus:border-casa-brand"
+            >
+              <option value="ALL">All Listing Types</option>
+              <option value="SALE">For Sale (Buy)</option>
+              <option value="RENT">For Rent / Lease</option>
+            </select>
+          </div>
+
+          {/* Price Range Filter */}
+          <div className="flex-1 min-w-[140px]">
+            <select
+              value={priceFilter}
+              onChange={(e) => {
+                setPriceFilter(e.target.value);
+                setVisibleCount(9);
+              }}
+              className="w-full px-3 py-2 text-xs font-medium bg-casa-canvas border border-casa-border-light rounded-xl text-casa-text-primary focus:outline-none focus:border-casa-brand"
+            >
+              <option value="ALL">All Price Ranges</option>
+              <option value="UNDER_50L">Under ₹50 Lacs</option>
+              <option value="50L_1CR">₹50 Lacs - ₹1 Crore</option>
+              <option value="1CR_2CR">₹1 Crore - ₹2 Crore</option>
+              <option value="2CR_PLUS">₹2 Crore & Above</option>
+            </select>
+          </div>
+
+          {/* Reset button if active */}
+          {(locationFilter !== 'ALL' || typeFilter !== 'ALL' || priceFilter !== 'ALL') && (
+            <button
+              type="button"
+              onClick={() => {
+                setLocationFilter('ALL');
+                setTypeFilter('ALL');
+                setPriceFilter('ALL');
+                setVisibleCount(9);
+              }}
+              className="text-xs font-semibold text-red-500 hover:text-red-700 px-2 py-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors cursor-pointer"
+            >
+              Reset Filters
+            </button>
+          )}
+        </div>
+
+        {/* 9:16 Vertical Video Grid: 4 to 5 cards per row on desktop screens */}
+        {displayedProperties.length === 0 ? (
+          <div className="text-center py-16 bg-casa-surface rounded-2xl border border-casa-border-light space-y-3">
+            <Video className="w-10 h-10 text-casa-text-muted mx-auto" />
+            <h3 className="text-sm font-bold text-casa-text-primary">No Video Properties Match Your Filter</h3>
+            <p className="text-xs text-casa-text-secondary max-w-sm mx-auto">
+              Try switching your location or price filters to explore other video reels in our marketplace.
+            </p>
+            <button
+              type="button"
+              onClick={() => {
+                setLocationFilter('ALL');
+                setTypeFilter('ALL');
+                setPriceFilter('ALL');
+              }}
+              className="px-4 py-2 bg-casa-brand text-white rounded-xl text-xs font-semibold cursor-pointer"
+            >
+              Show All Videos
+            </button>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 sm:gap-5">
+            {displayedProperties.map((property) => {
+              const video = property.media?.videoUrl || '';
+              const parsed = parseYouTubeUrl(video);
+              const thumb =
+                property.media?.thumbnailUrl ||
+                parsed.thumbnailUrl ||
+                'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=800&q=80';
+              const priceText = formatPrice(property.price?.amount || 0);
+
+              const locationString = [
+                property.location?.society,
+                property.location?.subArea,
+                property.location?.area || property.location?.locality,
+                property.location?.city,
+              ]
+                .filter(Boolean)
+                .filter((v, i, a) => a.indexOf(v) === i)
+                .slice(0, 2)
+                .join(', ');
+
+              return (
+                <div
+                  key={property.id}
+                  className="group relative rounded-2xl overflow-hidden bg-slate-900 border border-slate-800 shadow-md hover:shadow-2xl hover:border-casa-brand/60 transition-all duration-300 flex flex-col justify-between aspect-[9/16]"
+                >
+                  {/* Background Video Reel Thumbnail Image */}
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={thumb}
+                    alt={typeof property.title === 'string' ? property.title : property.title?.en}
+                    className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 opacity-90 group-hover:opacity-100"
+                    loading="lazy"
+                  />
+
+                  {/* Gradient Overlays for readable text */}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/30 to-black/60 pointer-events-none" />
+
+                  {/* Top Bar: Badge & Type */}
+                  <div className="relative z-10 p-3 flex items-center justify-between">
+                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-black/60 backdrop-blur-md text-white text-[10px] font-bold border border-white/20">
+                      <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
+                      <span>9:16 Reel</span>
+                    </span>
+
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-casa-brand text-white shadow-xs">
+                      {property.listingType === 'SALE' ? 'BUY' : 'RENT'}
+                    </span>
+                  </div>
+
+                  {/* Center Play Button Overlay */}
+                  <div className="relative z-10 my-auto flex flex-col items-center justify-center p-4">
+                    <button
+                      type="button"
+                      onClick={() => setActiveVideoModal(property)}
+                      className="w-14 h-14 rounded-full bg-white/90 hover:bg-white text-casa-brand flex items-center justify-center shadow-2xl group-hover:scale-110 transition-all cursor-pointer backdrop-blur-sm"
+                      title="Play Walkthrough Video Reel"
+                    >
+                      <Play className="w-6 h-6 fill-current ml-1" />
+                    </button>
+                    <span className="mt-2 text-[10px] font-bold text-white/90 tracking-wider uppercase drop-shadow">
+                      Watch Reel
+                    </span>
+                  </div>
+
+                  {/* Bottom Card Details */}
+                  <div className="relative z-10 p-3 space-y-1.5 bg-gradient-to-t from-black/90 via-black/70 to-transparent">
+                    {/* Price */}
+                    <div className="text-base font-extrabold text-white tracking-tight drop-shadow-sm">
+                      {priceText}
+                      {property.listingType !== 'SALE' && (
+                        <span className="text-[10px] text-white/70 font-normal"> / mo</span>
+                      )}
+                    </div>
+
+                    {/* Title */}
+                    <h4 className="text-xs font-bold text-white line-clamp-1 group-hover:text-amber-300 transition-colors">
+                      {typeof property.title === 'string' ? property.title : property.title?.en}
+                    </h4>
+
+                    {/* Location */}
+                    <div className="flex items-center gap-1 text-[11px] text-white/80 truncate">
+                      <MapPin className="w-3 h-3 text-red-400 flex-shrink-0" />
+                      <span className="truncate">{locationString || property.location?.city}</span>
+                    </div>
+
+                    {/* Bottom Action: Direct View Link */}
+                    <div className="pt-2 flex items-center gap-2">
+                      <Link
+                        href={`/property/${property.slug || property.id}`}
+                        className="flex-1 py-1.5 px-2.5 rounded-xl bg-white/20 hover:bg-white text-white hover:text-black text-[11px] font-semibold text-center transition-all flex items-center justify-center gap-1 backdrop-blur-md"
+                      >
+                        <span>View Details</span>
+                        <ChevronRight className="w-3 h-3" />
+                      </Link>
+
+                      <button
+                        type="button"
+                        onClick={() => setActiveVideoModal(property)}
+                        className="p-1.5 rounded-xl bg-casa-brand text-white hover:bg-casa-brand-hover text-xs transition-colors cursor-pointer"
+                        title="Preview Video in Popup"
+                      >
+                        <Maximize2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Working "Load More / View More" Option */}
+        {canLoadMore && (
+          <div className="mt-10 text-center">
+            <button
+              type="button"
+              onClick={handleLoadMore}
+              className="px-6 py-3 rounded-xl bg-casa-surface border border-casa-border-light hover:border-casa-brand text-xs font-bold text-casa-text-primary shadow-subtle hover:bg-casa-subtle/40 transition-all inline-flex items-center gap-2 cursor-pointer"
+            >
+              <Video className="w-4 h-4 text-casa-brand" />
+              <span>Load More Video Properties ({filteredProperties.length - visibleCount} remaining)</span>
+            </button>
+          </div>
+        )}
+
+        {/* Video Reel Modal Player */}
+        {activeVideoModal && (
+          <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
+            <div className="relative w-full max-w-sm bg-slate-950 rounded-3xl overflow-hidden border border-white/20 shadow-2xl flex flex-col aspect-[9/16] max-h-[85vh]">
+              {/* Close Button */}
+              <button
+                type="button"
+                onClick={() => setActiveVideoModal(null)}
+                className="absolute top-3 right-3 z-20 w-8 h-8 rounded-full bg-black/70 text-white flex items-center justify-center hover:bg-red-600 transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+
+              {/* Video Player */}
+              <div className="relative flex-1 bg-black flex items-center justify-center overflow-hidden">
+                {activeVideoModal.media?.videoUrl?.includes('youtu') ? (
+                  <iframe
+                    src={parseYouTubeUrl(activeVideoModal.media.videoUrl).embedUrl}
+                    title="Property Video Reel"
+                    className="w-full h-full object-cover"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allowFullScreen
+                  />
+                ) : (
+                  <video
+                    src={activeVideoModal.media?.videoUrl}
+                    controls
+                    autoPlay
+                    playsInline
+                    className="w-full h-full object-cover"
+                  />
+                )}
+              </div>
+
+              {/* Bottom Info Bar in Modal */}
+              <div className="p-4 bg-slate-900 border-t border-slate-800 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-base font-extrabold text-white">
+                    {formatPrice(activeVideoModal.price?.amount || 0)}
+                  </span>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-casa-brand text-white">
+                    {activeVideoModal.category}
+                  </span>
+                </div>
+                <h3 className="text-xs font-bold text-white line-clamp-1">
+                  {typeof activeVideoModal.title === 'string'
+                    ? activeVideoModal.title
+                    : activeVideoModal.title?.en}
+                </h3>
+                <div className="flex items-center justify-between pt-1">
+                  <span className="text-[11px] text-white/70 flex items-center gap-1 truncate max-w-[200px]">
+                    <MapPin className="w-3 h-3 text-red-400 flex-shrink-0" />
+                    <span className="truncate">
+                      {activeVideoModal.location?.area || activeVideoModal.location?.city}
+                    </span>
+                  </span>
+                  <Link
+                    href={`/property/${activeVideoModal.slug || activeVideoModal.id}`}
+                    onClick={() => setActiveVideoModal(null)}
+                    className="px-3 py-1.5 rounded-xl bg-casa-brand text-white text-xs font-semibold hover:bg-casa-brand-hover transition-colors inline-flex items-center gap-1"
+                  >
+                    <span>Full Listing</span>
+                    <ExternalLink className="w-3 h-3" />
+                  </Link>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </Container>
+    </section>
+  );
+}

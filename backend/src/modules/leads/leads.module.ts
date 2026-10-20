@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { LeadsController } from './leads.controller';
 import { LeadsService } from './leads.service';
+import { WhatsAppService } from './whatsapp.service';
 import { Lead, LeadSchema } from './schemas/lead.schema';
 import { Property, PropertySchema } from '../properties/schemas/property.schema';
 import { AuditLog, AuditLogSchema } from '../admin/schemas/audit-log.schema';
@@ -19,7 +20,7 @@ import { AuthModule } from '../auth/auth.module';
     AuthModule,
   ],
   controllers: [LeadsController],
-  providers: [LeadsService],
-  exports: [LeadsService],
+  providers: [LeadsService, WhatsAppService],
+  exports: [LeadsService, WhatsAppService],
 })
 export class LeadsModule {}

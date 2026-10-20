@@ -2,8 +2,10 @@ export type PlatformRole = 'SUPER_ADMIN' | 'ADMIN' | 'MODERATOR' | 'USER';
 
 export type AccountType =
   | 'DEVELOPER'
-  | 'AGENT'
+  | 'BROKER_AGENCY'
   | 'BROKER'
+  | 'BROKER_AGENT'
+  | 'AGENT'
   | 'PROPERTY_OWNER'
   | 'BUYER'
   | 'TENANT';
@@ -13,8 +15,10 @@ export type UserRole =
   | 'ADMIN'
   | 'MODERATOR'
   | 'DEVELOPER'
-  | 'AGENT'
+  | 'BROKER_AGENCY'
   | 'BROKER'
+  | 'BROKER_AGENT'
+  | 'AGENT'
   | 'PROPERTY_OWNER'
   | 'BUYER'
   | 'TENANT'
@@ -587,6 +591,12 @@ export interface LeadRecord {
   propertySlug?: string;
   propertyPrice?: number;
   propertyLocation?: string;
+  propertyImage?: string;
+  propertyUrl?: string;
+  propertyAdvertiserName?: string;
+  propertyAdvertiserPhone?: string;
+  propertyAgencyName?: string;
+  whatsappStatus?: 'PENDING' | 'SENT' | 'FAILED' | 'MOCK_SENT' | 'DISABLED';
   agentId?: string;
   assignedAgentId?: string;
   assignedAgent?: { id: string; name: string; mobile: string; role: string } | null;
@@ -827,4 +837,70 @@ export interface UsageMetricRecord {
     remaining: number;
   };
   lastViewedAt?: string;
+}
+
+export interface KycDocumentItem {
+  id: string;
+  documentType: string;
+  documentUrl?: string;
+  frontDocumentUrl?: string;
+  backDocumentUrl?: string | null;
+  documentName?: string;
+  documentNumber?: string;
+  status: string;
+  uploadedAt?: string;
+  rejectionReason?: string | null;
+}
+
+export interface KycQueueItem {
+  id: string;
+  name: string;
+  mobile: string;
+  normalizedMobile: string;
+  email?: string;
+  role: string;
+  accountType: string;
+  status: string;
+  isVerifiedAgent: boolean;
+  agencyName?: string | null;
+  reraNumber?: string | null;
+  kycStatus: 'PENDING' | 'APPROVED' | 'REJECTED' | 'NOT_SUBMITTED';
+  kycApprovedAt?: string | null;
+  kycApprovedBy?: string | null;
+  kycRejectionReason?: string | null;
+  kycDocumentType?: string | null;
+  kycDocumentNumber?: string | null;
+  kycFrontDocumentUrl?: string | null;
+  kycBackDocumentUrl?: string | null;
+  documents: KycDocumentItem[];
+  isTrialActive: boolean;
+  trialStartedAt?: string | null;
+  trialExpiresAt?: string | null;
+  activePackage?: {
+    id: string;
+    name: string;
+    planType: string;
+    tier?: string;
+  } | null;
+  trialPackage?: {
+    id: string;
+    name: string;
+    planType: string;
+  } | null;
+  createdAt?: string;
+}
+
+export interface KycQueueResponse {
+  items: KycQueueItem[];
+  pagination: {
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  };
+  counts: {
+    pending: number;
+    approved: number;
+    rejected: number;
+  };
 }

@@ -3,22 +3,55 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class UploadDocumentDto {
   @ApiProperty({
-    enum: ['RERA_CERTIFICATE', 'AGENCY_LICENSE', 'IDENTITY_DOCUMENT', 'ADDRESS_PROOF', 'OTHER'],
-    example: 'RERA_CERTIFICATE',
+    enum: [
+      'GST_CERTIFICATE',
+      'UDYAM_CERTIFICATE',
+      'RERA_CERTIFICATE',
+      'AADHAAR_CARD',
+      'AGENCY_LICENSE',
+      'IDENTITY_DOCUMENT',
+      'ADDRESS_PROOF',
+      'OTHER',
+    ],
+    example: 'GST_CERTIFICATE',
   })
   @IsNotEmpty()
-  @IsEnum(['RERA_CERTIFICATE', 'AGENCY_LICENSE', 'IDENTITY_DOCUMENT', 'ADDRESS_PROOF', 'OTHER'])
+  @IsEnum([
+    'GST_CERTIFICATE',
+    'UDYAM_CERTIFICATE',
+    'RERA_CERTIFICATE',
+    'AADHAAR_CARD',
+    'AGENCY_LICENSE',
+    'IDENTITY_DOCUMENT',
+    'ADDRESS_PROOF',
+    'OTHER',
+  ])
   documentType: string;
 
-  @ApiProperty({ example: 'https://images.unsplash.com/photo-1554224155-8d04cb21cd6c' })
-  @IsNotEmpty()
+  @ApiPropertyOptional({ example: 'https://images.unsplash.com/photo-1554224155-8d04cb21cd6c' })
+  @IsOptional()
   @IsString()
-  documentUrl: string;
+  documentUrl?: string;
 
-  @ApiProperty({ example: 'UP_RERA_Certificate_2026.pdf' })
+  @ApiPropertyOptional({ example: 'https://images.unsplash.com/photo-front' })
+  @IsOptional()
+  @IsString()
+  frontDocumentUrl?: string;
+
+  @ApiPropertyOptional({ example: 'https://images.unsplash.com/photo-back' })
+  @IsOptional()
+  @IsString()
+  backDocumentUrl?: string;
+
+  @ApiProperty({ example: 'GST_Registration_Certificate.pdf' })
   @IsNotEmpty()
   @IsString()
   documentName: string;
+
+  @ApiPropertyOptional({ example: 'BROKER_AGENCY' })
+  @IsOptional()
+  @IsString()
+  accountType?: string;
 
   @ApiPropertyOptional({ example: 'application/pdf' })
   @IsOptional()
@@ -30,8 +63,9 @@ export class UploadDocumentDto {
   @IsNumber()
   fileSize?: number;
 
-  @ApiPropertyOptional({ example: 'UPRERA/AGT/2026/892' })
+  @ApiPropertyOptional({ example: '24AAACH7409R1ZZ' })
   @IsOptional()
   @IsString()
   documentNumber?: string;
 }
+

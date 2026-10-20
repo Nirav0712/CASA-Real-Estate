@@ -49,26 +49,28 @@ export async function updateMyAgentProfile(
   return result.data;
 }
 
-export async function getMyVerification(): Promise<{
+export interface AgentVerificationResponse {
   verificationStatus: AgentVerificationStatus;
   isVerifiedAgent: boolean;
   rejectionReason?: string;
   verifiedAt?: string;
+  kycStatus?: 'NOT_SUBMITTED' | 'PENDING' | 'APPROVED' | 'REJECTED';
+  kycRejectionReason?: string;
+  kycApprovedAt?: string;
+  isTrialActive?: boolean;
+  trialStartedAt?: string;
+  trialExpiresAt?: string;
+  accountType?: string;
   reraNumber?: string;
   reraState?: string;
   reraAuthority?: string;
+  agencyName?: string;
+  verificationNotes?: string;
   documents: AgentDocument[];
-}> {
-  const result = await fetchApi<{
-    verificationStatus: AgentVerificationStatus;
-    isVerifiedAgent: boolean;
-    rejectionReason?: string;
-    verifiedAt?: string;
-    reraNumber?: string;
-    reraState?: string;
-    reraAuthority?: string;
-    documents: AgentDocument[];
-  }>('/agents/me/verification');
+}
+
+export async function getMyVerification(): Promise<AgentVerificationResponse> {
+  const result = await fetchApi<AgentVerificationResponse>('/agents/me/verification');
   if (!result.isBackendAvailable || result.error || !result.data) {
     throw new Error(result.error || 'Failed to fetch verification status.');
   }
@@ -96,8 +98,11 @@ export async function submitVerification(payload: {
 
 export async function uploadVerificationDocument(payload: {
   documentType: string;
-  documentUrl: string;
+  documentUrl?: string;
+  frontDocumentUrl?: string;
+  backDocumentUrl?: string;
   documentName: string;
+  accountType?: string;
   mimeType?: string;
   fileSize?: number;
   documentNumber?: string;

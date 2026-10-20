@@ -17,6 +17,7 @@ import { Package, PackageSchema } from '../entitlements/schemas/package.schema';
 import { Subscription, SubscriptionSchema } from '../payments/schemas/subscription.schema';
 import { AuthModule } from '../auth/auth.module';
 
+import { LeadsModule } from '../leads/leads.module';
 import { SettingsPublicController } from './settings-public.controller';
 
 @Module({
@@ -37,6 +38,7 @@ import { SettingsPublicController } from './settings-public.controller';
       { name: Subscription.name, schema: SubscriptionSchema },
     ]),
     AuthModule,
+    LeadsModule,
   ],
   controllers: [AdminController, SettingsPublicController],
   providers: [AdminService],

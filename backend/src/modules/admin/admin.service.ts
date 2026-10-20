@@ -40,6 +40,7 @@ import {
 import { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
 import { AuthService } from '../auth/auth.service';
 import { hashPassword } from '../auth/utils/password.util';
+import { WhatsAppService } from '../leads/whatsapp.service';
 
 const INITIAL_PENDING_FIXTURES = [
   {
@@ -268,6 +269,7 @@ export class AdminService implements OnModuleInit {
     @InjectModel(Package.name) private readonly packageModel: Model<PackageDocument>,
     @InjectModel(Subscription.name) private readonly subscriptionModel: Model<SubscriptionDocument>,
     private readonly authService: AuthService,
+    private readonly whatsappService: WhatsAppService,
   ) {}
 
   async onModuleInit() {
@@ -2193,9 +2195,39 @@ export class AdminService implements OnModuleInit {
       throw new NotFoundException(`Agent with ID "${id}" was not found.`);
     }
 
-    const previousState = { isVerifiedAgent: user.isVerifiedAgent, role: user.role };
+    const previousState = {
+      isVerifiedAgent: user.isVerifiedAgent,
+      role: user.role,
+      status: user.status,
+      kycStatus: user.kycStatus,
+    };
+
     user.isVerifiedAgent = true;
     user.role = UserRole.VERIFIED_AGENT;
+    user.status = AccountStatus.ACTIVE;
+    user.kycStatus = 'APPROVED';
+    user.kycApprovedAt = new Date();
+    user.kycApprovedBy = actor?.name || actor?.id || 'admin';
+    user.kycRejectionReason = undefined;
+
+    // Requirement 7 & 8: 3-day Free Trial starts ONLY after Super Admin approves KYC/account
+    const trialDays = 3;
+    const now = new Date();
+    user.isTrialActive = true;
+    user.trialStartedAt = now;
+    user.trialExpiresAt = new Date(now.getTime() + trialDays * 24 * 60 * 60 * 1000);
+
+    try {
+      const trialPackage = await this.packageModel.findOne({
+        slug: { $in: ['free-trial', 'trial', 'free'] },
+      });
+      if (trialPackage) {
+        user.trialPackageId = trialPackage._id.toString();
+      }
+    } catch (e) {
+      // ignore
+    }
+
     await user.save();
 
     const userId = user._id.toString();
@@ -2222,6 +2254,20 @@ export class AdminService implements OnModuleInit {
       { $set: { status: 'APPROVED', reviewedAt: new Date(), reviewedBy: actor?.id || 'admin' } },
     );
 
+    // Send WhatsApp notification
+    try {
+      await this.whatsappService.sendKycApprovedNotification({
+        userId,
+        customerName: user.name,
+        customerMobile: user.mobile,
+        accountType: user.accountType || user.role,
+        status: 'APPROVED',
+        trialExpiresAt: user.trialExpiresAt,
+      });
+    } catch (err: any) {
+      this.logger.warn(`Failed to dispatch KYC approval WhatsApp: ${err.message}`);
+    }
+
     // Record Audit Log
     await this.recordAuditLog({
       action: 'AGENT_VERIFIED',
@@ -2233,13 +2279,19 @@ export class AdminService implements OnModuleInit {
       targetEntity: 'AGENT_VERIFICATION',
       targetEntityId: userId,
       previousValue: previousState,
-      newValue: { isVerifiedAgent: true, role: UserRole.VERIFIED_AGENT, verificationStatus: 'VERIFIED' },
-      reason: notes || 'CASA Verified Agent badge granted by administrator.',
+      newValue: {
+        isVerifiedAgent: true,
+        role: UserRole.VERIFIED_AGENT,
+        verificationStatus: 'VERIFIED',
+        isTrialActive: true,
+        trialExpiresAt: user.trialExpiresAt,
+      },
+      reason: notes || 'CASA Verified Agent badge granted by administrator. 3-day Free Trial activated.',
     });
 
     return {
       success: true,
-      message: `CASA Verified Agent badge granted to ${user.name}.`,
+      message: `CASA Verified Agent badge granted to ${user.name}. 3-day Free Trial is now active.`,
       agent: {
         id: userId,
         name: user.name,
@@ -2247,6 +2299,10 @@ export class AdminService implements OnModuleInit {
         reraNumber: user.reraNumber,
         isVerifiedAgent: true,
         role: user.role,
+        status: user.status,
+        kycStatus: 'APPROVED',
+        isTrialActive: true,
+        trialExpiresAt: user.trialExpiresAt,
         verificationStatus: 'VERIFIED',
       },
     };
@@ -2265,6 +2321,10 @@ export class AdminService implements OnModuleInit {
     }
 
     const userId = user._id.toString();
+    user.kycStatus = 'REJECTED';
+    user.kycRejectionReason = reason.trim();
+    user.isVerifiedAgent = false;
+    await user.save();
 
     // Update AgentProfile
     await this.agentProfileModel.findOneAndUpdate(
@@ -2284,6 +2344,20 @@ export class AdminService implements OnModuleInit {
       { userId, status: 'PENDING' },
       { $set: { status: 'REJECTED', rejectionReason: reason.trim(), reviewedAt: new Date(), reviewedBy: actor?.id || 'admin' } },
     );
+
+    // Send WhatsApp notification
+    try {
+      await this.whatsappService.sendKycRejectedNotification({
+        userId,
+        customerName: user.name,
+        customerMobile: user.mobile,
+        accountType: user.accountType || user.role,
+        status: 'REJECTED',
+        reason: reason.trim(),
+      });
+    } catch (err: any) {
+      this.logger.warn(`Failed to dispatch KYC rejection WhatsApp: ${err.message}`);
+    }
 
     // Record Audit Log
     await this.recordAuditLog({
@@ -2307,7 +2381,218 @@ export class AdminService implements OnModuleInit {
         id: userId,
         name: user.name,
         verificationStatus: 'REJECTED',
+        kycStatus: 'REJECTED',
         rejectionReason: reason.trim(),
+      },
+    };
+  }
+
+  async getKycVerificationQueue(queryDto?: {
+    status?: string;
+    accountType?: string;
+    search?: string;
+    page?: number;
+    limit?: number;
+  }) {
+    const page = Math.max(1, Number(queryDto?.page) || 1);
+    const limit = Math.min(50, Math.max(1, Number(queryDto?.limit) || 20));
+    const skip = (page - 1) * limit;
+
+    const filter: any = {};
+
+    if (queryDto?.status && queryDto.status !== 'ALL') {
+      filter.kycStatus = queryDto.status;
+    } else {
+      filter.$or = [
+        { kycStatus: { $in: ['PENDING', 'APPROVED', 'REJECTED', 'NOT_SUBMITTED'] } },
+        {
+          accountType: {
+            $in: [
+              AccountType.BROKER_AGENCY,
+              AccountType.BROKER,
+              AccountType.BROKER_AGENT,
+              AccountType.DEVELOPER,
+            ],
+          },
+        },
+        { role: { $in: [UserRole.AGENT, UserRole.VERIFIED_AGENT] } },
+      ];
+    }
+
+    if (queryDto?.accountType && queryDto.accountType !== 'ALL') {
+      filter.accountType = queryDto.accountType;
+    }
+
+    if (queryDto?.search && queryDto.search.trim()) {
+      const regex = new RegExp(queryDto.search.trim(), 'i');
+      filter.$and = filter.$and || [];
+      filter.$and.push({
+        $or: [{ name: regex }, { mobile: regex }, { email: regex }, { agencyName: regex }],
+      });
+    }
+
+    const [total, users, pendingCount, approvedCount, rejectedCount] = await Promise.all([
+      this.userModel.countDocuments(filter),
+      this.userModel.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
+      this.userModel.countDocuments({ kycStatus: 'PENDING' }),
+      this.userModel.countDocuments({ kycStatus: 'APPROVED' }),
+      this.userModel.countDocuments({ kycStatus: 'REJECTED' }),
+    ]);
+
+    const userIds = users.map((u: any) => u._id.toString());
+    const [agentDocs, agentProfiles, packages] = await Promise.all([
+      this.agentDocumentModel.find({ userId: { $in: userIds } }).sort({ uploadedAt: -1 }).lean(),
+      this.agentProfileModel.find({ userId: { $in: userIds } }).lean(),
+      this.packageModel.find().lean(),
+    ]);
+
+    const docsByUserId = new Map<string, any[]>();
+    agentDocs.forEach((d: any) => {
+      const arr = docsByUserId.get(d.userId) || [];
+      arr.push(d);
+      docsByUserId.set(d.userId, arr);
+    });
+
+    const profilesByUserId = new Map<string, any>();
+    agentProfiles.forEach((p: any) => profilesByUserId.set(p.userId, p));
+
+    const packageMap = new Map<string, any>();
+    packages.forEach((pkg: any) => packageMap.set(pkg._id.toString(), pkg));
+
+    const items = users.map((u: any) => {
+      const uid = u._id.toString();
+      const docs = docsByUserId.get(uid) || [];
+      const profile = profilesByUserId.get(uid);
+      const activePkg = u.activePackageId ? packageMap.get(u.activePackageId.toString()) : null;
+      const trialPkg = u.trialPackageId ? packageMap.get(u.trialPackageId.toString()) : null;
+
+      let frontDoc = u.kycFrontDocumentUrl || null;
+      let backDoc = u.kycBackDocumentUrl || null;
+      let docType = u.kycDocumentType || null;
+      let docNumber = u.kycDocumentNumber || null;
+
+      if (!frontDoc && docs.length > 0) {
+        frontDoc = docs[0].frontDocumentUrl || docs[0].documentUrl || null;
+        backDoc = docs[0].backDocumentUrl || null;
+        docType = docs[0].documentType || null;
+        docNumber = docs[0].documentNumber || null;
+      }
+
+      return {
+        id: uid,
+        name: u.name,
+        mobile: u.mobile,
+        normalizedMobile: u.normalizedMobile,
+        email: u.email,
+        role: u.role,
+        accountType: u.accountType || (u.role === UserRole.AGENT ? AccountType.BROKER : u.role),
+        status: u.status,
+        isVerifiedAgent: Boolean(u.isVerifiedAgent),
+        agencyName: u.agencyName || profile?.agencyName || null,
+        reraNumber: u.reraNumber || profile?.reraNumber || null,
+        kycStatus: u.kycStatus || (docs.length > 0 ? docs[0].status : 'NOT_SUBMITTED'),
+        kycApprovedAt: u.kycApprovedAt || null,
+        kycApprovedBy: u.kycApprovedBy || null,
+        kycRejectionReason: u.kycRejectionReason || (docs.length > 0 ? docs[0].rejectionReason : null),
+        kycDocumentType: docType,
+        kycDocumentNumber: docNumber,
+        kycFrontDocumentUrl: frontDoc,
+        kycBackDocumentUrl: backDoc,
+        documents: docs.map((d: any) => ({
+          id: d._id.toString(),
+          documentType: d.documentType,
+          documentUrl: d.documentUrl,
+          frontDocumentUrl: d.frontDocumentUrl || d.documentUrl,
+          backDocumentUrl: d.backDocumentUrl || null,
+          documentName: d.documentName,
+          documentNumber: d.documentNumber,
+          status: d.status,
+          uploadedAt: d.uploadedAt,
+          rejectionReason: d.rejectionReason,
+        })),
+        isTrialActive: Boolean(u.isTrialActive),
+        trialStartedAt: u.trialStartedAt || null,
+        trialExpiresAt: u.trialExpiresAt || null,
+        activePackage: activePkg ? { id: activePkg._id.toString(), name: activePkg.name } : null,
+        trialPackage: trialPkg ? { id: trialPkg._id.toString(), name: trialPkg.name } : null,
+        createdAt: u.createdAt,
+      };
+    });
+
+    return {
+      success: true,
+      data: items,
+      metrics: {
+        total,
+        pending: pendingCount,
+        approved: approvedCount,
+        rejected: rejectedCount,
+      },
+      pagination: {
+        total,
+        page,
+        limit,
+        pages: Math.ceil(total / limit) || 1,
+      },
+    };
+  }
+
+  async assignUserPackage(userId: string, packageId: string, actor?: AuthenticatedUser) {
+    const query: any = isValidObjectId(userId) ? { _id: userId } : { normalizedMobile: userId };
+    const user = await this.userModel.findOne(query);
+
+    if (!user) {
+      throw new NotFoundException(`User with ID "${userId}" not found`);
+    }
+
+    const pkgQuery: any = isValidObjectId(packageId) ? { _id: packageId } : { slug: packageId };
+    const pkg = await this.packageModel.findOne(pkgQuery);
+
+    if (!pkg) {
+      throw new NotFoundException(`Package "${packageId}" not found`);
+    }
+
+    const prevPackage = user.activePackageId;
+    user.activePackageId = pkg._id.toString();
+    user.isTrialActive = false;
+    await user.save();
+
+    // Send WhatsApp notification
+    try {
+      await this.whatsappService.sendPackageChangedNotification({
+        userId: user._id.toString(),
+        customerName: user.name,
+        customerMobile: user.mobile,
+        accountType: user.accountType || user.role,
+        packageName: pkg.name,
+      });
+    } catch (err: any) {
+      this.logger.warn(`Failed to dispatch package change WhatsApp: ${err.message}`);
+    }
+
+    // Record Audit Log
+    await this.recordAuditLog({
+      action: 'USER_PACKAGE_ASSIGNED',
+      actorUserId: actor?.id || 'system_admin',
+      actorName: actor?.name || 'Administrator',
+      actorRole: actor?.role || 'ADMIN',
+      targetUserId: user._id.toString(),
+      targetUserName: user.name,
+      targetEntity: 'USER_PACKAGE',
+      targetEntityId: pkg._id.toString(),
+      previousValue: { activePackageId: prevPackage },
+      newValue: { activePackageId: pkg._id.toString(), packageName: pkg.name },
+      reason: `Package ${pkg.name} manually assigned by ${actor?.name || 'administrator'}`,
+    });
+
+    return {
+      success: true,
+      message: `Package "${pkg.name}" successfully assigned to ${user.name}.`,
+      user: {
+        id: user._id.toString(),
+        name: user.name,
+        activePackageId: user.activePackageId,
+        packageName: pkg.name,
       },
     };
   }

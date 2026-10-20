@@ -21,6 +21,7 @@ import { UserRole, AccountStatus, PlatformRole, AccountType } from '../auth/enum
 import { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
 
 import { AuthService } from '../auth/auth.service';
+import { WhatsAppService } from '../leads/whatsapp.service';
 
 describe('AdminService Moderation & User Governance (Phase 08)', () => {
   let service: AdminService;
@@ -258,6 +259,15 @@ describe('AdminService Moderation & User Governance (Phase 08)', () => {
         {
           provide: AuthService,
           useValue: mockAuthService,
+        },
+        {
+          provide: WhatsAppService,
+          useValue: {
+            sendLeadNotification: jest.fn().mockResolvedValue({ success: true }),
+            sendKycApprovedNotification: jest.fn().mockResolvedValue({ success: true }),
+            sendKycRejectedNotification: jest.fn().mockResolvedValue({ success: true }),
+            sendPackageChangedNotification: jest.fn().mockResolvedValue({ success: true }),
+          },
         },
       ],
     }).compile();

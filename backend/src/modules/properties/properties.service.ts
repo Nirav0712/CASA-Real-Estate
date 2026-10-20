@@ -613,6 +613,10 @@ export class PropertiesService implements OnModuleInit {
     country?: string;
     state?: string;
     city?: string;
+    area?: string;
+    subArea?: string;
+    society?: string;
+    hasVideo?: boolean | string;
     q?: string;
     featured?: boolean | string;
     status?: string;
@@ -638,6 +642,10 @@ export class PropertiesService implements OnModuleInit {
         filter.isFeatured = true;
       }
 
+      if (query.hasVideo === true || query.hasVideo === 'true') {
+        filter['media.videoUrl'] = { $exists: true, $nin: ['', null] };
+      }
+
       if (query.type && query.type !== 'all') {
         filter.listingType = new RegExp(`^${query.type}$`, 'i');
       }
@@ -657,6 +665,23 @@ export class PropertiesService implements OnModuleInit {
 
       if (query.city && query.city !== 'all') {
         filter['location.city'] = new RegExp(query.city.trim(), 'i');
+      }
+
+      if (query.area && query.area !== 'all') {
+        const areaRegex = new RegExp(query.area.trim(), 'i');
+        filter.$or = [
+          ...(filter.$or || []),
+          { 'location.area': areaRegex },
+          { 'location.locality': areaRegex },
+        ];
+      }
+
+      if (query.subArea && query.subArea !== 'all') {
+        filter['location.subArea'] = new RegExp(query.subArea.trim(), 'i');
+      }
+
+      if (query.society && query.society !== 'all') {
+        filter['location.society'] = new RegExp(query.society.trim(), 'i');
       }
 
       if (query.minPrice || query.maxPrice) {
@@ -797,6 +822,27 @@ export class PropertiesService implements OnModuleInit {
           { 'location.stateId': dto.locationId },
           { 'location.countryId': dto.locationId },
         ];
+      }
+
+      if (dto.area && dto.area !== 'all') {
+        const areaRegex = new RegExp(dto.area.trim(), 'i');
+        filter.$or = [
+          ...(filter.$or || []),
+          { 'location.area': areaRegex },
+          { 'location.locality': areaRegex },
+        ];
+      }
+
+      if (dto.subArea && dto.subArea !== 'all') {
+        filter['location.subArea'] = new RegExp(dto.subArea.trim(), 'i');
+      }
+
+      if (dto.society && dto.society !== 'all') {
+        filter['location.society'] = new RegExp(dto.society.trim(), 'i');
+      }
+
+      if (dto.hasVideo) {
+        filter['media.videoUrl'] = { $exists: true, $nin: ['', null] };
       }
 
       // 6. Numeric Price Range
@@ -1162,27 +1208,47 @@ export class PropertiesService implements OnModuleInit {
             district: 'Lucknow',
             city: 'Lucknow',
             locality: dto.location,
+            area: dto.location,
+            subArea: '',
+            society: '',
             coordinates: [80.9462, 26.8467] as [number, number],
           }
         : {
             state: dto.location?.state || 'Uttar Pradesh',
-            district: dto.location?.district || 'Lucknow',
+            district: dto.location?.district || dto.location?.city || 'Lucknow',
             city: dto.location?.city || 'Lucknow',
-            locality: dto.location?.locality || 'Lucknow City',
+            locality: dto.location?.area || dto.location?.locality || 'Area',
+            area: dto.location?.area || dto.location?.locality || 'Area',
+            subArea: dto.location?.subArea || '',
+            society: dto.location?.society || '',
             landmark: dto.location?.landmark,
             pincode: dto.location?.pincode,
             coordinates: dto.location?.coordinates || [80.9462, 26.8467],
+            countryId: dto.location?.countryId,
+            stateId: dto.location?.stateId,
+            districtId: dto.location?.districtId,
+            cityId: dto.location?.cityId,
+            localityId: dto.location?.localityId,
+            areaId: dto.location?.areaId,
+            subAreaId: dto.location?.subAreaId,
+            societyId: dto.location?.societyId,
           };
 
-    const mediaObj = dto.media || {
+    const mediaObj = {
       thumbnailUrl:
+        dto.media?.thumbnailUrl ||
         dto.thumbnailUrl ||
         'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=800&q=80',
-      coverImage: dto.coverImage,
-      images: dto.images || [
+      coverImage: dto.media?.coverImage || dto.coverImage,
+      images: dto.media?.images || dto.images || [
         'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1200&q=80',
       ],
-      videos: dto.videos || [],
+      videos: dto.media?.videos || dto.videos || [],
+      videoUrl: dto.media?.videoUrl || dto.videoUrl || '',
+      videoType: dto.media?.videoType || dto.videoType || 'LOCAL',
+      videoThumbnail: dto.media?.videoThumbnail || dto.videoThumbnail,
+      isReelFormat: dto.media?.isReelFormat !== undefined ? dto.media.isReelFormat : true,
+      primaryMediaType: dto.media?.primaryMediaType || (dto.media?.videoUrl || dto.videoUrl ? 'VIDEO' : 'IMAGE'),
     };
 
     const advertiserObj = dto.advertiser || {
@@ -1327,14 +1393,20 @@ export class PropertiesService implements OnModuleInit {
     return this.createProperty(createPropertyDto);
   }
 
-  async findMyProperties(userId: string) {
+  async findMyProperties(userId: string, user?: AuthenticatedUser) {
     if (!userId) {
       throw new BadRequestException('User ID is required to fetch owned properties');
     }
+    const query: any = {
+      $or: [{ ownerId: userId }, { advertiserId: userId }, { createdBy: userId }],
+    };
+
+    if (user?.role === UserRole.BROKER_AGENT || user?.accountType === 'BROKER_AGENT') {
+      query.$or.push({ assignedAgentId: userId });
+    }
+
     const properties = await this.propertyModel
-      .find({
-        $or: [{ ownerId: userId }, { advertiserId: userId }, { createdBy: userId }],
-      })
+      .find(query)
       .sort({ createdAt: -1 })
       .lean();
 
@@ -1426,6 +1498,24 @@ export class PropertiesService implements OnModuleInit {
       if (updateDto.units) {
         updateDto.totalUnits = updateDto.units.length;
         updateDto.availableUnits = updateDto.units.filter((u: any) => u.availabilityStatus === 'AVAILABLE').length;
+      }
+    }
+
+    // Location & Media updates
+    if (updateDto.location && typeof updateDto.location === 'object') {
+      const area = updateDto.location.area || updateDto.location.locality;
+      updateDto.location.locality = area || existing.location?.locality;
+      updateDto.location.area = area || existing.location?.area;
+      if (updateDto.location.subArea !== undefined) updateDto.location.subArea = updateDto.location.subArea;
+      if (updateDto.location.society !== undefined) updateDto.location.society = updateDto.location.society;
+    }
+
+    if (updateDto.media && typeof updateDto.media === 'object') {
+      if (updateDto.media.videoUrl !== undefined) {
+        updateDto.media.isReelFormat = updateDto.media.isReelFormat !== undefined ? updateDto.media.isReelFormat : true;
+        if (updateDto.media.videoUrl && !updateDto.media.primaryMediaType) {
+          updateDto.media.primaryMediaType = 'VIDEO';
+        }
       }
     }
 

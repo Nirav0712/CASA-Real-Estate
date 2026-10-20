@@ -113,6 +113,15 @@ export default () => {
       passwordResetUrl,
       devLog: cleanString(process.env.EMAIL_DEV_LOG, 'true').toLowerCase() === 'true',
     },
+    whatsapp: {
+      enabled: cleanString(process.env.WHATSAPP_ENABLED, 'true').toLowerCase() === 'true',
+      provider: cleanString(process.env.WHATSAPP_PROVIDER, 'mock'),
+      apiUrl: cleanString(process.env.WHATSAPP_API_URL, 'https://graph.facebook.com/v19.0'),
+      accessToken: cleanString(process.env.WHATSAPP_ACCESS_TOKEN || process.env.WHATSAPP_API_TOKEN, ''),
+      phoneNumberId: cleanString(process.env.WHATSAPP_PHONE_NUMBER_ID, ''),
+      leadDestinationNumber: cleanString(process.env.WHATSAPP_LEAD_DESTINATION_NUMBER, '+917069754589'),
+      verificationCallNumber: cleanString(process.env.WHATSAPP_VERIFICATION_CALL_NUMBER, '7069754589'),
+    },
   };
 };
 

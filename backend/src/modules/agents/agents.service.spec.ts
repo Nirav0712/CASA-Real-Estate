@@ -8,6 +8,7 @@ import { Property } from '../properties/schemas/property.schema';
 import { Lead } from '../leads/schemas/lead.schema';
 import { AuditLog } from '../admin/schemas/audit-log.schema';
 import { UserRole, AccountStatus, PlatformRole, AccountType } from '../auth/enums/auth.enums';
+import { WhatsAppService } from '../leads/whatsapp.service';
 
 describe('AgentsService', () => {
   let service: AgentsService;
@@ -97,6 +98,14 @@ describe('AgentsService', () => {
     create: jest.fn().mockResolvedValue(true),
   };
 
+  const mockWhatsAppService = {
+    sendLeadNotification: jest.fn().mockResolvedValue({ success: true }),
+    sendKycSubmittedNotification: jest.fn().mockResolvedValue({ success: true }),
+    sendKycApprovedNotification: jest.fn().mockResolvedValue({ success: true }),
+    sendKycRejectedNotification: jest.fn().mockResolvedValue({ success: true }),
+    sendPackageChangedNotification: jest.fn().mockResolvedValue({ success: true }),
+  };
+
   beforeEach(async () => {
     jest.clearAllMocks();
 
@@ -109,6 +118,7 @@ describe('AgentsService', () => {
         { provide: getModelToken(Property.name), useValue: mockPropertyModel },
         { provide: getModelToken(Lead.name), useValue: mockLeadModel },
         { provide: getModelToken(AuditLog.name), useValue: mockAuditLogModel },
+        { provide: WhatsAppService, useValue: mockWhatsAppService },
       ],
     }).compile();
 

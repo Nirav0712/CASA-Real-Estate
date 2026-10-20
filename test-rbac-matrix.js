@@ -84,7 +84,7 @@ async function runRbacTests() {
     console.log('1. Authenticating test users across all platform and marketplace roles...\n');
 
     // Super Admin (pre-assigned phone)
-    const superAdminAuth = await getAuthToken('9925843599', 'Super Admin', null, '10.0.0.100');
+    const superAdminAuth = await getAuthToken('9876543210', 'Super Admin', null, '10.0.0.100');
     assert(superAdminAuth.user.platformRole === 'SUPER_ADMIN', 'Super Admin platformRole is SUPER_ADMIN', `Received: ${superAdminAuth.user.platformRole}`);
     assert(superAdminAuth.user.accountType === null, 'Super Admin accountType is strictly null', `Received: ${superAdminAuth.user.accountType}`);
 

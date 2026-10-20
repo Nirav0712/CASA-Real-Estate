@@ -20,6 +20,8 @@ import { UpdateAgentProfileDto } from './dto/update-agent-profile.dto';
 import { SubmitVerificationDto } from './dto/submit-verification.dto';
 import { UploadDocumentDto } from './dto/upload-document.dto';
 import { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
+import { WhatsAppService } from '../leads/whatsapp.service';
+import { UserRole, AccountType } from '../auth/enums/auth.enums';
 
 @Injectable()
 export class AgentsService {
@@ -38,6 +40,7 @@ export class AgentsService {
     private readonly leadModel: Model<LeadDocument>,
     @InjectModel(AuditLog.name)
     private readonly auditLogModel: Model<AuditLogDocument>,
+    private readonly whatsappService: WhatsAppService,
   ) {}
 
   /**
@@ -331,6 +334,7 @@ export class AgentsService {
    */
   async getMyVerification(user: AuthenticatedUser) {
     const profile = await this.getOrCreateProfile(user);
+    const userDoc = await this.userModel.findById(user.id).lean();
     const documents = await this.agentDocumentModel
       .find({ userId: user.id })
       .sort({ createdAt: -1 })
@@ -340,6 +344,13 @@ export class AgentsService {
       verificationStatus: profile.verificationStatus,
       isVerifiedAgent: profile.isVerifiedAgent,
       verifiedAt: profile.verifiedAt,
+      kycStatus: userDoc?.kycStatus || profile.verificationStatus || 'NOT_SUBMITTED',
+      kycRejectionReason: userDoc?.kycRejectionReason || (profile.rejectionReasons && profile.rejectionReasons[0]),
+      kycApprovedAt: userDoc?.kycApprovedAt,
+      isTrialActive: userDoc?.isTrialActive || false,
+      trialStartedAt: userDoc?.trialStartedAt,
+      trialExpiresAt: userDoc?.trialExpiresAt,
+      accountType: userDoc?.accountType || user.accountType || user.role,
       reraNumber: profile.reraNumber,
       reraState: profile.reraState,
       reraAuthority: profile.reraAuthority,
@@ -350,6 +361,8 @@ export class AgentsService {
         id: d._id.toString(),
         documentType: d.documentType,
         documentUrl: d.documentUrl,
+        frontDocumentUrl: d.frontDocumentUrl || d.documentUrl,
+        backDocumentUrl: d.backDocumentUrl,
         documentName: d.documentName,
         mimeType: d.mimeType,
         fileSize: d.fileSize,
@@ -420,18 +433,36 @@ export class AgentsService {
    */
   async uploadDocument(user: AuthenticatedUser, dto: UploadDocumentDto) {
     const profile = await this.getOrCreateProfile(user);
+    const primaryUrl = dto.frontDocumentUrl || dto.documentUrl || '';
 
     const doc = await this.agentDocumentModel.create({
       agentId: profile._id.toString(),
       userId: user.id,
       documentType: dto.documentType,
-      documentUrl: dto.documentUrl,
+      documentUrl: primaryUrl,
+      frontDocumentUrl: dto.frontDocumentUrl || dto.documentUrl,
+      backDocumentUrl: dto.backDocumentUrl,
       documentName: dto.documentName,
+      accountType: dto.accountType,
       mimeType: dto.mimeType || 'application/pdf',
       fileSize: dto.fileSize || 500000,
       documentNumber: dto.documentNumber,
       status: 'PENDING',
       uploadedAt: new Date(),
+    });
+
+    profile.verificationStatus = 'PENDING';
+    await profile.save();
+
+    await this.userModel.findByIdAndUpdate(user.id, {
+      $set: {
+        kycStatus: 'PENDING',
+        kycDocumentType: dto.documentType,
+        kycDocumentNumber: dto.documentNumber,
+        kycFrontDocumentUrl: dto.frontDocumentUrl || dto.documentUrl,
+        kycBackDocumentUrl: dto.backDocumentUrl,
+        ...(dto.accountType ? { accountType: dto.accountType } : {}),
+      },
     });
 
     await this.auditLogModel.create({
@@ -444,17 +475,32 @@ export class AgentsService {
       targetEntity: 'AGENT_DOCUMENT',
       targetEntityId: doc._id.toString(),
       newValue: { documentType: dto.documentType, documentName: dto.documentName },
-      reason: 'Agent uploaded credential document',
+      reason: 'User uploaded KYC credential document',
       timestamp: new Date(),
     });
 
+    // Send WhatsApp notification
+    try {
+      await this.whatsappService.sendKycSubmittedNotification({
+        userId: user.id,
+        customerName: user.name || profile.displayName,
+        customerMobile: user.mobile,
+        accountType: dto.accountType || user.accountType || user.role,
+        status: 'SUBMITTED',
+      });
+    } catch (err: any) {
+      this.logger.warn(`Failed to dispatch KYC submission WhatsApp: ${err.message}`);
+    }
+
     return {
       success: true,
-      message: 'Document uploaded successfully',
+      message: 'Document uploaded successfully. KYC verification is pending review.',
       document: {
         id: doc._id.toString(),
         documentType: doc.documentType,
         documentUrl: doc.documentUrl,
+        frontDocumentUrl: doc.frontDocumentUrl,
+        backDocumentUrl: doc.backDocumentUrl,
         documentName: doc.documentName,
         status: doc.status,
         uploadedAt: doc.uploadedAt,
@@ -540,4 +586,175 @@ export class AgentsService {
       })),
     };
   }
+
+  // ==========================================
+  // BROKER AGENCY & BROKER TEAM MANAGEMENT (Requirement 5)
+  // ==========================================
+
+  async getAgencyTeamMembers(user: AuthenticatedUser) {
+    const isAgencyOrBroker =
+      user.role === UserRole.BROKER_AGENCY ||
+      user.role === UserRole.BROKER ||
+      user.role === UserRole.ADMIN ||
+      user.role === UserRole.SUPER_ADMIN ||
+      user.accountType === AccountType.BROKER_AGENCY ||
+      user.accountType === AccountType.BROKER;
+
+    if (!isAgencyOrBroker) {
+      throw new ForbiddenException('Only Broker Agencies and Brokers can manage team members.');
+    }
+
+    const team = await this.userModel
+      .find({
+        $or: [{ agencyId: user.id }, { parentUserId: user.id }],
+      })
+      .select('-passwordHash')
+      .sort({ createdAt: -1 })
+      .lean();
+
+    return team.map((member: any) => ({
+      id: member._id.toString(),
+      name: member.name,
+      mobile: member.mobile,
+      normalizedMobile: member.normalizedMobile,
+      email: member.email,
+      role: member.role,
+      accountType: member.accountType,
+      status: member.status,
+      permissions: member.permissions || member.grantedPermissions || [],
+      assignedProperties: member.assignedProperties || [],
+      createdAt: member.createdAt,
+    }));
+  }
+
+  async addAgencyTeamMember(
+    user: AuthenticatedUser,
+    dto: {
+      name: string;
+      mobile: string;
+      email?: string;
+      assignedProperties?: string[];
+      permissions?: string[];
+    },
+  ) {
+    const isAgencyOrBroker =
+      user.role === UserRole.BROKER_AGENCY ||
+      user.role === UserRole.BROKER ||
+      user.role === UserRole.ADMIN ||
+      user.role === UserRole.SUPER_ADMIN ||
+      user.accountType === AccountType.BROKER_AGENCY ||
+      user.accountType === AccountType.BROKER;
+
+    if (!isAgencyOrBroker) {
+      throw new ForbiddenException('Only Broker Agencies and Brokers can add team members.');
+    }
+
+    const cleanMobile = dto.mobile.trim().replace(/\s+/g, '');
+    let existing = await this.userModel.findOne({
+      $or: [{ mobile: cleanMobile }, { normalizedMobile: cleanMobile }],
+    });
+
+    if (existing) {
+      existing.agencyId = user.id;
+      existing.parentUserId = user.id;
+      existing.role = UserRole.BROKER_AGENT;
+      existing.accountType = AccountType.BROKER_AGENT;
+      if (dto.assignedProperties) existing.assignedProperties = dto.assignedProperties;
+      if (dto.permissions) existing.grantedPermissions = dto.permissions;
+      await existing.save();
+
+      return {
+        success: true,
+        message: `Agent ${existing.name} linked to your agency team.`,
+        agentId: existing._id.toString(),
+      };
+    }
+
+    const created = await this.userModel.create({
+      name: dto.name.trim(),
+      mobile: cleanMobile,
+      normalizedMobile: cleanMobile.startsWith('+') ? cleanMobile : `+91${cleanMobile.slice(-10)}`,
+      email: dto.email?.trim().toLowerCase(),
+      role: UserRole.BROKER_AGENT,
+      accountType: AccountType.BROKER_AGENT,
+      agencyId: user.id,
+      parentUserId: user.id,
+      assignedProperties: dto.assignedProperties || [],
+      grantedPermissions: dto.permissions || [],
+      status: 'ACTIVE',
+      isVerifiedAgent: true,
+      kycStatus: 'APPROVED',
+    });
+
+    return {
+      success: true,
+      message: `Agent ${created.name} successfully created under your agency.`,
+      agentId: created._id.toString(),
+    };
+  }
+
+  async updateAgencyTeamMember(
+    user: AuthenticatedUser,
+    agentId: string,
+    dto: {
+      assignedProperties?: string[];
+      permissions?: string[];
+      status?: string;
+    },
+  ) {
+    const agent = await this.userModel.findOne({
+      _id: agentId,
+      $or: [{ agencyId: user.id }, { parentUserId: user.id }],
+    });
+
+    if (!agent) {
+      throw new NotFoundException(`Team member not found under your agency.`);
+    }
+
+    if (dto.assignedProperties !== undefined) {
+      agent.assignedProperties = dto.assignedProperties;
+    }
+    if (dto.permissions !== undefined) {
+      agent.grantedPermissions = dto.permissions;
+    }
+    if (dto.status !== undefined) {
+      agent.status = dto.status as any;
+    }
+
+    await agent.save();
+
+    return {
+      success: true,
+      message: `Team member ${agent.name} updated successfully.`,
+      agent: {
+        id: agent._id.toString(),
+        name: agent.name,
+        assignedProperties: agent.assignedProperties,
+        permissions: agent.grantedPermissions,
+        status: agent.status,
+      },
+    };
+  }
+
+  async removeAgencyTeamMember(user: AuthenticatedUser, agentId: string) {
+    const agent = await this.userModel.findOne({
+      _id: agentId,
+      $or: [{ agencyId: user.id }, { parentUserId: user.id }],
+    });
+
+    if (!agent) {
+      throw new NotFoundException(`Team member not found under your agency.`);
+    }
+
+    agent.agencyId = null;
+    agent.parentUserId = null;
+    agent.assignedProperties = [];
+    await agent.save();
+
+    return {
+      success: true,
+      message: `Team member ${agent.name} unlinked from your agency.`,
+    };
+  }
 }
+

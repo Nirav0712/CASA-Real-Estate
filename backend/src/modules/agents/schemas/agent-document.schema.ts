@@ -13,15 +13,33 @@ export class AgentVerificationDocument {
 
   @Prop({
     required: true,
-    enum: ['RERA_CERTIFICATE', 'AGENCY_LICENSE', 'IDENTITY_DOCUMENT', 'ADDRESS_PROOF', 'OTHER'],
+    enum: [
+      'GST_CERTIFICATE',
+      'UDYAM_CERTIFICATE',
+      'RERA_CERTIFICATE',
+      'AADHAAR_CARD',
+      'AGENCY_LICENSE',
+      'IDENTITY_DOCUMENT',
+      'ADDRESS_PROOF',
+      'OTHER',
+    ],
   })
   documentType: string;
 
   @Prop({ required: true })
   documentUrl: string;
 
+  @Prop({ required: false })
+  frontDocumentUrl?: string;
+
+  @Prop({ required: false })
+  backDocumentUrl?: string;
+
   @Prop({ required: true })
   documentName: string;
+
+  @Prop()
+  accountType?: string;
 
   @Prop()
   mimeType?: string;
@@ -51,6 +69,9 @@ export class AgentVerificationDocument {
 
   @Prop()
   rejectionReason?: string;
+
+  @Prop()
+  adminNotes?: string;
 }
 
 export const AgentVerificationDocumentSchema = SchemaFactory.createForClass(AgentVerificationDocument);

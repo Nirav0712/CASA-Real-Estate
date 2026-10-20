@@ -125,6 +125,54 @@ export class User {
   @Prop({ type: Boolean, default: false })
   isTrialActive?: boolean;
 
+  @Prop({
+    type: String,
+    enum: ['NOT_SUBMITTED', 'PENDING', 'APPROVED', 'REJECTED'],
+    default: 'NOT_SUBMITTED',
+    index: true,
+  })
+  kycStatus?: string;
+
+  @Prop({ required: false })
+  kycRejectionReason?: string;
+
+  @Prop({ required: false })
+  kycApprovedAt?: Date;
+
+  @Prop({ required: false })
+  kycApprovedBy?: string;
+
+  @Prop({ required: false })
+  kycDocumentType?: string;
+
+  @Prop({ required: false })
+  kycFrontDocumentUrl?: string;
+
+  @Prop({ required: false })
+  kycBackDocumentUrl?: string;
+
+  @Prop({ required: false })
+  kycDocumentNumber?: string;
+
+  @Prop({ type: String, default: null, index: true })
+  agencyId?: string | null;
+
+  @Prop({ type: String, default: null, index: true })
+  parentUserId?: string | null;
+
+  @Prop({ type: [String], default: [] })
+  assignedProperties?: string[];
+
+  @Prop({ type: Object, default: {} })
+  developerDetails?: {
+    companyName?: string;
+    cinNumber?: string;
+    projectsCount?: number;
+    reraNumber?: string;
+    city?: string;
+    website?: string;
+  };
+
   @Prop({ required: false })
   avatar?: string;
 

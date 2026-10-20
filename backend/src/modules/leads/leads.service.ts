@@ -30,6 +30,8 @@ import {
   FollowUpType,
 } from './enums/lead.enums';
 
+import { WhatsAppService } from './whatsapp.service';
+
 @Injectable()
 export class LeadsService {
   private readonly logger = new Logger(LeadsService.name);
@@ -39,6 +41,7 @@ export class LeadsService {
     @InjectModel(Property.name) private readonly propertyModel: Model<PropertyDocument>,
     @InjectModel(AuditLog.name) private readonly auditLogModel: Model<AuditLogDocument>,
     @InjectModel(User.name) private readonly userModel: Model<UserDocument>,
+    private readonly whatsappService: WhatsAppService,
   ) {}
 
   /**
@@ -128,12 +131,40 @@ export class LeadsService {
       };
     }
 
-    // 3. Derive recipient server-side
+    // 3. Derive recipient server-side and snapshot property details
     const recipientOwnerId = property.ownerId || property.createdBy || 'usr-system';
     const recipientAgentId = property.advertiserId || property.ownerId || recipientOwnerId;
 
+    const propertyTitle = property.title?.en || (typeof property.title === 'string' ? property.title : 'Property Listing');
+    const propertySlug = property.slug;
+    const propertyImage =
+      property.media?.thumbnailUrl ||
+      property.media?.coverImage ||
+      (Array.isArray(property.media?.images) && property.media.images.length > 0 ? property.media.images[0] : '');
+    const propertyPrice = typeof property.price === 'number' ? property.price : property.price?.amount;
+    const propertyLocation = [
+      property.location?.society,
+      property.location?.subArea,
+      property.location?.area || property.location?.locality,
+      property.location?.city,
+      property.location?.state,
+    ]
+      .filter(Boolean)
+      .join(', ');
+    const propertyAdvertiserName = property.advertiser?.name || '';
+    const propertyAdvertiserPhone = property.advertiser?.phone || '';
+    const propertyAgencyName = property.advertiser?.agencyName || '';
+
     const lead = await this.leadModel.create({
       propertyId: cleanPropId,
+      propertyTitle,
+      propertySlug,
+      propertyImage,
+      propertyPrice,
+      propertyLocation,
+      propertyAdvertiserName,
+      propertyAdvertiserPhone,
+      propertyAgencyName,
       agentId: recipientAgentId,
       assignedAgentId: recipientAgentId,
       ownerId: recipientOwnerId,
@@ -144,7 +175,7 @@ export class LeadsService {
       contactPhone: mobile,
       email: dto.email?.trim().toLowerCase(),
       contactEmail: dto.email?.trim().toLowerCase(),
-      subject: dto.subject?.trim() || `Inquiry for ${property.title?.en || property.title || 'Property'}`,
+      subject: dto.subject?.trim() || `Inquiry for ${propertyTitle}`,
       message: dto.message.trim(),
       budget: dto.budget,
       preferredLocation: dto.preferredLocation,
@@ -178,7 +209,35 @@ export class LeadsService {
       `✅ New Lead created: ${lead._id} for property ${cleanPropId} assigned to agent/owner ${recipientAgentId}`,
     );
 
-    // 4. Record Audit Log
+    // 4. Dispatch WhatsApp Notification to Configured Destination Number & Advertiser
+    try {
+      const waResult = await this.whatsappService.sendLeadNotification({
+        leadId: lead._id.toString(),
+        propertyId: cleanPropId,
+        propertyTitle,
+        propertySlug,
+        customerName: dto.name.trim(),
+        customerMobile: mobile,
+        customerEmail: dto.email?.trim(),
+        message: dto.message.trim(),
+        advertiserPhone: propertyAdvertiserPhone,
+        enquiryDate: new Date(),
+      });
+      if (waResult) {
+        lead.whatsappStatus = waResult.status;
+        lead.whatsappSentAt = waResult.sentAt;
+        lead.whatsappError = waResult.error;
+        lead.whatsappDestinationNumber = waResult.recipient;
+        await lead.save();
+      }
+    } catch (waErr: any) {
+      this.logger.error(`WhatsApp lead notification dispatch error: ${waErr.message}`);
+      lead.whatsappStatus = 'FAILED';
+      lead.whatsappError = waErr.message;
+      await lead.save().catch(() => {});
+    }
+
+    // 5. Record Audit Log
     await this.auditLogModel.create({
       action: 'LEAD_CREATED',
       actorUserId: purchaserId || 'anonymous_public',
@@ -301,7 +360,7 @@ export class LeadsService {
                 ...(propertyIds.filter((id) => isValidObjectId(id)).map((id) => ({ _id: id }))),
               ],
             })
-            .select({ id: 1, slug: 1, title: 1, price: 1, category: 1, location: 1 })
+            .select({ id: 1, slug: 1, title: 1, price: 1, category: 1, location: 1, media: 1, specs: 1, advertiser: 1, ownerId: 1 })
             .lean()
         : [],
       agentIds.length > 0
@@ -321,13 +380,21 @@ export class LeadsService {
     const propMap = new Map();
     properties.forEach((p: any) => {
       const pId = p.id || p._id?.toString();
+      const formattedLoc = typeof p.location === 'string'
+        ? p.location
+        : [p.location?.society, p.location?.subArea, p.location?.area || p.location?.locality, p.location?.city, p.location?.state]
+            .filter(Boolean)
+            .join(', ');
+
       propMap.set(pId, {
         id: p.id,
         slug: p.slug,
         title: typeof p.title === 'string' ? p.title : p.title?.en,
         price: typeof p.price === 'number' ? p.price : p.price?.amount,
         category: p.category,
-        location: typeof p.location === 'string' ? p.location : `${p.location?.locality || ''}, ${p.location?.city || ''}`,
+        location: formattedLoc,
+        thumbnailUrl: p.media?.thumbnailUrl || p.media?.coverImage || (Array.isArray(p.media?.images) && p.media.images.length > 0 ? p.media.images[0] : null),
+        advertiser: p.advertiser,
       });
     });
 
@@ -339,15 +406,22 @@ export class LeadsService {
     });
 
     const data = leads.map((l: any) => {
-      const propInfo = propMap.get(l.propertyId) || { title: 'CASA Property Listing' };
+      const propInfo = propMap.get(l.propertyId) || {};
       const agentInfo = agentMap.get(l.assignedAgentId || l.agentId) || null;
       return {
         id: l._id.toString(),
         propertyId: l.propertyId,
-        propertyTitle: propInfo.title,
-        propertySlug: propInfo.slug,
-        propertyPrice: propInfo.price,
-        propertyLocation: propInfo.location,
+        propertyTitle: l.propertyTitle || propInfo.title || 'CASA Property Listing',
+        propertySlug: l.propertySlug || propInfo.slug,
+        propertyPrice: l.propertyPrice !== undefined ? l.propertyPrice : propInfo.price,
+        propertyLocation: l.propertyLocation || propInfo.location,
+        propertyImage: l.propertyImage || propInfo.thumbnailUrl || 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=400&q=80',
+        propertyUrl: l.propertyUrl || (propInfo.slug ? `/property/${propInfo.slug}` : undefined),
+        propertyAdvertiser: propInfo.advertiser || (l.propertyAdvertiserName ? { name: l.propertyAdvertiserName, phone: l.propertyAdvertiserPhone, agencyName: l.propertyAgencyName } : null),
+        whatsappStatus: l.whatsappStatus || 'MOCK_SENT',
+        whatsappSentAt: l.whatsappSentAt || l.createdAt,
+        whatsappError: l.whatsappError,
+        whatsappDestinationNumber: l.whatsappDestinationNumber,
         name: l.name || l.contactName,
         mobile: l.mobile || l.contactPhone,
         email: l.email || l.contactEmail,
@@ -480,6 +554,14 @@ export class LeadsService {
       };
     }
 
+    const formattedLoc = property
+      ? typeof property.location === 'string'
+        ? property.location
+        : [property.location?.society, property.location?.subArea, property.location?.area || property.location?.locality, property.location?.city, property.location?.state]
+            .filter(Boolean)
+            .join(', ')
+      : lead.propertyLocation || 'Location unavailable';
+
     return {
       id: lead._id.toString(),
       property: property
@@ -489,14 +571,29 @@ export class LeadsService {
             title: typeof property.title === 'string' ? property.title : property.title?.en,
             price: typeof property.price === 'number' ? property.price : property.price?.amount,
             category: property.category,
-            location:
-              typeof property.location === 'string'
-                ? property.location
-                : `${property.location?.locality || ''}, ${property.location?.city || ''}`,
-            thumbnailUrl: property.media?.thumbnailUrl || property.media?.coverImage,
-            advertiser: property.advertiser,
+            location: formattedLoc,
+            thumbnailUrl: property.media?.thumbnailUrl || property.media?.coverImage || (Array.isArray(property.media?.images) ? property.media.images[0] : null) || lead.propertyImage,
+            advertiser: property.advertiser || (lead.propertyAdvertiserName ? { name: lead.propertyAdvertiserName, phone: lead.propertyAdvertiserPhone, agencyName: lead.propertyAgencyName } : null),
           }
-        : null,
+        : {
+            id: lead.propertyId,
+            slug: lead.propertySlug,
+            title: lead.propertyTitle || 'CASA Property Listing',
+            price: lead.propertyPrice,
+            location: lead.propertyLocation,
+            thumbnailUrl: lead.propertyImage,
+            advertiser: lead.propertyAdvertiserName ? { name: lead.propertyAdvertiserName, phone: lead.propertyAdvertiserPhone, agencyName: lead.propertyAgencyName } : null,
+          },
+      propertyTitle: lead.propertyTitle || (property ? (typeof property.title === 'string' ? property.title : property.title?.en) : 'CASA Property Listing'),
+      propertySlug: lead.propertySlug || property?.slug,
+      propertyLocation: formattedLoc,
+      propertyImage: lead.propertyImage || property?.media?.thumbnailUrl || property?.media?.coverImage,
+      propertyPrice: lead.propertyPrice !== undefined ? lead.propertyPrice : (property ? (typeof property.price === 'number' ? property.price : property.price?.amount) : undefined),
+      propertyUrl: lead.propertyUrl || (property?.slug ? `/property/${property.slug}` : undefined),
+      whatsappStatus: lead.whatsappStatus || 'MOCK_SENT',
+      whatsappSentAt: lead.whatsappSentAt || lead.createdAt,
+      whatsappError: lead.whatsappError,
+      whatsappDestinationNumber: lead.whatsappDestinationNumber,
       name: lead.name || lead.contactName,
       mobile: lead.mobile || lead.contactPhone,
       email: lead.email || lead.contactEmail,

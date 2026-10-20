@@ -1,5 +1,5 @@
 import { fetchAdminApi } from '@/lib/api-client';
-import { AdminDashboardStats, AdminPropertyItem, RoleRecord } from '@/types';
+import { AdminDashboardStats, AdminPropertyItem, RoleRecord, KycQueueResponse, KycQueueItem } from '@/types';
 
 export async function getAdminDashboardStats(): Promise<{
   stats: AdminDashboardStats;
@@ -628,5 +628,98 @@ export async function getAdminAuditLogs(params?: {
       hasPreviousPage: false,
     },
   };
+}
+
+export async function getAdminKycQueue(params?: {
+  status?: string;
+  accountType?: string;
+  search?: string;
+  page?: number;
+  limit?: number;
+}): Promise<KycQueueResponse> {
+  const searchParams = new URLSearchParams();
+  if (params?.status && params.status !== 'ALL') searchParams.set('status', params.status);
+  if (params?.accountType && params.accountType !== 'ALL') searchParams.set('accountType', params.accountType);
+  if (params?.search && params.search.trim()) searchParams.set('search', params.search.trim());
+  if (params?.page) searchParams.set('page', String(params.page));
+  if (params?.limit) searchParams.set('limit', String(params.limit));
+
+  const queryStr = searchParams.toString() ? `?${searchParams.toString()}` : '';
+  const result = await fetchAdminApi<KycQueueResponse>(`/admin/kyc${queryStr}`);
+
+  if (result.isBackendAvailable && result.data) {
+    return result.data;
+  }
+  return {
+    items: [],
+    pagination: {
+      total: 0,
+      page: params?.page || 1,
+      limit: params?.limit || 12,
+      totalPages: 0,
+    },
+    counts: {
+      pending: 0,
+      approved: 0,
+      rejected: 0,
+    },
+  };
+}
+
+export async function approveAdminKyc(
+  id: string,
+  notes?: string,
+): Promise<{ success: boolean; message: string; user?: any }> {
+  const result = await fetchAdminApi<{ success: boolean; message: string; user?: any }>(
+    `/admin/kyc/${encodeURIComponent(id)}/approve`,
+    {
+      method: 'POST',
+      body: JSON.stringify({ notes: notes?.trim() || '' }),
+    },
+  );
+
+  if (!result.isBackendAvailable || result.error) {
+    throw new Error(result.error || 'Failed to approve KYC and activate trial');
+  }
+
+  return result.data || { success: true, message: 'KYC approved and 3-day Free Trial started' };
+}
+
+export async function rejectAdminKyc(
+  id: string,
+  reason: string,
+): Promise<{ success: boolean; message: string; user?: any }> {
+  const result = await fetchAdminApi<{ success: boolean; message: string; user?: any }>(
+    `/admin/kyc/${encodeURIComponent(id)}/reject`,
+    {
+      method: 'POST',
+      body: JSON.stringify({ reason: reason.trim() }),
+    },
+  );
+
+  if (!result.isBackendAvailable || result.error) {
+    throw new Error(result.error || 'Failed to reject KYC application');
+  }
+
+  return result.data || { success: true, message: 'KYC application rejected' };
+}
+
+export async function assignAdminUserPackage(
+  userId: string,
+  packageId: string,
+): Promise<{ success: boolean; message: string; user?: any }> {
+  const result = await fetchAdminApi<{ success: boolean; message: string; user?: any }>(
+    `/admin/users/${encodeURIComponent(userId)}/package`,
+    {
+      method: 'POST',
+      body: JSON.stringify({ packageId }),
+    },
+  );
+
+  if (!result.isBackendAvailable || result.error) {
+    throw new Error(result.error || 'Failed to assign package to user');
+  }
+
+  return result.data || { success: true, message: 'Package assigned successfully' };
 }
 

@@ -10,6 +10,7 @@ import { PropertyCardSkeleton } from '@/components/ui/skeleton';
 import { PropertyCard } from '@/features/properties/property-card';
 import { HeroSection } from '@/components/home/hero-section';
 import { CategoryCarousel } from '@/components/home/category-carousel';
+import { VideoPropertySection } from '@/components/home/video-property-section';
 import { useLanguage } from '@/contexts/language-context';
 import { useToast } from '@/contexts/toast-context';
 import {
@@ -181,6 +182,9 @@ export default function HomePage() {
           )}
         </Container>
       </section>
+
+      {/* DEDICATED 9:16 VIDEO PROPERTY REELS (Requirement 6) */}
+      <VideoPropertySection />
 
       {/* 3. LATEST PROPERTIES FEED */}
       <section id="latest" className="py-16 bg-casa-canvas border-b border-casa-border-light transition-colors duration-200">

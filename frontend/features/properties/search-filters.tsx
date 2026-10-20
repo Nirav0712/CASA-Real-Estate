@@ -27,15 +27,23 @@ import {
   ShieldCheck,
   Users,
   CheckCircle2,
+  Video,
 } from 'lucide-react';
 
 const POPULAR_CITIES = [
   'All Cities',
   'Lucknow',
-  'Ayodhya',
-  'Varanasi',
-  'Kanpur',
+  'Ahmedabad',
+  'Surat',
+  'Mumbai',
+  'Bengaluru',
+  'Delhi NCR',
   'Noida',
+  'Gurugram',
+  'Pune',
+  'Kanpur',
+  'Varanasi',
+  'Ayodhya',
   'Prayagraj',
   'Gorakhpur',
 ];
@@ -467,6 +475,45 @@ export function SearchFilters({
             </option>
           ))}
         </select>
+
+        {/* Micro-Market & Area Filter */}
+        <input
+          type="text"
+          placeholder="Filter by Area (e.g. Gomti Nagar, Satellite, Bandra)..."
+          value={filters.area || ''}
+          onChange={(e) => onFilterChange({ area: e.target.value || undefined, page: 1 })}
+          className="w-full px-3 py-2 text-xs rounded-xl bg-casa-surface border border-casa-border-light text-casa-text-primary placeholder:text-casa-text-muted focus:outline-none focus:border-casa-brand"
+        />
+
+        {/* Sub-area Filter */}
+        <input
+          type="text"
+          placeholder="Filter by Sub-area (e.g. Extension, Jodhpur Cross Road)..."
+          value={filters.subArea || ''}
+          onChange={(e) => onFilterChange({ subArea: e.target.value || undefined, page: 1 })}
+          className="w-full px-3 py-2 text-xs rounded-xl bg-casa-surface border border-casa-border-light text-casa-text-primary placeholder:text-casa-text-muted focus:outline-none focus:border-casa-brand"
+        />
+
+        {/* Society / Project Filter */}
+        <input
+          type="text"
+          placeholder="Filter by Society / Project (e.g. Omaxe, Goyal Riviera)..."
+          value={filters.society || ''}
+          onChange={(e) => onFilterChange({ society: e.target.value || undefined, page: 1 })}
+          className="w-full px-3 py-2 text-xs rounded-xl bg-casa-surface border border-casa-border-light text-casa-text-primary placeholder:text-casa-text-muted focus:outline-none focus:border-casa-brand"
+        />
+
+        {/* Properties with Video / Reel Toggle */}
+        <label className="flex items-center gap-2 cursor-pointer p-2 rounded-xl bg-casa-surface border border-casa-border-light text-xs font-semibold text-casa-text-primary hover:border-casa-brand transition-colors">
+          <input
+            type="checkbox"
+            checked={Boolean(filters.hasVideo)}
+            onChange={(e) => onFilterChange({ hasVideo: e.target.checked ? true : undefined, page: 1 })}
+            className="w-4 h-4 text-casa-brand rounded focus:ring-casa-brand"
+          />
+          <Video className="w-3.5 h-3.5 text-casa-brand" />
+          <span>Only Properties with Videos / Reels</span>
+        </label>
       </div>
 
       {/* 5. Price Range */}

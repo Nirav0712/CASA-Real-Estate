@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import { useRouter } from 'next/navigation';
 import {
   Sparkles,
   Check,
@@ -9,10 +10,13 @@ import {
   ShieldCheck,
   ChevronRight,
   X,
+  Phone,
   Building,
   Eye,
   MessageSquare,
   Award,
+  ArrowRight,
+  CheckCircle2,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/auth-context';
 import { useToast } from '@/contexts/toast-context';
@@ -25,6 +29,7 @@ import {
 export function PlanSelectionModal() {
   const { isPlanSelectionModalOpen, closePlanSelectionModal, user, refreshUser } = useAuth();
   const toast = useToast();
+  const router = useRouter();
 
   const [packages, setPackages] = React.useState<PackagePlan[]>([]);
   const [loading, setLoading] = React.useState(true);
@@ -39,7 +44,6 @@ export function PlanSelectionModal() {
       try {
         const plans = await getActivePackages();
         if (isMounted) {
-          // Sort plans by price ascending
           setPackages(plans.sort((a, b) => a.price - b.price));
         }
       } catch (err: any) {
@@ -57,31 +61,22 @@ export function PlanSelectionModal() {
 
   if (!isPlanSelectionModalOpen) return null;
 
-  const handleSelectPlan = async (pkg: PackagePlan) => {
-    const pkgId = pkg.id || pkg._id || '';
-    if (!pkgId) return;
+  // Calculate remaining trial days
+  const isTrialActive = Boolean(user?.isTrialActive);
+  let remainingDays = 0;
+  if (user?.trialExpiresAt) {
+    const diff = new Date(user.trialExpiresAt).getTime() - Date.now();
+    remainingDays = Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
+  }
 
-    setSubmittingId(pkgId);
-    try {
-      const res = await startTrial(pkgId);
-      toast.success(
-        '🎉 3-Day Free Trial Activated!',
-        `You have been granted full access to the "${pkg.name}" tier for 3 days. No payment needed!`,
-      );
-      if (refreshUser) {
-        await refreshUser();
-      }
-      closePlanSelectionModal();
-    } catch (err: any) {
-      toast.error('Activation Failed', err.message || 'Could not start free trial.');
-    } finally {
-      setSubmittingId(null);
-    }
+  const handleContinueWithFreeTrial = () => {
+    closePlanSelectionModal();
+    router.push('/dashboard/kyc');
   };
 
   return (
     <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto animate-in fade-in duration-200">
-      <div className="relative w-full max-w-5xl bg-casa-surface border border-casa-border-light rounded-3xl shadow-2xl p-6 md:p-8 my-8 max-h-[92vh] overflow-y-auto space-y-6">
+      <div className="relative w-full max-w-2xl bg-casa-surface border border-casa-border-light rounded-3xl shadow-2xl p-6 md:p-8 my-8 max-h-[92vh] overflow-y-auto space-y-6">
         {/* Close Button */}
         <button
           onClick={closePlanSelectionModal}
@@ -92,172 +87,162 @@ export function PlanSelectionModal() {
         </button>
 
         {/* Header Banner */}
-        <div className="text-center max-w-2xl mx-auto space-y-2">
+        <div className="text-center max-w-xl mx-auto space-y-2">
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-casa-brand-subtle text-casa-brand text-xs font-bold uppercase tracking-wider mb-1">
             <Sparkles className="w-3.5 h-3.5" />
-            <span>Welcome to CASA Real Estate</span>
+            <span>CASA Real Estate — Free Trial Access</span>
           </div>
 
           <h2 className="text-2xl md:text-3xl font-extrabold text-casa-text-primary">
-            Choose Your Plan — <span className="text-casa-brand">Get 3 Days Free Trial</span>
+            Experience CASA with a <span className="text-casa-brand">3-Day Free Trial</span>
           </h2>
 
           <p className="text-xs md:text-sm text-casa-text-secondary leading-relaxed">
-            Select any membership package to instantly activate your <strong>3-Day Full Access Trial</strong>.
-            Experience all premium listing tools, lead generation, and verified direct contact details with{' '}
-            <strong className="text-casa-brand">Zero Payment Gateway or Credit Card Required</strong>.
+            All registered Broker Agencies, Brokers, Agents, and Developers receive a{' '}
+            <strong>3-Day Full Access Free Trial</strong> upon account verification by our Super Admin governance team.
           </p>
         </div>
 
-        {/* Plans Grid */}
-        {loading ? (
-          <div className="py-20 text-center space-y-3">
-            <div className="w-8 h-8 border-3 border-casa-brand border-t-transparent rounded-full animate-spin mx-auto" />
-            <p className="text-xs text-casa-text-muted">Loading live membership packages from admin gateway...</p>
+        {/* Verification Call Notice Banner (Requirement 7 & 8) */}
+        <div className="bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 rounded-2xl p-4 flex items-start gap-3 text-amber-900 dark:text-amber-200 text-xs shadow-subtle">
+          <Phone className="w-5 h-5 flex-shrink-0 text-amber-600 dark:text-amber-400 mt-0.5" />
+          <div className="space-y-1">
+            <p className="font-bold text-sm">
+              Manual Verification Call Notice:
+            </p>
+            <p className="text-amber-800 dark:text-amber-300">
+              Users may receive a verification call from{' '}
+              <strong className="font-bold underline text-amber-950 dark:text-white">
+                7069754589
+              </strong>{' '}
+              to complete their KYC verification. Your 3-day Free Trial starts <strong>immediately after approval</strong> by the Super Admin.
+            </p>
           </div>
-        ) : packages.length === 0 ? (
-          <div className="py-12 text-center text-xs text-casa-text-muted bg-casa-canvas rounded-2xl border border-casa-border-light">
-            No active packages available at the moment. Please contact support.
+        </div>
+
+        {/* If user already has an active trial */}
+        {isTrialActive ? (
+          <div className="p-6 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 rounded-3xl space-y-4 text-center">
+            <div className="w-12 h-12 rounded-full bg-emerald-600 text-white flex items-center justify-center mx-auto shadow-md">
+              <CheckCircle2 className="w-7 h-7" />
+            </div>
+
+            <div>
+              <h3 className="text-lg font-bold text-emerald-950 dark:text-emerald-100">
+                Your 3-Day Free Trial is Currently Active!
+              </h3>
+              <p className="text-xs text-emerald-800 dark:text-emerald-300 mt-1">
+                You have unrestricted access to property publishing, reels, and lead management.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 max-w-sm mx-auto text-xs bg-white dark:bg-gray-900 p-3.5 rounded-2xl border border-emerald-200 dark:border-emerald-800">
+              <div>
+                <span className="text-[10px] uppercase font-bold text-casa-text-muted block">
+                  Trial Started
+                </span>
+                <span className="font-bold text-casa-text-primary">
+                  {user?.trialStartedAt ? new Date(user.trialStartedAt).toLocaleDateString() : 'Active'}
+                </span>
+              </div>
+              <div>
+                <span className="text-[10px] uppercase font-bold text-casa-text-muted block">
+                  Expires On
+                </span>
+                <span className="font-bold text-casa-brand">
+                  {user?.trialExpiresAt ? new Date(user.trialExpiresAt).toLocaleDateString() : 'In 3 Days'}
+                </span>
+              </div>
+            </div>
+
+            <div className="pt-2">
+              <span className="inline-block px-3 py-1 rounded-full bg-emerald-600 text-white text-xs font-bold">
+                {remainingDays} Day{remainingDays !== 1 ? 's' : ''} Remaining
+              </span>
+            </div>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-5 pt-2">
-            {packages.map((pkg) => {
-              const pkgId = pkg.id || pkg._id || '';
-              const isSubmitting = submittingId === pkgId;
-              const isPopular = pkg.isPopular || pkg.slug.includes('pro') || pkg.price > 0 && pkg.price < 3000;
+          /* Free Trial Plan Card */
+          <div className="bg-casa-surface border-2 border-casa-brand rounded-3xl p-6 md:p-8 space-y-5 shadow-xl relative overflow-hidden">
+            <div className="absolute top-0 right-0 bg-casa-brand text-white text-[10px] font-extrabold uppercase tracking-wider px-3 py-1 rounded-bl-xl shadow-xs">
+              Zero Payment Required
+            </div>
 
-              return (
-                <div
-                  key={pkgId}
-                  className={`relative rounded-3xl p-6 flex flex-col justify-between border transition-all duration-200 ${
-                    isPopular
-                      ? 'bg-casa-surface border-casa-brand ring-2 ring-casa-brand/20 shadow-xl md:-translate-y-1'
-                      : 'bg-casa-surface border-casa-border-light hover:border-casa-border shadow-subtle'
-                  }`}
-                >
-                  {isPopular && (
-                    <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 px-3 py-0.5 rounded-full bg-casa-brand text-white text-[11px] font-extrabold tracking-wider uppercase shadow-sm flex items-center gap-1">
-                      <Zap className="w-3 h-3 fill-current" />
-                      <span>Most Popular</span>
-                    </div>
-                  )}
+            <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-2 border-b border-casa-border-light pb-4">
+              <div>
+                <h3 className="text-xl font-bold text-casa-text-primary flex items-center gap-2">
+                  <Sparkles className="w-5 h-5 text-casa-brand" />
+                  CASA 3-Day Free Trial
+                </h3>
+                <p className="text-xs text-casa-text-secondary mt-0.5">
+                  Complete feature suite activated upon KYC document verification.
+                </p>
+              </div>
 
-                  <div className="space-y-4">
-                    <div>
-                      <h3 className="text-lg font-bold text-casa-text-primary">{pkg.name}</h3>
-                      <p className="text-xs text-casa-text-secondary mt-1 line-clamp-2 min-h-[32px]">
-                        {pkg.description || 'Full platform capabilities and marketplace discovery.'}
-                      </p>
-                    </div>
+              <div className="text-left sm:text-right">
+                <span className="text-3xl font-extrabold text-casa-brand">₹0</span>
+                <span className="text-xs text-casa-text-muted font-bold ml-1">/ 3 Days</span>
+              </div>
+            </div>
 
-                    {/* Price Tag */}
-                    <div className="py-3 border-y border-casa-border-light/80">
-                      <div className="flex items-baseline gap-1">
-                        <span className="text-3xl font-extrabold text-casa-text-primary">
-                          {pkg.price === 0 ? 'FREE' : `₹${pkg.price.toLocaleString('en-IN')}`}
-                        </span>
-                        {pkg.price > 0 && (
-                          <span className="text-xs text-casa-text-muted font-medium">
-                            / {pkg.billingPeriod.toLowerCase()}
-                          </span>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-1.5 mt-1 text-[11px] font-bold text-emerald-600">
-                        <Clock className="w-3.5 h-3.5" />
-                        <span>3 Days 100% Free Trial Included</span>
-                      </div>
-                    </div>
-
-                    {/* Features checklist */}
-                    <div className="space-y-2.5 text-xs text-casa-text-secondary">
-                      <div className="flex items-center gap-2">
-                        <div className="w-4 h-4 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center flex-shrink-0">
-                          <Check className="w-3 h-3" />
-                        </div>
-                        <span>
-                          Property Views:{' '}
-                          <strong className="text-casa-text-primary font-mono">
-                            {pkg.limits?.propertyViewsMonthly === -1
-                              ? 'Unlimited (∞)'
-                              : `${pkg.limits?.propertyViewsMonthly || 25} / month`}
-                          </strong>
-                        </span>
-                      </div>
-
-                      <div className="flex items-center gap-2">
-                        <div className="w-4 h-4 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center flex-shrink-0">
-                          <Check className="w-3 h-3" />
-                        </div>
-                        <span>
-                          Active Listings Cap:{' '}
-                          <strong className="text-casa-text-primary font-mono">
-                            {pkg.limits?.propertyListingsMax === -1
-                              ? 'Unlimited (∞)'
-                              : `${pkg.limits?.propertyListingsMax || 5} listings`}
-                          </strong>
-                        </span>
-                      </div>
-
-                      <div className="flex items-center gap-2">
-                        <div className="w-4 h-4 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center flex-shrink-0">
-                          <Check className="w-3 h-3" />
-                        </div>
-                        <span>
-                          Monthly Buyer Leads:{' '}
-                          <strong className="text-casa-text-primary font-mono">
-                            {pkg.limits?.leadsMonthly === -1
-                              ? 'Unlimited (∞)'
-                              : `${pkg.limits?.leadsMonthly || 10} leads`}
-                          </strong>
-                        </span>
-                      </div>
-
-                      <div className="flex items-center gap-2">
-                        <div className="w-4 h-4 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center flex-shrink-0">
-                          <Check className="w-3 h-3" />
-                        </div>
-                        <span>Full Direct Owner/Agent Contact Access</span>
-                      </div>
-
-                      <div className="flex items-center gap-2">
-                        <div className="w-4 h-4 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center flex-shrink-0">
-                          <Check className="w-3 h-3" />
-                        </div>
-                        <span>AI Search & Verified Listings Filter</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* CTA Button */}
-                  <div className="pt-6 mt-4">
-                    <button
-                      onClick={() => handleSelectPlan(pkg)}
-                      disabled={isSubmitting || submittingId !== null}
-                      className={`w-full py-3 px-4 rounded-2xl text-xs font-bold transition-all shadow-subtle flex items-center justify-center gap-1.5 cursor-pointer ${
-                        isPopular
-                          ? 'bg-casa-brand hover:bg-casa-brand/90 text-white'
-                          : 'bg-casa-text-primary hover:bg-casa-text-primary/90 text-white dark:text-zinc-900'
-                      }`}
-                    >
-                      {isSubmitting ? (
-                        <>
-                          <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                          <span>Activating Trial...</span>
-                        </>
-                      ) : (
-                        <>
-                          <span>Start 3-Day Free Trial</span>
-                          <ChevronRight className="w-3.5 h-3.5" />
-                        </>
-                      )}
-                    </button>
-                    <span className="block text-center text-[10px] text-casa-text-muted mt-2">
-                      No charge • Full access for 3 days
-                    </span>
-                  </div>
+            {/* Feature Checklist */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs text-casa-text-secondary">
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-4 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center flex-shrink-0">
+                  <Check className="w-3 h-3" />
                 </div>
-              );
-            })}
+                <span>Unlimited Property Listings during trial</span>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-4 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center flex-shrink-0">
+                  <Check className="w-3 h-3" />
+                </div>
+                <span>9:16 Video Property Reels upload</span>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-4 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center flex-shrink-0">
+                  <Check className="w-3 h-3" />
+                </div>
+                <span>Instant WhatsApp Lead Notifications</span>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-4 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center flex-shrink-0">
+                  <Check className="w-3 h-3" />
+                </div>
+                <span>Verified Trust Badge upon approval</span>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-4 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center flex-shrink-0">
+                  <Check className="w-3 h-3" />
+                </div>
+                <span>Full CRM Enquiry Management</span>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-4 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center flex-shrink-0">
+                  <Check className="w-3 h-3" />
+                </div>
+                <span>Direct Purchaser Mobile Contact</span>
+              </div>
+            </div>
+
+            {/* Action Button */}
+            <div className="pt-2">
+              <button
+                onClick={handleContinueWithFreeTrial}
+                className="w-full py-3.5 px-6 rounded-2xl bg-casa-brand hover:bg-casa-brand-hover text-white text-xs md:text-sm font-bold shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <span>Continue to KYC Verification & Start Free Trial</span>
+                <ArrowRight className="w-4 h-4" />
+              </button>
+              <span className="block text-center text-[11px] text-casa-text-muted mt-2">
+                Step 1 of 2: Upload GST / Udyam / RERA / Aadhaar • Super Admin manual audit ensures platform safety
+              </span>
+            </div>
           </div>
         )}
 
@@ -265,13 +250,13 @@ export function PlanSelectionModal() {
         <div className="pt-4 border-t border-casa-border-light flex flex-col sm:flex-row items-center justify-between text-[11px] text-casa-text-muted gap-2">
           <div className="flex items-center gap-2">
             <ShieldCheck className="w-4 h-4 text-emerald-600" />
-            <span>100% Risk-Free: Instant activation with no credit card or payment gateway requirement.</span>
+            <span>100% Risk-Free: Instant activation with zero credit card or payment gateway requirement.</span>
           </div>
           <button
             onClick={closePlanSelectionModal}
-            className="text-casa-text-secondary hover:text-casa-brand font-semibold underline underline-offset-4"
+            className="text-casa-text-secondary hover:text-casa-brand font-semibold underline underline-offset-4 cursor-pointer"
           >
-            Decide later and explore marketplace
+            Explore marketplace
           </button>
         </div>
       </div>

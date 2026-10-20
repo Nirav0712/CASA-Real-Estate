@@ -120,6 +120,27 @@ export class SearchPropertiesDto {
   @IsString()
   pincodeId?: string;
 
+  @ApiPropertyOptional({ description: 'Specific Area name' })
+  @IsOptional()
+  @IsString()
+  area?: string;
+
+  @ApiPropertyOptional({ description: 'Specific Sub-area name' })
+  @IsOptional()
+  @IsString()
+  subArea?: string;
+
+  @ApiPropertyOptional({ description: 'Specific Society or residential complex' })
+  @IsOptional()
+  @IsString()
+  society?: string;
+
+  @ApiPropertyOptional({ description: 'Filter only properties that have a property video / reel' })
+  @IsOptional()
+  @Transform(({ value }) => value === true || value === 'true')
+  @IsBoolean()
+  hasVideo?: boolean;
+
   @ApiPropertyOptional({ description: 'Minimum price (INR)' })
   @IsOptional()
   @Type(() => Number)

@@ -2731,4 +2731,64 @@ export class LocationsService implements OnModuleInit {
       this.logger.error(`Failed to write location audit log: ${err.message}`);
     }
   }
+
+  async addCustomLocation(dto: {
+    name: string;
+    type: LocationType;
+    parentId?: string;
+    cityName?: string;
+    stateName?: string;
+  }): Promise<LocationDocument> {
+    const cleanName = dto.name?.trim();
+    if (!cleanName) {
+      throw new BadRequestException('Location name is required');
+    }
+
+    const type = dto.type || LocationType.AREA;
+    let parentId: Types.ObjectId | null = null;
+    let ancestorIds: Types.ObjectId[] = [];
+
+    if (dto.parentId && Types.ObjectId.isValid(dto.parentId)) {
+      const parent = await this.locationModel.findById(dto.parentId);
+      if (parent) {
+        parentId = parent._id as Types.ObjectId;
+        ancestorIds = [...(parent.ancestorIds || []), parentId];
+      }
+    }
+
+    if (!parentId && dto.cityName) {
+      const cityNode = await this.locationModel.findOne({
+        name: new RegExp(`^${dto.cityName.trim()}$`, 'i'),
+        type: { $in: [LocationType.CITY, LocationType.DISTRICT] },
+      });
+      if (cityNode) {
+        parentId = cityNode._id as Types.ObjectId;
+        ancestorIds = [...(cityNode.ancestorIds || []), parentId];
+      }
+    }
+
+    const slug = this.slugify(cleanName);
+    const existing = await this.locationModel.findOne({
+      $or: [
+        { name: new RegExp(`^${cleanName}$`, 'i'), parentId: parentId || null },
+        { slug, parentId: parentId || null },
+      ],
+    });
+
+    if (existing) {
+      return existing;
+    }
+
+    const newLoc = new this.locationModel({
+      name: cleanName,
+      slug: `${slug}-${Date.now().toString().slice(-4)}`,
+      type,
+      parentId,
+      ancestorIds,
+      isActive: true,
+      sortOrder: 100,
+    });
+
+    return newLoc.save();
+  }
 }

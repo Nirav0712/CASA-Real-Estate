@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { useAuth } from '@/contexts/auth-context';
 import { useToast } from '@/contexts/toast-context';
 import { createProperty, submitPropertyForApproval } from '@/services/property-service';
-import { fetchLocationAutocomplete } from '@/services/location-service';
+import { fetchLocationAutocomplete, addCustomLocation } from '@/services/location-service';
 import { formatPrice } from '@/lib/utils';
 import {
   CATEGORY_GROUPS,
@@ -41,6 +41,9 @@ import {
   IndianRupee,
   Layers,
   Sparkles,
+  Video,
+  Plus,
+  Play,
 } from 'lucide-react';
 
 const STANDARD_AMENITIES = [
@@ -75,6 +78,197 @@ const PG_FACILITIES_OPTIONS = [
   'Power Backup',
   'Warden / Caretaker on site',
 ];
+
+const LOCATION_HIERARCHY_DATA: Record<
+  string,
+  {
+    cities: Record<
+      string,
+      {
+        areas: Record<
+          string,
+          {
+            subAreas: string[];
+            societies: string[];
+          }
+        >;
+      }
+    >;
+  }
+> = {
+  'Gujarat': {
+    cities: {
+      'Ahmedabad': {
+        areas: {
+          'Satellite': {
+            subAreas: ['Shyamal Cross Road', 'Jodhpur Cross Road', 'Star Bazaar Road', 'ISRO Colony'],
+            societies: ['Goyal Riviera', 'Bunglows Satellite', 'Riviera Elegance', 'Satellite Apartments'],
+          },
+          'Bodakdev': {
+            subAreas: ['Judges Bungalow Road', 'Pakwan Cross Road', 'Sindhu Bhavan Marg'],
+            societies: ['Iscon Platinum', 'Goyal Orchid Whitefield', 'Bodakdev Enclave'],
+          },
+          'Vastrapur': {
+            subAreas: ['IIM Road', 'Vastrapur Lake Area', 'Mansi Circle'],
+            societies: ['Nebula Tower', 'Vastrapur Heights', 'Amrapali Enclave'],
+          },
+          'Prahlad Nagar': {
+            subAreas: ['Prahladnagar Garden Road', 'Anand Nagar Road', 'Titanium City'],
+            societies: ['Venus Atlantis', 'Prahladnagar Residency', 'Mondeal Heights'],
+          },
+          'Bopal': {
+            subAreas: ['South Bopal', 'TRP Mall Road', 'Ghuma Road'],
+            societies: ['Arohi Residency', 'Bopal Greens', 'Sun South Park'],
+          },
+          'Thaltej': {
+            subAreas: ['Thaltej Shilaj Road', 'Hebatpur Road', 'Science City Road'],
+            societies: ['Shilp Serene', 'Ganesh Housing Complex', 'Thaltej Meadows'],
+          },
+        },
+      },
+      'Surat': {
+        areas: {
+          'Vesu': {
+            subAreas: ['VIP Road', 'Udhna Magdalla Road', 'University Road'],
+            societies: ['Rajhans Zion', 'Surat Dream Residency', 'Vesu Palms'],
+          },
+          'Adajan': {
+            subAreas: ['Pal Road', 'Anand Mahal Road', 'Honey Park Road'],
+            societies: ['Adajan Towers', 'Green City Heights', 'Surat Enclave'],
+          },
+        },
+      },
+      'Vadodara': {
+        areas: {
+          'Alkapuri': {
+            subAreas: ['RC Dutt Road', 'Jetpur Road', 'Sampatrao Colony'],
+            societies: ['Alkapuri Heights', 'Royal Residency', 'Baroda Greens'],
+          },
+          'Vasna Road': {
+            subAreas: ['Bhayli', 'Gotri Road', 'Sun Pharma Road'],
+            societies: ['Vasna Greens', 'Bhayli Orchid', 'Gotri Enclave'],
+          },
+        },
+      },
+    },
+  },
+  'Uttar Pradesh': {
+    cities: {
+      'Lucknow': {
+        areas: {
+          'Gomti Nagar': {
+            subAreas: ['Gomti Nagar Extension', 'Vibhuti Khand', 'Vikalp Khand', 'Viram Khand', 'Patrakarpuram'],
+            societies: ['Omaxe Residency', 'Rohtas Presidential Tower', 'Eldeco Greens', 'MI Rustle Court', 'Parsvnath Planet'],
+          },
+          'Hazratganj': {
+            subAreas: ['Main Market Square', 'Naval Kishore Road', 'Sapru Marg', 'Ashok Marg'],
+            societies: ['Hazratganj Royale', 'Civil Lines Court', 'Metro View Apartments'],
+          },
+          'Aliganj': {
+            subAreas: ['Sector A', 'Sector B', 'Sector Q', 'Kapoorthala'],
+            societies: ['Aliganj Heights', 'Kapoorthala Towers', 'Lucknow Enclave'],
+          },
+          'Indira Nagar': {
+            subAreas: ['Sector 14', 'Sector 18', 'Munshipulia', 'Bhootnath Market'],
+            societies: ['Indira Greens', 'Munshipulia Heights', 'Avadh Vihar'],
+          },
+          'Sushant Golf City': {
+            subAreas: ['Amar Shaheed Path', 'Lulu Mall Sector', 'Medanta Road'],
+            societies: ['Ansal Pocket 1', 'Celebrity Gardens', 'Rishita Manhattan', 'Palassio Enclave'],
+          },
+        },
+      },
+      'Noida': {
+        areas: {
+          'Sector 62': {
+            subAreas: ['Electronic City', 'Fortis Road', 'Model Town'],
+            societies: ['Stellar Park', 'Designer Park', 'Meghdootam Apartments'],
+          },
+          'Sector 150': {
+            subAreas: ['Noida-Greater Noida Expressway', 'Sports City', 'Shaheed Bhagat Singh Park'],
+            societies: ['Godrej Woods', 'Tata Eureka Park', 'ATS Pious Orchards'],
+          },
+        },
+      },
+    },
+  },
+  'Maharashtra': {
+    cities: {
+      'Mumbai': {
+        areas: {
+          'Bandra West': {
+            subAreas: ['Pali Hill', 'Carter Road', 'Bandstand', 'Hill Road', 'BKC Connector'],
+            societies: ['Sea Spray Apartments', 'Bandra Heights', 'Pali Palms', 'Sterling Seaface'],
+          },
+          'Andheri West': {
+            subAreas: ['Lokhandwala Complex', 'Oshiwara', 'Versova', 'Link Road'],
+            societies: ['Oberoi Springs', 'Adani Western Heights', 'Windermere Towers'],
+          },
+          'Juhu': {
+            subAreas: ['Juhu Tara Road', 'Gulmohar Road', 'JVPD Scheme'],
+            societies: ['Juhu Beach Apartments', 'Ruia Park', 'Sea Face Enclave'],
+          },
+        },
+      },
+      'Pune': {
+        areas: {
+          'Koregaon Park': {
+            subAreas: ['North Main Road', 'South Main Road', 'Lane 7'],
+            societies: ['Vascon Windermere', 'Marvel Basilo', 'Gera Song of Joy'],
+          },
+          'Hinjawadi': {
+            subAreas: ['Phase 1 Tech Park', 'Phase 2', 'Phase 3 Circle'],
+            societies: ['Megapolis Mystic', 'Kolte Patil Life Republic', 'Godrej 24'],
+          },
+        },
+      },
+    },
+  },
+  'Karnataka': {
+    cities: {
+      'Bengaluru': {
+        areas: {
+          'Whitefield': {
+            subAreas: ['ITPL Main Road', 'Hope Farm Junction', 'EPIP Zone', 'Kadugodi'],
+            societies: ['Prestige Shantiniketan', 'Brigade Cosmopolis', 'Sobha Rose', 'Divyasree Republic'],
+          },
+          'Koramangala': {
+            subAreas: ['3rd Block', '4th Block 100ft Road', '5th Block Sony World', '6th Block'],
+            societies: ['Raheja Residency', 'Adarsh Palm Retreat', 'Koramangala Enclave'],
+          },
+          'Indiranagar': {
+            subAreas: ['100ft Road', '12th Main', 'Defense Colony', 'HAL 2nd Stage'],
+            societies: ['Indiranagar Heights', 'Defense Colony Villas', 'HM Symphony'],
+          },
+        },
+      },
+    },
+  },
+  'Delhi NCR': {
+    cities: {
+      'New Delhi': {
+        areas: {
+          'South Delhi': {
+            subAreas: ['Greater Kailash 1', 'Greater Kailash 2', 'Hauz Khas', 'Defence Colony'],
+            societies: ['GK Enclave', 'DLF King\'s Court', 'Vasant Enclave', 'Def Col Villas'],
+          },
+          'Central Delhi': {
+            subAreas: ['Connaught Place', 'Chanakyapuri', 'Barakhamba Road', 'Golf Links'],
+            societies: ['Golf Links Residence', 'Jor Bagh Mansions', 'Central Court'],
+          },
+        },
+      },
+      'Gurugram': {
+        areas: {
+          'Golf Course Road': {
+            subAreas: ['Sector 42', 'Sector 54', 'Sector 53'],
+            societies: ['DLF The Camellias', 'DLF The Magnolias', 'DLF The Aralias', 'Belvedere Park'],
+          },
+        },
+      },
+    },
+  },
+};
 
 export default function NewPropertyWizardPage() {
   const { isAuthenticated, isLoading: isAuthLoading, openAuthModal } = useAuth();
@@ -185,18 +379,107 @@ export default function NewPropertyWizardPage() {
     state: 'Uttar Pradesh',
     district: 'Lucknow',
     city: 'Lucknow',
-    locality: '',
+    locationArea: 'Gomti Nagar',
+    subArea: 'Gomti Nagar Extension',
+    society: '',
+    locality: 'Gomti Nagar Extension',
     landmark: '',
     pincode: '226010',
 
     // Step 5: Amenities
     amenities: ['24/7 Gated Security & CCTV', '100% Power Backup', 'Covered Car Parking'] as string[],
 
-    // Step 6: Photos
+    // Step 6: Photos & Video
     uploadedImages: [] as string[],
+    videoUrl: '',
+    isReelFormat: true,
   });
 
   const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+  // Location Hierarchy Custom Inputs & Options
+  const [customCity, setCustomCity] = React.useState('');
+  const [showAddCustomCity, setShowAddCustomCity] = React.useState(false);
+  const [customArea, setCustomArea] = React.useState('');
+  const [showAddCustomArea, setShowAddCustomArea] = React.useState(false);
+  const [customSubArea, setCustomSubArea] = React.useState('');
+  const [showAddCustomSubArea, setShowAddCustomSubArea] = React.useState(false);
+  const [customSociety, setCustomSociety] = React.useState('');
+  const [showAddCustomSociety, setShowAddCustomSociety] = React.useState(false);
+
+  const stateOptions = React.useMemo(() => Object.keys(LOCATION_HIERARCHY_DATA), []);
+
+  const cityOptions = React.useMemo(() => {
+    const st = LOCATION_HIERARCHY_DATA[formData.state];
+    return st?.cities ? Object.keys(st.cities) : ['Lucknow', 'Ahmedabad', 'Mumbai', 'Bengaluru', 'New Delhi'];
+  }, [formData.state]);
+
+  const areaOptions = React.useMemo(() => {
+    const cityData = LOCATION_HIERARCHY_DATA[formData.state]?.cities[formData.city];
+    return cityData ? Object.keys(cityData.areas) : ['Gomti Nagar', 'Hazratganj', 'Satellite', 'Bandra West'];
+  }, [formData.state, formData.city]);
+
+  const subAreaOptions = React.useMemo(() => {
+    const areaData = LOCATION_HIERARCHY_DATA[formData.state]?.cities[formData.city]?.areas[formData.locationArea];
+    return areaData?.subAreas || [];
+  }, [formData.state, formData.city, formData.locationArea]);
+
+  const societyOptions = React.useMemo(() => {
+    const areaData = LOCATION_HIERARCHY_DATA[formData.state]?.cities[formData.city]?.areas[formData.locationArea];
+    return areaData?.societies || [];
+  }, [formData.state, formData.city, formData.locationArea]);
+
+  const handleAddCustomArea = async () => {
+    if (!customArea.trim()) return;
+    const name = customArea.trim();
+    setFormData((prev) => ({ ...prev, locationArea: name, locality: name }));
+    setShowAddCustomArea(false);
+    setCustomArea('');
+    try {
+      await addCustomLocation({
+        name,
+        type: 'AREA',
+        cityName: formData.city,
+        stateName: formData.state,
+      });
+      toast.success('Custom Area Added', `"${name}" added and selected.`);
+    } catch (_) {}
+  };
+
+  const handleAddCustomSubArea = async () => {
+    if (!customSubArea.trim()) return;
+    const name = customSubArea.trim();
+    setFormData((prev) => ({ ...prev, subArea: name }));
+    setShowAddCustomSubArea(false);
+    setCustomSubArea('');
+    try {
+      await addCustomLocation({
+        name,
+        type: 'SUB_AREA',
+        cityName: formData.city,
+        stateName: formData.state,
+      });
+      toast.success('Custom Sub-area Added', `"${name}" added and selected.`);
+    } catch (_) {}
+  };
+
+  const handleAddCustomSociety = async () => {
+    if (!customSociety.trim()) return;
+    const name = customSociety.trim();
+    setFormData((prev) => ({ ...prev, society: name }));
+    setShowAddCustomSociety(false);
+    setCustomSociety('');
+    try {
+      await addCustomLocation({
+        name,
+        type: 'SOCIETY',
+        cityName: formData.city,
+        stateName: formData.state,
+      });
+      toast.success('Custom Society Added', `"${name}" added and selected.`);
+    } catch (_) {}
+  };
+
 
   // Field visibility matrix
   const visibility = React.useMemo(() => {
@@ -458,9 +741,12 @@ export default function NewPropertyWizardPage() {
       },
       location: {
         state: formData.state,
-        district: formData.district,
+        district: formData.district || formData.city,
         city: formData.city,
-        locality: formData.locality,
+        area: formData.locationArea || formData.locality,
+        subArea: formData.subArea || '',
+        society: formData.society || '',
+        locality: formData.locality || formData.subArea || formData.locationArea,
         landmark: formData.landmark || undefined,
         pincode: formData.pincode || undefined,
         coordinates: [80.9462, 26.8467],
@@ -520,7 +806,9 @@ export default function NewPropertyWizardPage() {
         thumbnailUrl: primaryImg,
         coverImage: primaryImg,
         images: formData.uploadedImages.length > 0 ? formData.uploadedImages : [primaryImg],
-        videos: [],
+        videos: formData.videoUrl ? [formData.videoUrl] : [],
+        videoUrl: formData.videoUrl || undefined,
+        isReelFormat: formData.isReelFormat,
       },
       status: 'DRAFT',
     };
@@ -1776,46 +2064,324 @@ export default function NewPropertyWizardPage() {
               />
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            {/* Dependent Structured Location Hierarchy: State -> City -> Area -> Sub-area -> Society */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* Level 1: State */}
               <div>
-                <label className="text-xs font-semibold text-casa-text-primary block mb-1.5">State</label>
-                <input
-                  type="text"
+                <label className="text-xs font-semibold text-casa-text-primary block mb-1.5">
+                  1. State *
+                </label>
+                <select
                   value={formData.state}
-                  onChange={(e) => setFormData({ ...formData, state: e.target.value })}
-                  className="w-full px-3.5 py-2.5 text-xs bg-casa-canvas border border-casa-border-light rounded-xl text-casa-text-primary"
-                />
+                  onChange={(e) => {
+                    const nextState = e.target.value;
+                    const citiesInState = LOCATION_HIERARCHY_DATA[nextState]?.cities
+                      ? Object.keys(LOCATION_HIERARCHY_DATA[nextState].cities)
+                      : [];
+                    const nextCity = citiesInState[0] || 'Lucknow';
+                    const areasInCity = LOCATION_HIERARCHY_DATA[nextState]?.cities[nextCity]?.areas
+                      ? Object.keys(LOCATION_HIERARCHY_DATA[nextState].cities[nextCity].areas)
+                      : [];
+                    const nextArea = areasInCity[0] || '';
+                    const nextSubAreas = LOCATION_HIERARCHY_DATA[nextState]?.cities[nextCity]?.areas[nextArea]?.subAreas || [];
+                    const nextSocieties = LOCATION_HIERARCHY_DATA[nextState]?.cities[nextCity]?.areas[nextArea]?.societies || [];
+
+                    setFormData({
+                      ...formData,
+                      state: nextState,
+                      city: nextCity,
+                      locationArea: nextArea,
+                      subArea: nextSubAreas[0] || '',
+                      society: nextSocieties[0] || '',
+                      locality: nextArea,
+                    });
+                  }}
+                  className="w-full px-3.5 py-2.5 text-xs bg-casa-canvas border border-casa-border-light rounded-xl text-casa-text-primary font-medium focus:outline-none focus:border-casa-brand"
+                >
+                  {stateOptions.map((st) => (
+                    <option key={st} value={st}>
+                      {st}
+                    </option>
+                  ))}
+                </select>
               </div>
 
+              {/* Level 2: City */}
               <div>
-                <label className="text-xs font-semibold text-casa-text-primary block mb-1.5">City</label>
-                <input
-                  type="text"
-                  value={formData.city}
-                  onChange={(e) => setFormData({ ...formData, city: e.target.value })}
-                  className="w-full px-3.5 py-2.5 text-xs bg-casa-canvas border border-casa-border-light rounded-xl text-casa-text-primary font-medium"
-                />
-              </div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="text-xs font-semibold text-casa-text-primary">
+                    2. City *
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setShowAddCustomCity(!showAddCustomCity)}
+                    className="text-[11px] font-semibold text-casa-brand hover:underline flex items-center gap-1 cursor-pointer"
+                  >
+                    <Plus className="w-3 h-3" />
+                    <span>{showAddCustomCity ? 'Pick from List' : '+ Add Custom City'}</span>
+                  </button>
+                </div>
 
-              <div>
-                <label className="text-xs font-semibold text-casa-text-primary block mb-1.5">Locality / Neighborhood *</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g., Gomti Nagar Extension, Sector 4"
-                  value={formData.locality}
-                  onChange={(e) => setFormData({ ...formData, locality: e.target.value })}
-                  className="w-full px-3.5 py-2.5 text-xs bg-casa-canvas border border-casa-border-light rounded-xl text-casa-text-primary font-medium"
-                />
+                {showAddCustomCity ? (
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      placeholder="Type custom city name..."
+                      value={customCity}
+                      onChange={(e) => setCustomCity(e.target.value)}
+                      className="w-full px-3.5 py-2.5 text-xs bg-casa-canvas border border-casa-brand rounded-xl text-casa-text-primary"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (customCity.trim()) {
+                          setFormData({ ...formData, city: customCity.trim() });
+                          setShowAddCustomCity(false);
+                          setCustomCity('');
+                          toast.success('City Set', `"${customCity.trim()}" selected as city.`);
+                        }
+                      }}
+                      className="px-3 py-2 bg-casa-brand text-white rounded-xl text-xs font-semibold"
+                    >
+                      Set
+                    </button>
+                  </div>
+                ) : (
+                  <select
+                    value={formData.city}
+                    onChange={(e) => {
+                      const nextCity = e.target.value;
+                      const cityData = LOCATION_HIERARCHY_DATA[formData.state]?.cities[nextCity];
+                      const areasInCity = cityData?.areas ? Object.keys(cityData.areas) : [];
+                      const nextArea = areasInCity[0] || '';
+                      const nextSubAreas = cityData?.areas[nextArea]?.subAreas || [];
+                      const nextSocieties = cityData?.areas[nextArea]?.societies || [];
+
+                      setFormData({
+                        ...formData,
+                        city: nextCity,
+                        locationArea: nextArea,
+                        subArea: nextSubAreas[0] || '',
+                        society: nextSocieties[0] || '',
+                        locality: nextArea,
+                      });
+                    }}
+                    className="w-full px-3.5 py-2.5 text-xs bg-casa-canvas border border-casa-border-light rounded-xl text-casa-text-primary font-medium focus:outline-none focus:border-casa-brand"
+                  >
+                    {cityOptions.map((c) => (
+                      <option key={c} value={c}>
+                        {c}
+                      </option>
+                    ))}
+                  </select>
+                )}
               </div>
             </div>
 
+            {/* Level 3: Area */}
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-xs font-semibold text-casa-text-primary">
+                  3. Area / Locality *
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setShowAddCustomArea(!showAddCustomArea)}
+                  className="text-[11px] font-semibold text-casa-brand hover:underline flex items-center gap-1 cursor-pointer"
+                >
+                  <Plus className="w-3 h-3" />
+                  <span>{showAddCustomArea ? 'Pick from List' : '+ Add Custom Area'}</span>
+                </button>
+              </div>
+
+              {showAddCustomArea ? (
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    placeholder="Enter custom area name (e.g. Science City, Alambagh, Jodhpur Gam)..."
+                    value={customArea}
+                    onChange={(e) => setCustomArea(e.target.value)}
+                    className="w-full px-3.5 py-2.5 text-xs bg-casa-canvas border border-casa-brand rounded-xl text-casa-text-primary"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleAddCustomArea}
+                    className="px-4 py-2 bg-casa-brand text-white rounded-xl text-xs font-semibold whitespace-nowrap cursor-pointer"
+                  >
+                    Add & Select
+                  </button>
+                </div>
+              ) : (
+                <select
+                  value={formData.locationArea}
+                  onChange={(e) => {
+                    const nextArea = e.target.value;
+                    const areaData = LOCATION_HIERARCHY_DATA[formData.state]?.cities[formData.city]?.areas[nextArea];
+                    const nextSubAreas = areaData?.subAreas || [];
+                    const nextSocieties = areaData?.societies || [];
+
+                    setFormData({
+                      ...formData,
+                      locationArea: nextArea,
+                      locality: nextArea,
+                      subArea: nextSubAreas[0] || '',
+                      society: nextSocieties[0] || '',
+                    });
+                  }}
+                  className="w-full px-3.5 py-2.5 text-xs bg-casa-canvas border border-casa-border-light rounded-xl text-casa-text-primary font-medium focus:outline-none focus:border-casa-brand"
+                >
+                  {areaOptions.map((a) => (
+                    <option key={a} value={a}>
+                      {a}
+                    </option>
+                  ))}
+                  {formData.locationArea && !areaOptions.includes(formData.locationArea) && (
+                    <option value={formData.locationArea}>{formData.locationArea} (Custom)</option>
+                  )}
+                </select>
+              )}
+            </div>
+
+            {/* Level 4 & 5: Sub-area & Society */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* Level 4: Sub-area */}
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="text-xs font-semibold text-casa-text-primary">
+                    4. Sub-area / Sector / Block
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setShowAddCustomSubArea(!showAddCustomSubArea)}
+                    className="text-[11px] font-semibold text-casa-brand hover:underline flex items-center gap-1 cursor-pointer"
+                  >
+                    <Plus className="w-3 h-3" />
+                    <span>{showAddCustomSubArea ? 'Pick from List' : '+ Add Custom Sub-area'}</span>
+                  </button>
+                </div>
+
+                {showAddCustomSubArea ? (
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      placeholder="Type custom sub-area / sector..."
+                      value={customSubArea}
+                      onChange={(e) => setCustomSubArea(e.target.value)}
+                      className="w-full px-3.5 py-2.5 text-xs bg-casa-canvas border border-casa-brand rounded-xl text-casa-text-primary"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleAddCustomSubArea}
+                      className="px-3.5 py-2 bg-casa-brand text-white rounded-xl text-xs font-semibold whitespace-nowrap cursor-pointer"
+                    >
+                      Save
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-1.5">
+                    {subAreaOptions.length > 0 ? (
+                      <select
+                        value={formData.subArea}
+                        onChange={(e) => setFormData({ ...formData, subArea: e.target.value })}
+                        className="w-full px-3.5 py-2.5 text-xs bg-casa-canvas border border-casa-border-light rounded-xl text-casa-text-primary font-medium focus:outline-none focus:border-casa-brand"
+                      >
+                        <option value="">Select Sub-area / Sector...</option>
+                        {subAreaOptions.map((sa) => (
+                          <option key={sa} value={sa}>
+                            {sa}
+                          </option>
+                        ))}
+                        {formData.subArea && !subAreaOptions.includes(formData.subArea) && (
+                          <option value={formData.subArea}>{formData.subArea} (Custom)</option>
+                        )}
+                      </select>
+                    ) : (
+                      <input
+                        type="text"
+                        placeholder="e.g. Sector 4, Extension, Block C"
+                        value={formData.subArea}
+                        onChange={(e) => setFormData({ ...formData, subArea: e.target.value })}
+                        className="w-full px-3.5 py-2.5 text-xs bg-casa-canvas border border-casa-border-light rounded-xl text-casa-text-primary"
+                      />
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Level 5: Society */}
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="text-xs font-semibold text-casa-text-primary">
+                    5. Society / Project / Complex
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setShowAddCustomSociety(!showAddCustomSociety)}
+                    className="text-[11px] font-semibold text-casa-brand hover:underline flex items-center gap-1 cursor-pointer"
+                  >
+                    <Plus className="w-3 h-3" />
+                    <span>{showAddCustomSociety ? 'Pick from List' : '+ Add Custom Society'}</span>
+                  </button>
+                </div>
+
+                {showAddCustomSociety ? (
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      placeholder="Type custom society name..."
+                      value={customSociety}
+                      onChange={(e) => setCustomSociety(e.target.value)}
+                      className="w-full px-3.5 py-2.5 text-xs bg-casa-canvas border border-casa-brand rounded-xl text-casa-text-primary"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleAddCustomSociety}
+                      className="px-3.5 py-2 bg-casa-brand text-white rounded-xl text-xs font-semibold whitespace-nowrap cursor-pointer"
+                    >
+                      Save
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-1.5">
+                    {societyOptions.length > 0 ? (
+                      <select
+                        value={formData.society}
+                        onChange={(e) => setFormData({ ...formData, society: e.target.value })}
+                        className="w-full px-3.5 py-2.5 text-xs bg-casa-canvas border border-casa-border-light rounded-xl text-casa-text-primary font-medium focus:outline-none focus:border-casa-brand"
+                      >
+                        <option value="">Select Society / Gated Project...</option>
+                        {societyOptions.map((soc) => (
+                          <option key={soc} value={soc}>
+                            {soc}
+                          </option>
+                        ))}
+                        {formData.society && !societyOptions.includes(formData.society) && (
+                          <option value={formData.society}>{formData.society} (Custom)</option>
+                        )}
+                      </select>
+                    ) : (
+                      <input
+                        type="text"
+                        placeholder="e.g. Omaxe Residency, DLF Park, Goyal Enclave"
+                        value={formData.society}
+                        onChange={(e) => setFormData({ ...formData, society: e.target.value })}
+                        className="w-full px-3.5 py-2.5 text-xs bg-casa-canvas border border-casa-border-light rounded-xl text-casa-text-primary"
+                      />
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Landmark & PIN Code */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="text-xs font-semibold text-casa-text-primary block mb-1.5">Landmark</label>
+                <label className="text-xs font-semibold text-casa-text-primary block mb-1.5">
+                  Landmark
+                </label>
                 <input
                   type="text"
-                  placeholder="e.g., Near Phoenix Palassio Mall"
+                  placeholder="e.g., Near Phoenix Palassio Mall, Opposite Metro Pillar 140"
                   value={formData.landmark}
                   onChange={(e) => setFormData({ ...formData, landmark: e.target.value })}
                   className="w-full px-3.5 py-2.5 text-xs bg-casa-canvas border border-casa-border-light rounded-xl text-casa-text-primary"
@@ -1823,7 +2389,9 @@ export default function NewPropertyWizardPage() {
               </div>
 
               <div>
-                <label className="text-xs font-semibold text-casa-text-primary block mb-1.5">PIN Code</label>
+                <label className="text-xs font-semibold text-casa-text-primary block mb-1.5">
+                  PIN Code
+                </label>
                 <input
                   type="text"
                   placeholder="e.g., 226010"
@@ -1945,6 +2513,65 @@ export default function NewPropertyWizardPage() {
                 </div>
               </div>
             )}
+
+            {/* Dedicated Property Video / 9:16 Vertical Reel Section */}
+            <div className="pt-4 border-t border-casa-border-light space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div>
+                  <h3 className="text-xs font-bold text-casa-text-primary flex items-center gap-1.5">
+                    <Video className="w-4 h-4 text-casa-brand" />
+                    <span>Property Video / 9:16 Video Reel (Optional)</span>
+                  </h3>
+                  <p className="text-[11px] text-casa-text-secondary mt-0.5">
+                    Videos tagged as 9:16 format appear prominently in the dedicated Video Property section on the CASA homepage.
+                  </p>
+                </div>
+                <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-casa-text-primary bg-casa-surface border border-casa-border-light px-3 py-1.5 rounded-xl">
+                  <input
+                    type="checkbox"
+                    checked={formData.isReelFormat}
+                    onChange={(e) => setFormData({ ...formData, isReelFormat: e.target.checked })}
+                    className="w-4 h-4 text-casa-brand rounded focus:ring-casa-brand"
+                  />
+                  <span>9:16 Reel Format</span>
+                </label>
+              </div>
+
+              <div>
+                <input
+                  type="url"
+                  placeholder="Paste YouTube Short, Instagram Reel, or MP4 video URL (e.g. https://www.youtube.com/shorts/...)"
+                  value={formData.videoUrl}
+                  onChange={(e) => setFormData({ ...formData, videoUrl: e.target.value })}
+                  className="w-full px-3.5 py-2.5 text-xs bg-casa-canvas border border-casa-border-light rounded-xl text-casa-text-primary placeholder:text-casa-text-muted focus:outline-none focus:border-casa-brand"
+                />
+              </div>
+
+              {formData.videoUrl && (
+                <div className="p-3 bg-casa-subtle/50 rounded-xl border border-casa-border-light flex items-center justify-between text-xs">
+                  <div className="flex items-center gap-2 overflow-hidden">
+                    <div className="w-7 h-7 rounded-lg bg-red-600/10 text-red-600 flex items-center justify-center flex-shrink-0">
+                      <Play className="w-3.5 h-3.5 fill-current" />
+                    </div>
+                    <span className="font-medium text-casa-text-primary truncate max-w-sm">
+                      {formData.videoUrl}
+                    </span>
+                    {formData.isReelFormat && (
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-casa-brand/10 text-casa-brand">
+                        9:16 Reel
+                      </span>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setFormData({ ...formData, videoUrl: '' })}
+                    className="text-red-500 hover:text-red-700 text-xs font-semibold flex-shrink-0 cursor-pointer"
+                  >
+                    Remove
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         )}
 

@@ -3,6 +3,7 @@ import {
   Get,
   Patch,
   Post,
+  Delete,
   Body,
   Param,
   UseGuards,
@@ -94,6 +95,68 @@ export class AgentsController {
     @Body() dto: UploadDocumentDto,
   ) {
     return this.agentsService.uploadDocument(user, dto);
+  }
+
+  // ==========================================
+  // BROKER AGENCY & BROKER TEAM ENDPOINTS (Requirement 5)
+  // ==========================================
+
+  @Get('team')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'List all broker agents under the current agency/broker' })
+  @ApiResponse({ status: 200, description: 'Team members returned' })
+  getAgencyTeamMembers(@CurrentUser() user: AuthenticatedUser) {
+    return this.agentsService.getAgencyTeamMembers(user);
+  }
+
+  @Post('team')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Add a new broker agent to the current agency' })
+  @ApiResponse({ status: 201, description: 'Team member added' })
+  addAgencyTeamMember(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body()
+    dto: {
+      name: string;
+      mobile: string;
+      email?: string;
+      assignedProperties?: string[];
+      permissions?: string[];
+    },
+  ) {
+    return this.agentsService.addAgencyTeamMember(user, dto);
+  }
+
+  @Patch('team/:id')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Update permissions and assigned properties of an agent' })
+  @ApiResponse({ status: 200, description: 'Team member updated' })
+  updateAgencyTeamMember(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+    @Body()
+    dto: {
+      assignedProperties?: string[];
+      permissions?: string[];
+      status?: string;
+    },
+  ) {
+    return this.agentsService.updateAgencyTeamMember(user, id, dto);
+  }
+
+  @Delete('team/:id')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Remove or unlink an agent from the agency' })
+  @ApiResponse({ status: 200, description: 'Team member removed' })
+  removeAgencyTeamMember(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+  ) {
+    return this.agentsService.removeAgencyTeamMember(user, id);
   }
 
   @Get(':slug')

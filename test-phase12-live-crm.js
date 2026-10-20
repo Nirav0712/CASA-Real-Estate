@@ -102,7 +102,7 @@ async function runPhase12TestSuite() {
     }
 
     // 2. Authenticate Users
-    const adminAuth = await loginUser('+917359237870');
+    const adminAuth = await loginUser('9876543210');
     pass('2. Super Admin authenticated', `Role: ${adminAuth.user.role}`);
 
     let agentAAuth = await loginUser('+919870033882');

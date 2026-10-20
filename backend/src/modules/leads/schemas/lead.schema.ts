@@ -102,6 +102,33 @@ export class Lead {
   propertyId: string;
 
   @Prop({ index: true })
+  propertyTitle?: string;
+
+  @Prop({ index: true })
+  propertySlug?: string;
+
+  @Prop()
+  propertyUrl?: string;
+
+  @Prop()
+  propertyImage?: string;
+
+  @Prop()
+  propertyPrice?: number;
+
+  @Prop()
+  propertyLocation?: string;
+
+  @Prop()
+  propertyAdvertiserName?: string;
+
+  @Prop()
+  propertyAdvertiserPhone?: string;
+
+  @Prop()
+  propertyAgencyName?: string;
+
+  @Prop({ index: true })
   agentId?: string;
 
   @Prop({ index: true })
@@ -199,6 +226,23 @@ export class Lead {
 
   @Prop()
   lostReason?: string;
+
+  @Prop({
+    type: String,
+    enum: ['PENDING', 'SENT', 'FAILED', 'MOCK_SENT', 'DISABLED'],
+    default: 'PENDING',
+    index: true,
+  })
+  whatsappStatus?: string;
+
+  @Prop()
+  whatsappError?: string;
+
+  @Prop()
+  whatsappSentAt?: Date;
+
+  @Prop()
+  whatsappDestinationNumber?: string;
 
   createdAt?: Date;
   updatedAt?: Date;

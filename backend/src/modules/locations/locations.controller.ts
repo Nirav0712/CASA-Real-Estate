@@ -1,6 +1,8 @@
 import {
   Controller,
   Get,
+  Post,
+  Body,
   Param,
   Query,
   UsePipes,
@@ -8,6 +10,7 @@ import {
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { LocationsService } from './locations.service';
+import { LocationType } from './enums/location-type.enum';
 import {
   QueryLocationDto,
   AutocompleteLocationDto,
@@ -19,6 +22,18 @@ import {
 @UsePipes(new ValidationPipe({ transform: true, whitelist: true }))
 export class LocationsController {
   constructor(private readonly locationsService: LocationsService) {}
+
+  @Post('add-custom')
+  @ApiOperation({ summary: 'Add custom area, sub-area, or society' })
+  async addCustomLocation(
+    @Body() body: { name: string; type: LocationType; parentId?: string; cityName?: string; stateName?: string },
+  ) {
+    const data = await this.locationsService.addCustomLocation(body);
+    return {
+      success: true,
+      data,
+    };
+  }
 
   @Get()
   @ApiOperation({ summary: 'List and filter active locations' })

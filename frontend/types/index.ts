@@ -2,8 +2,10 @@ export type PlatformRole = 'SUPER_ADMIN' | 'ADMIN' | 'MODERATOR' | 'USER';
 
 export type AccountType =
   | 'DEVELOPER'
-  | 'AGENT'
+  | 'BROKER_AGENCY'
   | 'BROKER'
+  | 'BROKER_AGENT'
+  | 'AGENT'
   | 'PROPERTY_OWNER'
   | 'BUYER'
   | 'TENANT';
@@ -305,7 +307,7 @@ export interface Property {
   ownerId?: string;
   advertiserId?: string;
   title: LocalizedText;
-  description: LocalizedText;
+  description?: LocalizedText;
   category: string;
   subcategory?: string;
   listingType: ListingType;
@@ -338,6 +340,9 @@ export interface Property {
     state?: string;
     district?: string;
     city?: string;
+    area?: string;
+    subArea?: string;
+    society?: string;
     locality: string;
     landmark?: string;
     pincode?: string;
@@ -351,6 +356,7 @@ export interface Property {
     images: string[];
     videos?: string[];
     videoUrl?: string;
+    isReelFormat?: boolean;
     videoType?: 'YOUTUBE' | 'LOCAL' | 'EMBED';
     videoThumbnail?: string;
     primaryMediaType?: 'IMAGE' | 'VIDEO';
@@ -439,6 +445,10 @@ export interface SearchPropertiesParams {
   state?: string;
   district?: string;
   city?: string;
+  area?: string;
+  subArea?: string;
+  society?: string;
+  hasVideo?: boolean | string;
   locality?: string;
   pincode?: string;
   locationId?: string;
@@ -528,7 +538,10 @@ export interface LocationAutocompleteItem {
 export type AgentVerificationStatus = 'NOT_SUBMITTED' | 'PENDING' | 'VERIFIED' | 'REJECTED';
 
 export type AgentDocumentType =
+  | 'GST_CERTIFICATE'
+  | 'UDYAM_CERTIFICATE'
   | 'RERA_CERTIFICATE'
+  | 'AADHAAR_CARD'
   | 'AGENCY_LICENSE'
   | 'IDENTITY_DOCUMENT'
   | 'ADDRESS_PROOF'
@@ -543,6 +556,9 @@ export interface AgentDocument {
   userId: string;
   documentType: AgentDocumentType;
   documentUrl: string;
+  frontDocumentUrl?: string;
+  backDocumentUrl?: string;
+  accountType?: string;
   documentName: string;
   mimeType?: string;
   fileSize?: number;

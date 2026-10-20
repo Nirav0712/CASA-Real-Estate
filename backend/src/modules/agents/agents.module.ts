@@ -12,6 +12,7 @@ import { Property, PropertySchema } from '../properties/schemas/property.schema'
 import { Lead, LeadSchema } from '../leads/schemas/lead.schema';
 import { AuditLog, AuditLogSchema } from '../admin/schemas/audit-log.schema';
 import { AuthModule } from '../auth/auth.module';
+import { LeadsModule } from '../leads/leads.module';
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { AuthModule } from '../auth/auth.module';
       { name: AuditLog.name, schema: AuditLogSchema },
     ]),
     AuthModule,
+    LeadsModule,
   ],
   controllers: [AgentsController],
   providers: [AgentsService],

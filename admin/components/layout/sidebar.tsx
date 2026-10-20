@@ -17,6 +17,7 @@ import {
   Users,
   UserCheck,
   User,
+  ShieldCheck,
   MessageSquare,
   CreditCard,
   Receipt,
@@ -60,19 +61,20 @@ export function AdminSidebar() {
     {
       label: 'PROPERTY MANAGEMENT',
       items: [
-        { label: 'All Properties', href: '/properties', icon: Home },
-        { label: 'Pending Approvals', href: '/moderation', icon: CheckSquare, badge: '3' },
-        { label: 'Property Reports', href: '/reports', icon: ShieldAlert },
-        { label: 'Categories', href: '/categories', icon: Layers },
-        { label: 'Locations', href: '/locations', icon: MapPin },
+        { label: 'All Properties', href: '/properties', icon: Home, active: pathname?.startsWith('/properties') },
+        { label: 'Pending Approvals', href: '/moderation', icon: CheckSquare, badge: '3', active: pathname?.startsWith('/moderation') },
+        { label: 'Property Reports', href: '/reports', icon: ShieldAlert, active: pathname?.startsWith('/reports') },
+        { label: 'Categories', href: '/categories', icon: Layers, active: pathname?.startsWith('/categories') },
+        { label: 'Locations', href: '/locations', icon: MapPin, active: pathname?.startsWith('/locations') },
       ],
     },
     {
       label: 'USER MANAGEMENT',
       items: [
-        { label: 'All Users', href: '/users', icon: Users },
-        { label: 'Agents & Verification', href: '/agents', icon: UserCheck },
-        { label: 'Purchasers', href: '/purchasers', icon: User },
+        { label: 'All Users', href: '/users', icon: Users, active: pathname?.startsWith('/users') },
+        { label: 'KYC & Verification', href: '/kyc', icon: ShieldCheck, active: pathname?.startsWith('/kyc') },
+        { label: 'Agents & Badges', href: '/agents', icon: UserCheck, active: pathname?.startsWith('/agents') },
+        { label: 'Purchasers', href: '/purchasers', icon: User, active: pathname?.startsWith('/purchasers') },
       ],
     },
     {

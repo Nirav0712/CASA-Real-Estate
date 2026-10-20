@@ -120,7 +120,7 @@ export class PropertiesController {
   @ApiOperation({ summary: 'List all properties owned by currently authenticated user' })
   @ApiResponse({ status: 200, description: 'List of owned properties' })
   findMyProperties(@CurrentUser() user: AuthenticatedUser) {
-    return this.propertiesService.findMyProperties(user.id);
+    return this.propertiesService.findMyProperties(user.id, user);
   }
 
   @Get('user/my/:id')

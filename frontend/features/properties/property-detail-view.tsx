@@ -199,7 +199,7 @@ export function PropertyDetailView({
     property.title[locale] || property.title.en || 'Property Details';
 
   const localizedDescription =
-    property.description[locale] || property.description.en || '';
+    property.description?.[locale] || property.description?.en || '';
 
   const localizedCategory = getCategoryLabel(property.category, locale);
 
@@ -403,22 +403,35 @@ export function PropertyDetailView({
 
   const handleLeadSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!leadForm.name || !leadForm.mobile) {
-      toast.error('Validation Error', 'Please provide your name and mobile number.');
+    const cleanName = leadForm.name.trim();
+    const rawMobile = leadForm.mobile.trim().replace(/[\s\-\(\)]/g, '');
+
+    if (!cleanName || cleanName.length < 2) {
+      toast.error('Validation Error', 'Full Name is required (minimum 2 characters).');
       return;
     }
+
+    const digitsOnly = rawMobile.replace(/^\+/, '');
+    if (!rawMobile || digitsOnly.length < 10 || digitsOnly.length > 13) {
+      toast.error('Validation Error', 'Please enter a valid 10-digit mobile number.');
+      return;
+    }
+
     setIsSubmittingLead(true);
     try {
       await createLead({
-        propertyId: property.id,
-        name: leadForm.name,
-        mobile: leadForm.mobile,
-        email: leadForm.email || undefined,
-        message: leadForm.message,
+        propertyId: (property as any)._id || property.id,
+        name: cleanName,
+        mobile: rawMobile,
+        email: leadForm.email?.trim() || undefined,
+        message: leadForm.message?.trim() || 'I am interested in this property. Please contact me.',
         source: 'PROPERTY_PAGE',
       });
       setLeadSubmitted(true);
-      toast.success('Enquiry Sent', 'Your enquiry has been delivered to the property advertiser.');
+      toast.success(
+        'Enquiry Sent via WhatsApp & CRM',
+        'Your enquiry has been dispatched directly to our WhatsApp team (+917069754589) and the verified advertiser.',
+      );
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Could not send enquiry.';
       toast.error('Enquiry Failed', msg);
@@ -739,7 +752,16 @@ export function PropertyDetailView({
                   <div className="flex items-center gap-1.5 text-sm text-casa-text-secondary">
                     <MapPin className="w-4 h-4 text-casa-brand flex-shrink-0" />
                     <span>
-                      {property.location.locality}, {property.location.city}, {property.location.state}
+                      {[
+                        property.location.society,
+                        property.location.subArea,
+                        property.location.area || property.location.locality,
+                        property.location.city,
+                        property.location.state,
+                      ]
+                        .filter(Boolean)
+                        .filter((v, i, a) => a.indexOf(v) === i)
+                        .join(', ')}
                     </span>
                   </div>
                 </div>

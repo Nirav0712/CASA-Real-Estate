@@ -21,17 +21,15 @@ export function buildWhatsAppEnquiryUrl({
   propertyId,
   category,
   location,
-}: WhatsAppEnquiryParams): string | null {
-  if (!phone || typeof phone !== 'string') {
-    return null;
-  }
+}: WhatsAppEnquiryParams): string {
+  const targetPhone = phone && phone.trim() ? phone : (process.env.NEXT_PUBLIC_WHATSAPP_LEAD_DESTINATION_NUMBER || '917069754589');
 
   // Remove any non-numeric characters except leading plus if any
-  const cleanedDigits = phone.replace(/[^0-9]/g, '');
+  const cleanedDigits = targetPhone.replace(/[^0-9]/g, '');
 
   // Must have a valid phone number length (at least 10 digits)
   if (cleanedDigits.length < 10) {
-    return null;
+    return 'https://wa.me/917069754589';
   }
 
   // Ensure international format (if 10 digits in Indian context, prepend 91)

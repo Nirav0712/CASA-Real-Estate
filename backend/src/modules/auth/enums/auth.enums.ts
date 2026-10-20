@@ -7,8 +7,10 @@ export enum PlatformRole {
 
 export enum AccountType {
   DEVELOPER = 'DEVELOPER',
-  AGENT = 'AGENT',
+  BROKER_AGENCY = 'BROKER_AGENCY',
   BROKER = 'BROKER',
+  BROKER_AGENT = 'BROKER_AGENT',
+  AGENT = 'AGENT',
   PROPERTY_OWNER = 'PROPERTY_OWNER',
   BUYER = 'BUYER',
   TENANT = 'TENANT',
@@ -19,8 +21,10 @@ export enum UserRole {
   ADMIN = 'ADMIN',
   MODERATOR = 'MODERATOR',
   DEVELOPER = 'DEVELOPER',
-  AGENT = 'AGENT',
+  BROKER_AGENCY = 'BROKER_AGENCY',
   BROKER = 'BROKER',
+  BROKER_AGENT = 'BROKER_AGENT',
+  AGENT = 'AGENT',
   PROPERTY_OWNER = 'PROPERTY_OWNER',
   BUYER = 'BUYER',
   TENANT = 'TENANT',
@@ -84,7 +88,7 @@ export function normalizeUserRoleModel(input: {
   }
 
   // 2. Marketplace users: platformRole === USER
-  const rawAccount = input.accountType || input.role;
+  const rawAccount = (input.accountType || input.role || '').toUpperCase();
 
   if (rawAccount === 'DEVELOPER') {
     return {
@@ -94,11 +98,27 @@ export function normalizeUserRoleModel(input: {
       isVerifiedAgent,
     };
   }
+  if (rawAccount === 'BROKER_AGENCY' || rawAccount === 'AGENCY') {
+    return {
+      platformRole: PlatformRole.USER,
+      accountType: AccountType.BROKER_AGENCY,
+      role: UserRole.BROKER_AGENCY,
+      isVerifiedAgent,
+    };
+  }
   if (rawAccount === 'BROKER') {
     return {
       platformRole: PlatformRole.USER,
       accountType: AccountType.BROKER,
       role: UserRole.BROKER,
+      isVerifiedAgent,
+    };
+  }
+  if (rawAccount === 'BROKER_AGENT') {
+    return {
+      platformRole: PlatformRole.USER,
+      accountType: AccountType.BROKER_AGENT,
+      role: UserRole.BROKER_AGENT,
       isVerifiedAgent,
     };
   }

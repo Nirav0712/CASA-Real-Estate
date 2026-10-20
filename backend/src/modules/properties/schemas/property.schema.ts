@@ -105,6 +105,15 @@ export class PropertyLocation {
   @Prop({ required: true })
   locality: string;
 
+  @Prop({ index: true })
+  area?: string;
+
+  @Prop({ index: true })
+  subArea?: string;
+
+  @Prop({ index: true })
+  society?: string;
+
   @Prop()
   landmark?: string;
 
@@ -128,6 +137,15 @@ export class PropertyLocation {
 
   @Prop({ index: true })
   localityId?: string;
+
+  @Prop({ index: true })
+  areaId?: string;
+
+  @Prop({ index: true })
+  subAreaId?: string;
+
+  @Prop({ index: true })
+  societyId?: string;
 
   @Prop({ index: true })
   subLocalityId?: string;
@@ -283,6 +301,9 @@ export class PropertyMedia {
 
   @Prop()
   videoThumbnail?: string; // High-res poster/thumbnail for video
+
+  @Prop({ default: true })
+  isReelFormat?: boolean; // 9:16 vertical mobile-friendly reel format
 
   @Prop({ default: 'IMAGE' })
   primaryMediaType?: string; // IMAGE or VIDEO
@@ -809,12 +830,18 @@ PropertySchema.index({ isParentProject: 1, status: 1 });
 PropertySchema.index({ isChildUnit: 1, parentPropertyId: 1, status: 1 });
 PropertySchema.index({ 'unitDetails.floorNumber': 1, parentPropertyId: 1 });
 PropertySchema.index({ 'unitDetails.unitNumber': 1, parentPropertyId: 1 });
+PropertySchema.index({ 'location.area': 1, status: 1 });
+PropertySchema.index({ 'location.society': 1, status: 1 });
+PropertySchema.index({ 'media.videoUrl': 1, status: 1, isPublished: 1 });
 PropertySchema.index(
   {
     'title.en': 'text',
     'title.hi': 'text',
     'description.en': 'text',
     'location.locality': 'text',
+    'location.area': 'text',
+    'location.subArea': 'text',
+    'location.society': 'text',
     'location.city': 'text',
     referenceId: 'text',
     'projectDetails.projectName': 'text',
@@ -830,6 +857,9 @@ PropertySchema.index(
       'projectDetails.buildingName': 6,
       'unitDetails.unitNumber': 8,
       'location.locality': 6,
+      'location.area': 6,
+      'location.subArea': 5,
+      'location.society': 7,
       'location.city': 5,
       referenceId: 8,
       'description.en': 2,
