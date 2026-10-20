@@ -27,7 +27,7 @@ export default function TenantDashboardPage() {
     <RoleGuard
       allowedRoles={['TENANT', 'BUYER', 'PURCHASER', 'ADMIN', 'SUPER_ADMIN']}
       dashboardName="Tenant Rental Portal"
-      loginPrompt="Sign in to your CASA Tenant account to search verified rental flats, track tenancy enquiries, and book apartment visits."
+      loginPrompt="Sign in to your myproperty Tenant account to search verified rental flats, track tenancy enquiries, and book apartment visits."
     >
       <div className="min-h-screen bg-casa-canvas py-8 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto space-y-8 text-start">
         {/* Header Banner */}

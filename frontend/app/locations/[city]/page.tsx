@@ -86,7 +86,7 @@ export async function generateMetadata({ params }: CityPageProps): Promise<Metad
       description,
       url: canonicalUrl,
       type: 'website',
-      siteName: 'CASA Real Estate Marketplace',
+      siteName: 'myproperty Marketplace',
       images: [
         {
           url: 'https://casa-real-estate-mocha.vercel.app/og-image.jpg',

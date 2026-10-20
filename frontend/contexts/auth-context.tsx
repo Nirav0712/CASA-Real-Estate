@@ -202,7 +202,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setIsAuthModalOpen(false);
         const roleLabel = res.user.role ? ` (${res.user.role.replace('_', ' ')})` : '';
         toast.success(
-          'Welcome to CASA',
+          'Welcome to myproperty',
           `Signed in as ${res.user.name || res.user.email || res.user.normalizedMobile}${roleLabel}`,
         );
       } catch (err: unknown) {
@@ -231,7 +231,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setIsAuthModalOpen(false);
           toast.success(
             'Account Created',
-            `Welcome to CASA, ${(res as any).user.name || (res as any).user.email}!`,
+            `Welcome to myproperty, ${(res as any).user.name || (res as any).user.email}!`,
           );
         } else {
           setIsAuthModalOpen(false);
@@ -292,7 +292,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setIsAuthModalOpen(false);
         const roleLabel = res.user.role ? ` (${res.user.role.replace('_', ' ')})` : '';
         toast.success(
-          'Welcome to CASA',
+          'Welcome to myproperty',
           `Signed in as ${res.user.name || res.user.normalizedMobile}${roleLabel}`,
         );
 

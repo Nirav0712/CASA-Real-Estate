@@ -131,7 +131,7 @@ export class PaymentsService {
     const payment = await this.paymentModel.create({
       orderId,
       userId: user.id,
-      userName: user.name || 'CASA User',
+      userName: user.name || 'myproperty User',
       userMobile: user.mobile,
       provider: PaymentProviderType.RAZORPAY,
       providerOrderId: providerOrder.providerOrderId,

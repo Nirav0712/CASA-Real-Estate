@@ -160,12 +160,12 @@ export class MailService {
    */
   async sendVerificationEmail(to: string, name: string, token: string): Promise<SendMailResult> {
     const verificationLink = this.generateVerificationLink(to, token);
-    const from = this.configService.get<string>('mail.from') || '"CASA Real Estate" <no-reply@casarealestate.com>';
+    const from = this.configService.get<string>('mail.from') || '"myproperty" <no-reply@myproperty.com>';
     const isProduction = this.configService.get<string>('nodeEnv') === 'production';
 
-    const subject = 'Activate Your CASA Account — Verify Email';
+    const subject = 'Activate Your myproperty Account — Verify Email';
     const html = this.buildVerificationEmailTemplate(name, verificationLink);
-    const text = `Hello ${name || 'User'},\n\nThank you for joining CASA Real Estate Marketplace.\n\nPlease verify your email address by visiting this link:\n${verificationLink}\n\nThis verification link will expire in 24 hours.\n\nBest regards,\nThe CASA Team`;
+    const text = `Hello ${name || 'User'},\n\nThank you for joining myproperty Marketplace.\n\nPlease verify your email address by visiting this link:\n${verificationLink}\n\nThis verification link will expire in 24 hours.\n\nBest regards,\nThe myproperty Team`;
 
     if (this.transporter) {
       try {
@@ -207,12 +207,12 @@ export class MailService {
    */
   async sendPasswordResetEmail(to: string, name: string, token: string): Promise<SendMailResult> {
     const resetLink = this.generatePasswordResetLink(to, token);
-    const from = this.configService.get<string>('mail.from') || '"CASA Real Estate" <no-reply@casarealestate.com>';
+    const from = this.configService.get<string>('mail.from') || '"myproperty" <no-reply@myproperty.com>';
     const isProduction = this.configService.get<string>('nodeEnv') === 'production';
 
-    const subject = 'Reset Your CASA Password';
+    const subject = 'Reset Your myproperty Password';
     const html = this.buildPasswordResetEmailTemplate(name, resetLink);
-    const text = `Hello ${name || 'User'},\n\nWe received a request to reset your password for CASA Real Estate Marketplace.\n\nReset your password by clicking this link:\n${resetLink}\n\nThis link is valid for 1 hour. If you did not make this request, please ignore this email.\n\nBest regards,\nThe CASA Security Team`;
+    const text = `Hello ${name || 'User'},\n\nWe received a request to reset your password for myproperty Marketplace.\n\nReset your password by clicking this link:\n${resetLink}\n\nThis link is valid for 1 hour. If you did not make this request, please ignore this email.\n\nBest regards,\nThe myproperty Security Team`;
 
     if (this.transporter) {
       try {
@@ -257,7 +257,7 @@ export class MailService {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Confirm Your Email - CASA Real Estate</title>
+  <title>Confirm Your Email - myproperty</title>
   <style>
     body { margin: 0; padding: 0; background-color: #f1f5f9; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; }
     .container { max-width: 580px; margin: 40px auto; background: #ffffff; border-radius: 20px; overflow: hidden; border: 1px solid #e2e8f0; box-shadow: 0 10px 25px rgba(0,0,0,0.06); }
@@ -277,12 +277,12 @@ export class MailService {
 <body>
   <div class="container">
     <div class="header">
-      <div class="logo-badge">CASA Real Estate</div>
+      <div class="logo-badge">myproperty</div>
       <h1>Confirm Your Email Address</h1>
     </div>
     <div class="content">
       <div class="greeting">Hello ${safeName},</div>
-      <p>Thank you for registering on <strong>CASA Real Estate Marketplace</strong>. To complete your registration and activate your account, please confirm your email address by clicking the button below:</p>
+      <p>Thank you for registering on <strong>myproperty Marketplace</strong>. To complete your registration and activate your account, please confirm your email address by clicking the button below:</p>
       
       <div class="button-container">
         <a href="${link}" class="button" target="_blank">Confirm Email &amp; Activate Account</a>
@@ -296,11 +296,11 @@ export class MailService {
       <p style="word-break: break-all; font-size: 13px; color: #0284c7;"><a href="${link}">${link}</a></p>
 
       <div class="notice">
-        This confirmation link will expire in <strong>24 hours</strong>. If you did not create an account on CASA Real Estate, please disregard this email.
+        This confirmation link will expire in <strong>24 hours</strong>. If you did not create an account on myproperty, please disregard this email.
       </div>
     </div>
     <div class="footer">
-      &copy; ${new Date().getFullYear()} CASA Real Estate Marketplace. All rights reserved.
+      &copy; ${new Date().getFullYear()} myproperty Marketplace. All rights reserved.
     </div>
   </div>
 </body>
@@ -315,7 +315,7 @@ export class MailService {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Reset Password - CASA Real Estate</title>
+  <title>Reset Password - myproperty</title>
   <style>
     body { margin: 0; padding: 0; background-color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; }
     .container { max-width: 580px; margin: 40px auto; background: #ffffff; border-radius: 16px; overflow: hidden; border: 1px solid #e2e8f0; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
@@ -332,11 +332,11 @@ export class MailService {
 <body>
   <div class="container">
     <div class="header">
-      <h1>CASA Security</h1>
+      <h1>myproperty Security</h1>
     </div>
     <div class="content">
       <div class="greeting">Hello, ${safeName}</div>
-      <p>We received a request to reset your password for your CASA Real Estate account. Click the button below to choose a new, secure password.</p>
+      <p>We received a request to reset your password for your myproperty account. Click the button below to choose a new, secure password.</p>
       <div class="button-container">
         <a href="${link}" class="button" target="_blank">Reset Password</a>
       </div>
@@ -347,7 +347,7 @@ export class MailService {
       </div>
     </div>
     <div class="footer">
-      &copy; ${new Date().getFullYear()} CASA Real Estate Marketplace. Security &amp; Trust.
+      &copy; ${new Date().getFullYear()} myproperty Marketplace. Security &amp; Trust.
     </div>
   </div>
 </body>

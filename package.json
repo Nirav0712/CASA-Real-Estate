@@ -2,7 +2,7 @@
   "name": "casa-real-estate",
   "version": "1.0.0",
   "private": true,
-  "description": "CASA Real Estate Marketplace - Scalable Multilingual Property Platform",
+  "description": "myproperty Marketplace - Scalable Multilingual Property Platform",
   "scripts": {
     "dev:frontend": "npm --prefix frontend run dev",
     "dev:admin": "npm --prefix admin run dev",

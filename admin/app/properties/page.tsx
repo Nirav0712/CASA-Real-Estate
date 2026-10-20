@@ -375,7 +375,7 @@ export default function AdminPropertiesPage() {
 
   const handleVerifyRera = async (prop: AdminPropertyItem) => {
     try {
-      await verifyPropertyRera(prop.id, 'Verified by CASA Admin');
+      await verifyPropertyRera(prop.id, 'Verified by myproperty Admin');
       toast.success('RERA Verified', `RERA credentials for "${prop.title}" marked as Verified.`);
       setSelectedProperty((prev) =>
         prev

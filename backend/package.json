@@ -2,7 +2,7 @@
   "name": "casa-backend",
   "version": "1.0.0",
   "private": true,
-  "description": "CASA Real Estate - Modular RESTful API Gateway",
+  "description": "myproperty - Modular RESTful API Gateway",
   "scripts": {
     "build": "nest build",
     "dev": "nest start --watch",

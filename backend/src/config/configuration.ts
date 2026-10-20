@@ -63,7 +63,7 @@ export default () => {
   return {
     port: parseInt(cleanString(process.env.PORT, '5000'), 10),
     nodeEnv,
-    appName: cleanString(process.env.APP_NAME, 'CASA API Gateway'),
+    appName: cleanString(process.env.APP_NAME, 'myproperty API Gateway'),
     appPrefix: cleanPrefix(process.env.APP_PREFIX, 'api/v1'),
     cors: {
       frontendUrl,
@@ -95,7 +95,7 @@ export default () => {
       mockOtpAllowedMobile: cleanString(process.env.MOCK_OTP_ALLOWED_MOBILE),
       msg91AuthKey: cleanString(process.env.MSG91_AUTH_KEY),
       msg91TemplateId: cleanString(process.env.MSG91_TEMPLATE_ID),
-      msg91SenderId: cleanString(process.env.MSG91_SENDER_ID, 'CASARE'),
+      msg91SenderId: cleanString(process.env.MSG91_SENDER_ID, 'MYPROP'),
     },
     payments: {
       razorpayKeyId: cleanString(process.env.RAZORPAY_KEY_ID),
@@ -108,7 +108,7 @@ export default () => {
       secure: cleanString(process.env.SMTP_SECURE).toLowerCase() === 'true',
       user: cleanString(process.env.SMTP_USER),
       pass: cleanString(process.env.SMTP_PASS),
-      from: cleanString(process.env.EMAIL_FROM, '"CASA Real Estate" <no-reply@casarealestate.com>'),
+      from: cleanString(process.env.EMAIL_FROM, '"myproperty" <no-reply@myproperty.com>'),
       verificationUrl,
       passwordResetUrl,
       devLog: cleanString(process.env.EMAIL_DEV_LOG, 'true').toLowerCase() === 'true',

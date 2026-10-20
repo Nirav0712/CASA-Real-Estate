@@ -8,9 +8,19 @@ import { User } from '../auth/schemas/user.schema';
 import { BadRequestException, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { UserRole, AccountStatus } from '../auth/enums/auth.enums';
 import { LeadStatus, LeadPriority, ActivityType, FollowUpStatus, FollowUpType } from './enums/lead.enums';
+import { WhatsAppService } from './whatsapp.service';
 
 describe('LeadsService', () => {
   let service: LeadsService;
+
+  const mockWhatsAppService = {
+    dispatchPropertyLeadWhatsApp: jest.fn().mockResolvedValue({ success: true, status: 'MOCK_SENT' }),
+    sendLeadNotification: jest.fn().mockResolvedValue({ success: true, status: 'MOCK_SENT' }),
+    sendKycSubmittedNotification: jest.fn().mockResolvedValue({ success: true, status: 'MOCK_SENT' }),
+    sendKycApprovedNotification: jest.fn().mockResolvedValue({ success: true, status: 'MOCK_SENT' }),
+    sendKycRejectedNotification: jest.fn().mockResolvedValue({ success: true, status: 'MOCK_SENT' }),
+    sendPackageChangedNotification: jest.fn().mockResolvedValue({ success: true, status: 'MOCK_SENT' }),
+  };
 
   const mockProperty = {
     _id: '6ac37112546469ec17b68c44',
@@ -121,6 +131,7 @@ describe('LeadsService', () => {
         { provide: getModelToken(Property.name), useValue: mockPropertyModel },
         { provide: getModelToken(AuditLog.name), useValue: mockAuditLogModel },
         { provide: getModelToken(User.name), useValue: mockUserModel },
+        { provide: WhatsAppService, useValue: mockWhatsAppService },
       ],
     }).compile();
 

@@ -77,7 +77,7 @@ function ResetPasswordContent() {
           Set New Administrator Password
         </h1>
         <p className="text-xs text-casa-text-muted">
-          Enter your new password to restore access to the CASA Governance Portal.
+          Enter your new password to restore access to the myproperty Governance Portal.
         </p>
       </div>
 

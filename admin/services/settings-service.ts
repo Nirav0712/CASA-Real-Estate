@@ -30,15 +30,15 @@ export async function getSystemSettings(): Promise<SystemSettingsRecord> {
 
   const payload = json?.data !== undefined ? json.data : json;
   return {
-    appName: payload?.appName || 'CASA Real Estate Marketplace',
+    appName: payload?.appName || 'myproperty Marketplace',
     companySalesNumber: payload?.companySalesNumber || '+91 98765 43210',
     companyServiceNumber: payload?.companyServiceNumber || '+91 98765 43211',
-    companySalesEmail: payload?.companySalesEmail || 'sales@casarealestate.com',
-    companySupportEmail: payload?.companySupportEmail || 'support@casarealestate.com',
+    companySalesEmail: payload?.companySalesEmail || 'sales@myproperty.com',
+    companySupportEmail: payload?.companySupportEmail || 'support@myproperty.com',
     companyAddress: payload?.companyAddress || 'Vibhuti Khand, Gomti Nagar, Lucknow, UP',
     trialDays: Number(payload?.trialDays) || 3,
     smsProvider: payload?.smsProvider || 'msg91',
-    smsSenderId: payload?.smsSenderId || 'CASARE',
+    smsSenderId: payload?.smsSenderId || 'MYPROP',
     otpExpiryMinutes: Number(payload?.otpExpiryMinutes) || 5,
   };
 }

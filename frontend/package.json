@@ -2,7 +2,7 @@
   "name": "casa-frontend",
   "version": "1.0.0",
   "private": true,
-  "description": "CASA Real Estate - Public Marketplace & Consumer Portal",
+  "description": "myproperty - Public Marketplace & Consumer Portal",
   "scripts": {
     "dev": "next dev -p 3000",
     "build": "next build",

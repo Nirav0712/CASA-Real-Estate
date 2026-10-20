@@ -89,7 +89,7 @@ export default function AgentsPage() {
         await verifyAdminAgent(actionAgent.id, actionReason);
         toast.success(
           'Badge Granted',
-          `CASA Verified Agent badge awarded to ${actionAgent.name}.`,
+          `myproperty Verified Agent badge awarded to ${actionAgent.name}.`,
         );
       } else if (actionType === 'reject') {
         await rejectAdminAgent(actionAgent.id, actionReason.trim());
@@ -101,7 +101,7 @@ export default function AgentsPage() {
         await revokeAdminAgent(actionAgent.id, actionReason);
         toast.info(
           'Badge Revoked',
-          `CASA Verified Agent badge revoked for ${actionAgent.name}.`,
+          `myproperty Verified Agent badge revoked for ${actionAgent.name}.`,
         );
       }
       setActionAgent(null);
@@ -265,7 +265,7 @@ export default function AgentsPage() {
                         : 'bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-300'
                     }`}
                   >
-                    {ag.isVerifiedAgent ? 'CASA VERIFIED' : 'PENDING BADGE'}
+                    {ag.isVerifiedAgent ? 'myproperty VERIFIED' : 'PENDING BADGE'}
                   </span>
                   <span className="text-[10px] text-casa-text-muted">
                     {ag.createdAt ? new Date(ag.createdAt).toLocaleDateString() : 'Joined'}
@@ -276,7 +276,7 @@ export default function AgentsPage() {
                   <h3 className="text-base font-bold text-casa-text-primary flex items-center gap-1.5">
                     {ag.name}
                     {ag.isVerifiedAgent && (
-                      <span title="CASA Verified Agent">
+                      <span title="myproperty Verified Agent">
                         <Award className="w-4 h-4 text-emerald-600" />
                       </span>
                     )}
@@ -535,15 +535,15 @@ export default function AgentsPage() {
               )}
               <h3 className="text-base font-bold">
                 {actionType === 'verify'
-                  ? 'Grant CASA Verified Badge'
+                  ? 'Grant myproperty Verified Badge'
                   : actionType === 'reject'
                   ? 'Reject Agent Verification'
-                  : 'Revoke CASA Verified Badge'}
+                  : 'Revoke myproperty Verified Badge'}
               </h3>
             </div>
             <p className="text-xs text-casa-text-secondary">
               {actionType === 'verify'
-                ? `Grant official CASA Verified Agent status to ${actionAgent.name}. This promotes their role to VERIFIED_AGENT and attaches the verified green badge across all their listings.`
+                ? `Grant official myproperty Verified Agent status to ${actionAgent.name}. This promotes their role to VERIFIED_AGENT and attaches the verified green badge across all their listings.`
                 : actionType === 'reject'
                 ? `Reject verification for ${actionAgent.name}. A governance reason is required to notify the agent.`
                 : `Revoke verified status from ${actionAgent.name}. Their role will revert to regular AGENT and the badge will be removed.`}

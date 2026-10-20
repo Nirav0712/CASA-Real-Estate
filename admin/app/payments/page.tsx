@@ -224,7 +224,7 @@ export default function PaymentsPage() {
                       </div>
                     </td>
                     <td className="px-4 py-3.5">
-                      <div className="font-semibold text-casa-text-primary">{t.userName || 'CASA User'}</div>
+                      <div className="font-semibold text-casa-text-primary">{t.userName || 'myproperty User'}</div>
                       <div className="text-[11px] font-mono text-casa-text-muted">{t.userMobile || t.userId}</div>
                     </td>
                     <td className="px-4 py-3.5">

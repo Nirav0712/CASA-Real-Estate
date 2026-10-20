@@ -153,7 +153,7 @@ export default function AdminLoginPage() {
             <Building2 className="w-6 h-6" />
           </div>
           <h1 className="text-xl font-bold text-casa-text-primary tracking-tight">
-            CASA Governance Portal
+            myproperty Governance Portal
           </h1>
           <p className="text-xs text-casa-text-muted">
             Internal administrative operations, moderation queue & RBAC governance.
@@ -458,7 +458,7 @@ export default function AdminLoginPage() {
         </Card>
 
         <p className="text-[11px] text-center text-casa-text-muted">
-          CASA Real Estate Marketplace — Internal Governance System
+          myproperty Marketplace — Internal Governance System
         </p>
       </div>
     </div>

@@ -1,5 +1,5 @@
 /**
- * Safe WhatsApp Click-to-Chat URL Helper for CASA Real Estate
+ * Safe WhatsApp Click-to-Chat URL Helper for myproperty
  * Adheres to WhatsApp web and mobile standard schema (wa.me)
  */
 
@@ -37,7 +37,7 @@ export function buildWhatsAppEnquiryUrl({
     cleanedDigits.length === 10 ? `91${cleanedDigits}` : cleanedDigits;
 
   // Build clean and courteous inquiry text
-  let message = `Hello! I am inquiring about the listing on CASA:\n`;
+  let message = `Hello! I am inquiring about the listing on myproperty:\n`;
   message += `• Property: "${propertyTitle}"\n`;
   if (category) message += `• Category: ${category}\n`;
   if (priceText) message += `• Price: ${priceText}\n`;

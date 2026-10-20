@@ -43,7 +43,7 @@ export const SUPPORTED_LOCALES: Record<Locale, LocaleConfig> = {
 export const DICTIONARY = {
   en: {
     // Navigation
-    brand: 'CASA',
+    brand: 'myproperty',
     tagline: 'Real Estate',
     home: 'Home',
     buyProperty: 'Buy Property',
@@ -80,7 +80,7 @@ export const DICTIONARY = {
     // Sections
     browseByType: 'Explore by Property Category',
     exploreCategoriesLabel: 'Canonical Portfolio',
-    categoriesSubtitle: 'Browse all 10 standard real estate categories supported on CASA.',
+    categoriesSubtitle: 'Browse all 10 standard real estate categories supported on myproperty.',
     curatedListingsLabel: 'Handpicked Collection',
     featuredProperties: 'Featured Properties',
     verifiedBadgeNotice: '100% Moderated & Verified Listings',
@@ -95,7 +95,7 @@ export const DICTIONARY = {
     clearFilters: 'Clear Filters',
 
     // Trust & Value Section
-    trustTitle: 'Why Choose the CASA Marketplace Experience',
+    trustTitle: 'Why Choose the myproperty Marketplace Experience',
     trustSubtitle: 'Built from the ground up for transparency, verified connections, and direct communication.',
     trustPillar1Title: 'Direct Owner & Agent Listings',
     trustPillar1Desc: 'Connect directly with certified property owners and RERA-compliant agents without obscure middle layers.',
@@ -132,7 +132,7 @@ export const DICTIONARY = {
     propertyDescription: 'Description & Highlights',
     keyFeaturesAmenities: 'Amenities & Features',
     advertiserContact: 'Contact Advertiser',
-    safetyDisclaimerTitle: 'CASA Trust & Safety Notice',
+    safetyDisclaimerTitle: 'myproperty Trust & Safety Notice',
     safetyDisclaimerText: 'Always inspect the property physically and verify official registry documents before transferring booking amounts or deposits.',
     similarProperties: 'Similar Properties in this Category',
     shareListing: 'Share Listing',
@@ -144,7 +144,7 @@ export const DICTIONARY = {
     floorLevel: 'Floor Level',
 
     // Footer
-    aboutDesc: 'CASA is the next-generation open real estate marketplace for property owners, buyers, tenants, and certified brokers.',
+    aboutDesc: 'myproperty is the next-generation open real estate marketplace for property owners, buyers, tenants, and certified brokers.',
     popularCategories: 'Categories',
     platformArchitecture: 'Platform Overview',
     multilingualReach: 'Multilingual Support',
@@ -157,7 +157,7 @@ export const DICTIONARY = {
 
   hi: {
     // Navigation
-    brand: 'कासा',
+    brand: 'माईप्रॉपर्टी',
     tagline: 'रियल एस्टेट',
     home: 'होम',
     buyProperty: 'प्रॉपर्टी खरीदें',
@@ -193,7 +193,7 @@ export const DICTIONARY = {
     // Sections
     browseByType: 'श्रेणी के अनुसार संपत्तियां देखें',
     exploreCategoriesLabel: 'संपूर्ण पोर्टफोलियो',
-    categoriesSubtitle: 'कासा पर उपलब्ध सभी 10 मानक रियल एस्टेट श्रेणियों का अन्वेषण करें।',
+    categoriesSubtitle: 'माईप्रॉपर्टी पर उपलब्ध सभी 10 मानक रियल एस्टेट श्रेणियों का अन्वेषण करें।',
     curatedListingsLabel: 'चयनित संपत्तियां',
     featuredProperties: 'विशेष संपत्तियां',
     verifiedBadgeNotice: '100% मॉडरेटेड एवं सत्यापित विज्ञापन',
@@ -208,7 +208,7 @@ export const DICTIONARY = {
     clearFilters: 'फ़िल्टर हटाएं',
 
     // Trust & Value Section
-    trustTitle: 'कासा मार्केटप्लेस क्यों चुनें',
+    trustTitle: 'माईप्रॉपर्टी मार्केटप्लेस क्यों चुनें',
     trustSubtitle: 'पारदर्शिता, सत्यापित संपर्कों और सीधी बातचीत के लिए विशेष रूप से निर्मित।',
     trustPillar1Title: 'मालिकों और एजेंटों से सीधा संपर्क',
     trustPillar1Desc: 'बिना किसी अवांछित बिचौलिए के प्रमाणित संपत्ति मालिकों और पंजीकृत एजेंटों से सीधा संवाद करें।',
@@ -245,7 +245,7 @@ export const DICTIONARY = {
     propertyDescription: 'विवरण एवं मुख्य विशेषताएं',
     keyFeaturesAmenities: 'सुविधाएं एवं विशेषताएं',
     advertiserContact: 'विज्ञापनदाता से संपर्क करें',
-    safetyDisclaimerTitle: 'कासा सुरक्षा एवं विश्वास सूचना',
+    safetyDisclaimerTitle: 'माईप्रॉपर्टी सुरक्षा एवं विश्वास सूचना',
     safetyDisclaimerText: 'कोई भी अग्रिम भुगतान करने से पहले संपत्ति का प्रत्यक्ष निरीक्षण करें और कानूनी रजिस्ट्री दस्तावेजों की जांच करें।',
     similarProperties: 'इस श्रेणी में अन्य संपत्तियां',
     shareListing: 'शेयर करें',
@@ -257,7 +257,7 @@ export const DICTIONARY = {
     floorLevel: 'मंजिल',
 
     // Footer
-    aboutDesc: 'कासा संपत्ति मालिकों, खरीदारों, किरायेदारों और प्रमाणित ब्रोकर्स के लिए अगली पीढ़ी का खुला रियल एस्टेट प्लेटफॉर्म है।',
+    aboutDesc: 'माईप्रॉपर्टी संपत्ति मालिकों, खरीदारों, किरायेदारों और प्रमाणित ब्रोकर्स के लिए अगली पीढ़ी का खुला रियल एस्टेट प्लेटफॉर्म है।',
     popularCategories: 'श्रेणियाँ',
     platformArchitecture: 'प्लेटफ़ॉर्म वास्तुकला',
     multilingualReach: 'बहुभाषी समर्थन',
@@ -270,7 +270,7 @@ export const DICTIONARY = {
 
   ar: {
     // Navigation
-    brand: 'كاسا',
+    brand: 'ماي بروبرتي',
     tagline: 'العقارات الفاخرة',
     home: 'الرئيسية',
     buyProperty: 'شراء عقار',
@@ -306,7 +306,7 @@ export const DICTIONARY = {
     // Sections
     browseByType: 'استكشف حسب تصنيف العقار',
     exploreCategoriesLabel: 'التصنيفات المعتمدة',
-    categoriesSubtitle: 'تصفح جميع التصنيفات العقارية العشرة القياسية المدعومة في كاسا.',
+    categoriesSubtitle: 'تصفح جميع التصنيفات العقارية العشرة القياسية المدعومة في ماي بروبرتي.',
     curatedListingsLabel: 'مجموعة مختارة',
     featuredProperties: 'عقارات مميزة',
     verifiedBadgeNotice: 'إعلانات تم التحقق منها ومراجعتها 100%',
@@ -321,7 +321,7 @@ export const DICTIONARY = {
     clearFilters: 'مسح الفلاتر',
 
     // Trust & Value Section
-    trustTitle: 'لماذا تختار تجربة سوق كاسا العقاري',
+    trustTitle: 'لماذا تختار تجربة سوق ماي بروبرتي العقاري',
     trustSubtitle: 'صُممت المنصة من الأساس لتعزيز الشفافية والتواصل المباشر والتحقق الموثوق.',
     trustPillar1Title: 'إعلانات مباشرة من الملاك والوكلاء',
     trustPillar1Desc: 'تواصل مباشرة مع ملاك العقارات والوكلاء المرخصين دون أي وسطاء خفيين.',
@@ -358,7 +358,7 @@ export const DICTIONARY = {
     propertyDescription: 'الوصف والمميزات الرئيسية',
     keyFeaturesAmenities: 'المرافق والخدمات',
     advertiserContact: 'معلومات المعلن',
-    safetyDisclaimerTitle: 'إشعار الأمان والثقة في كاسا',
+    safetyDisclaimerTitle: 'إشعار الأمان والثقة في ماي بروبرتي',
     safetyDisclaimerText: 'يرجى معاينة العقار على أرض الواقع والتحقق من صكوك الملكية الرسمية قبل تحويل أي مبالغ أو عربون.',
     similarProperties: 'عقارات مماثلة في نفس التصنيف',
     shareListing: 'مشاركة الإعلان',
@@ -370,7 +370,7 @@ export const DICTIONARY = {
     floorLevel: 'رقم الطابق',
 
     // Footer
-    aboutDesc: 'كاسا هي المنصة العقارية الرائدة للملاك والمشترين والمستأجرين والوسطاء المعتمدين.',
+    aboutDesc: 'ماي بروبرتي هي المنصة العقارية الرائدة للملاك والمشترين والمستأجرين والوسطاء المعتمدين.',
     popularCategories: 'التصنيفات',
     platformArchitecture: 'بنية المنصة',
     multilingualReach: 'دعم اللغات',
@@ -383,7 +383,7 @@ export const DICTIONARY = {
 
   ur: {
     // Navigation
-    brand: 'کاسا',
+    brand: 'مائی پراپرٹی',
     tagline: 'ریئل اسٹیٹ',
     home: 'ہوم',
     buyProperty: 'پراپرٹی خریدیں',
@@ -419,7 +419,7 @@ export const DICTIONARY = {
     // Sections
     browseByType: 'پراپرٹی کی قسم کے لحاظ سے تلاش کریں',
     exploreCategoriesLabel: 'مکمل پورٹ فولیو',
-    categoriesSubtitle: 'کاسا پر موجود تمام 10 معیاری ریئل اسٹیٹ اقسام دریافت کریں۔',
+    categoriesSubtitle: 'مائی پراپرٹی پر موجود تمام 10 معیاری ریئل اسٹیٹ اقسام دریافت کریں۔',
     curatedListingsLabel: 'منتخب کردہ پراپرٹیز',
     featuredProperties: 'خصوصی پراپرٹیز',
     verifiedBadgeNotice: '100% تصدیق شدہ اور محفوظ اشتہارات',
@@ -434,7 +434,7 @@ export const DICTIONARY = {
     clearFilters: 'فلٹرز ختم کریں',
 
     // Trust & Value Section
-    trustTitle: 'کاسا ریئل اسٹیٹ مارکیٹ پلیس کیوں منتخب کریں',
+    trustTitle: 'مائی پراپرٹی ریئل اسٹیٹ مارکیٹ پلیس کیوں منتخب کریں',
     trustSubtitle: 'شفافیت، تصدیق شدہ رابطوں اور براہ راست بات چیت کے لیے خصوصی طور پر تیار کردہ۔',
     trustPillar1Title: 'مالکان اور ایجنٹس سے براہ راست رابطہ',
     trustPillar1Desc: 'کسی غیر ضروری واسطے کے بغیر تصدیق شدہ مالکان اور لائسنس یافتہ ایجنٹس سے رابطہ کریں۔',
@@ -471,7 +471,7 @@ export const DICTIONARY = {
     propertyDescription: 'تفصیلات اور اہم خصوصیات',
     keyFeaturesAmenities: 'سہولیات اور فیچرز',
     advertiserContact: 'اشتہار دہندہ سے رابطہ',
-    safetyDisclaimerTitle: 'کاسا تحفظ و اعتماد کی ہدایت',
+    safetyDisclaimerTitle: 'مائی پراپرٹی تحفظ و اعتماد کی ہدایت',
     safetyDisclaimerText: 'کسی بھی قسم کی پیشگی ادائیگی سے قبل پراپرٹی کا ذاتی معائنہ کریں اور سرکاری ملکیتی کاغذات کی تصدیق کریں۔',
     similarProperties: 'اس قسم کی مزید پراپرٹیز',
     shareListing: 'اشتہار شیئر کریں',
@@ -483,7 +483,7 @@ export const DICTIONARY = {
     floorLevel: 'منزل',
 
     // Footer
-    aboutDesc: 'کاسا پراپرٹی مالکان، خریداروں، کرایہ داروں اور تصدیق شدہ بروکرز کے لیے جدید ترین اوپن ریئل اسٹیٹ پلیٹ فارم ہے۔',
+    aboutDesc: 'مائی پراپرٹی پراپرٹی مالکان، خریداروں، کرایہ داروں اور تصدیق شدہ بروکرز کے لیے جدید ترین اوپن ریئل اسٹیٹ پلیٹ فارم ہے۔',
     popularCategories: 'اقسام',
     platformArchitecture: 'پلیٹ فارم کا جائزہ',
     multilingualReach: 'کثیر لسانی سپورٹ',

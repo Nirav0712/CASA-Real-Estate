@@ -111,7 +111,7 @@ export default function PurchasersPage() {
             </span>
           </div>
           <p className="text-xs md:text-sm text-casa-text-secondary mt-1">
-            Complete records of users who purchased packages or selected 3-day free trials across the CASA marketplace.
+            Complete records of users who purchased packages or selected 3-day free trials across the myproperty marketplace.
           </p>
         </div>
 

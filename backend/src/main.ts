@@ -86,8 +86,8 @@ async function bootstrap() {
 
   // OpenAPI Swagger Documentation
   const swaggerConfig = new DocumentBuilder()
-    .setTitle('CASA Real Estate API')
-    .setDescription('Modular RESTful Microservices Gateway for CASA Marketplace')
+    .setTitle('myproperty API')
+    .setDescription('Modular RESTful Microservices Gateway for myproperty Marketplace')
     .setVersion('1.0.0')
     .addBearerAuth()
     .addTag('Health', 'System health checks and status')

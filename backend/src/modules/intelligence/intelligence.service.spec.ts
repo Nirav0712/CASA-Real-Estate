@@ -120,7 +120,7 @@ describe('IntelligenceService', () => {
 
   it('should retrieve aggregated marketplace pricing intelligence without investment guarantees', async () => {
     const pricing = await service.getPricingIntelligence({ city: 'Lucknow' });
-    expect(pricing.disclaimer).toContain('CASA Marketplace Data');
+    expect(pricing.disclaimer).toContain('myproperty Marketplace Data');
     expect(pricing.city).toBe('Lucknow');
     expect(pricing.averagePrice).toBeGreaterThan(0);
     expect(pricing.priceDistribution).toBeInstanceOf(Array);

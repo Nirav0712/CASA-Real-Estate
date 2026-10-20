@@ -240,7 +240,7 @@ export default function AdminIntelligencePage() {
           </div>
 
           <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900/40 text-[11px] text-amber-800 dark:text-amber-300">
-            {pricing?.disclaimer || 'CASA Marketplace Data — Aggregated based on active listings.'}
+            {pricing?.disclaimer || 'myproperty Marketplace Data — Aggregated based on active listings.'}
           </div>
         </div>
       </div>

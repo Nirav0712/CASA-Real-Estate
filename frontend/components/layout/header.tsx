@@ -229,7 +229,7 @@ export function Header() {
                       {/* User Header Profile */}
                       <div className="px-3.5 py-2.5 border-b border-casa-border-light">
                         <span className="text-xs font-bold text-casa-text-primary block truncate">
-                          {user.name || 'CASA User'}
+                          {user.name || 'myproperty User'}
                         </span>
                         <div className="flex items-center gap-1.5 mt-0.5">
                           <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-casa-brand-subtle text-casa-brand uppercase">

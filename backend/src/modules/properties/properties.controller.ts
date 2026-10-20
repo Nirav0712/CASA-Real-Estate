@@ -137,7 +137,7 @@ export class PropertiesController {
   @UseGuards(JwtAuthGuard, PermissionsGuard)
   @RequirePermissions(Permission.PROPERTY_CREATE)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Submit a draft or rejected property listing for CASA moderation' })
+  @ApiOperation({ summary: 'Submit a draft or rejected property listing for myproperty moderation' })
   @ApiResponse({ status: 200, description: 'Property submitted for review' })
   submitProperty(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
     return this.propertiesService.submitProperty(id, user);

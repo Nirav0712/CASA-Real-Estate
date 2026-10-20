@@ -13,9 +13,9 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: 'CASA — Administrative Governance & Operations Portal',
+  title: 'myproperty — Administrative Governance & Operations Portal',
   description:
-    'Internal moderation queue, listing approvals, taxonomy configuration, user role management, and audit logging for CASA Real Estate.',
+    'Internal moderation queue, listing approvals, taxonomy configuration, user role management, and audit logging for myproperty.',
 };
 
 export default function RootLayout({

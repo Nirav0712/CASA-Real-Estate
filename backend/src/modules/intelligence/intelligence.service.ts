@@ -84,7 +84,7 @@ export class IntelligenceService {
     const limit = query?.limit ? Math.min(20, Math.max(1, query.limit)) : 6;
     let preferredCities: string[] = [];
     let preferredCategories: string[] = [];
-    let reason = 'Popular verified properties on CASA';
+    let reason = 'Popular verified properties on myproperty';
 
     if (query?.propertyId && Types.ObjectId.isValid(query.propertyId)) {
       const targetProperty = await this.propertyModel.findById(query.propertyId).lean();
@@ -336,7 +336,7 @@ export class IntelligenceService {
       {
         code: 'HOMEPAGE_30D',
         name: '30-Day Premium Homepage Featured',
-        description: 'Maximum exposure on CASA homepage and city hubs for 30 days',
+        description: 'Maximum exposure on myproperty homepage and city hubs for 30 days',
         type: PromotionType.HOMEPAGE_FEATURED,
         durationDays: 30,
         priceAmount: 1999,
@@ -444,7 +444,7 @@ export class IntelligenceService {
     };
 
     return {
-      disclaimer: 'CASA Marketplace Data — Aggregated based on verified active listings on CASA',
+      disclaimer: 'myproperty Marketplace Data — Aggregated based on verified active listings on myproperty',
       city: query.city || 'All Markets',
       category: query.category || 'All Categories',
       listingType: query.listingType || 'All Types',

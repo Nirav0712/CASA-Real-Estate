@@ -1252,7 +1252,7 @@ export class PropertiesService implements OnModuleInit {
     };
 
     const advertiserObj = dto.advertiser || {
-      name: user?.name || dto.advertiserName || 'CASA Property Owner',
+      name: user?.name || dto.advertiserName || 'myproperty Property Owner',
       phone: user?.mobile || dto.advertiserPhone || '+917359237870',
       email: user?.email,
       isVerifiedAgent: user?.isVerifiedAgent || false,
@@ -1607,11 +1607,11 @@ export class PropertiesService implements OnModuleInit {
     };
 
     await property.save();
-    this.logger.log(`📥 Property "${property.id}" submitted for CASA moderation by ${user.name || user.id}`);
+    this.logger.log(`📥 Property "${property.id}" submitted for myproperty moderation by ${user.name || user.id}`);
 
     return {
       success: true,
-      message: 'Your property has been submitted for CASA review.',
+      message: 'Your property has been submitted for myproperty review.',
       property,
     };
   }

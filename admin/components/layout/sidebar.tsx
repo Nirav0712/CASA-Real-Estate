@@ -123,7 +123,7 @@ export function AdminSidebar() {
           </div>
           <div>
             <span className="font-bold text-sm text-casa-text-primary block leading-none">
-              CASA Admin
+              myproperty Admin
             </span>
             <span className="text-[10px] text-casa-text-muted font-medium uppercase tracking-wider">
               Governance Portal

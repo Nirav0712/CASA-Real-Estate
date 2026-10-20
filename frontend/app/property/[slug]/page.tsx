@@ -20,8 +20,8 @@ export async function generateMetadata({
 
   if (!property) {
     return {
-      title: 'Property Not Found | CASA Real Estate',
-      description: 'The requested property listing was not found on CASA.',
+      title: 'Property Not Found | myproperty',
+      description: 'The requested property listing was not found on myproperty.',
     };
   }
 
@@ -35,13 +35,13 @@ export async function generateMetadata({
     property.price.currency,
   );
 
-  const title = `${localizedTitle} — ${formattedPrice} | CASA`;
+  const title = `${localizedTitle} — ${formattedPrice} | myproperty`;
 
   const description =
     (typeof property.description === 'string'
       ? property.description
       : property.description?.en) ||
-    `${property.category} for ${property.listingType.toLowerCase()} in ${property.location.locality}, ${property.location.city}. Verified by CASA.`;
+    `${property.category} for ${property.listingType.toLowerCase()} in ${property.location.locality}, ${property.location.city}. Verified by myproperty.`;
 
   const canonicalUrl = `${BASE_URL}/property/${property.slug}`;
   const imageUrl = property.media.thumbnailUrl || `${BASE_URL}/og-image.jpg`;
@@ -68,7 +68,7 @@ export async function generateMetadata({
       description,
       url: canonicalUrl,
       type: 'website',
-      siteName: 'CASA Real Estate Marketplace',
+      siteName: 'myproperty Marketplace',
       images: [
         {
           url: imageUrl,

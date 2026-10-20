@@ -235,7 +235,7 @@ export function AuthModal() {
     BUYER: 'Explore verified properties, save favorites, compare homes, and schedule site visits.',
     TENANT: 'Search verified rental homes, book apartment walk-throughs, and chat directly with owners.',
     PROPERTY_OWNER: 'List your flat, villa, plot, or commercial space for direct sale or rent.',
-    AGENT: 'List client properties, receive buyer leads, and apply for CASA RERA verification.',
+    AGENT: 'List client properties, receive buyer leads, and apply for myproperty RERA verification.',
     BROKER: 'Manage brokerage portfolio, commercial mandates, and verified commission deals.',
     DEVELOPER: 'Manage builder townships, project phases, digital floor plans, and direct buyer leads.',
   };
@@ -273,7 +273,7 @@ export function AuthModal() {
         registeredEmail
           ? 'Check Your Email'
           : mode === 'REGISTER'
-          ? 'Create Your CASA Account'
+          ? 'Create Your myproperty Account'
           : mode === 'FORGOT_PASSWORD'
           ? 'Reset Your Password'
           : 'Welcome Back — Sign In'
@@ -282,7 +282,7 @@ export function AuthModal() {
         registeredEmail
           ? 'An activation link has been dispatched to your email address.'
           : mode === 'REGISTER'
-          ? 'Join CASA Real Estate Marketplace to buy, rent, or list properties.'
+          ? 'Join myproperty Marketplace to buy, rent, or list properties.'
           : mode === 'FORGOT_PASSWORD'
           ? 'Enter your email address to receive password reset instructions.'
           : 'Sign in to access your saved properties, enquiries, and dashboard.'

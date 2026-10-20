@@ -161,7 +161,7 @@ export default function CategoriesPage() {
             </h1>
           </div>
           <p className="text-xs md:text-sm text-casa-text-secondary mt-1">
-            Create, configure, and manage property categories shown across CASA marketplace filters.
+            Create, configure, and manage property categories shown across myproperty marketplace filters.
           </p>
         </div>
 

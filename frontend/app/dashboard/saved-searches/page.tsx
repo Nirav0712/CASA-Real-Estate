@@ -141,7 +141,7 @@ export default function SavedSearchesPage() {
             </div>
             <h3 className="text-lg font-semibold text-casa-text-primary">No saved searches yet</h3>
             <p className="text-sm text-casa-text-secondary max-w-md mx-auto mt-1 mb-6">
-              When searching for properties on CASA, save your search criteria with alert notifications to never miss your dream listing.
+              When searching for properties on myproperty, save your search criteria with alert notifications to never miss your dream listing.
             </p>
             <Link href="/properties">
               <Button className="bg-casa-brand text-white hover:bg-casa-brand-hover">

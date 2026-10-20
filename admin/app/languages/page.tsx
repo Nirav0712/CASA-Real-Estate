@@ -25,7 +25,7 @@ export default function LanguagesPage() {
             </h1>
           </div>
           <p className="text-xs md:text-sm text-casa-text-secondary mt-1">
-            Translations for 4 core supported languages across CASA marketplace.
+            Translations for 4 core supported languages across myproperty marketplace.
           </p>
         </div>
       </div>

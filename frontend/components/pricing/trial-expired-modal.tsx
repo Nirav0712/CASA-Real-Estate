@@ -25,11 +25,11 @@ export function TrialExpiredModal() {
 
   const [packages, setPackages] = React.useState<PackagePlan[]>([]);
   const [settings, setSettings] = React.useState<CompanySettings>({
-    appName: 'CASA Real Estate Marketplace',
+    appName: 'myproperty Marketplace',
     companySalesNumber: '+91 98765 43210',
     companyServiceNumber: '+91 98765 43211',
-    companySalesEmail: 'sales@casarealestate.com',
-    companySupportEmail: 'support@casarealestate.com',
+    companySalesEmail: 'sales@myproperty.com',
+    companySupportEmail: 'support@myproperty.com',
     companyAddress: 'Vibhuti Khand, Gomti Nagar, Lucknow, UP',
     trialDays: 3,
   });

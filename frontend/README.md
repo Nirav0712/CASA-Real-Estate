@@ -50,7 +50,7 @@ The frontend is engineered to run **independently without requiring the backend 
 
 ## Environment Configuration (`.env.local`)
 ```env
-NEXT_PUBLIC_APP_NAME="CASA Real Estate"
+NEXT_PUBLIC_APP_NAME="myproperty"
 NEXT_PUBLIC_APP_URL="http://localhost:3000"
 NEXT_PUBLIC_API_BASE_URL="http://localhost:5000/api/v1"
 NEXT_PUBLIC_DEFAULT_LOCALE="en"

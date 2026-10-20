@@ -101,7 +101,7 @@ function VerifyEmailContent() {
               Verifying Your Administrator Credentials...
             </h2>
             <p className="text-xs text-casa-text-muted">
-              Please wait while we validate your secure token against CASA governance standards.
+              Please wait while we validate your secure token against myproperty governance standards.
             </p>
           </div>
         )}

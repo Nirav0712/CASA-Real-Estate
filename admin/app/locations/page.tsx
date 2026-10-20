@@ -1183,7 +1183,7 @@ export default function AdminLocationsPage() {
             </p>
 
             <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl text-[11px] text-amber-800 dark:text-amber-300">
-              ⚠️ If properties or child sub-locations reference this location, hard deletion will be safely blocked by CASA server governance. In such cases, consider deactivating the location instead.
+              ⚠️ If properties or child sub-locations reference this location, hard deletion will be safely blocked by myproperty server governance. In such cases, consider deactivating the location instead.
             </div>
 
             <div className="flex items-center justify-end gap-2.5 pt-2">

@@ -26,9 +26,9 @@ const arabic = Noto_Sans_Arabic({
 });
 
 export const metadata: Metadata = {
-  title: 'CASA — Real Estate Marketplace | Verified Properties, Plots & Commercial',
+  title: 'myproperty — Real Estate Marketplace | Verified Properties, Plots & Commercial',
   description:
-    'Discover, buy, and lease residential houses, luxury flats, plotting land, and commercial properties across top regional cities on CASA.',
+    'Discover, buy, and lease residential houses, luxury flats, plotting land, and commercial properties across top regional cities on myproperty.',
 };
 
 export default function RootLayout({

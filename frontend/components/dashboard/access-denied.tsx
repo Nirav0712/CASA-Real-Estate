@@ -74,7 +74,7 @@ export function AccessDenied({
           </p>
 
           <p className="text-xs text-slate-500 max-w-md mb-8">
-            If you believe you should have access to this feature, please contact your organization administrator or CASA support to update your role permissions.
+            If you believe you should have access to this feature, please contact your organization administrator or myproperty support to update your role permissions.
           </p>
 
           <div className="flex flex-wrap items-center justify-center gap-3">

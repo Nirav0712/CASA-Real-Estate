@@ -738,7 +738,7 @@ export default function UsersPage() {
                       <td className="px-4 py-3.5">
                         {u.isVerifiedAgent ? (
                           <span className="text-emerald-600 font-semibold text-[11px] flex items-center gap-1">
-                            <CheckCircle className="w-3.5 h-3.5" /> CASA Verified
+                            <CheckCircle className="w-3.5 h-3.5" /> myproperty Verified
                           </span>
                         ) : u.role === 'AGENT' ? (
                           <span className="text-amber-600 text-[11px] flex items-center gap-1">
@@ -1198,7 +1198,7 @@ export default function UsersPage() {
                       <option value="PURCHASER">Purchaser (Buyer)</option>
                       <option value="PROPERTY_OWNER">Property Owner</option>
                       <option value="AGENT">Agent (Real Estate Broker)</option>
-                      <option value="VERIFIED_AGENT">Verified Agent (CASA Badge)</option>
+                      <option value="VERIFIED_AGENT">Verified Agent (myproperty Badge)</option>
                       <option value="MODERATOR">Moderator (Listing Reviewer)</option>
                       <option value="ADMIN">Admin (Governance Operator)</option>
                     </optgroup>
@@ -1596,7 +1596,7 @@ export default function UsersPage() {
                   />
                   <span className="text-xs font-semibold text-casa-text-primary flex items-center gap-1">
                     <CheckCircle className="w-3.5 h-3.5 text-emerald-600" />
-                    CASA Verified Agent Badge
+                    myproperty Verified Agent Badge
                   </span>
                 </label>
 

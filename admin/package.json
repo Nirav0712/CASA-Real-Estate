@@ -2,7 +2,7 @@
   "name": "casa-admin",
   "version": "1.0.0",
   "private": true,
-  "description": "CASA Real Estate - Administrative Governance & Moderation Portal",
+  "description": "myproperty - Administrative Governance & Moderation Portal",
   "scripts": {
     "dev": "next dev -p 3001",
     "build": "next build",

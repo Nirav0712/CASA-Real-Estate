@@ -5,7 +5,7 @@ export type SystemSettingDocument = SystemSetting & Document;
 
 @Schema({ timestamps: true, collection: 'system_settings' })
 export class SystemSetting {
-  @Prop({ default: 'CASA Real Estate Marketplace' })
+  @Prop({ default: 'myproperty Marketplace' })
   appName: string;
 
   @Prop({ default: '+91 98765 43210' })
@@ -14,10 +14,10 @@ export class SystemSetting {
   @Prop({ default: '+91 98765 43211' })
   companyServiceNumber: string;
 
-  @Prop({ default: 'sales@casarealestate.com' })
+  @Prop({ default: 'sales@myproperty.com' })
   companySalesEmail: string;
 
-  @Prop({ default: 'support@casarealestate.com' })
+  @Prop({ default: 'support@myproperty.com' })
   companySupportEmail: string;
 
   @Prop({ default: 'Vibhuti Khand, Gomti Nagar, Lucknow, Uttar Pradesh, 226010' })
@@ -29,7 +29,7 @@ export class SystemSetting {
   @Prop({ default: 'msg91' })
   smsProvider: string;
 
-  @Prop({ default: 'CASARE' })
+  @Prop({ default: 'MYPROP' })
   smsSenderId: string;
 
   @Prop({ default: 5 })

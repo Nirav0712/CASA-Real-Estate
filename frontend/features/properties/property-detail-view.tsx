@@ -242,7 +242,7 @@ export function PropertyDetailView({
       navigator
         .share({
           title: localizedTitle,
-          text: `Check out this property on CASA: ${localizedTitle} for ${formattedPrice}`,
+          text: `Check out this property on myproperty: ${localizedTitle} for ${formattedPrice}`,
           url: window.location.href,
         })
         .catch(() => {});
@@ -1919,7 +1919,7 @@ export function PropertyDetailView({
 
                 <div className="grid grid-cols-2 gap-2 pt-2">
                   <a
-                    href={`https://api.whatsapp.com/send?text=${encodeURIComponent(`Check out ${localizedTitle} on CASA: ${shareUrl}`)}`}
+                    href={`https://api.whatsapp.com/send?text=${encodeURIComponent(`Check out ${localizedTitle} on myproperty: ${shareUrl}`)}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="p-2.5 rounded-xl border border-casa-border hover:border-emerald-500 hover:bg-emerald-500/5 flex items-center gap-2 text-xs font-medium text-casa-text-primary transition-all"
@@ -1939,7 +1939,7 @@ export function PropertyDetailView({
                   </a>
 
                   <a
-                    href={`https://twitter.com/intent/tweet?url=${encodeURIComponent(shareUrl)}&text=${encodeURIComponent(`Check out ${localizedTitle} on CASA`)}`}
+                    href={`https://twitter.com/intent/tweet?url=${encodeURIComponent(shareUrl)}&text=${encodeURIComponent(`Check out ${localizedTitle} on myproperty`)}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="p-2.5 rounded-xl border border-casa-border hover:border-sky-500 hover:bg-sky-500/5 flex items-center gap-2 text-xs font-medium text-casa-text-primary transition-all"

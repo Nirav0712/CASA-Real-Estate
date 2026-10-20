@@ -90,11 +90,11 @@ export function PlanSelectionModal() {
         <div className="text-center max-w-xl mx-auto space-y-2">
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-casa-brand-subtle text-casa-brand text-xs font-bold uppercase tracking-wider mb-1">
             <Sparkles className="w-3.5 h-3.5" />
-            <span>CASA Real Estate — Free Trial Access</span>
+            <span>myproperty — Free Trial Access</span>
           </div>
 
           <h2 className="text-2xl md:text-3xl font-extrabold text-casa-text-primary">
-            Experience CASA with a <span className="text-casa-brand">3-Day Free Trial</span>
+            Experience myproperty with a <span className="text-casa-brand">3-Day Free Trial</span>
           </h2>
 
           <p className="text-xs md:text-sm text-casa-text-secondary leading-relaxed">
@@ -172,7 +172,7 @@ export function PlanSelectionModal() {
               <div>
                 <h3 className="text-xl font-bold text-casa-text-primary flex items-center gap-2">
                   <Sparkles className="w-5 h-5 text-casa-brand" />
-                  CASA 3-Day Free Trial
+                  myproperty 3-Day Free Trial
                 </h3>
                 <p className="text-xs text-casa-text-secondary mt-0.5">
                   Complete feature suite activated upon KYC document verification.

@@ -6,7 +6,7 @@ import { FileText, Edit3, Globe } from 'lucide-react';
 
 export default function ContentCMSPage() {
   const pages = [
-    { slug: 'about-us', title: 'About CASA Real Estate', lastEdited: '2026-09-28', status: 'PUBLISHED', locale: 'en, hi, ar, ur' },
+    { slug: 'about-us', title: 'About myproperty', lastEdited: '2026-09-28', status: 'PUBLISHED', locale: 'en, hi, ar, ur' },
     { slug: 'terms-and-conditions', title: 'Terms of Service & Platform Rules', lastEdited: '2026-10-01', status: 'PUBLISHED', locale: 'en, hi' },
     { slug: 'privacy-policy', title: 'Data Privacy & GDPR Compliance', lastEdited: '2026-10-01', status: 'PUBLISHED', locale: 'en, hi' },
     { slug: 'rera-guidelines', title: 'RERA Compliance & Buyer Safety Advisory', lastEdited: '2026-09-30', status: 'PUBLISHED', locale: 'en, hi, ar, ur' },

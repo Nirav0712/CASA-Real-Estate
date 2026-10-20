@@ -29,15 +29,15 @@ export default function SettingsPage() {
   const [isSaving, setIsSaving] = React.useState(false);
 
   const [form, setForm] = React.useState<SystemSettingsRecord>({
-    appName: 'CASA Real Estate Marketplace',
+    appName: 'myproperty Marketplace',
     companySalesNumber: '+91 98765 43210',
     companyServiceNumber: '+91 98765 43211',
-    companySalesEmail: 'sales@casarealestate.com',
-    companySupportEmail: 'support@casarealestate.com',
+    companySalesEmail: 'sales@myproperty.com',
+    companySupportEmail: 'support@myproperty.com',
     companyAddress: 'Vibhuti Khand, Gomti Nagar, Lucknow, Uttar Pradesh, 226010',
     trialDays: 3,
     smsProvider: 'msg91',
-    smsSenderId: 'CASARE',
+    smsSenderId: 'MYPROP',
     otpExpiryMinutes: 5,
   });
 

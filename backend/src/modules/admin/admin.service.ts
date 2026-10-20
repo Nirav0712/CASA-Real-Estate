@@ -3016,15 +3016,15 @@ export class AdminService implements OnModuleInit {
     let settings = await this.systemSettingModel.findOne().exec();
     if (!settings) {
       settings = await this.systemSettingModel.create({
-        appName: 'CASA Real Estate Marketplace',
+        appName: 'myproperty Marketplace',
         companySalesNumber: '+91 98765 43210',
         companyServiceNumber: '+91 98765 43211',
-        companySalesEmail: 'sales@casarealestate.com',
-        companySupportEmail: 'support@casarealestate.com',
+        companySalesEmail: 'sales@myproperty.com',
+        companySupportEmail: 'support@myproperty.com',
         companyAddress: 'Vibhuti Khand, Gomti Nagar, Lucknow, Uttar Pradesh, 226010',
         trialDays: 3,
         smsProvider: 'msg91',
-        smsSenderId: 'CASARE',
+        smsSenderId: 'MYPROP',
         otpExpiryMinutes: 5,
       });
     }
@@ -3046,11 +3046,11 @@ export class AdminService implements OnModuleInit {
   async getPublicSettings() {
     const settings = await this.getSystemSettings();
     return {
-      appName: settings.appName || 'CASA Real Estate',
+      appName: settings.appName || 'myproperty',
       companySalesNumber: settings.companySalesNumber || '+91 98765 43210',
       companyServiceNumber: settings.companyServiceNumber || '+91 98765 43211',
-      companySalesEmail: settings.companySalesEmail || 'sales@casarealestate.com',
-      companySupportEmail: settings.companySupportEmail || 'support@casarealestate.com',
+      companySalesEmail: settings.companySalesEmail || 'sales@myproperty.com',
+      companySupportEmail: settings.companySupportEmail || 'support@myproperty.com',
       companyAddress: settings.companyAddress || 'Vibhuti Khand, Gomti Nagar, Lucknow, UP',
       trialDays: settings.trialDays || 3,
     };

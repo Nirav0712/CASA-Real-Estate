@@ -1,5 +1,5 @@
 /**
- * CASA Real Estate — Video Processing & Validation Utility
+ * myproperty — Video Processing & Validation Utility
  */
 
 export interface ParsedYouTubeResult {

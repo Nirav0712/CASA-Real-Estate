@@ -7,7 +7,7 @@ import { CreditCard, Check } from 'lucide-react';
 export default function SubscriptionsPage() {
   const plans = [
     { name: 'Standard Agent', price: '₹2,499 / mo', listings: '10 Active Listings', badge: false, features: ['Standard search placement', 'Direct buyer phone calls', 'Basic lead CRM'] },
-    { name: 'Featured Broker Pro', price: '₹6,999 / mo', listings: '35 Active Listings', badge: true, features: ['Top-of-search featured boost', 'CASA Verified Agent badge', 'SMS lead instant dispatch', 'Priority moderation (<2 hrs)'] },
+    { name: 'Featured Broker Pro', price: '₹6,999 / mo', listings: '35 Active Listings', badge: true, features: ['Top-of-search featured boost', 'myproperty Verified Agent badge', 'SMS lead instant dispatch', 'Priority moderation (<2 hrs)'] },
     { name: 'Developer & Enterprise', price: '₹19,999 / mo', listings: 'Unlimited Projects', badge: true, features: ['Township / Project Showcase banner', 'Dedicated Account Manager', 'Custom 3D Virtual Tour embed', 'API sync integration'] },
   ];
 
