@@ -70,7 +70,11 @@ export default function KycVerificationDashboard() {
     if (!isAuthenticated) return;
     setLoading(true);
     try {
-      const res = await getMyVerification();
+      const [verifRes] = await Promise.allSettled([
+        getMyVerification(),
+        refreshUser(),
+      ]);
+      const res = verifRes.status === 'fulfilled' ? verifRes.value : await getMyVerification();
       setVerificationData({
         kycStatus: res.kycStatus || (res.verificationStatus as any) || 'NOT_SUBMITTED',
         kycRejectionReason: res.kycRejectionReason || res.rejectionReason,
@@ -94,7 +98,7 @@ export default function KycVerificationDashboard() {
     } finally {
       setLoading(false);
     }
-  }, [isAuthenticated, user, toast, documentNumber, agencyName]);
+  }, [isAuthenticated, user, toast, documentNumber, agencyName, refreshUser]);
 
   React.useEffect(() => {
     if (isAuthenticated) {
@@ -297,30 +301,67 @@ export default function KycVerificationDashboard() {
             </div>
           </div>
 
-          {/* Trial Duration Card */}
-          {verificationData?.isTrialActive && (
-            <div className="bg-white dark:bg-gray-900 border border-emerald-200 dark:border-emerald-800 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          {/* 3-Day Free Trial Duration & Activation Status Card (Requirement 3) */}
+          <div className="bg-white dark:bg-gray-900 border border-emerald-200 dark:border-emerald-800 rounded-xl p-4 shadow-subtle space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-emerald-100 dark:border-emerald-900/60 pb-3">
               <div className="flex items-center gap-2.5">
-                <Sparkles className="w-5 h-5 text-emerald-600" />
+                <div className="p-2 bg-emerald-50 dark:bg-emerald-950 text-emerald-600 rounded-lg">
+                  <Sparkles className="w-5 h-5" />
+                </div>
                 <div>
-                  <span className="text-xs font-bold text-casa-text-primary block">
-                    3-Day Free Trial Active
-                  </span>
-                  <span className="text-[11px] text-casa-text-muted">
-                    Trial Expires on:{' '}
-                    <strong>
-                      {verificationData.trialExpiresAt
-                        ? new Date(verificationData.trialExpiresAt).toLocaleDateString()
-                        : 'In 3 Days'}
-                    </strong>
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-bold text-casa-text-primary">
+                      3-Day Free Trial
+                    </span>
+                    <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-200 border border-emerald-300 dark:border-emerald-700">
+                      Account Status: Active
+                    </span>
+                  </div>
+                  <p className="text-xs text-casa-text-muted mt-0.5">
+                    Your trial includes full access to property listings and buyer lead discovery.
+                  </p>
                 </div>
               </div>
-              <span className="text-xs font-bold bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-200 px-3 py-1 rounded-full self-start sm:self-auto">
-                {trialRemainingDays} Day{trialRemainingDays !== 1 ? 's' : ''} Remaining
+              <span className="text-xs font-bold bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-200 px-3.5 py-1.5 rounded-full self-start sm:self-auto border border-emerald-300 dark:border-emerald-700">
+                {trialRemainingDays > 0 ? `${trialRemainingDays} Day${trialRemainingDays !== 1 ? 's' : ''} Remaining` : 'Trial Active'}
               </span>
             </div>
-          )}
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+              <div className="bg-slate-50 dark:bg-slate-800/60 p-3 rounded-xl border border-slate-200 dark:border-slate-700 space-y-1">
+                <span className="text-[10px] font-semibold text-casa-text-muted uppercase tracking-wider block">
+                  Trial Start Date
+                </span>
+                <span className="font-bold text-casa-text-primary text-sm">
+                  {verificationData?.trialStartedAt
+                    ? new Date(verificationData.trialStartedAt).toLocaleDateString('en-IN', {
+                        day: 'numeric',
+                        month: 'short',
+                        year: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })
+                    : 'Upon Verification Approval'}
+                </span>
+              </div>
+              <div className="bg-slate-50 dark:bg-slate-800/60 p-3 rounded-xl border border-slate-200 dark:border-slate-700 space-y-1">
+                <span className="text-[10px] font-semibold text-casa-text-muted uppercase tracking-wider block">
+                  Trial Expiry Date
+                </span>
+                <span className="font-bold text-casa-text-primary text-sm">
+                  {verificationData?.trialExpiresAt
+                    ? new Date(verificationData.trialExpiresAt).toLocaleDateString('en-IN', {
+                        day: 'numeric',
+                        month: 'short',
+                        year: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })
+                    : 'In 3 Days'}
+                </span>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 

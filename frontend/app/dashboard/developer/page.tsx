@@ -6,6 +6,7 @@ import { useAuth } from '@/contexts/auth-context';
 import { RoleGuard } from '@/components/auth/role-guard';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { KycStatusBanner } from '@/components/dashboard/kyc-status-banner';
 import {
   Building2,
   PlusCircle,
@@ -59,6 +60,9 @@ export default function DeveloperDashboardPage() {
             </div>
           </div>
         </div>
+
+        {/* KYC Verification & Account Activation Status Banner */}
+        <KycStatusBanner />
 
         {/* Quick KPI Stats */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

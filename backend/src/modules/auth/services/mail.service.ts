@@ -6,6 +6,7 @@ export interface SendMailResult {
   success: boolean;
   messageId?: string;
   isMock?: boolean;
+  error?: string;
 }
 
 function cleanUrl(val?: string, defaultVal = ''): string {
@@ -352,5 +353,72 @@ export class MailService {
   </div>
 </body>
 </html>`;
+  }
+
+  /**
+   * Dispatches KYC Approval Email only if properly configured
+   */
+  async sendKycApprovedEmail(to: string, name: string, trialExpiresAt?: Date): Promise<SendMailResult> {
+    const from = this.configService.get<string>('mail.from') || '"myproperty" <no-reply@myproperty.com>';
+
+    const expiryStr = trialExpiresAt
+      ? trialExpiresAt.toLocaleDateString('en-IN', {
+          dateStyle: 'full',
+          timeZone: 'Asia/Kolkata',
+        })
+      : 'in 3 days';
+
+    const subject = 'Congratulations! Your myproperty KYC Verification is Approved';
+    const text = `Hello ${name || 'User'},\n\nYour KYC verification application has been approved by the Super Admin.\n\nYour 3-Day Free Trial is now active until: ${expiryStr}.\n\nYou can access your dashboard and publish listings at: ${cleanUrl(this.configService.get<string>('cors.frontendUrl'), 'http://localhost:3000')}/dashboard\n\nBest regards,\nThe myproperty Compliance Team`;
+
+    if (this.transporter) {
+      try {
+        const info = await this.transporter.sendMail({
+          from,
+          to,
+          subject,
+          text,
+        });
+        this.logger.log(`📧 KYC approved email sent to ${to} (Message ID: ${info.messageId})`);
+        return { success: true, messageId: info.messageId, isMock: false };
+      } catch (err: any) {
+        this.logger.error(`SMTP KYC approved delivery failed for ${to}: ${err?.message}`);
+        return { success: false, isMock: false, error: err.message };
+      }
+    }
+
+    // SMTP not configured - log for development but do NOT fake success
+    this.logger.warn(`[SMTP UNCONFIGURED] KYC Approved email for [${to}] was not sent because SMTP is unconfigured.`);
+    return { success: false, isMock: true, error: 'SMTP delivery service is not configured' };
+  }
+
+  /**
+   * Dispatches KYC Rejection Email only if properly configured
+   */
+  async sendKycRejectedEmail(to: string, name: string, reason: string): Promise<SendMailResult> {
+    const from = this.configService.get<string>('mail.from') || '"myproperty" <no-reply@myproperty.com>';
+
+    const subject = 'myproperty KYC Verification Update — Action Required';
+    const text = `Hello ${name || 'User'},\n\nWe reviewed your KYC verification documents, but were unable to approve them due to the following reason:\n\n${reason}\n\nPlease visit your dashboard to upload corrected documents:\n${cleanUrl(this.configService.get<string>('cors.frontendUrl'), 'http://localhost:3000')}/dashboard/kyc\n\nBest regards,\nThe myproperty Compliance Team`;
+
+    if (this.transporter) {
+      try {
+        const info = await this.transporter.sendMail({
+          from,
+          to,
+          subject,
+          text,
+        });
+        this.logger.log(`📧 KYC rejection email sent to ${to} (Message ID: ${info.messageId})`);
+        return { success: true, messageId: info.messageId, isMock: false };
+      } catch (err: any) {
+        this.logger.error(`SMTP KYC rejection delivery failed for ${to}: ${err?.message}`);
+        return { success: false, isMock: false, error: err.message };
+      }
+    }
+
+    // SMTP not configured - log for development but do NOT fake success
+    this.logger.warn(`[SMTP UNCONFIGURED] KYC Rejection email for [${to}] was not sent because SMTP is unconfigured.`);
+    return { success: false, isMock: true, error: 'SMTP delivery service is not configured' };
   }
 }

@@ -8,6 +8,7 @@ import { getAgentDashboard } from '@/services/agent-service';
 import { EngagementService, AgentAnalytics } from '@/services/engagement-service';
 import { AgentDashboardData } from '@/types';
 import { formatPrice } from '@/lib/utils';
+import { KycStatusBanner } from '@/components/dashboard/kyc-status-banner';
 import {
   Building2,
   Users,
@@ -150,35 +151,8 @@ export default function AgentDashboardPage() {
         </div>
       </div>
 
-      {/* Verification Notice Banner if not verified */}
-      {!isVerified && (
-        <div className="bg-gradient-to-r from-casa-50 to-indigo-50 border border-casa-100 p-5 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <div className="flex items-start space-x-3.5">
-            <div className="p-2.5 bg-white rounded-xl shadow-xs text-casa-600 shrink-0">
-              <Sparkles className="w-6 h-6" />
-            </div>
-            <div>
-              <h3 className="font-semibold text-slate-900">
-                {verificationStatus === 'PENDING'
-                  ? 'Your RERA verification is under admin review'
-                  : 'Get the CASA Verified Agent Badge'}
-              </h3>
-              <p className="text-sm text-slate-600 mt-0.5">
-                {verificationStatus === 'PENDING'
-                  ? 'Our compliance team is auditing your RERA certificate and documents.'
-                  : 'Verified agents receive higher listing rankings, verified badges, and up to 3x more buyer enquiries.'}
-              </p>
-            </div>
-          </div>
-          <Link
-            href="/dashboard/agent/verification"
-            className="inline-flex items-center px-4 py-2 bg-white text-casa-700 text-sm font-semibold rounded-xl border border-casa-200 hover:bg-casa-50 transition shadow-xs whitespace-nowrap"
-          >
-            {verificationStatus === 'PENDING' ? 'Check Status' : 'Start Verification'}
-            <ChevronRight className="w-4 h-4 ml-1" />
-          </Link>
-        </div>
-      )}
+      {/* KYC Verification & Account Activation Status Banner */}
+      <KycStatusBanner onRefresh={loadData} />
 
       {/* KPI Metrics Grid */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">

@@ -49,6 +49,11 @@ export interface User {
   trialExpiresAt?: string | null;
   trialPackageId?: string | null;
   isTrialActive?: boolean;
+  kycStatus?: 'NOT_SUBMITTED' | 'PENDING' | 'APPROVED' | 'REJECTED' | string;
+  kycRejectionReason?: string | null;
+  kycApprovedAt?: string | null;
+  kycApprovedBy?: string | null;
+  kycDocumentType?: string | null;
 }
 
 export interface AuthTokens {
@@ -627,6 +632,12 @@ export interface AgentDashboardData {
     role: string;
     isVerifiedAgent: boolean;
     verificationStatus: AgentVerificationStatus;
+    kycStatus?: 'NOT_SUBMITTED' | 'PENDING' | 'APPROVED' | 'REJECTED' | string;
+    kycRejectionReason?: string | null;
+    kycApprovedAt?: string | null;
+    isTrialActive?: boolean;
+    trialStartedAt?: string | null;
+    trialExpiresAt?: string | null;
   };
   profile: AgentProfile | null;
   counts: {

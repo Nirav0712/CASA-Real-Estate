@@ -187,6 +187,11 @@ export class AgentsService {
       enquirySubmissions: totalLeads,
     };
 
+    const isTrialActive = Boolean(userDoc?.trialExpiresAt && new Date() <= new Date(userDoc.trialExpiresAt));
+    const kycStatus = userDoc?.kycStatus || profile.verificationStatus || 'NOT_SUBMITTED';
+    const kycRejectionReason = userDoc?.kycRejectionReason || (profile.rejectionReasons && profile.rejectionReasons[0]) || null;
+    const kycApprovedAt = userDoc?.kycApprovedAt || profile.verifiedAt || null;
+
     const agent = {
       userId: user.id,
       name: userDoc?.name || user.name || profile.displayName || 'Agent',
@@ -195,6 +200,12 @@ export class AgentsService {
       role: userDoc?.role || user.role,
       isVerifiedAgent: profile.isVerifiedAgent ?? Boolean(userDoc?.isVerifiedAgent),
       verificationStatus: profile.verificationStatus || (userDoc?.isVerifiedAgent ? 'VERIFIED' : 'NOT_SUBMITTED'),
+      kycStatus,
+      kycRejectionReason,
+      kycApprovedAt,
+      isTrialActive,
+      trialStartedAt: userDoc?.trialStartedAt || null,
+      trialExpiresAt: userDoc?.trialExpiresAt || null,
     };
 
     const formattedListings = recentProperties.map((p: any) => ({
@@ -233,6 +244,12 @@ export class AgentsService {
         agencyName: profile.agencyName,
         isVerifiedAgent: profile.isVerifiedAgent,
         verificationStatus: profile.verificationStatus,
+        kycStatus,
+        kycRejectionReason,
+        kycApprovedAt,
+        isTrialActive,
+        trialStartedAt: userDoc?.trialStartedAt || null,
+        trialExpiresAt: userDoc?.trialExpiresAt || null,
         reraNumber: profile.reraNumber,
         profileImage: profile.profileImage,
       },
@@ -347,7 +364,7 @@ export class AgentsService {
       kycStatus: userDoc?.kycStatus || profile.verificationStatus || 'NOT_SUBMITTED',
       kycRejectionReason: userDoc?.kycRejectionReason || (profile.rejectionReasons && profile.rejectionReasons[0]),
       kycApprovedAt: userDoc?.kycApprovedAt,
-      isTrialActive: userDoc?.isTrialActive || false,
+      isTrialActive: Boolean(userDoc?.isTrialActive || (userDoc?.trialExpiresAt && new Date() <= new Date(userDoc.trialExpiresAt))),
       trialStartedAt: userDoc?.trialStartedAt,
       trialExpiresAt: userDoc?.trialExpiresAt,
       accountType: userDoc?.accountType || user.accountType || user.role,

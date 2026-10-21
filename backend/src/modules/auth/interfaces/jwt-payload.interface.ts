@@ -43,6 +43,11 @@ export interface AuthenticatedUser {
   trialExpiresAt?: Date | string | null;
   trialPackageId?: string | null;
   isTrialActive?: boolean;
+  kycStatus?: string;
+  kycRejectionReason?: string | null;
+  kycApprovedAt?: Date | string | null;
+  kycApprovedBy?: string | null;
+  kycDocumentType?: string | null;
 }
 
 export interface AuthTokens {

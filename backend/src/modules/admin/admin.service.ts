@@ -5,6 +5,7 @@ import {
   ForbiddenException,
   Logger,
   OnModuleInit,
+  Optional,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, isValidObjectId } from 'mongoose';
@@ -41,6 +42,7 @@ import { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
 import { AuthService } from '../auth/auth.service';
 import { hashPassword } from '../auth/utils/password.util';
 import { WhatsAppService } from '../leads/whatsapp.service';
+import { MailService } from '../auth/services/mail.service';
 
 const INITIAL_PENDING_FIXTURES = [
   {
@@ -270,6 +272,7 @@ export class AdminService implements OnModuleInit {
     @InjectModel(Subscription.name) private readonly subscriptionModel: Model<SubscriptionDocument>,
     private readonly authService: AuthService,
     private readonly whatsappService: WhatsAppService,
+    @Optional() private readonly mailService?: MailService,
   ) {}
 
   async onModuleInit() {
@@ -2268,6 +2271,15 @@ export class AdminService implements OnModuleInit {
       this.logger.warn(`Failed to dispatch KYC approval WhatsApp: ${err.message}`);
     }
 
+    // Send Email notification (only if email is provided and service is configured)
+    if (user.email && this.mailService) {
+      try {
+        await this.mailService.sendKycApprovedEmail(user.email, user.name, user.trialExpiresAt);
+      } catch (err: any) {
+        this.logger.warn(`Failed to dispatch KYC approval email: ${err.message}`);
+      }
+    }
+
     // Record Audit Log
     await this.recordAuditLog({
       action: 'AGENT_VERIFIED',
@@ -2357,6 +2369,15 @@ export class AdminService implements OnModuleInit {
       });
     } catch (err: any) {
       this.logger.warn(`Failed to dispatch KYC rejection WhatsApp: ${err.message}`);
+    }
+
+    // Send Email notification (only if email is provided and service is configured)
+    if (user.email && this.mailService) {
+      try {
+        await this.mailService.sendKycRejectedEmail(user.email, user.name, reason.trim());
+      } catch (err: any) {
+        this.logger.warn(`Failed to dispatch KYC rejection email: ${err.message}`);
+      }
     }
 
     // Record Audit Log

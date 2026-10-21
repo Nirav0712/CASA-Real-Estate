@@ -1776,6 +1776,11 @@ export class AuthService implements OnModuleInit {
       trialExpiresAt: user.trialExpiresAt || null,
       trialPackageId: user.trialPackageId || null,
       isTrialActive: Boolean(user.trialExpiresAt && new Date() <= new Date(user.trialExpiresAt)),
+      kycStatus: user.kycStatus || 'NOT_SUBMITTED',
+      kycRejectionReason: user.kycRejectionReason || null,
+      kycApprovedAt: user.kycApprovedAt || null,
+      kycApprovedBy: user.kycApprovedBy || null,
+      kycDocumentType: user.kycDocumentType || null,
     };
   }
 }

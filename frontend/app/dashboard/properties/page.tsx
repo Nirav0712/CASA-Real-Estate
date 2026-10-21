@@ -38,6 +38,7 @@ import {
 } from 'lucide-react';
 
 import { AccessDenied } from '@/components/dashboard/access-denied';
+import { KycStatusBanner } from '@/components/dashboard/kyc-status-banner';
 
 export default function MyPropertiesPage() {
   const { user, isAuthenticated, isLoading: isAuthLoading, openAuthModal } = useAuth();
@@ -201,6 +202,9 @@ export default function MyPropertiesPage() {
           </Link>
         </div>
       </div>
+
+      {/* KYC Verification & Account Activation Status Banner */}
+      <KycStatusBanner onRefresh={loadProperties} />
 
       {/* Properties List */}
       {isLoading ? (

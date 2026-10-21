@@ -165,7 +165,7 @@ export class WhatsAppService {
    * Send WhatsApp KYC Submission Confirmation
    */
   async sendKycSubmittedNotification(payload: KycWhatsAppPayload): Promise<WhatsAppSendResult> {
-    if (!this.enabled) return { success: true, status: 'DISABLED' };
+    if (!this.enabled) return { success: false, status: 'DISABLED', error: 'WhatsApp service is disabled' };
 
     const recipient = this.formatMobileNumber(payload.customerMobile);
     const messageText =
@@ -184,7 +184,7 @@ export class WhatsAppService {
    * Send WhatsApp KYC Approved & 3-Day Trial Activation Notification
    */
   async sendKycApprovedNotification(payload: KycWhatsAppPayload): Promise<WhatsAppSendResult> {
-    if (!this.enabled) return { success: true, status: 'DISABLED' };
+    if (!this.enabled) return { success: false, status: 'DISABLED', error: 'WhatsApp service is disabled' };
 
     const recipient = this.formatMobileNumber(payload.customerMobile);
     const expiryStr = payload.trialExpiresAt
@@ -211,7 +211,7 @@ export class WhatsAppService {
    * Send WhatsApp KYC Rejection Notification
    */
   async sendKycRejectedNotification(payload: KycWhatsAppPayload): Promise<WhatsAppSendResult> {
-    if (!this.enabled) return { success: true, status: 'DISABLED' };
+    if (!this.enabled) return { success: false, status: 'DISABLED', error: 'WhatsApp service is disabled' };
 
     const recipient = this.formatMobileNumber(payload.customerMobile);
     const messageText =
@@ -230,7 +230,7 @@ export class WhatsAppService {
    * Send WhatsApp Package Assignment / Change Notification
    */
   async sendPackageChangedNotification(payload: PackageChangeWhatsAppPayload): Promise<WhatsAppSendResult> {
-    if (!this.enabled) return { success: true, status: 'DISABLED' };
+    if (!this.enabled) return { success: false, status: 'DISABLED', error: 'WhatsApp service is disabled' };
 
     const recipient = this.formatMobileNumber(payload.customerMobile);
     const expiryStr = payload.validUntil
@@ -266,26 +266,23 @@ export class WhatsAppService {
       return { success: false, status: 'FAILED', error: 'Invalid recipient mobile number' };
     }
 
-    // 1. Mock Provider (Default for development / testing)
-    if (this.provider === 'mock' || !this.accessToken || !this.phoneNumberId) {
-      this.logger.log(
-        `\n================= [WHATSAPP DISPATCH (MOCK)] =================\n` +
-        `To: ${cleanRecipient}\n` +
-        `Timestamp: ${sentAt.toISOString()}\n` +
-        `Message:\n${messageText}\n` +
-        `=============================================================\n`,
-      );
-      return {
-        success: true,
-        status: 'MOCK_SENT',
-        messageId: `mock-wa-${Date.now()}`,
-        recipient: cleanRecipient,
-        sentAt,
-      };
+    if (!this.enabled || this.provider === 'disabled') {
+      this.logger.log(`WhatsApp notifications are disabled by configuration`);
+      return { success: false, status: 'DISABLED', error: 'WhatsApp service is disabled' };
     }
 
-    // 2. Meta WhatsApp Business Cloud API
+    // 1. Meta WhatsApp Business Cloud API (Live configured delivery)
     if (this.provider === 'meta') {
+      if (!this.accessToken || !this.phoneNumberId) {
+        this.logger.warn(`Cannot send WhatsApp: Meta WhatsApp API credentials (accessToken, phoneNumberId) are unconfigured`);
+        return {
+          success: false,
+          status: 'FAILED',
+          error: 'Meta WhatsApp credentials are unconfigured',
+          recipient: cleanRecipient,
+          sentAt,
+        };
+      }
       try {
         const url = `${this.apiUrl}/${this.phoneNumberId}/messages`;
         const phoneNoDigits = cleanRecipient.replace(/^\+/, '');
@@ -343,14 +340,22 @@ export class WhatsAppService {
       }
     }
 
-    // Fallback: mock delivery if provider is unconfigured
-    this.logger.log(`WhatsApp delivered via fallback provider (${this.provider}) to ${cleanRecipient}`);
+    // Fallback: Unconfigured / Mock provider (log for local inspection, never fake live delivery)
+    this.logger.log(
+      `\n================= [WHATSAPP DISPATCH (UNCONFIGURED / MOCK)] =================\n` +
+      `To: ${cleanRecipient}\n` +
+      `Provider: ${this.provider}\n` +
+      `Timestamp: ${sentAt.toISOString()}\n` +
+      `Message:\n${messageText}\n` +
+      `============================================================================\n`,
+    );
     return {
-      success: true,
+      success: false,
       status: 'MOCK_SENT',
-      messageId: `wa-fb-${Date.now()}`,
+      messageId: `mock-wa-${Date.now()}`,
       recipient: cleanRecipient,
       sentAt,
+      error: 'Live WhatsApp delivery not configured (credentials missing or mock mode active)',
     };
   }
 }
