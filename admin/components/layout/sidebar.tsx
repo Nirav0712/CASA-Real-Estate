@@ -31,6 +31,7 @@ import {
   Sun,
   Moon,
   LogOut,
+  Video,
 } from 'lucide-react';
 
 interface NavItem {
@@ -61,7 +62,8 @@ export function AdminSidebar() {
     {
       label: 'PROPERTY MANAGEMENT',
       items: [
-        { label: 'All Properties', href: '/properties', icon: Home, active: pathname?.startsWith('/properties') },
+        { label: 'All Properties', href: '/properties', icon: Home, active: pathname === '/properties' },
+        { label: '9:16 Video Reels', href: '/reels', icon: Video, active: pathname?.startsWith('/reels') },
         { label: 'Pending Approvals', href: '/moderation', icon: CheckSquare, badge: '3', active: pathname?.startsWith('/moderation') },
         { label: 'Property Reports', href: '/reports', icon: ShieldAlert, active: pathname?.startsWith('/reports') },
         { label: 'Categories', href: '/categories', icon: Layers, active: pathname?.startsWith('/categories') },

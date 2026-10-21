@@ -643,7 +643,11 @@ export class PropertiesService implements OnModuleInit {
       }
 
       if (query.hasVideo === true || query.hasVideo === 'true') {
-        filter['media.videoUrl'] = { $exists: true, $nin: ['', null] };
+        filter.$or = [
+          { 'media.videoUrl': { $exists: true, $nin: ['', null] } },
+          { videoUrl: { $exists: true, $nin: ['', null] } },
+          { 'media.videos.0': { $exists: true, $nin: ['', null] } },
+        ];
       }
 
       if (query.type && query.type !== 'all') {
@@ -842,7 +846,18 @@ export class PropertiesService implements OnModuleInit {
       }
 
       if (dto.hasVideo) {
-        filter['media.videoUrl'] = { $exists: true, $nin: ['', null] };
+        delete filter.status;
+        delete filter.isPublished;
+        filter.$and = filter.$and || [];
+        filter.$and.push({
+          status: { $in: ['PUBLISHED', 'ACTIVE', 'PENDING_REVIEW', 'APPROVED', 'DRAFT'] },
+          $or: [
+            { 'media.videoUrl': { $exists: true, $nin: ['', null] } },
+            { videoUrl: { $exists: true, $nin: ['', null] } },
+            { 'media.videos.0': { $exists: true, $nin: ['', null] } },
+            { 'media.isReelFormat': true },
+          ],
+        });
       }
 
       // 6. Numeric Price Range

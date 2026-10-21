@@ -15,12 +15,21 @@ import {
   Video,
   ExternalLink,
   ChevronRight,
+  ChevronLeft,
   Filter,
   X,
   Sparkles,
   Maximize2,
   Volume2,
   VolumeX,
+  Phone,
+  MessageCircle,
+  Bed,
+  Bath,
+  Square,
+  ShieldCheck,
+  Info,
+  Check,
 } from 'lucide-react';
 
 const FALLBACK_VIDEO_PROPERTIES: Property[] = [
@@ -480,10 +489,11 @@ export function VideoPropertySection() {
   const [typeFilter, setTypeFilter] = React.useState('ALL');
   const [priceFilter, setPriceFilter] = React.useState('ALL');
 
-  // Preview Modal State
-  const [activeVideoModal, setActiveVideoModal] = React.useState<Property | null>(null);
+  // Preview Modal & Navigation State
+  const [activeVideoIndex, setActiveVideoIndex] = React.useState<number | null>(null);
+  const [showDetailsDrawer, setShowDetailsDrawer] = React.useState(false);
 
-  // Fetch real videos from API with fallback
+  // Fetch real videos from API with fallback & local storage sync
   React.useEffect(() => {
     let isMounted = true;
     async function loadVideos() {
@@ -491,15 +501,39 @@ export function VideoPropertySection() {
       try {
         const res = await searchProperties({
           hasVideo: true,
-          limit: 20,
+          limit: 50,
         });
-        if (isMounted && res.data && res.data.length > 0) {
-          // Merge API properties with fallback properties to ensure full dataset
-          const apiIds = new Set(res.data.map((p) => p.id));
-          const combined = [
-            ...res.data,
-            ...FALLBACK_VIDEO_PROPERTIES.filter((p) => !apiIds.has(p.id)),
-          ];
+
+        // Sync with any deleted reels stored locally
+        let deletedIds = new Set<string>();
+        try {
+          const storedDeleted = localStorage.getItem('casa_deleted_reels');
+          if (storedDeleted) {
+            deletedIds = new Set(JSON.parse(storedDeleted));
+          }
+        } catch (_) {}
+
+        // Sync with custom admin created reels
+        let customReels: Property[] = [];
+        try {
+          const storedCustom = localStorage.getItem('casa_custom_reels');
+          if (storedCustom) {
+            customReels = JSON.parse(storedCustom);
+          }
+        } catch (_) {}
+
+        const apiList = (res.data || []).filter((p) => !deletedIds.has(p.id));
+        const filteredFallbacks = FALLBACK_VIDEO_PROPERTIES.filter((p) => !deletedIds.has(p.id));
+        const apiIds = new Set(apiList.map((p) => p.id));
+        const validCustom = customReels.filter((p) => !deletedIds.has(p.id) && !apiIds.has(p.id));
+
+        const combined = [
+          ...validCustom,
+          ...apiList,
+          ...filteredFallbacks.filter((p) => !apiIds.has(p.id)),
+        ];
+
+        if (isMounted) {
           setProperties(combined);
         }
       } catch (_) {
@@ -551,6 +585,54 @@ export function VideoPropertySection() {
   const handleLoadMore = () => {
     setVisibleCount((prev) => prev + 5);
   };
+
+  const activeVideoProperty =
+    activeVideoIndex !== null && displayedProperties[activeVideoIndex]
+      ? displayedProperties[activeVideoIndex]
+      : null;
+
+  const handleOpenModal = (property: Property) => {
+    const idx = displayedProperties.findIndex((p) => p.id === property.id);
+    setActiveVideoIndex(idx >= 0 ? idx : 0);
+    setShowDetailsDrawer(false);
+  };
+
+  const handleNextVideo = React.useCallback(() => {
+    if (displayedProperties.length === 0) return;
+    setActiveVideoIndex((prev) => {
+      const cur = prev ?? 0;
+      return (cur + 1) % displayedProperties.length;
+    });
+    setShowDetailsDrawer(false);
+  }, [displayedProperties.length]);
+
+  const handlePrevVideo = React.useCallback(() => {
+    if (displayedProperties.length === 0) return;
+    setActiveVideoIndex((prev) => {
+      const cur = prev ?? 0;
+      return (cur - 1 + displayedProperties.length) % displayedProperties.length;
+    });
+    setShowDetailsDrawer(false);
+  }, [displayedProperties.length]);
+
+  // Keyboard navigation: Left/Right arrows + Escape
+  React.useEffect(() => {
+    if (activeVideoIndex === null) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        handleNextVideo();
+      } else if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        handlePrevVideo();
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        setActiveVideoIndex(null);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [activeVideoIndex, handleNextVideo, handlePrevVideo]);
 
   return (
     <section
@@ -735,7 +817,7 @@ export function VideoPropertySection() {
                   <div className="relative z-10 my-auto flex flex-col items-center justify-center p-4">
                     <button
                       type="button"
-                      onClick={() => setActiveVideoModal(property)}
+                      onClick={() => handleOpenModal(property)}
                       className="w-14 h-14 rounded-full bg-white/90 hover:bg-white text-casa-brand flex items-center justify-center shadow-2xl group-hover:scale-110 transition-all cursor-pointer backdrop-blur-sm"
                       title="Play Walkthrough Video Reel"
                     >
@@ -779,7 +861,7 @@ export function VideoPropertySection() {
 
                       <button
                         type="button"
-                        onClick={() => setActiveVideoModal(property)}
+                        onClick={() => handleOpenModal(property)}
                         className="p-1.5 rounded-xl bg-casa-brand text-white hover:bg-casa-brand-hover text-xs transition-colors cursor-pointer"
                         title="Preview Video in Popup"
                       >
@@ -807,24 +889,62 @@ export function VideoPropertySection() {
           </div>
         )}
 
-        {/* Video Reel Modal Player */}
-        {activeVideoModal && (
-          <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
-            <div className="relative w-full max-w-sm bg-slate-950 rounded-3xl overflow-hidden border border-white/20 shadow-2xl flex flex-col aspect-[9/16] max-h-[85vh]">
-              {/* Close Button */}
-              <button
-                type="button"
-                onClick={() => setActiveVideoModal(null)}
-                className="absolute top-3 right-3 z-20 w-8 h-8 rounded-full bg-black/70 text-white flex items-center justify-center hover:bg-red-600 transition-colors cursor-pointer"
-              >
-                <X className="w-4 h-4" />
-              </button>
+        {/* 9:16 Video Reel Interactive Modal Player */}
+        {activeVideoProperty && (
+          <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex items-center justify-center p-2 sm:p-4 select-none">
+            {/* Global Left / Previous Arrow Button */}
+            <button
+              type="button"
+              onClick={handlePrevVideo}
+              className="fixed left-3 sm:left-6 md:left-12 lg:left-24 top-1/2 -translate-y-1/2 z-50 w-11 h-11 sm:w-14 sm:h-14 rounded-full bg-white/10 hover:bg-white/30 active:scale-95 text-white backdrop-blur-md border border-white/20 flex items-center justify-center transition-all shadow-2xl hover:scale-110 cursor-pointer"
+              title="Previous Reel (Left Arrow key)"
+              aria-label="Previous Video Reel"
+            >
+              <ChevronLeft className="w-6 h-6 sm:w-8 sm:h-8" />
+            </button>
 
-              {/* Video Player */}
+            {/* Global Right / Next Arrow Button */}
+            <button
+              type="button"
+              onClick={handleNextVideo}
+              className="fixed right-3 sm:right-6 md:right-12 lg:right-24 top-1/2 -translate-y-1/2 z-50 w-11 h-11 sm:w-14 sm:h-14 rounded-full bg-white/10 hover:bg-white/30 active:scale-95 text-white backdrop-blur-md border border-white/20 flex items-center justify-center transition-all shadow-2xl hover:scale-110 cursor-pointer"
+              title="Next Reel (Right Arrow key)"
+              aria-label="Next Video Reel"
+            >
+              <ChevronRight className="w-6 h-6 sm:w-8 sm:h-8" />
+            </button>
+
+            {/* 9:16 Vertical Video Frame Container */}
+            <div className="relative w-full max-w-sm sm:max-w-md bg-slate-950 rounded-3xl overflow-hidden border border-white/20 shadow-2xl flex flex-col aspect-[9/16] max-h-[90vh]">
+              {/* Top Navigation & Status Bar */}
+              <div className="absolute top-0 inset-x-0 z-30 p-3.5 bg-gradient-to-b from-black/80 via-black/40 to-transparent flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-black/60 backdrop-blur-md text-white text-[10px] font-bold border border-white/20">
+                    <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
+                    <span>Reel {(activeVideoIndex ?? 0) + 1} / {displayedProperties.length}</span>
+                  </span>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-casa-brand text-white shadow-xs">
+                    {activeVideoProperty.listingType === 'SALE' ? 'BUY' : 'RENT'}
+                  </span>
+                </div>
+
+                {/* Close Modal Button */}
+                <button
+                  type="button"
+                  onClick={() => setActiveVideoIndex(null)}
+                  className="w-8 h-8 rounded-full bg-black/70 text-white flex items-center justify-center hover:bg-red-600 transition-colors cursor-pointer border border-white/20"
+                  title="Close Reel Player (Esc)"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Video Player Box */}
               <div className="relative flex-1 bg-black flex items-center justify-center overflow-hidden">
-                {activeVideoModal.media?.videoUrl?.includes('youtu') ? (
+                {activeVideoProperty.media?.videoUrl?.includes('youtu') ? (
                   <iframe
-                    src={parseYouTubeUrl(activeVideoModal.media.videoUrl).embedUrl}
+                    key={activeVideoProperty.id}
+                    src={`${parseYouTubeUrl(activeVideoProperty.media.videoUrl).embedUrl}?autoplay=1&mute=0`}
                     title="Property Video Reel"
                     className="w-full h-full object-cover"
                     allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
@@ -832,47 +952,224 @@ export function VideoPropertySection() {
                   />
                 ) : (
                   <video
-                    src={activeVideoModal.media?.videoUrl}
+                    key={activeVideoProperty.id}
+                    src={activeVideoProperty.media?.videoUrl || (activeVideoProperty as any).videoUrl}
                     controls
                     autoPlay
+                    loop
                     playsInline
                     className="w-full h-full object-cover"
                   />
                 )}
+
+                {/* In-Video Mobile Touch Arrows */}
+                <button
+                  type="button"
+                  onClick={handlePrevVideo}
+                  className="sm:hidden absolute left-2 top-1/2 -translate-y-1/2 z-20 w-8 h-8 rounded-full bg-black/50 text-white flex items-center justify-center hover:bg-black/80"
+                  title="Previous Video"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={handleNextVideo}
+                  className="sm:hidden absolute right-2 top-1/2 -translate-y-1/2 z-20 w-8 h-8 rounded-full bg-black/50 text-white flex items-center justify-center hover:bg-black/80"
+                  title="Next Video"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </button>
               </div>
 
-              {/* Bottom Info Bar in Modal */}
-              <div className="p-4 bg-slate-900 border-t border-slate-800 space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-base font-extrabold text-white">
-                    {formatPrice(activeVideoModal.price?.amount || 0)}
-                  </span>
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-casa-brand text-white">
-                    {activeVideoModal.category}
-                  </span>
+              {/* Expandable Full Property Details Drawer / Sheet */}
+              {showDetailsDrawer ? (
+                <div className="absolute inset-x-0 bottom-0 top-14 z-30 bg-slate-950/95 backdrop-blur-xl border-t border-slate-800 p-4 overflow-y-auto space-y-3.5 flex flex-col justify-between animate-in slide-in-from-bottom-6 duration-200">
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                      <div className="flex items-center gap-1.5 text-xs font-bold text-casa-brand">
+                        <Info className="w-3.5 h-3.5" />
+                        <span>Verified Property Details</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setShowDetailsDrawer(false)}
+                        className="text-xs text-white/70 hover:text-white px-2 py-0.5 rounded-lg bg-white/10"
+                      >
+                        Hide Details
+                      </button>
+                    </div>
+
+                    {/* Price & Category */}
+                    <div className="flex items-center justify-between">
+                      <span className="text-xl font-black text-white">
+                        {formatPrice(activeVideoProperty.price?.amount || 0)}
+                        {activeVideoProperty.listingType !== 'SALE' && (
+                          <span className="text-xs text-white/70 font-normal"> / mo</span>
+                        )}
+                      </span>
+                      <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-casa-brand text-white">
+                        {activeVideoProperty.category}
+                      </span>
+                    </div>
+
+                    {/* Title */}
+                    <h3 className="text-sm font-bold text-white leading-snug">
+                      {typeof activeVideoProperty.title === 'string'
+                        ? activeVideoProperty.title
+                        : activeVideoProperty.title?.en}
+                    </h3>
+
+                    {/* Location Breakdown */}
+                    <div className="p-2.5 rounded-xl bg-slate-900 border border-slate-800 space-y-1 text-xs">
+                      <div className="flex items-center gap-1.5 text-red-400 font-semibold">
+                        <MapPin className="w-3.5 h-3.5 flex-shrink-0" />
+                        <span>
+                          {activeVideoProperty.location?.society || activeVideoProperty.location?.subArea || 'Prime Location'}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-white/70 pl-5">
+                        {[
+                          activeVideoProperty.location?.subArea,
+                          activeVideoProperty.location?.area || activeVideoProperty.location?.locality,
+                          activeVideoProperty.location?.city,
+                          activeVideoProperty.location?.state,
+                        ]
+                          .filter(Boolean)
+                          .filter((v, i, a) => a.indexOf(v) === i)
+                          .join(', ')}
+                      </p>
+                    </div>
+
+                    {/* Specs Grid */}
+                    <div className="grid grid-cols-3 gap-2 text-center text-xs">
+                      {activeVideoProperty.specs?.bedrooms ? (
+                        <div className="p-2 rounded-xl bg-slate-900 border border-slate-800">
+                          <Bed className="w-3.5 h-3.5 text-casa-brand mx-auto mb-0.5" />
+                          <div className="font-bold text-white">{activeVideoProperty.specs.bedrooms} BHK</div>
+                          <div className="text-[10px] text-white/60">Bedrooms</div>
+                        </div>
+                      ) : null}
+                      {activeVideoProperty.specs?.bathrooms ? (
+                        <div className="p-2 rounded-xl bg-slate-900 border border-slate-800">
+                          <Bath className="w-3.5 h-3.5 text-amber-400 mx-auto mb-0.5" />
+                          <div className="font-bold text-white">{activeVideoProperty.specs.bathrooms} Baths</div>
+                          <div className="text-[10px] text-white/60">Bathrooms</div>
+                        </div>
+                      ) : null}
+                      {activeVideoProperty.specs?.carpetAreaSqFt || activeVideoProperty.specs?.area ? (
+                        <div className="p-2 rounded-xl bg-slate-900 border border-slate-800">
+                          <Square className="w-3.5 h-3.5 text-emerald-400 mx-auto mb-0.5" />
+                          <div className="font-bold text-white">
+                            {activeVideoProperty.specs.carpetAreaSqFt || activeVideoProperty.specs.area}
+                          </div>
+                          <div className="text-[10px] text-white/60">Sq. Ft.</div>
+                        </div>
+                      ) : null}
+                    </div>
+
+                    {/* Advertiser & Direct Contact */}
+                    <div className="p-2.5 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-between">
+                      <div className="truncate pr-2">
+                        <div className="text-[11px] text-white/60">Listing Agent</div>
+                        <div className="text-xs font-bold text-white truncate flex items-center gap-1">
+                          <span>{activeVideoProperty.advertiser?.name || 'myproperty Verified Partner'}</span>
+                          {activeVideoProperty.advertiser?.isVerifiedAgent && (
+                            <ShieldCheck className="w-3 h-3 text-emerald-400 flex-shrink-0" />
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1.5 flex-shrink-0">
+                        {activeVideoProperty.advertiser?.phone && (
+                          <>
+                            <a
+                              href={`https://wa.me/${activeVideoProperty.advertiser.phone.replace(/\D/g, '')}?text=Hi,%20I%20am%20interested%20in%20property%20listing:%20${encodeURIComponent(typeof activeVideoProperty.title === 'string' ? activeVideoProperty.title : activeVideoProperty.title?.en || '')}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="p-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white transition-colors"
+                              title="Chat on WhatsApp"
+                            >
+                              <MessageCircle className="w-3.5 h-3.5" />
+                            </a>
+                            <a
+                              href={`tel:${activeVideoProperty.advertiser.phone}`}
+                              className="p-1.5 rounded-lg bg-casa-brand hover:bg-casa-brand-hover text-white transition-colors"
+                              title="Call Agent"
+                            >
+                              <Phone className="w-3.5 h-3.5" />
+                            </a>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Direct Link to Complete Property Detail Page */}
+                  <div className="pt-2">
+                    <Link
+                      href={`/property/${activeVideoProperty.slug || activeVideoProperty.id}`}
+                      onClick={() => setActiveVideoIndex(null)}
+                      className="w-full py-2.5 px-4 rounded-xl bg-casa-brand hover:bg-casa-brand-hover text-white text-xs font-bold text-center transition-all flex items-center justify-center gap-1.5 shadow-md"
+                    >
+                      <span>Open Full Property Page</span>
+                      <ExternalLink className="w-3.5 h-3.5" />
+                    </Link>
+                  </div>
                 </div>
-                <h3 className="text-xs font-bold text-white line-clamp-1">
-                  {typeof activeVideoModal.title === 'string'
-                    ? activeVideoModal.title
-                    : activeVideoModal.title?.en}
-                </h3>
-                <div className="flex items-center justify-between pt-1">
-                  <span className="text-[11px] text-white/70 flex items-center gap-1 truncate max-w-[200px]">
-                    <MapPin className="w-3 h-3 text-red-400 flex-shrink-0" />
-                    <span className="truncate">
-                      {activeVideoModal.location?.area || activeVideoModal.location?.city}
+              ) : (
+                /* Collapsed Bottom Bar in Modal with Quick Info & "View Details" Trigger */
+                <div className="p-3.5 bg-slate-900 border-t border-slate-800 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-base font-extrabold text-white">
+                      {formatPrice(activeVideoProperty.price?.amount || 0)}
+                      {activeVideoProperty.listingType !== 'SALE' && (
+                        <span className="text-[10px] text-white/70 font-normal"> / mo</span>
+                      )}
                     </span>
-                  </span>
-                  <Link
-                    href={`/property/${activeVideoModal.slug || activeVideoModal.id}`}
-                    onClick={() => setActiveVideoModal(null)}
-                    className="px-3 py-1.5 rounded-xl bg-casa-brand text-white text-xs font-semibold hover:bg-casa-brand-hover transition-colors inline-flex items-center gap-1"
-                  >
-                    <span>Full Listing</span>
-                    <ExternalLink className="w-3 h-3" />
-                  </Link>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-casa-brand text-white">
+                      {activeVideoProperty.category}
+                    </span>
+                  </div>
+
+                  <h3 className="text-xs font-bold text-white line-clamp-1">
+                    {typeof activeVideoProperty.title === 'string'
+                      ? activeVideoProperty.title
+                      : activeVideoProperty.title?.en}
+                  </h3>
+
+                  <div className="flex items-center justify-between pt-1 gap-2">
+                    <span className="text-[11px] text-white/70 flex items-center gap-1 truncate max-w-[150px]">
+                      <MapPin className="w-3 h-3 text-red-400 flex-shrink-0" />
+                      <span className="truncate">
+                        {activeVideoProperty.location?.society || activeVideoProperty.location?.area || activeVideoProperty.location?.city}
+                      </span>
+                    </span>
+
+                    <div className="flex items-center gap-1.5 flex-shrink-0">
+                      {/* View Details button opens specs inside modal */}
+                      <button
+                        type="button"
+                        onClick={() => setShowDetailsDrawer(true)}
+                        className="px-2.5 py-1.5 rounded-xl bg-white/20 hover:bg-white text-white hover:text-black text-[11px] font-semibold transition-all flex items-center gap-1 cursor-pointer"
+                        title="View Property Specs & Details"
+                      >
+                        <Info className="w-3 h-3" />
+                        <span>View Details</span>
+                      </button>
+
+                      {/* Full Listing Link */}
+                      <Link
+                        href={`/property/${activeVideoProperty.slug || activeVideoProperty.id}`}
+                        onClick={() => setActiveVideoIndex(null)}
+                        className="px-2.5 py-1.5 rounded-xl bg-casa-brand text-white text-[11px] font-semibold hover:bg-casa-brand-hover transition-colors inline-flex items-center gap-1"
+                        title="Open Full Property Page"
+                      >
+                        <span>Full Page</span>
+                        <ExternalLink className="w-3 h-3" />
+                      </Link>
+                    </div>
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
           </div>
         )}
