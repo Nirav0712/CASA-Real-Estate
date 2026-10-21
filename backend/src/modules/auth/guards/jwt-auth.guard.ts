@@ -3,13 +3,18 @@ import {
   CanActivate,
   ExecutionContext,
   UnauthorizedException,
+  Optional,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
+import { InjectModel } from '@nestjs/mongoose';
+import { Model, isValidObjectId } from 'mongoose';
 import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
 import { JwtAccessPayload, AuthenticatedUser } from '../interfaces/jwt-payload.interface';
 import { AccountStatus, normalizeUserRoleModel } from '../enums/auth.enums';
+import { User, UserDocument } from '../schemas/user.schema';
+import { AuthService } from '../auth.service';
 
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
@@ -17,6 +22,8 @@ export class JwtAuthGuard implements CanActivate {
     private readonly reflector: Reflector,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
+    @Optional() @InjectModel(User.name) private readonly userModel?: Model<UserDocument>,
+    @Optional() private readonly authService?: AuthService,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -42,31 +49,72 @@ export class JwtAuthGuard implements CanActivate {
         secret: accessSecret,
       });
 
-      if (payload.status === AccountStatus.SUSPENDED) {
-        throw new UnauthorizedException('Your account has been suspended. Please contact support.');
+      const userId = payload.userId || payload.sub;
+      if (!userId) {
+        throw new UnauthorizedException('Authentication token is invalid.');
       }
 
-      if (payload.status === AccountStatus.DEACTIVATED) {
-        throw new UnauthorizedException('Your account is deactivated.');
+      // Live verification of account status directly from database/store
+      let user: any = null;
+      if (this.userModel) {
+        try {
+          const query = isValidObjectId(userId)
+            ? { _id: userId }
+            : { normalizedMobile: payload.normalizedMobile || userId };
+          user = await this.userModel
+            .findOne(query)
+            .select('status role platformRole accountType isVerifiedAgent permissions name mobile normalizedMobile')
+            .lean();
+        } catch {
+          // Fallback to in-memory store if DB query fails
+        }
+      }
+
+      if (!user && this.authService) {
+        user =
+          this.authService.getMemUserById(userId) ||
+          (payload.normalizedMobile ? this.authService.getMemUserById(payload.normalizedMobile) : undefined);
+      }
+
+      if (user) {
+        if (user.status === AccountStatus.SUSPENDED) {
+          throw new UnauthorizedException('Your account has been suspended. Please contact support.');
+        }
+
+        if (user.status === AccountStatus.DEACTIVATED) {
+          throw new UnauthorizedException('Your account has been deactivated. Please contact support.');
+        }
+      } else {
+        // Fallback for isolated unit tests without injected user model
+        if (payload.status === AccountStatus.SUSPENDED) {
+          throw new UnauthorizedException('Your account has been suspended. Please contact support.');
+        }
+
+        if (payload.status === AccountStatus.DEACTIVATED) {
+          throw new UnauthorizedException('Your account has been deactivated. Please contact support.');
+        }
       }
 
       const norm = normalizeUserRoleModel({
-        role: payload.role,
-        platformRole: payload.platformRole,
-        accountType: payload.accountType,
-        isVerifiedAgent: payload.isVerifiedAgent,
+        role: user?.role || payload.role,
+        platformRole: user?.platformRole || payload.platformRole,
+        accountType: user?.accountType || payload.accountType,
+        isVerifiedAgent: user?.isVerifiedAgent ?? payload.isVerifiedAgent,
       });
 
       const authenticatedUser: AuthenticatedUser = {
-        id: payload.userId || payload.sub,
-        name: '', // Populated by service when required
-        mobile: payload.mobile,
-        normalizedMobile: payload.normalizedMobile,
+        id: (user as any)?._id ? (user as any)._id.toString() : userId,
+        name: user?.name || '',
+        mobile: user?.mobile || payload.mobile,
+        normalizedMobile: user?.normalizedMobile || payload.normalizedMobile,
         platformRole: norm.platformRole,
         accountType: norm.accountType,
         role: norm.role,
-        permissions: payload.permissions || [],
-        status: payload.status,
+        permissions:
+          user?.permissions && user.permissions.length > 0
+            ? user.permissions
+            : payload.permissions || [],
+        status: user?.status || payload.status,
         isVerifiedAgent: norm.isVerifiedAgent,
       };
 

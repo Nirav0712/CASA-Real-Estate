@@ -263,6 +263,29 @@ export class AuthService implements OnModuleInit {
     return false;
   }
 
+  updateMemUserStatus(id?: string, status?: AccountStatus): boolean {
+    if (!id || !status) return false;
+    let updated = false;
+    for (const u of this.memUsers.values()) {
+      if (u._id === id || u.normalizedMobile === id || u.mobile === id) {
+        u.status = status;
+        u.updatedAt = new Date();
+        updated = true;
+      }
+    }
+    return updated;
+  }
+
+  revokeUserSessions(userId?: string): void {
+    if (!userId) return;
+    for (const session of this.memSessions.values()) {
+      if (session.userId === userId) {
+        session.isRevoked = true;
+        session.revokedAt = new Date();
+      }
+    }
+  }
+
   private seedDefaultUsers() {
     const adminMobiles = ['+919925843531'];
     adminMobiles.forEach((mob) => {
@@ -725,6 +748,9 @@ export class AuthService implements OnModuleInit {
           if (user.status === AccountStatus.SUSPENDED) {
             throw new ForbiddenException('Your account has been suspended.');
           }
+          if (user.status === AccountStatus.DEACTIVATED) {
+            throw new ForbiddenException('Your account has been deactivated. Please contact support.');
+          }
 
           if (isDesignatedAdmin) {
             user.platformRole = PlatformRole.SUPER_ADMIN;
@@ -819,6 +845,9 @@ export class AuthService implements OnModuleInit {
       } else {
         if (memUser.status === AccountStatus.SUSPENDED) {
           throw new ForbiddenException('Your account has been suspended.');
+        }
+        if (memUser.status === AccountStatus.DEACTIVATED) {
+          throw new ForbiddenException('Your account has been deactivated. Please contact support.');
         }
         if (isDesignatedAdmin) {
           memUser.platformRole = PlatformRole.SUPER_ADMIN;

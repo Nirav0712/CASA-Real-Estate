@@ -169,4 +169,56 @@ describe('JwtAuthGuard (Authentication & Token Validation)', () => {
       'Your account has been suspended. Please contact support.',
     );
   });
+
+  it('should throw UnauthorizedException when user account is deactivated', async () => {
+    const { context } = createMockContext({
+      authorization: 'Bearer deactivated-user-token',
+    });
+
+    (jwtService.verifyAsync as jest.Mock).mockResolvedValue({
+      sub: 'usr-deactivated-123',
+      mobile: '+919999999999',
+      normalizedMobile: '+919999999999',
+      role: UserRole.PROPERTY_OWNER,
+      status: AccountStatus.DEACTIVATED,
+      isVerifiedAgent: false,
+    });
+
+    await expect(guard.canActivate(context)).rejects.toThrow(
+      'Your account has been deactivated. Please contact support.',
+    );
+  });
+
+  it('should reject active token when database status is DEACTIVATED', async () => {
+    const mockUserModel = {
+      findOne: jest.fn().mockReturnValue({
+        select: jest.fn().mockReturnValue({
+          lean: jest.fn().mockResolvedValue({
+            _id: '507f1f77bcf86cd799439011',
+            status: AccountStatus.DEACTIVATED,
+            role: UserRole.BUYER,
+          }),
+        }),
+      }),
+    } as any;
+
+    const guardWithDb = new JwtAuthGuard(reflector, jwtService, configService, mockUserModel);
+
+    const { context } = createMockContext({
+      authorization: 'Bearer previously-active-token',
+    });
+
+    (jwtService.verifyAsync as jest.Mock).mockResolvedValue({
+      sub: '507f1f77bcf86cd799439011',
+      mobile: '+919925843599',
+      normalizedMobile: '+919925843599',
+      role: UserRole.BUYER,
+      status: AccountStatus.ACTIVE, // Token claims ACTIVE
+    });
+
+    await expect(guardWithDb.canActivate(context)).rejects.toThrow(
+      'Your account has been deactivated. Please contact support.',
+    );
+  });
 });
+

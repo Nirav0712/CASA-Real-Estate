@@ -134,15 +134,87 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (!currentToken) return;
       const res = await authService.getCurrentUser(currentToken);
       if (res && res.user) {
+        if (res.user.status === 'DEACTIVATED' || res.user.status === 'SUSPENDED') {
+          setUser(null);
+          setToken(null);
+          if (typeof window !== 'undefined') {
+            try {
+              localStorage.removeItem('casa_access_token');
+              localStorage.removeItem('casa_user');
+            } catch {
+              // ignore
+            }
+            if (window.location.pathname.startsWith('/dashboard')) {
+              window.location.href = '/';
+            }
+          }
+          return;
+        }
         setUser(res.user);
         if (typeof window !== 'undefined') {
           localStorage.setItem('casa_user', JSON.stringify(res.user));
         }
       }
-    } catch (err) {
+    } catch (err: any) {
       console.warn('Silent refresh user error:', err);
+      const msg = String(err?.message || '').toLowerCase();
+      if (msg.includes('deactivated') || msg.includes('suspended')) {
+        setUser(null);
+        setToken(null);
+        if (typeof window !== 'undefined') {
+          try {
+            localStorage.removeItem('casa_access_token');
+            localStorage.removeItem('casa_user');
+          } catch {
+            // ignore
+          }
+          if (window.location.pathname.startsWith('/dashboard')) {
+            window.location.href = '/';
+          }
+        }
+      }
     }
   }, [token]);
+
+  // Instantly handle real-time deactivation event emitted by fetchApi on any 401 response
+  React.useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const handleDeactivated = (e: any) => {
+      setUser(null);
+      setToken(null);
+      try {
+        localStorage.removeItem('casa_access_token');
+        localStorage.removeItem('casa_user');
+      } catch {
+        // ignore
+      }
+      toast.error(
+        'Account Deactivated',
+        e?.detail?.message || 'Your account has been deactivated. Please contact support.',
+      );
+      if (window.location.pathname.startsWith('/dashboard')) {
+        window.location.href = '/';
+      }
+    };
+    window.addEventListener('casa:auth:deactivated', handleDeactivated);
+    return () => window.removeEventListener('casa:auth:deactivated', handleDeactivated);
+  }, [toast]);
+
+  // Periodic and focus validation for active dashboard sessions
+  React.useEffect(() => {
+    if (!user || typeof window === 'undefined') return;
+    const checkStatus = () => {
+      if (window.location.pathname.startsWith('/dashboard')) {
+        refreshUser();
+      }
+    };
+    window.addEventListener('focus', checkStatus);
+    const interval = setInterval(checkStatus, 15000);
+    return () => {
+      window.removeEventListener('focus', checkStatus);
+      clearInterval(interval);
+    };
+  }, [user, refreshUser]);
 
   // Compute trial status dynamically
   const trialStatus = React.useMemo(() => {

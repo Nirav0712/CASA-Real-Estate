@@ -51,9 +51,27 @@ export async function fetchApi<T>(
     if (!res.ok) {
       const errorMsg =
         (json && (json.message || json.error)) || `API error: ${res.status} ${res.statusText}`;
+      const parsedError = Array.isArray(errorMsg) ? errorMsg[0] : errorMsg;
+
+      // Real-time deactivation/revocation interception
+      if (res.status === 401 && typeof window !== 'undefined') {
+        const lowerMsg = String(parsedError).toLowerCase();
+        if (lowerMsg.includes('deactivated') || lowerMsg.includes('suspended')) {
+          try {
+            localStorage.removeItem('casa_access_token');
+            localStorage.removeItem('casa_user');
+          } catch {
+            // ignore localStorage errors
+          }
+          window.dispatchEvent(
+            new CustomEvent('casa:auth:deactivated', { detail: { message: parsedError } }),
+          );
+        }
+      }
+
       return {
         data: null,
-        error: Array.isArray(errorMsg) ? errorMsg[0] : errorMsg,
+        error: parsedError,
         isBackendAvailable: true,
         status: res.status,
       };

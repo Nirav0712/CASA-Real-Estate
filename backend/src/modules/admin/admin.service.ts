@@ -1570,6 +1570,24 @@ export class AdminService implements OnModuleInit {
     const user = await this.userModel.findOne(query);
 
     if (!user) {
+      const memUser = this.authService.getMemUserById(id);
+      if (memUser) {
+        memUser.status = dto.status;
+        if (dto.status === AccountStatus.SUSPENDED || dto.status === AccountStatus.DEACTIVATED) {
+          this.authService.revokeUserSessions(memUser._id);
+        }
+        return {
+          success: true,
+          message: `User status successfully updated to ${dto.status}.`,
+          user: {
+            id: memUser._id,
+            name: memUser.name,
+            mobile: memUser.mobile,
+            role: memUser.role,
+            status: memUser.status,
+          },
+        };
+      }
       throw new NotFoundException(`User with ID "${id}" was not found.`);
     }
 
@@ -1604,14 +1622,26 @@ export class AdminService implements OnModuleInit {
     // Invalidate all active sessions if user is suspended or deactivated
     if (dto.status === AccountStatus.SUSPENDED || dto.status === AccountStatus.DEACTIVATED) {
       try {
-        await this.refreshSessionModel.updateMany(
-          { userId: user._id },
-          { $set: { isRevoked: true, revokedAt: new Date() } },
-        );
-        this.logger.log(`Revoked all refresh sessions for suspended/deactivated user ${user._id}`);
+        await this.refreshSessionModel.deleteMany({
+          $or: [{ userId: user._id }, { userId: user._id.toString() }],
+        });
+        this.logger.log(`Revoked and deleted all refresh sessions for suspended/deactivated user ${user._id}`);
       } catch (err: any) {
         this.logger.warn(`Session revocation note: ${err?.message}`);
       }
+    }
+
+    // Synchronize in-memory store and session state immediately
+    try {
+      this.authService.updateMemUserStatus(user._id.toString(), dto.status);
+      if (user.normalizedMobile) {
+        this.authService.updateMemUserStatus(user.normalizedMobile, dto.status);
+      }
+      if (dto.status === AccountStatus.SUSPENDED || dto.status === AccountStatus.DEACTIVATED) {
+        this.authService.revokeUserSessions(user._id.toString());
+      }
+    } catch (memErr: any) {
+      this.logger.warn(`In-memory status sync note: ${memErr?.message}`);
     }
 
     // Record Audit Log

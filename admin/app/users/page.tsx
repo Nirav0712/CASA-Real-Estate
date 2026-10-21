@@ -273,9 +273,9 @@ export default function UsersPage() {
     }
   };
 
-  const handleOpenStatusModal = (user: UserRecord) => {
+  const handleOpenStatusModal = (user: UserRecord, initialTargetStatus?: AccountStatus) => {
     setStatusModalUser(user);
-    setNewStatus(user.status === 'ACTIVE' ? 'SUSPENDED' : 'ACTIVE');
+    setNewStatus(initialTargetStatus || (user.status === 'ACTIVE' ? 'DEACTIVATED' : 'ACTIVE'));
     setStatusReason('');
   };
 
@@ -288,6 +288,13 @@ export default function UsersPage() {
         'Status Updated',
         `User ${statusModalUser.name} status changed to ${newStatus}.`,
       );
+      // Instant optimistic UI update so status changes visibly immediately
+      setUsers((prev) =>
+        prev.map((u) => (u.id === statusModalUser.id ? { ...u, status: newStatus } : u)),
+      );
+      if (selectedUser?.id === statusModalUser.id) {
+        setSelectedUser((prev) => (prev ? { ...prev, status: newStatus } : prev));
+      }
       setStatusModalUser(null);
       loadUsers();
       if (selectedUser?.id === statusModalUser.id) {
@@ -811,16 +818,27 @@ export default function UsersPage() {
                           >
                             Role
                           </Button>
-                          <Button
-                            variant={u.status === 'ACTIVE' ? 'outline' : 'primary'}
-                            size="sm"
-                            onClick={() => handleOpenStatusModal(u)}
-                            className={`text-xs h-7 px-2 ${
-                              u.status === 'ACTIVE' ? 'hover:bg-red-50 hover:text-red-600' : ''
-                            }`}
-                          >
-                            {u.status === 'ACTIVE' ? 'Suspend' : 'Activate'}
-                          </Button>
+                          {u.status === 'ACTIVE' ? (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleOpenStatusModal(u, 'DEACTIVATED')}
+                              className="text-xs h-7 px-2 text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 border-rose-200 dark:border-rose-900/50"
+                              title="Deactivate User Immediately"
+                            >
+                              Deactivate
+                            </Button>
+                          ) : (
+                            <Button
+                              variant="primary"
+                              size="sm"
+                              onClick={() => handleOpenStatusModal(u, 'ACTIVE')}
+                              className="text-xs h-7 px-2"
+                              title="Reactivate User"
+                            >
+                              Activate
+                            </Button>
+                          )}
                           <Button
                             variant="outline"
                             size="sm"
@@ -1048,17 +1066,27 @@ export default function UsersPage() {
                   >
                     Change Role
                   </Button>
-                  <Button
-                    variant={selectedUser.status === 'ACTIVE' ? 'outline' : 'primary'}
-                    className={`flex-1 text-xs ${
-                      selectedUser.status === 'ACTIVE' ? 'hover:bg-red-50 hover:text-red-600' : ''
-                    }`}
-                    onClick={() => {
-                      handleOpenStatusModal(selectedUser);
-                    }}
-                  >
-                    {selectedUser.status === 'ACTIVE' ? 'Suspend Account' : 'Activate Account'}
-                  </Button>
+                  {selectedUser.status === 'ACTIVE' ? (
+                    <Button
+                      variant="outline"
+                      className="flex-1 text-xs text-rose-600 hover:bg-rose-50 border-rose-200 dark:border-rose-900/50"
+                      onClick={() => {
+                        handleOpenStatusModal(selectedUser, 'DEACTIVATED');
+                      }}
+                    >
+                      Deactivate Account
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="primary"
+                      className="flex-1 text-xs"
+                      onClick={() => {
+                        handleOpenStatusModal(selectedUser, 'ACTIVE');
+                      }}
+                    >
+                      Activate Account
+                    </Button>
+                  )}
                   <Button
                     variant="outline"
                     className="w-full text-xs text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 border-red-200 dark:border-red-900/50 flex items-center justify-center gap-1.5"

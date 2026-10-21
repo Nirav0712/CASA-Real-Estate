@@ -50,9 +50,21 @@ export async function fetchAdminApi<T>(
     if (!res.ok) {
       const errorMsg =
         (json && (json.message || json.error)) || `API error: ${res.status} ${res.statusText}`;
+      const parsedError = Array.isArray(errorMsg) ? errorMsg[0] : errorMsg;
+      if (res.status === 401 && typeof window !== 'undefined') {
+        const lower = String(parsedError).toLowerCase();
+        if (lower.includes('deactivated') || lower.includes('suspended')) {
+          try {
+            localStorage.removeItem('casa_admin_access_token');
+            localStorage.removeItem('casa_admin_user');
+          } catch {
+            // ignore
+          }
+        }
+      }
       return {
         data: null,
-        error: Array.isArray(errorMsg) ? errorMsg[0] : errorMsg,
+        error: parsedError,
         isBackendAvailable: true,
         status: res.status,
       };
