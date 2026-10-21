@@ -132,6 +132,8 @@ describe('AdminService Moderation & User Governance (Phase 08)', () => {
       findById: jest.fn(),
       countDocuments: jest.fn().mockResolvedValue(1),
       create: jest.fn(),
+      aggregate: jest.fn().mockResolvedValue([]),
+      updateMany: jest.fn().mockResolvedValue({ modifiedCount: 0 }),
     };
 
     mockAuditLogModel = {
@@ -174,6 +176,7 @@ describe('AdminService Moderation & User Governance (Phase 08)', () => {
         }),
       }),
       findOneAndUpdate: jest.fn().mockResolvedValue(true),
+      distinct: jest.fn().mockResolvedValue([]),
     };
 
     const mockAgentDocumentModel = {
@@ -184,6 +187,7 @@ describe('AdminService Moderation & User Governance (Phase 08)', () => {
         }),
       }),
       updateMany: jest.fn().mockResolvedValue({ modifiedCount: 1 }),
+      distinct: jest.fn().mockResolvedValue([]),
     };
 
     mockAuthService = {
@@ -842,6 +846,106 @@ describe('AdminService Moderation & User Governance (Phase 08)', () => {
       expect(logs.data.length).toBeGreaterThan(0);
       expect(logs.data[0].action).toBe('USER_STATUS_CHANGED');
       expect(logs.pagination.total).toBe(1);
+    });
+  });
+
+  describe('12. KYC Verification Queue & Governance Regression Tests', () => {
+    it('should query KYC queue, return items, counts, and pagination, and prioritize pending requests', async () => {
+      mockUserModel.countDocuments
+        .mockResolvedValueOnce(3) // total
+        .mockResolvedValueOnce(1) // pendingCount
+        .mockResolvedValueOnce(1) // approvedCount
+        .mockResolvedValueOnce(1); // rejectedCount
+
+      mockUserModel.aggregate.mockResolvedValueOnce([
+        {
+          _id: 'usr-pending-1',
+          name: 'Pending Broker',
+          mobile: '9876543210',
+          normalizedMobile: '+919876543210',
+          role: UserRole.BROKER,
+          accountType: AccountType.BROKER,
+          status: AccountStatus.ACTIVE,
+          kycStatus: 'PENDING',
+          kycDocumentType: 'GST_CERTIFICATE',
+          kycDocumentNumber: 'TEST-GST-0001',
+          kycFrontDocumentUrl: 'data:image/png;base64,mock',
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+      ]);
+
+      const res = await service.getKycVerificationQueue({ status: 'ALL', page: 1, limit: 12 });
+
+      expect(res.success).toBe(true);
+      expect(res.items).toHaveLength(1);
+      expect(res.items[0].id).toBe('usr-pending-1');
+      expect(res.items[0].kycStatus).toBe('PENDING');
+      expect(res.counts).toBeDefined();
+      expect(res.counts.pending).toBe(1);
+      expect(res.counts.approved).toBe(1);
+      expect(res.counts.rejected).toBe(1);
+      expect(res.counts.total).toBe(3);
+      expect(res.pagination.total).toBe(3);
+      expect(res.pagination.totalPages).toBe(1);
+    });
+
+    it('should approve KYC application, grant verified badge, activate 3-day trial, and approve documents', async () => {
+      const userToApprove = {
+        _id: 'usr-kyc-approve-1',
+        name: 'Applicant Broker',
+        mobile: '9876543211',
+        role: UserRole.AGENT,
+        accountType: AccountType.BROKER,
+        status: AccountStatus.ACTIVE,
+        isVerifiedAgent: false,
+        kycStatus: 'PENDING',
+        save: jest.fn().mockResolvedValue(true),
+      };
+
+      mockUserModel.findOne.mockResolvedValueOnce(userToApprove);
+
+      const res = await service.verifyAgent('usr-kyc-approve-1', 'Documents verified valid', mockAdminUser);
+
+      expect(res.success).toBe(true);
+      expect(userToApprove.kycStatus).toBe('APPROVED');
+      expect(userToApprove.isVerifiedAgent).toBe(true);
+      expect((userToApprove as any).isTrialActive).toBe(true);
+      expect((userToApprove as any).trialStartedAt).toBeDefined();
+      expect((userToApprove as any).trialExpiresAt).toBeDefined();
+      expect(userToApprove.save).toHaveBeenCalled();
+    });
+
+    it('should reject KYC application with mandatory reason and update documents', async () => {
+      const userToReject = {
+        _id: 'usr-kyc-reject-1',
+        name: 'Rejected Broker',
+        mobile: '9876543212',
+        role: UserRole.AGENT,
+        accountType: AccountType.BROKER,
+        status: AccountStatus.ACTIVE,
+        isVerifiedAgent: false,
+        kycStatus: 'PENDING',
+        save: jest.fn().mockResolvedValue(true),
+      };
+
+      mockUserModel.findOne.mockResolvedValueOnce(userToReject);
+
+      // Rejection with empty reason should fail
+      await expect(service.rejectAgentVerification('usr-kyc-reject-1', '  ', mockAdminUser)).rejects.toThrow();
+
+      // Valid rejection
+      const res = await service.rejectAgentVerification(
+        'usr-kyc-reject-1',
+        'GST certificate is expired and illegible',
+        mockAdminUser,
+      );
+
+      expect(res.success).toBe(true);
+      expect(userToReject.kycStatus).toBe('REJECTED');
+      expect((userToReject as any).kycRejectionReason).toBe('GST certificate is expired and illegible');
+      expect(userToReject.isVerifiedAgent).toBe(false);
+      expect(userToReject.save).toHaveBeenCalled();
     });
   });
 });

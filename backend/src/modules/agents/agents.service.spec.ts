@@ -171,7 +171,7 @@ describe('AgentsService', () => {
     expect(metrics.leadSummary.totalLeads).toBe(3);
   });
 
-  it('should submit verification application and write audit log', async () => {
+  it('should submit verification application, set kycStatus to PENDING, and write audit log', async () => {
     mockAgentProfileModel.findOne.mockResolvedValueOnce({
       ...mockAgentProfile,
       verificationStatus: 'NOT_SUBMITTED',
@@ -199,8 +199,72 @@ describe('AgentsService', () => {
 
     expect(res.success).toBe(true);
     expect(res.verificationStatus).toBe('PENDING');
+    expect(mockUserModel.findByIdAndUpdate).toHaveBeenCalledWith(
+      'user-agent-1',
+      expect.objectContaining({
+        $set: expect.objectContaining({ kycStatus: 'PENDING', reraNumber: 'UPRERAAGT12890' }),
+        $unset: { kycRejectionReason: 1 },
+      }),
+    );
     expect(mockAuditLogModel.create).toHaveBeenCalledWith(
       expect.objectContaining({ action: 'AGENT_VERIFICATION_SUBMITTED' }),
+    );
+  });
+
+  it('should upload KYC document, set kycStatus to PENDING, clear previous rejection reason, and dispatch notification', async () => {
+    const mockSave = jest.fn().mockResolvedValue(true);
+    mockAgentProfileModel.findOne.mockResolvedValueOnce({
+      ...mockAgentProfile,
+      _id: 'prof-123',
+      verificationStatus: 'REJECTED',
+      rejectionReasons: ['Document illegible'],
+      save: mockSave,
+    });
+
+    mockAgentDocumentModel.create.mockResolvedValueOnce({
+      _id: 'doc-456',
+      documentType: 'GST_CERTIFICATE',
+      documentUrl: 'data:image/png;base64,dummy',
+      frontDocumentUrl: 'data:image/png;base64,dummy',
+      backDocumentUrl: undefined,
+      documentName: 'gst.png',
+      status: 'PENDING',
+      uploadedAt: new Date(),
+    });
+
+    const authUser = {
+      id: 'user-agent-1',
+      mobile: '+919925843599',
+      normalizedMobile: '+919925843599',
+      name: 'Rajesh Verma',
+      role: UserRole.AGENT,
+      platformRole: PlatformRole.USER,
+      accountType: AccountType.AGENT,
+      status: AccountStatus.ACTIVE,
+      isVerifiedAgent: false,
+    };
+
+    const res = await service.uploadDocument(authUser, {
+      documentType: 'GST_CERTIFICATE',
+      documentName: 'gst.png',
+      documentNumber: 'GSTIN09ABCDE1234F',
+      documentUrl: 'data:image/png;base64,dummy',
+      accountType: 'BROKER',
+    });
+
+    expect(res.success).toBe(true);
+    expect(res.document.status).toBe('PENDING');
+    expect(mockSave).toHaveBeenCalled();
+    expect(mockUserModel.findByIdAndUpdate).toHaveBeenCalledWith(
+      'user-agent-1',
+      expect.objectContaining({
+        $set: expect.objectContaining({
+          kycStatus: 'PENDING',
+          kycDocumentType: 'GST_CERTIFICATE',
+          kycDocumentNumber: 'GSTIN09ABCDE1234F',
+        }),
+        $unset: { kycRejectionReason: 1 },
+      }),
     );
   });
 });

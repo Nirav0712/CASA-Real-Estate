@@ -6,7 +6,7 @@ const API_BASE_URL =
 export async function fetchAdminApi<T>(
   endpoint: string,
   options?: RequestInit,
-): Promise<{ data: T | null; error: string | null; isBackendAvailable: boolean; status?: number }> {
+): Promise<{ data: T | null; raw?: any; error: string | null; isBackendAvailable: boolean; status?: number }> {
   try {
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
@@ -41,8 +41,13 @@ export async function fetchAdminApi<T>(
       };
     }
 
+    // Preserve the full response if it contains queue/paginated metadata like items, counts, metrics, or pagination
+    const hasQueueMetadata = Boolean(json && (json.items || json.counts || json.metrics || json.pagination));
+    const dataToReturn = (hasQueueMetadata || json?.data === undefined) ? json : json.data;
+
     return {
-      data: (json?.data !== undefined ? json.data : json) as T,
+      data: dataToReturn as T,
+      raw: json,
       error: null,
       isBackendAvailable: true,
       status: res.status,

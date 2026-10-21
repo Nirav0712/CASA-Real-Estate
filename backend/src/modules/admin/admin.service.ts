@@ -2398,13 +2398,36 @@ export class AdminService implements OnModuleInit {
     const limit = Math.min(50, Math.max(1, Number(queryDto?.limit) || 20));
     const skip = (page - 1) * limit;
 
+    // Cross-collection consistency: Query users with pending/approved/rejected verification documents or profiles
+    const [pendingDocUserIds, pendingProfileUserIds] = await Promise.all([
+      this.agentDocumentModel.distinct('userId', { status: 'PENDING' }),
+      this.agentProfileModel.distinct('userId', { verificationStatus: 'PENDING' }),
+    ]);
+    const allPendingUserIds = Array.from(new Set([...pendingDocUserIds, ...pendingProfileUserIds]));
+
+    // Self-heal: ensure users with pending documents/profiles reflect kycStatus: 'PENDING'
+    if (allPendingUserIds.length > 0) {
+      await this.userModel.updateMany(
+        { _id: { $in: allPendingUserIds }, kycStatus: { $ne: 'PENDING' } },
+        { $set: { kycStatus: 'PENDING' } },
+      );
+    }
+
     const filter: any = {};
 
     if (queryDto?.status && queryDto.status !== 'ALL') {
-      filter.kycStatus = queryDto.status;
+      if (queryDto.status === 'PENDING') {
+        filter.$or = [
+          { kycStatus: 'PENDING' },
+          { _id: { $in: allPendingUserIds } },
+        ];
+      } else {
+        filter.kycStatus = queryDto.status;
+      }
     } else {
       filter.$or = [
         { kycStatus: { $in: ['PENDING', 'APPROVED', 'REJECTED', 'NOT_SUBMITTED'] } },
+        { _id: { $in: allPendingUserIds } },
         {
           accountType: {
             $in: [
@@ -2431,13 +2454,38 @@ export class AdminService implements OnModuleInit {
       });
     }
 
-    const [total, users, pendingCount, approvedCount, rejectedCount] = await Promise.all([
+    // Prioritize PENDING requests at the very top of the queue, followed by REJECTED, APPROVED, NOT_SUBMITTED
+    const [total, pendingCount, approvedCount, rejectedCount] = await Promise.all([
       this.userModel.countDocuments(filter),
-      this.userModel.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
-      this.userModel.countDocuments({ kycStatus: 'PENDING' }),
+      this.userModel.countDocuments({
+        $or: [{ kycStatus: 'PENDING' }, { _id: { $in: allPendingUserIds } }],
+      }),
       this.userModel.countDocuments({ kycStatus: 'APPROVED' }),
       this.userModel.countDocuments({ kycStatus: 'REJECTED' }),
     ]);
+
+    const pipeline: any[] = [
+      { $match: filter },
+      {
+        $addFields: {
+          statusOrder: {
+            $switch: {
+              branches: [
+                { case: { $eq: ['$kycStatus', 'PENDING'] }, then: 1 },
+                { case: { $eq: ['$kycStatus', 'REJECTED'] }, then: 2 },
+                { case: { $eq: ['$kycStatus', 'APPROVED'] }, then: 3 },
+              ],
+              default: 4,
+            },
+          },
+        },
+      },
+      { $sort: { statusOrder: 1, updatedAt: -1, createdAt: -1 } },
+      { $skip: skip },
+      { $limit: limit },
+    ];
+
+    const users = await this.userModel.aggregate(pipeline);
 
     const userIds = users.map((u: any) => u._id.toString());
     const [agentDocs, agentProfiles, packages] = await Promise.all([
@@ -2478,6 +2526,11 @@ export class AdminService implements OnModuleInit {
         docNumber = docs[0].documentNumber || null;
       }
 
+      const hasPendingDoc = docs.some((d: any) => d.status === 'PENDING');
+      const resolvedKycStatus = hasPendingDoc
+        ? 'PENDING'
+        : u.kycStatus || (docs.length > 0 ? docs[0].status : (profile?.verificationStatus === 'VERIFIED' ? 'APPROVED' : profile?.verificationStatus || 'NOT_SUBMITTED'));
+
       return {
         id: uid,
         name: u.name,
@@ -2490,7 +2543,7 @@ export class AdminService implements OnModuleInit {
         isVerifiedAgent: Boolean(u.isVerifiedAgent),
         agencyName: u.agencyName || profile?.agencyName || null,
         reraNumber: u.reraNumber || profile?.reraNumber || null,
-        kycStatus: u.kycStatus || (docs.length > 0 ? docs[0].status : 'NOT_SUBMITTED'),
+        kycStatus: resolvedKycStatus,
         kycApprovedAt: u.kycApprovedAt || null,
         kycApprovedBy: u.kycApprovedBy || null,
         kycRejectionReason: u.kycRejectionReason || (docs.length > 0 ? docs[0].rejectionReason : null),
@@ -2519,21 +2572,27 @@ export class AdminService implements OnModuleInit {
       };
     });
 
+    const counts = {
+      pending: pendingCount,
+      approved: approvedCount,
+      rejected: rejectedCount,
+      total,
+    };
+
+    const pagination = {
+      total,
+      page,
+      limit,
+      pages: Math.ceil(total / limit) || 1,
+      totalPages: Math.ceil(total / limit) || 1,
+    };
+
     return {
       success: true,
-      data: items,
-      metrics: {
-        total,
-        pending: pendingCount,
-        approved: approvedCount,
-        rejected: rejectedCount,
-      },
-      pagination: {
-        total,
-        page,
-        limit,
-        pages: Math.ceil(total / limit) || 1,
-      },
+      items,
+      counts,
+      metrics: counts,
+      pagination,
     };
   }
 
@@ -2952,7 +3011,7 @@ export class AdminService implements OnModuleInit {
         senderName: `Agent (${k.agentId?.toString().slice(-6) || 'KYC'})`,
         status: 'PENDING',
         isRead: false,
-        link: `/agents`,
+        link: `/kyc`,
       });
     }
 

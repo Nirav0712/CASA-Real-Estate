@@ -400,8 +400,12 @@ export class AgentsService {
 
     await this.userModel.findByIdAndUpdate(user.id, {
       $set: {
+        kycStatus: 'PENDING',
         reraNumber: dto.reraNumber,
         agencyName: dto.agencyName || profile.agencyName,
+      },
+      $unset: {
+        kycRejectionReason: 1,
       },
     });
 
@@ -452,6 +456,7 @@ export class AgentsService {
     });
 
     profile.verificationStatus = 'PENDING';
+    profile.rejectionReasons = [];
     await profile.save();
 
     await this.userModel.findByIdAndUpdate(user.id, {
@@ -462,6 +467,9 @@ export class AgentsService {
         kycFrontDocumentUrl: dto.frontDocumentUrl || dto.documentUrl,
         kycBackDocumentUrl: dto.backDocumentUrl,
         ...(dto.accountType ? { accountType: dto.accountType } : {}),
+      },
+      $unset: {
+        kycRejectionReason: 1,
       },
     });
 

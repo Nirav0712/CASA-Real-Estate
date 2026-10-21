@@ -645,11 +645,63 @@ export async function getAdminKycQueue(params?: {
   if (params?.limit) searchParams.set('limit', String(params.limit));
 
   const queryStr = searchParams.toString() ? `?${searchParams.toString()}` : '';
-  const result = await fetchAdminApi<KycQueueResponse>(`/admin/kyc${queryStr}`);
+  const result = await fetchAdminApi<any>(`/admin/kyc${queryStr}`);
 
-  if (result.isBackendAvailable && result.data) {
-    return result.data;
+  if (result.isBackendAvailable && (result.data || result.raw)) {
+    const raw = result.raw || {};
+    const resData = result.data || {};
+
+    const items: KycQueueItem[] = Array.isArray(resData?.items)
+      ? resData.items
+      : Array.isArray(resData?.data)
+      ? resData.data
+      : Array.isArray(resData)
+      ? resData
+      : Array.isArray(raw?.items)
+      ? raw.items
+      : Array.isArray(raw?.data)
+      ? raw.data
+      : [];
+
+    const countsSource = resData?.counts || resData?.metrics || raw?.counts || raw?.metrics || {};
+    const pending = typeof countsSource.pending === 'number'
+      ? countsSource.pending
+      : items.filter((i) => i.kycStatus === 'PENDING').length;
+    const approved = typeof countsSource.approved === 'number'
+      ? countsSource.approved
+      : items.filter((i) => i.kycStatus === 'APPROVED').length;
+    const rejected = typeof countsSource.rejected === 'number'
+      ? countsSource.rejected
+      : items.filter((i) => i.kycStatus === 'REJECTED').length;
+
+    const pagSource = resData?.pagination || raw?.pagination || {};
+    const total = typeof pagSource.total === 'number' ? pagSource.total : items.length;
+    const totalPages = typeof pagSource.totalPages === 'number'
+      ? pagSource.totalPages
+      : typeof pagSource.pages === 'number'
+      ? pagSource.pages
+      : Math.ceil(total / (params?.limit || 12)) || 1;
+
+    return {
+      items,
+      pagination: {
+        total,
+        page: params?.page || pagSource.page || 1,
+        limit: params?.limit || pagSource.limit || 12,
+        totalPages,
+      },
+      counts: {
+        pending,
+        approved,
+        rejected,
+      },
+    };
   }
+
+  if (result.error) {
+    throw new Error(result.error);
+  }
+
   return {
     items: [],
     pagination: {
