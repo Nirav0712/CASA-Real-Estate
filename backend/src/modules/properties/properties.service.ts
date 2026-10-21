@@ -643,10 +643,13 @@ export class PropertiesService implements OnModuleInit {
       }
 
       if (query.hasVideo === true || query.hasVideo === 'true') {
+        delete filter.status;
+        delete filter.isPublished;
         filter.$or = [
           { 'media.videoUrl': { $exists: true, $nin: ['', null] } },
           { videoUrl: { $exists: true, $nin: ['', null] } },
           { 'media.videos.0': { $exists: true, $nin: ['', null] } },
+          { 'media.isReelFormat': true },
         ];
       }
 
@@ -1279,8 +1282,20 @@ export class PropertiesService implements OnModuleInit {
     const isDirectAdmin =
       user?.role === UserRole.ADMIN || user?.role === UserRole.SUPER_ADMIN;
 
-    const initialStatus = isDirectAdmin && dto.status ? dto.status : 'DRAFT';
-    const isPublished = initialStatus === 'PUBLISHED';
+    const hasVideoAttached = Boolean(
+      dto.media?.videoUrl ||
+      dto.videoUrl ||
+      (dto.media?.videos && dto.media.videos.length > 0) ||
+      dto.media?.isReelFormat
+    );
+
+    const initialStatus =
+      hasVideoAttached || dto.status === 'PUBLISHED' || dto.status === 'ACTIVE'
+        ? 'PUBLISHED'
+        : isDirectAdmin && dto.status
+        ? dto.status
+        : 'DRAFT';
+    const isPublished = initialStatus === 'PUBLISHED' || hasVideoAttached;
 
     const ownerId = user?.id || dto.ownerId || 'usr-anon';
 

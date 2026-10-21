@@ -18,11 +18,11 @@ export function parseYouTubeUrl(rawUrl: string): ParsedYouTubeResult {
   const url = rawUrl.trim();
 
   const patterns = [
-    /(?:https?:\/\/)?(?:www\.)?youtube\.com\/watch\?(?:.*&)?v=([a-zA-Z0-9_-]{11})/,
-    /(?:https?:\/\/)?(?:www\.)?youtu\.be\/([a-zA-Z0-9_-]{11})/,
-    /(?:https?:\/\/)?(?:www\.)?youtube\.com\/embed\/([a-zA-Z0-9_-]{11})/,
-    /(?:https?:\/\/)?(?:www\.)?youtube\.com\/shorts\/([a-zA-Z0-9_-]{11})/,
-    /(?:https?:\/\/)?(?:www\.)?youtube-nocookie\.com\/embed\/([a-zA-Z0-9_-]{11})/,
+    /(?:https?:\/\/)?(?:www\.|m\.)?youtube\.com\/watch\?(?:.*&)?v=([a-zA-Z0-9_-]{11})/,
+    /(?:https?:\/\/)?(?:www\.|m\.)?youtu\.be\/([a-zA-Z0-9_-]{11})/,
+    /(?:https?:\/\/)?(?:www\.|m\.)?youtube\.com\/embed\/([a-zA-Z0-9_-]{11})/,
+    /(?:https?:\/\/)?(?:www\.|m\.)?youtube\.com\/shorts\/([a-zA-Z0-9_-]{11})/,
+    /(?:https?:\/\/)?(?:www\.|m\.)?youtube-nocookie\.com\/embed\/([a-zA-Z0-9_-]{11})/,
   ];
 
   for (const regex of patterns) {
@@ -32,7 +32,31 @@ export function parseYouTubeUrl(rawUrl: string): ParsedYouTubeResult {
       return {
         isValid: true,
         videoId,
-        embedUrl: `https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1&mute=1&playsinline=1&rel=0&modestbranding=1`,
+        embedUrl: `https://www.youtube.com/embed/${videoId}?autoplay=1&mute=0&playsinline=1&rel=0&modestbranding=1`,
+        thumbnailUrl: `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`,
+      };
+    }
+  }
+
+  // Handle raw 11-character video ID
+  if (/^[a-zA-Z0-9_-]{11}$/.test(url)) {
+    return {
+      isValid: true,
+      videoId: url,
+      embedUrl: `https://www.youtube.com/embed/${url}?autoplay=1&mute=0&playsinline=1&rel=0&modestbranding=1`,
+      thumbnailUrl: `https://img.youtube.com/vi/${url}/hqdefault.jpg`,
+    };
+  }
+
+  // Fallback for any URL containing youtu and an 11-char sequence
+  if (url.includes('youtu.be') || url.includes('youtube.com')) {
+    const fallbackMatch = url.match(/([a-zA-Z0-9_-]{11})/);
+    if (fallbackMatch && fallbackMatch[1]) {
+      const videoId = fallbackMatch[1];
+      return {
+        isValid: true,
+        videoId,
+        embedUrl: `https://www.youtube.com/embed/${videoId}?autoplay=1&mute=0&playsinline=1&rel=0&modestbranding=1`,
         thumbnailUrl: `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`,
       };
     }

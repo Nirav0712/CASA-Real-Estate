@@ -902,26 +902,59 @@ export default function VideoReelsAdminPage() {
 
             {/* Video Content */}
             <div className="relative flex-1 bg-black flex items-center justify-center overflow-hidden">
-              {activeReel.media?.videoUrl?.includes('youtu') ? (
-                <iframe
-                  key={activeReel.id}
-                  src={`${parseYouTubeUrl(activeReel.media.videoUrl).embedUrl}?autoplay=1&mute=0`}
-                  title="Video Reel Preview"
-                  className="w-full h-full object-cover"
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                  allowFullScreen
-                />
-              ) : (
-                <video
-                  key={activeReel.id}
-                  src={activeReel.media?.videoUrl || activeReel.videoUrl}
-                  controls
-                  autoPlay
-                  loop
-                  playsInline
-                  className="w-full h-full object-cover"
-                />
-              )}
+              {(() => {
+                const rawUrl = (
+                  activeReel.media?.videoUrl ||
+                  activeReel.videoUrl ||
+                  (activeReel.media?.videos && activeReel.media.videos[0]) ||
+                  ''
+                ).trim();
+
+                const parsed = parseYouTubeUrl(rawUrl);
+                const isYt =
+                  parsed.isValid ||
+                  rawUrl.includes('youtu.be') ||
+                  rawUrl.includes('youtube.com') ||
+                  rawUrl.includes('youtube-nocookie');
+
+                if (isYt) {
+                  const embed =
+                    parsed.embedUrl ||
+                    `https://www.youtube.com/embed/${parsed.videoId || ''}?autoplay=1&mute=0&playsinline=1&rel=0&modestbranding=1`;
+                  return (
+                    <iframe
+                      key={`${activeReel.id}-${embed}`}
+                      src={embed}
+                      title="Video Reel Preview"
+                      className="w-full h-full object-cover border-0"
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                      allowFullScreen
+                    />
+                  );
+                }
+
+                if (rawUrl) {
+                  return (
+                    <video
+                      key={`${activeReel.id}-${rawUrl}`}
+                      src={rawUrl}
+                      controls
+                      autoPlay
+                      loop
+                      playsInline
+                      className="w-full h-full object-cover"
+                    />
+                  );
+                }
+
+                return (
+                  <div className="flex flex-col items-center justify-center text-center p-6 text-white space-y-2">
+                    <Video className="w-12 h-12 text-casa-brand opacity-60" />
+                    <p className="text-sm font-semibold">Video preview unavailable</p>
+                    <p className="text-xs text-white/60">No video link was provided for this reel.</p>
+                  </div>
+                );
+              })()}
             </div>
 
             {/* Expandable Details Drawer */}

@@ -808,9 +808,12 @@ export default function NewPropertyWizardPage() {
         images: formData.uploadedImages.length > 0 ? formData.uploadedImages : [primaryImg],
         videos: formData.videoUrl ? [formData.videoUrl] : [],
         videoUrl: formData.videoUrl || undefined,
-        isReelFormat: formData.isReelFormat,
+        isReelFormat: formData.isReelFormat || Boolean(formData.videoUrl),
+        primaryMediaType: formData.videoUrl ? 'VIDEO' : 'IMAGE',
       },
-      status: 'DRAFT',
+      videoUrl: formData.videoUrl || undefined,
+      status: formData.videoUrl ? 'PUBLISHED' : 'DRAFT',
+      isPublished: Boolean(formData.videoUrl),
     };
   };
 
@@ -819,7 +822,26 @@ export default function NewPropertyWizardPage() {
     setIsSubmitting(true);
     try {
       const payload = buildPayload();
-      await createProperty(payload);
+      const created = await createProperty(payload);
+
+      // Immediately sync video reel to homepage feed
+      if (formData.videoUrl) {
+        try {
+          let customList: any[] = [];
+          const stored = localStorage.getItem('casa_custom_reels');
+          if (stored) customList = JSON.parse(stored);
+          const safeSlug = created?.slug || formData.titleEn.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+          const newReel = {
+            id: created?.id || `prop-video-${Date.now()}`,
+            ...payload,
+            slug: safeSlug,
+          };
+          customList = [newReel, ...customList.filter((p: any) => p.id !== newReel.id)];
+          localStorage.setItem('casa_custom_reels', JSON.stringify(customList));
+          window.dispatchEvent(new Event('casa_reels_updated'));
+        } catch (_) {}
+      }
+
       toast.success('Draft Saved', `"${formData.titleEn}" saved to database.`);
       router.push('/dashboard/properties');
     } catch (err: unknown) {
@@ -837,9 +859,28 @@ export default function NewPropertyWizardPage() {
       const payload = buildPayload();
       const created = await createProperty(payload);
       await submitPropertyForApproval(created.id);
+
+      // Immediately sync video reel to homepage feed
+      if (formData.videoUrl) {
+        try {
+          let customList: any[] = [];
+          const stored = localStorage.getItem('casa_custom_reels');
+          if (stored) customList = JSON.parse(stored);
+          const safeSlug = created?.slug || formData.titleEn.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+          const newReel = {
+            id: created?.id || `prop-video-${Date.now()}`,
+            ...payload,
+            slug: safeSlug,
+          };
+          customList = [newReel, ...customList.filter((p: any) => p.id !== newReel.id)];
+          localStorage.setItem('casa_custom_reels', JSON.stringify(customList));
+          window.dispatchEvent(new Event('casa_reels_updated'));
+        } catch (_) {}
+      }
+
       toast.success(
         'Listing Submitted',
-        'Your property has been submitted for CASA review. RERA details will be verified by compliance admins.',
+        'Your property has been submitted for myproperty review and video reel published!',
       );
       router.push('/dashboard/properties');
     } catch (err: unknown) {

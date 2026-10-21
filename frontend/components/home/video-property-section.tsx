@@ -5,7 +5,8 @@ import Link from 'next/link';
 import { Container } from '@/components/ui/card';
 import { formatPrice } from '@/lib/utils';
 import { parseYouTubeUrl } from '@/lib/video';
-import { searchProperties } from '@/services/property-service';
+import { useToast } from '@/contexts/toast-context';
+import { searchProperties, deleteProperty, getProperties } from '@/services/property-service';
 import { Property } from '@/types';
 import {
   Play,
@@ -30,6 +31,11 @@ import {
   ShieldCheck,
   Info,
   Check,
+  Trash2,
+  PlusCircle,
+  AlertCircle,
+  Eye,
+  EyeOff,
 } from 'lucide-react';
 
 const FALLBACK_VIDEO_PROPERTIES: Property[] = [
@@ -480,7 +486,8 @@ const FALLBACK_VIDEO_PROPERTIES: Property[] = [
 ];
 
 export function VideoPropertySection() {
-  const [properties, setProperties] = React.useState<Property[]>(FALLBACK_VIDEO_PROPERTIES);
+  const toast = useToast();
+  const [properties, setProperties] = React.useState<Property[]>([]);
   const [isLoading, setIsLoading] = React.useState(false);
   const [visibleCount, setVisibleCount] = React.useState(9);
 
@@ -494,59 +501,169 @@ export function VideoPropertySection() {
   const [showDetailsDrawer, setShowDetailsDrawer] = React.useState(false);
 
   // Fetch real videos from API with fallback & local storage sync
-  React.useEffect(() => {
-    let isMounted = true;
-    async function loadVideos() {
-      setIsLoading(true);
+  const loadVideos = React.useCallback(async () => {
+    setIsLoading(true);
+    try {
+      // 1. Check deleted IDs
+      let deletedIds = new Set<string>();
+      try {
+        const storedDeleted = localStorage.getItem('casa_deleted_reels');
+        if (storedDeleted) {
+          deletedIds = new Set(JSON.parse(storedDeleted));
+        }
+      } catch (_) {}
+
+      // 2. Check if user explicitly hid demo reels
+      const hideDemoReels = localStorage.getItem('casa_hide_demo_reels') === 'true';
+
+      // 3. Sync with custom reels created via Dashboard or New Property
+      let customReels: Property[] = [];
+      try {
+        const storedCustom = localStorage.getItem('casa_custom_reels');
+        if (storedCustom) {
+          customReels = JSON.parse(storedCustom);
+        }
+      } catch (_) {}
+
+      // 4. Fetch properties from API
+      let apiProperties: Property[] = [];
       try {
         const res = await searchProperties({
           hasVideo: true,
           limit: 50,
         });
-
-        // Sync with any deleted reels stored locally
-        let deletedIds = new Set<string>();
-        try {
-          const storedDeleted = localStorage.getItem('casa_deleted_reels');
-          if (storedDeleted) {
-            deletedIds = new Set(JSON.parse(storedDeleted));
-          }
-        } catch (_) {}
-
-        // Sync with custom admin created reels
-        let customReels: Property[] = [];
-        try {
-          const storedCustom = localStorage.getItem('casa_custom_reels');
-          if (storedCustom) {
-            customReels = JSON.parse(storedCustom);
-          }
-        } catch (_) {}
-
-        const apiList = (res.data || []).filter((p) => !deletedIds.has(p.id));
-        const filteredFallbacks = FALLBACK_VIDEO_PROPERTIES.filter((p) => !deletedIds.has(p.id));
-        const apiIds = new Set(apiList.map((p) => p.id));
-        const validCustom = customReels.filter((p) => !deletedIds.has(p.id) && !apiIds.has(p.id));
-
-        const combined = [
-          ...validCustom,
-          ...apiList,
-          ...filteredFallbacks.filter((p) => !apiIds.has(p.id)),
-        ];
-
-        if (isMounted) {
-          setProperties(combined);
+        if (res && Array.isArray(res.data) && res.data.length > 0) {
+          apiProperties = res.data;
         }
-      } catch (_) {
-        // Retain fallback dataset
-      } finally {
-        if (isMounted) setIsLoading(false);
+      } catch (_) {}
+
+      // Fallback check: if searchProperties returned 0, try getProperties
+      if (apiProperties.length === 0) {
+        try {
+          const allProps = await getProperties();
+          apiProperties = (allProps.properties || []).filter(
+            (p) => Boolean(p.media?.videoUrl || (p as any).videoUrl || (p.media?.videos && p.media.videos.length > 0))
+          );
+        } catch (_) {}
       }
+
+      const apiList = apiProperties.filter((p) => !deletedIds.has(p.id));
+      const apiIds = new Set(apiList.map((p) => p.id));
+      const validCustom = customReels.filter((p) => !deletedIds.has(p.id) && !apiIds.has(p.id));
+
+      const realCount = validCustom.length + apiList.length;
+
+      // Only show fallbacks if there are ZERO real properties and demo reels have not been hidden!
+      let fallbacksToShow: Property[] = [];
+      if (!hideDemoReels && realCount === 0) {
+        fallbacksToShow = FALLBACK_VIDEO_PROPERTIES.filter((p) => !deletedIds.has(p.id));
+      }
+
+      const combined = [
+        ...validCustom,
+        ...apiList,
+        ...fallbacksToShow.filter((p) => !apiIds.has(p.id)),
+      ];
+
+      setProperties(combined);
+    } catch (_) {
+      const hideDemo = localStorage.getItem('casa_hide_demo_reels') === 'true';
+      if (!hideDemo) {
+        setProperties(FALLBACK_VIDEO_PROPERTIES);
+      }
+    } finally {
+      setIsLoading(false);
     }
-    loadVideos();
-    return () => {
-      isMounted = false;
-    };
   }, []);
+
+  React.useEffect(() => {
+    loadVideos();
+
+    const handleReelsUpdated = () => {
+      loadVideos();
+    };
+    window.addEventListener('casa_reels_updated', handleReelsUpdated);
+    window.addEventListener('storage', handleReelsUpdated);
+
+    return () => {
+      window.removeEventListener('casa_reels_updated', handleReelsUpdated);
+      window.removeEventListener('storage', handleReelsUpdated);
+    };
+  }, [loadVideos]);
+
+  // Delete / Remove individual reel
+  const handleDeleteReel = async (property: Property) => {
+    try {
+      // 1. Add to deleted IDs
+      let deletedList: string[] = [];
+      try {
+        const stored = localStorage.getItem('casa_deleted_reels');
+        if (stored) deletedList = JSON.parse(stored);
+      } catch (_) {}
+
+      if (!deletedList.includes(property.id)) {
+        deletedList.push(property.id);
+        localStorage.setItem('casa_deleted_reels', JSON.stringify(deletedList));
+      }
+
+      // 2. Remove from custom reels if stored
+      try {
+        const storedCustom = localStorage.getItem('casa_custom_reels');
+        if (storedCustom) {
+          const customList: Property[] = JSON.parse(storedCustom);
+          const filtered = customList.filter((p) => p.id !== property.id);
+          localStorage.setItem('casa_custom_reels', JSON.stringify(filtered));
+        }
+      } catch (_) {}
+
+      // 3. Trigger backend delete if not demo ID
+      if (!property.id.startsWith('vid-reel-')) {
+        deleteProperty(property.id).catch(() => {});
+      }
+
+      // 4. Update local state
+      setProperties((prev) => prev.filter((p) => p.id !== property.id));
+
+      if (activeVideoIndex !== null && displayedProperties[activeVideoIndex]?.id === property.id) {
+        setActiveVideoIndex(null);
+      }
+
+      window.dispatchEvent(new Event('casa_reels_updated'));
+      toast.success(
+        'Reel Removed',
+        `"${typeof property.title === 'string' ? property.title : property.title?.en || 'Property'}" removed successfully.`
+      );
+    } catch (_) {
+      toast.error('Notice', 'Failed to remove reel.');
+    }
+  };
+
+  // Clear all demo reels permanently
+  const handleClearAllDemoReels = () => {
+    try {
+      let deletedList: string[] = [];
+      try {
+        const stored = localStorage.getItem('casa_deleted_reels');
+        if (stored) deletedList = JSON.parse(stored);
+      } catch (_) {}
+
+      FALLBACK_VIDEO_PROPERTIES.forEach((demo) => {
+        if (!deletedList.includes(demo.id)) {
+          deletedList.push(demo.id);
+        }
+      });
+
+      localStorage.setItem('casa_deleted_reels', JSON.stringify(deletedList));
+      localStorage.setItem('casa_hide_demo_reels', 'true');
+
+      setProperties((prev) => prev.filter((p) => !p.id.startsWith('vid-reel-')));
+      window.dispatchEvent(new Event('casa_reels_updated'));
+
+      toast.success('Demo Reels Removed', 'All 12 dummy demo video reels have been removed.');
+    } catch (_) {
+      toast.error('Notice', 'Failed to remove demo reels.');
+    }
+  };
 
   // Filter logic
   const filteredProperties = React.useMemo(() => {
@@ -659,9 +776,31 @@ export function VideoPropertySection() {
             </p>
           </div>
 
-          <div className="flex items-center gap-2 text-xs font-semibold text-casa-text-muted">
-            <Video className="w-4 h-4 text-casa-brand" />
-            <span>Showing {displayedProperties.length} of {filteredProperties.length} Video Properties</span>
+          <div className="flex flex-wrap items-center gap-2.5">
+            <Link
+              href="/dashboard/reels"
+              className="px-3.5 py-1.5 rounded-xl bg-casa-brand text-white hover:bg-casa-brand-hover text-xs font-bold transition-all shadow-subtle flex items-center gap-1.5"
+            >
+              <PlusCircle className="w-3.5 h-3.5" />
+              <span>Add / Manage Reels</span>
+            </Link>
+
+            {properties.some((p) => p.id.startsWith('vid-reel-')) && (
+              <button
+                type="button"
+                onClick={handleClearAllDemoReels}
+                className="px-3 py-1.5 rounded-xl bg-red-600/10 hover:bg-red-600 text-red-600 hover:text-white dark:bg-red-950/40 dark:text-red-300 border border-red-500/30 text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5"
+                title="Remove all dummy demo reels from the website"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Remove All Dummy Reels</span>
+              </button>
+            )}
+
+            <div className="flex items-center gap-1.5 text-xs font-semibold text-casa-text-muted px-2.5 py-1.5 rounded-xl bg-casa-surface border border-casa-border-light">
+              <Video className="w-3.5 h-3.5 text-casa-brand" />
+              <span>Showing {displayedProperties.length} of {filteredProperties.length} Reels</span>
+            </div>
           </div>
         </div>
 
@@ -765,13 +904,22 @@ export function VideoPropertySection() {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 sm:gap-5">
             {displayedProperties.map((property) => {
-              const video = property.media?.videoUrl || '';
-              const parsed = parseYouTubeUrl(video);
+              const rawCardVideo = (
+                property.media?.videoUrl ||
+                (property as any).videoUrl ||
+                (property.media?.videos && property.media.videos[0]) ||
+                ''
+              ).trim();
+              const parsed = parseYouTubeUrl(rawCardVideo);
               const thumb =
                 property.media?.thumbnailUrl ||
+                (property as any).thumbnailUrl ||
+                property.media?.coverImage ||
+                (property.media?.images && property.media.images[0]) ||
                 parsed.thumbnailUrl ||
                 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=800&q=80';
               const priceText = formatPrice(property.price?.amount || 0);
+              const isDemo = property.id.startsWith('vid-reel-');
 
               const locationString = [
                 property.location?.society,
@@ -801,16 +949,32 @@ export function VideoPropertySection() {
                   {/* Gradient Overlays for readable text */}
                   <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/30 to-black/60 pointer-events-none" />
 
-                  {/* Top Bar: Badge & Type */}
+                  {/* Top Bar: Badge, Type & Delete Button */}
                   <div className="relative z-10 p-3 flex items-center justify-between">
                     <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-black/60 backdrop-blur-md text-white text-[10px] font-bold border border-white/20">
                       <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
                       <span>9:16 Reel</span>
                     </span>
 
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-casa-brand text-white shadow-xs">
-                      {property.listingType === 'SALE' ? 'BUY' : 'RENT'}
-                    </span>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-casa-brand text-white shadow-xs">
+                        {property.listingType === 'SALE' ? 'BUY' : 'RENT'}
+                      </span>
+
+                      {/* Quick Delete / Purge button on each reel card */}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteReel(property);
+                        }}
+                        className="w-7 h-7 rounded-full bg-black/60 hover:bg-red-600 active:scale-95 text-white/80 hover:text-white flex items-center justify-center transition-all border border-white/20 cursor-pointer shadow-md"
+                        title={isDemo ? 'Remove this dummy demo reel' : 'Delete this video reel'}
+                        aria-label="Delete Reel"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                   </div>
 
                   {/* Center Play Button Overlay */}
@@ -941,26 +1105,63 @@ export function VideoPropertySection() {
 
               {/* Video Player Box */}
               <div className="relative flex-1 bg-black flex items-center justify-center overflow-hidden">
-                {activeVideoProperty.media?.videoUrl?.includes('youtu') ? (
-                  <iframe
-                    key={activeVideoProperty.id}
-                    src={`${parseYouTubeUrl(activeVideoProperty.media.videoUrl).embedUrl}?autoplay=1&mute=0`}
-                    title="Property Video Reel"
-                    className="w-full h-full object-cover"
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                    allowFullScreen
-                  />
-                ) : (
-                  <video
-                    key={activeVideoProperty.id}
-                    src={activeVideoProperty.media?.videoUrl || (activeVideoProperty as any).videoUrl}
-                    controls
-                    autoPlay
-                    loop
-                    playsInline
-                    className="w-full h-full object-cover"
-                  />
-                )}
+                {(() => {
+                  const rawUrl = (
+                    activeVideoProperty.media?.videoUrl ||
+                    (activeVideoProperty as any).videoUrl ||
+                    (activeVideoProperty.media?.videos && activeVideoProperty.media.videos[0]) ||
+                    ''
+                  ).trim();
+
+                  const parsed = parseYouTubeUrl(rawUrl);
+                  const isYt =
+                    parsed.isValid ||
+                    rawUrl.includes('youtu.be') ||
+                    rawUrl.includes('youtube.com') ||
+                    rawUrl.includes('youtube-nocookie');
+
+                  if (isYt) {
+                    const embed =
+                      parsed.embedUrl ||
+                      `https://www.youtube.com/embed/${parsed.videoId || ''}?autoplay=1&mute=0&playsinline=1&rel=0&modestbranding=1`;
+                    return (
+                      <iframe
+                        key={`${activeVideoProperty.id}-${embed}`}
+                        src={embed}
+                        title={
+                          typeof activeVideoProperty.title === 'string'
+                            ? activeVideoProperty.title
+                            : activeVideoProperty.title?.en || 'Property Video Reel'
+                        }
+                        className="w-full h-full object-cover border-0"
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                        allowFullScreen
+                      />
+                    );
+                  }
+
+                  if (rawUrl) {
+                    return (
+                      <video
+                        key={`${activeVideoProperty.id}-${rawUrl}`}
+                        src={rawUrl}
+                        controls
+                        autoPlay
+                        loop
+                        playsInline
+                        className="w-full h-full object-cover"
+                      />
+                    );
+                  }
+
+                  return (
+                    <div className="flex flex-col items-center justify-center text-center p-6 text-white space-y-2">
+                      <Video className="w-12 h-12 text-casa-brand opacity-60" />
+                      <p className="text-sm font-semibold">Video preview unavailable</p>
+                      <p className="text-xs text-white/60">No valid video link was attached to this property.</p>
+                    </div>
+                  );
+                })()}
 
                 {/* In-Video Mobile Touch Arrows */}
                 <button
