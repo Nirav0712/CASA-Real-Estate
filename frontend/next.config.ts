@@ -29,6 +29,14 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  async rewrites() {
+    return [
+      {
+        source: '/api/v1/:path*',
+        destination: 'https://snow-cod-326067.hostingersite.com/api/v1/:path*',
+      },
+    ];
+  },
   async headers() {
     return [
       {

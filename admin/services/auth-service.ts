@@ -6,10 +6,9 @@ import {
   ResetPasswordPayload,
 } from '@/types';
 
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL ||
-  process.env.NEXT_PUBLIC_API_URL ||
-  'http://localhost:5000/api/v1';
+import { getAdminApiBaseUrl } from '@/lib/api-client';
+
+const API_BASE_URL = getAdminApiBaseUrl();
 
 const ADMIN_PLATFORM_ROLES = ['SUPER_ADMIN', 'ADMIN', 'MODERATOR'];
 

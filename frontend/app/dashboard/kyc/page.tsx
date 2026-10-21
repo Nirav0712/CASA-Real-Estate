@@ -70,27 +70,23 @@ export default function KycVerificationDashboard() {
     if (!isAuthenticated) return;
     setLoading(true);
     try {
-      const [verifRes] = await Promise.allSettled([
-        getMyVerification(),
-        refreshUser(),
-      ]);
-      const res = verifRes.status === 'fulfilled' ? verifRes.value : await getMyVerification();
+      const res = await getMyVerification();
       setVerificationData({
         kycStatus: res.kycStatus || (res.verificationStatus as any) || 'NOT_SUBMITTED',
         kycRejectionReason: res.kycRejectionReason || res.rejectionReason,
         kycApprovedAt: res.kycApprovedAt || res.verifiedAt,
-        isTrialActive: Boolean(res.isTrialActive || user?.isTrialActive),
-        trialStartedAt: (res.trialStartedAt || user?.trialStartedAt) ?? undefined,
-        trialExpiresAt: (res.trialExpiresAt || user?.trialExpiresAt) ?? undefined,
+        isTrialActive: Boolean(res.isTrialActive),
+        trialStartedAt: res.trialStartedAt ?? undefined,
+        trialExpiresAt: res.trialExpiresAt ?? undefined,
         documents: res.documents || [],
         reraNumber: res.reraNumber,
         agencyName: res.agencyName,
       });
-      if (res.reraNumber && !documentNumber) {
-        setDocumentNumber(res.reraNumber);
+      if (res.reraNumber) {
+        setDocumentNumber((prev) => prev || res.reraNumber || '');
       }
-      if (res.agencyName && !agencyName) {
-        setAgencyName(res.agencyName);
+      if (res.agencyName) {
+        setAgencyName((prev) => prev || res.agencyName || '');
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Failed to fetch verification status';
@@ -98,7 +94,7 @@ export default function KycVerificationDashboard() {
     } finally {
       setLoading(false);
     }
-  }, [isAuthenticated, user, toast, documentNumber, agencyName, refreshUser]);
+  }, [isAuthenticated, toast]);
 
   React.useEffect(() => {
     if (isAuthenticated) {

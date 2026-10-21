@@ -4,7 +4,7 @@ import * as React from 'react';
 import Link from 'next/link';
 import { Container } from '@/components/ui/card';
 import { formatPrice } from '@/lib/utils';
-import { parseYouTubeUrl } from '@/lib/video';
+import { parseYouTubeUrl, parseInstagramUrl, detectVideoSource } from '@/lib/video';
 import { useToast } from '@/contexts/toast-context';
 import { searchProperties, deleteProperty, getProperties } from '@/services/property-service';
 import { Property } from '@/types';
@@ -533,16 +533,18 @@ export function VideoPropertySection() {
           limit: 50,
         });
         if (res && Array.isArray(res.data) && res.data.length > 0) {
-          apiProperties = res.data;
+          apiProperties = res.data.filter(
+            (p) => Boolean((p.media?.videoUrl || (p as any).videoUrl || (p.media?.videos && p.media.videos.length > 0) || '').trim())
+          );
         }
       } catch (_) {}
 
       // Fallback check: if searchProperties returned 0, try getProperties
       if (apiProperties.length === 0) {
         try {
-          const allProps = await getProperties();
+          const allProps = await getProperties({ hasVideo: true });
           apiProperties = (allProps.properties || []).filter(
-            (p) => Boolean(p.media?.videoUrl || (p as any).videoUrl || (p.media?.videos && p.media.videos.length > 0))
+            (p) => Boolean((p.media?.videoUrl || (p as any).videoUrl || (p.media?.videos && p.media.videos.length > 0) || '').trim())
           );
         } catch (_) {}
       }
@@ -951,10 +953,31 @@ export function VideoPropertySection() {
 
                   {/* Top Bar: Badge, Type & Delete Button */}
                   <div className="relative z-10 p-3 flex items-center justify-between">
-                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-black/60 backdrop-blur-md text-white text-[10px] font-bold border border-white/20">
-                      <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
-                      <span>9:16 Reel</span>
-                    </span>
+                    {(() => {
+                      const source = detectVideoSource(rawCardVideo);
+                      if (source === 'YOUTUBE') {
+                        return (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-red-600/90 text-white text-[10px] font-bold border border-white/20 shadow-xs">
+                            <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
+                            <span>YouTube</span>
+                          </span>
+                        );
+                      }
+                      if (source === 'INSTAGRAM') {
+                        return (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-gradient-to-r from-purple-600 via-pink-600 to-amber-500 text-white text-[10px] font-bold border border-white/20 shadow-xs">
+                            <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
+                            <span>Instagram</span>
+                          </span>
+                        );
+                      }
+                      return (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-black/60 backdrop-blur-md text-white text-[10px] font-bold border border-white/20">
+                          <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
+                          <span>9:16 Reel</span>
+                        </span>
+                      );
+                    })()}
 
                     <div className="flex items-center gap-1.5">
                       <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-casa-brand text-white shadow-xs">
@@ -1113,17 +1136,16 @@ export function VideoPropertySection() {
                     ''
                   ).trim();
 
-                  const parsed = parseYouTubeUrl(rawUrl);
-                  const isYt =
-                    parsed.isValid ||
-                    rawUrl.includes('youtu.be') ||
-                    rawUrl.includes('youtube.com') ||
-                    rawUrl.includes('youtube-nocookie');
+                  const sourceType = detectVideoSource(rawUrl);
 
-                  if (isYt) {
+                  // 1. YouTube Source
+                  if (sourceType === 'YOUTUBE') {
+                    const ytParsed = parseYouTubeUrl(rawUrl);
                     const embed =
-                      parsed.embedUrl ||
-                      `https://www.youtube.com/embed/${parsed.videoId || ''}?autoplay=1&mute=0&playsinline=1&rel=0&modestbranding=1`;
+                      ytParsed.embedUrl ||
+                      (ytParsed.videoId
+                        ? `https://www.youtube.com/embed/${ytParsed.videoId}?autoplay=1&mute=0&playsinline=1&rel=0&modestbranding=1`
+                        : rawUrl);
                     return (
                       <iframe
                         key={`${activeVideoProperty.id}-${embed}`}
@@ -1140,6 +1162,58 @@ export function VideoPropertySection() {
                     );
                   }
 
+                  // 2. Instagram Source
+                  if (sourceType === 'INSTAGRAM') {
+                    const igParsed = parseInstagramUrl(rawUrl);
+                    if (igParsed.isValid && igParsed.embedUrl) {
+                      return (
+                        <div className="relative w-full h-full flex flex-col items-center justify-center bg-black">
+                          <iframe
+                            key={`${activeVideoProperty.id}-${igParsed.embedUrl}`}
+                            src={igParsed.embedUrl}
+                            title="Instagram Reel"
+                            className="w-full h-full border-0"
+                            allow="autoplay; encrypted-media; picture-in-picture"
+                            allowFullScreen
+                          />
+                          <div className="absolute top-14 right-2 z-20">
+                            <a
+                              href={igParsed.directUrl || rawUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="px-2.5 py-1 rounded-full bg-black/75 hover:bg-black text-white text-[10px] font-semibold border border-white/20 flex items-center gap-1 shadow-lg backdrop-blur-sm"
+                              title="Open directly on Instagram"
+                            >
+                              <span>Open on Instagram</span>
+                              <ExternalLink className="w-3 h-3" />
+                            </a>
+                          </div>
+                        </div>
+                      );
+                    }
+
+                    // Fallback for restricted or unsupported Instagram links
+                    return (
+                      <div className="flex flex-col items-center justify-center text-center p-6 text-white space-y-3">
+                        <Video className="w-12 h-12 text-pink-500 opacity-80" />
+                        <p className="text-sm font-semibold">Instagram Video Notice</p>
+                        <p className="text-xs text-white/70 max-w-xs">
+                          This Instagram video is restricted or requires viewing directly in Instagram.
+                        </p>
+                        <a
+                          href={rawUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="px-4 py-2 bg-gradient-to-r from-purple-600 via-pink-600 to-amber-600 hover:opacity-90 text-white rounded-xl text-xs font-bold inline-flex items-center gap-1.5 shadow-md"
+                        >
+                          <span>Watch on Instagram</span>
+                          <ExternalLink className="w-3.5 h-3.5" />
+                        </a>
+                      </div>
+                    );
+                  }
+
+                  // 3. Local / Cloudinary / ImageKit / Direct MP4 or WebM video
                   if (rawUrl) {
                     return (
                       <video

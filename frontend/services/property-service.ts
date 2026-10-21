@@ -1,4 +1,4 @@
-import { fetchApi } from '@/lib/api-client';
+import { fetchApi, getApiBaseUrl } from '@/lib/api-client';
 import { Property, SearchPropertiesParams, PaginatedResponse } from '@/types';
 
 // Controlled development fallback dataset if backend API is offline
@@ -211,6 +211,7 @@ export async function getProperties(params?: {
   city?: string;
   q?: string;
   featured?: boolean;
+  hasVideo?: boolean;
 }): Promise<{
   properties: Property[];
   source: 'api' | 'fallback_dev';
@@ -231,9 +232,12 @@ export async function getProperties(params?: {
   if (params?.featured) {
     searchParams.set('featured', 'true');
   }
+  if (params?.hasVideo) {
+    searchParams.set('hasVideo', 'true');
+  }
 
   const endpoint = `/properties${searchParams.toString() ? `?${searchParams.toString()}` : ''}`;
-  const result = await fetchApi<Property[]>(endpoint);
+  const result = await fetchApi<Property[]>(endpoint, { cache: 'no-store' });
 
   if (result.isBackendAvailable && result.data && Array.isArray(result.data)) {
     return { properties: result.data, source: 'api' };
@@ -241,6 +245,12 @@ export async function getProperties(params?: {
 
   // Fallback filtering in memory
   let filtered = [...DEV_FALLBACK_PROPERTIES];
+
+  if (params?.hasVideo) {
+    filtered = filtered.filter(
+      (p) => Boolean(p.media?.videoUrl || (p as any).videoUrl || (p.media?.videos && p.media.videos.length > 0))
+    );
+  }
 
   if (params?.featured) {
     filtered = filtered.filter((p) => p.isFeatured);
@@ -295,7 +305,7 @@ export async function searchProperties(params?: SearchPropertiesParams): Promise
   }
 
   const endpoint = `/properties/search${searchParams.toString() ? `?${searchParams.toString()}` : ''}`;
-  const result = await fetchApi<PaginatedResponse<Property>>(endpoint);
+  const result = await fetchApi<PaginatedResponse<Property>>(endpoint, { cache: 'no-store' });
 
   if (result.isBackendAvailable && result.data && Array.isArray(result.data.data)) {
     return result.data;
@@ -425,4 +435,61 @@ export async function deleteProperty(id: string): Promise<{ success: boolean; me
   }
 
   return result.data;
+}
+
+export async function uploadPropertyVideo(
+  file: File,
+  onProgress?: (percent: number) => void,
+): Promise<{ url: string; videoType: string; originalName?: string; size?: number }> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const apiBase = getApiBaseUrl();
+
+    xhr.open('POST', `${apiBase}/properties/upload-video`);
+
+    // Attach auth token if available
+    if (typeof window !== 'undefined') {
+      const token = localStorage.getItem('casa_access_token');
+      if (token) {
+        xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+      }
+    }
+
+    if (xhr.upload && onProgress) {
+      xhr.upload.onprogress = (event) => {
+        if (event.lengthComputable) {
+          const percent = Math.round((event.loaded / event.total) * 100);
+          onProgress(percent);
+        }
+      };
+    }
+
+    xhr.onload = () => {
+      let resp: any = null;
+      try {
+        resp = JSON.parse(xhr.responseText);
+      } catch {
+        resp = null;
+      }
+
+      if (xhr.status >= 200 && xhr.status < 300) {
+        const data = resp?.data !== undefined ? resp.data : resp;
+        resolve(data);
+      } else {
+        const errorMsg =
+          resp?.message || resp?.error || `Upload failed with status ${xhr.status}`;
+        const finalMsg = Array.isArray(errorMsg) ? errorMsg.join(', ') : errorMsg;
+        reject(new Error(finalMsg));
+      }
+    };
+
+    xhr.onerror = () => {
+      reject(new Error('Network error during video upload. Please check your connection.'));
+    };
+
+    xhr.send(formData);
+  });
 }

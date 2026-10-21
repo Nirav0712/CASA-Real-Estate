@@ -17,6 +17,7 @@ import {
   validateReraNumber,
 } from '@/lib/property-categories';
 import { PropertyUnitsManager } from '@/components/property/property-units-manager';
+import { PropertyVideoManager } from '@/components/property/property-video-manager';
 import {
   PropertyStructureType,
   PropertyUnitDetails,
@@ -278,6 +279,15 @@ export default function NewPropertyWizardPage() {
   const [currentStep, setCurrentStep] = React.useState(1);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
 
+  // Auto-prompt login modal if visitor is logged out
+  const hasPromptedAuth = React.useRef(false);
+  React.useEffect(() => {
+    if (!isAuthLoading && !isAuthenticated && !hasPromptedAuth.current) {
+      hasPromptedAuth.current = true;
+      openAuthModal('SIGN_IN');
+    }
+  }, [isAuthLoading, isAuthenticated, openAuthModal]);
+
   // Multi-Unit & Plotted Hierarchy State
   const [structureType, setStructureType] = React.useState<PropertyStructureType>('INDEPENDENT');
   const [projectDetails, setProjectDetails] = React.useState<ProjectBuildingDetails>({
@@ -392,6 +402,7 @@ export default function NewPropertyWizardPage() {
     // Step 6: Photos & Video
     uploadedImages: [] as string[],
     videoUrl: '',
+    videoType: '' as string | undefined,
     isReelFormat: true,
   });
 
@@ -808,12 +819,14 @@ export default function NewPropertyWizardPage() {
         images: formData.uploadedImages.length > 0 ? formData.uploadedImages : [primaryImg],
         videos: formData.videoUrl ? [formData.videoUrl] : [],
         videoUrl: formData.videoUrl || undefined,
+        videoType: formData.videoType || undefined,
         isReelFormat: formData.isReelFormat || Boolean(formData.videoUrl),
         primaryMediaType: formData.videoUrl ? 'VIDEO' : 'IMAGE',
       },
       videoUrl: formData.videoUrl || undefined,
-      status: formData.videoUrl ? 'PUBLISHED' : 'DRAFT',
-      isPublished: Boolean(formData.videoUrl),
+      videoType: formData.videoType || undefined,
+      status: 'DRAFT',
+      isPublished: false,
     };
   };
 
@@ -822,25 +835,7 @@ export default function NewPropertyWizardPage() {
     setIsSubmitting(true);
     try {
       const payload = buildPayload();
-      const created = await createProperty(payload);
-
-      // Immediately sync video reel to homepage feed
-      if (formData.videoUrl) {
-        try {
-          let customList: any[] = [];
-          const stored = localStorage.getItem('casa_custom_reels');
-          if (stored) customList = JSON.parse(stored);
-          const safeSlug = created?.slug || formData.titleEn.toLowerCase().replace(/[^a-z0-9]+/g, '-');
-          const newReel = {
-            id: created?.id || `prop-video-${Date.now()}`,
-            ...payload,
-            slug: safeSlug,
-          };
-          customList = [newReel, ...customList.filter((p: any) => p.id !== newReel.id)];
-          localStorage.setItem('casa_custom_reels', JSON.stringify(customList));
-          window.dispatchEvent(new Event('casa_reels_updated'));
-        } catch (_) {}
-      }
+      await createProperty({ ...payload, status: 'DRAFT' });
 
       toast.success('Draft Saved', `"${formData.titleEn}" saved to database.`);
       router.push('/dashboard/properties');
@@ -857,30 +852,12 @@ export default function NewPropertyWizardPage() {
     setIsSubmitting(true);
     try {
       const payload = buildPayload();
-      const created = await createProperty(payload);
+      const created = await createProperty({ ...payload, status: 'DRAFT' });
       await submitPropertyForApproval(created.id);
-
-      // Immediately sync video reel to homepage feed
-      if (formData.videoUrl) {
-        try {
-          let customList: any[] = [];
-          const stored = localStorage.getItem('casa_custom_reels');
-          if (stored) customList = JSON.parse(stored);
-          const safeSlug = created?.slug || formData.titleEn.toLowerCase().replace(/[^a-z0-9]+/g, '-');
-          const newReel = {
-            id: created?.id || `prop-video-${Date.now()}`,
-            ...payload,
-            slug: safeSlug,
-          };
-          customList = [newReel, ...customList.filter((p: any) => p.id !== newReel.id)];
-          localStorage.setItem('casa_custom_reels', JSON.stringify(customList));
-          window.dispatchEvent(new Event('casa_reels_updated'));
-        } catch (_) {}
-      }
 
       toast.success(
         'Listing Submitted',
-        'Your property has been submitted for myproperty review and video reel published!',
+        'Your property has been submitted for review.',
       );
       router.push('/dashboard/properties');
     } catch (err: unknown) {
@@ -2556,62 +2533,20 @@ export default function NewPropertyWizardPage() {
             )}
 
             {/* Dedicated Property Video / 9:16 Vertical Reel Section */}
-            <div className="pt-4 border-t border-casa-border-light space-y-3">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                <div>
-                  <h3 className="text-xs font-bold text-casa-text-primary flex items-center gap-1.5">
-                    <Video className="w-4 h-4 text-casa-brand" />
-                    <span>Property Video / 9:16 Video Reel (Optional)</span>
-                  </h3>
-                  <p className="text-[11px] text-casa-text-secondary mt-0.5">
-                    Videos tagged as 9:16 format appear prominently in the dedicated Video Property section on the CASA homepage.
-                  </p>
-                </div>
-                <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-casa-text-primary bg-casa-surface border border-casa-border-light px-3 py-1.5 rounded-xl">
-                  <input
-                    type="checkbox"
-                    checked={formData.isReelFormat}
-                    onChange={(e) => setFormData({ ...formData, isReelFormat: e.target.checked })}
-                    className="w-4 h-4 text-casa-brand rounded focus:ring-casa-brand"
-                  />
-                  <span>9:16 Reel Format</span>
-                </label>
-              </div>
-
-              <div>
-                <input
-                  type="url"
-                  placeholder="Paste YouTube Short, Instagram Reel, or MP4 video URL (e.g. https://www.youtube.com/shorts/...)"
-                  value={formData.videoUrl}
-                  onChange={(e) => setFormData({ ...formData, videoUrl: e.target.value })}
-                  className="w-full px-3.5 py-2.5 text-xs bg-casa-canvas border border-casa-border-light rounded-xl text-casa-text-primary placeholder:text-casa-text-muted focus:outline-none focus:border-casa-brand"
-                />
-              </div>
-
-              {formData.videoUrl && (
-                <div className="p-3 bg-casa-subtle/50 rounded-xl border border-casa-border-light flex items-center justify-between text-xs">
-                  <div className="flex items-center gap-2 overflow-hidden">
-                    <div className="w-7 h-7 rounded-lg bg-red-600/10 text-red-600 flex items-center justify-center flex-shrink-0">
-                      <Play className="w-3.5 h-3.5 fill-current" />
-                    </div>
-                    <span className="font-medium text-casa-text-primary truncate max-w-sm">
-                      {formData.videoUrl}
-                    </span>
-                    {formData.isReelFormat && (
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-casa-brand/10 text-casa-brand">
-                        9:16 Reel
-                      </span>
-                    )}
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setFormData({ ...formData, videoUrl: '' })}
-                    className="text-red-500 hover:text-red-700 text-xs font-semibold flex-shrink-0 cursor-pointer"
-                  >
-                    Remove
-                  </button>
-                </div>
-              )}
+            <div className="pt-4 border-t border-casa-border-light">
+              <PropertyVideoManager
+                videoUrl={formData.videoUrl}
+                videoType={formData.videoType}
+                isReelFormat={formData.isReelFormat}
+                onChange={({ videoUrl, isReelFormat, videoType }) =>
+                  setFormData((prev) => ({
+                    ...prev,
+                    videoUrl,
+                    isReelFormat,
+                    videoType,
+                  }))
+                }
+              />
             </div>
           </div>
         )}

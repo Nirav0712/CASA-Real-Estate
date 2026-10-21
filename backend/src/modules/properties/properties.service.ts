@@ -3,6 +3,7 @@ import {
   NotFoundException,
   BadRequestException,
   ForbiddenException,
+  ServiceUnavailableException,
   Logger,
   OnModuleInit,
 } from '@nestjs/common';
@@ -643,13 +644,12 @@ export class PropertiesService implements OnModuleInit {
       }
 
       if (query.hasVideo === true || query.hasVideo === 'true') {
-        delete filter.status;
-        delete filter.isPublished;
+        filter.status = { $in: ['PUBLISHED', 'ACTIVE'] };
+        filter.isPublished = true;
         filter.$or = [
           { 'media.videoUrl': { $exists: true, $nin: ['', null] } },
           { videoUrl: { $exists: true, $nin: ['', null] } },
           { 'media.videos.0': { $exists: true, $nin: ['', null] } },
-          { 'media.isReelFormat': true },
         ];
       }
 
@@ -849,16 +849,14 @@ export class PropertiesService implements OnModuleInit {
       }
 
       if (dto.hasVideo) {
-        delete filter.status;
-        delete filter.isPublished;
+        filter.status = { $in: ['PUBLISHED', 'ACTIVE'] };
+        filter.isPublished = true;
         filter.$and = filter.$and || [];
         filter.$and.push({
-          status: { $in: ['PUBLISHED', 'ACTIVE', 'PENDING_REVIEW', 'APPROVED', 'DRAFT'] },
           $or: [
             { 'media.videoUrl': { $exists: true, $nin: ['', null] } },
             { videoUrl: { $exists: true, $nin: ['', null] } },
             { 'media.videos.0': { $exists: true, $nin: ['', null] } },
-            { 'media.isReelFormat': true },
           ],
         });
       }
@@ -1038,6 +1036,10 @@ export class PropertiesService implements OnModuleInit {
         default:
           sortObj = { isFeatured: -1, publishedAt: -1, createdAt: -1 };
           break;
+      }
+
+      if (dto.hasVideo && (!dto.sort || dto.sort === PropertySortOption.NEWEST)) {
+        sortObj = { publishedAt: -1, createdAt: -1 };
       }
 
       // 13. Pagination Parameters
@@ -1290,12 +1292,12 @@ export class PropertiesService implements OnModuleInit {
     );
 
     const initialStatus =
-      hasVideoAttached || dto.status === 'PUBLISHED' || dto.status === 'ACTIVE'
-        ? 'PUBLISHED'
-        : isDirectAdmin && dto.status
+      isDirectAdmin && (dto.status === 'PUBLISHED' || dto.status === 'ACTIVE')
         ? dto.status
+        : dto.status === 'PENDING_REVIEW' || dto.status === 'SUBMITTED'
+        ? 'PENDING_REVIEW'
         : 'DRAFT';
-    const isPublished = initialStatus === 'PUBLISHED' || hasVideoAttached;
+    const isPublished = initialStatus === 'PUBLISHED' || initialStatus === 'ACTIVE';
 
     const ownerId = user?.id || dto.ownerId || 'usr-anon';
 
@@ -1760,5 +1762,137 @@ export class PropertiesService implements OnModuleInit {
     cat.isActive = !cat.isActive;
     await cat.save();
     return cat;
+  }
+
+  async uploadVideoFile(file: any, user: AuthenticatedUser) {
+    if (!file) {
+      throw new BadRequestException('Please select a video file to upload.');
+    }
+
+    // 1. Validation: Mime Type and Extension
+    const allowedMimeTypes = [
+      'video/mp4',
+      'video/webm',
+      'video/quicktime',
+      'video/ogg',
+      'video/x-m4v',
+    ];
+    const allowedExtensions = ['.mp4', '.webm', '.mov', '.ogg', '.m4v'];
+    const originalName = (file.originalname || '').toLowerCase();
+    const hasValidExt = allowedExtensions.some((ext) => originalName.endsWith(ext));
+    const hasValidMime = allowedMimeTypes.includes((file.mimetype || '').toLowerCase());
+
+    if (!hasValidExt && !hasValidMime) {
+      throw new BadRequestException(
+        'Unsupported video file format. Supported video formats are MP4, WebM, and MOV.',
+      );
+    }
+
+    // 2. Validation: Max File Size (100 MB)
+    const maxBytes = 100 * 1024 * 1024;
+    if (file.size > maxBytes) {
+      throw new BadRequestException(
+        `Video file exceeds maximum allowed size of 100MB. (Uploaded size: ${(file.size / (1024 * 1024)).toFixed(1)}MB)`,
+      );
+    }
+
+    // 3. Persistent cloud storage credentials verification
+    const ikPrivateKey = process.env.IMAGEKIT_PRIVATE_KEY;
+    const ikPublicKey = process.env.IMAGEKIT_PUBLIC_KEY;
+    const ikUrlEndpoint = process.env.IMAGEKIT_URL_ENDPOINT || 'https://ik.imagekit.io/casa';
+    const cloudinaryUrl = process.env.CLOUDINARY_URL;
+
+    // A. ImageKit Cloud Storage
+    if (ikPrivateKey && ikPrivateKey !== 'your_imagekit_private_key') {
+      try {
+        const authHeader = 'Basic ' + Buffer.from(`${ikPrivateKey}:`).toString('base64');
+        const formData = new FormData();
+        const blob = new Blob([file.buffer], { type: file.mimetype || 'video/mp4' });
+        formData.append('file', blob, file.originalname);
+        formData.append('fileName', `${Date.now()}-${file.originalname}`);
+        formData.append('folder', '/casa/properties/videos');
+
+        const uploadRes = await fetch('https://upload.imagekit.io/api/v1/files/upload', {
+          method: 'POST',
+          headers: {
+            Authorization: authHeader,
+          },
+          body: formData,
+        });
+
+        if (!uploadRes.ok) {
+          const errData = (await uploadRes.json().catch(() => ({}))) as any;
+          throw new Error(errData?.message || `ImageKit upload HTTP ${uploadRes.status}`);
+        }
+
+        const data: any = await uploadRes.json();
+        this.logger.log(`🎬 Video uploaded to ImageKit CDN: ${data.url} (${file.originalname})`);
+        return {
+          url: data.url,
+          videoType: 'LOCAL',
+          provider: 'imagekit',
+          originalName: file.originalname,
+          size: file.size,
+        };
+      } catch (err: any) {
+        this.logger.error(`ImageKit upload failed: ${err?.message}`);
+        throw new BadRequestException(`ImageKit cloud upload failed: ${err?.message}`);
+      }
+    }
+
+    // B. Cloudinary Cloud Storage
+    if (cloudinaryUrl) {
+      try {
+        const uriParts = new URL(cloudinaryUrl);
+        const apiKey = uriParts.username;
+        const apiSecret = uriParts.password;
+        const cloudName = uriParts.hostname;
+        const uploadUrl = `https://api.cloudinary.com/v1_1/${cloudName}/video/upload`;
+        const timestamp = Math.floor(Date.now() / 1000);
+
+        const crypto = await import('crypto');
+        const signatureStr = `folder=casa/properties/videos&timestamp=${timestamp}${apiSecret}`;
+        const signature = crypto.createHash('sha1').update(signatureStr).digest('hex');
+
+        const formData = new FormData();
+        const blob = new Blob([file.buffer], { type: file.mimetype || 'video/mp4' });
+        formData.append('file', blob, file.originalname);
+        formData.append('api_key', apiKey);
+        formData.append('timestamp', String(timestamp));
+        formData.append('signature', signature);
+        formData.append('folder', 'casa/properties/videos');
+
+        const uploadRes = await fetch(uploadUrl, {
+          method: 'POST',
+          body: formData,
+        });
+
+        if (!uploadRes.ok) {
+          const errData = (await uploadRes.json().catch(() => ({}))) as any;
+          throw new Error(errData?.error?.message || `Cloudinary upload HTTP ${uploadRes.status}`);
+        }
+
+        const data: any = await uploadRes.json();
+        this.logger.log(`🎬 Video uploaded to Cloudinary: ${data.secure_url}`);
+        return {
+          url: data.secure_url,
+          videoType: 'LOCAL',
+          provider: 'cloudinary',
+          originalName: file.originalname,
+          size: file.size,
+        };
+      } catch (err: any) {
+        this.logger.error(`Cloudinary upload failed: ${err?.message}`);
+        throw new BadRequestException(`Cloudinary upload failed: ${err?.message}`);
+      }
+    }
+
+    // C. Missing cloud storage credentials
+    this.logger.warn(
+      '⚠️ Direct video file upload attempted, but persistent cloud storage credentials are not configured.',
+    );
+    throw new ServiceUnavailableException(
+      'Direct video upload requires persistent cloud media storage configuration. Missing required environment variables: IMAGEKIT_PRIVATE_KEY, IMAGEKIT_PUBLIC_KEY, and IMAGEKIT_URL_ENDPOINT (or AWS_S3_BUCKET / CLOUDINARY_URL). Please configure these in backend/.env to enable direct video file storage, or use a YouTube Short or Instagram Reel URL.',
+    );
   }
 }

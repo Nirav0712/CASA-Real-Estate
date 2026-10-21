@@ -570,7 +570,7 @@ export function Header() {
               )}
 
               {/* Post Free Property CTA */}
-              <Link href="/#post-ad">
+              <Link href="/dashboard/properties/new">
                 <Button variant="primary" size="sm" className="shadow-sm">
                   <PlusCircle className="w-4 h-4" />
                   <span className="hidden sm:inline">{t('postAd')}</span>
@@ -1044,7 +1044,7 @@ export function Header() {
               <span>{SUPPORTED_LOCALES[locale].nativeName} ({locale.toUpperCase()})</span>
             </Button>
 
-            <Link href="/#post-ad" onClick={() => setIsMobileMenuOpen(false)}>
+            <Link href="/dashboard/properties/new" onClick={() => setIsMobileMenuOpen(false)}>
               <Button variant="primary" size="md" fullWidth>
                 <PlusCircle className="w-4 h-4" />
                 <span>{t('postAd')}</span>

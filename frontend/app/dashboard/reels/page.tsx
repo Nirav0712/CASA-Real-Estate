@@ -7,7 +7,7 @@ import { useToast } from '@/contexts/toast-context';
 import { Card, Container } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { formatPrice } from '@/lib/utils';
-import { parseYouTubeUrl } from '@/lib/video';
+import { parseYouTubeUrl, parseInstagramUrl, detectVideoSource } from '@/lib/video';
 import {
   getMyProperties,
   createProperty,
@@ -869,17 +869,15 @@ export default function BrokerReelsPage() {
                   ''
                 ).trim();
 
-                const parsed = parseYouTubeUrl(rawUrl);
-                const isYt =
-                  parsed.isValid ||
-                  rawUrl.includes('youtu.be') ||
-                  rawUrl.includes('youtube.com') ||
-                  rawUrl.includes('youtube-nocookie');
+                const sourceType = detectVideoSource(rawUrl);
 
-                if (isYt) {
+                if (sourceType === 'YOUTUBE') {
+                  const ytParsed = parseYouTubeUrl(rawUrl);
                   const embed =
-                    parsed.embedUrl ||
-                    `https://www.youtube.com/embed/${parsed.videoId || ''}?autoplay=1&mute=0&playsinline=1&rel=0&modestbranding=1`;
+                    ytParsed.embedUrl ||
+                    (ytParsed.videoId
+                      ? `https://www.youtube.com/embed/${ytParsed.videoId}?autoplay=1&mute=0&playsinline=1&rel=0&modestbranding=1`
+                      : rawUrl);
                   return (
                     <iframe
                       key={`${activeReel.id}-${embed}`}
@@ -889,6 +887,55 @@ export default function BrokerReelsPage() {
                       allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
                       allowFullScreen
                     />
+                  );
+                }
+
+                if (sourceType === 'INSTAGRAM') {
+                  const igParsed = parseInstagramUrl(rawUrl);
+                  if (igParsed.isValid && igParsed.embedUrl) {
+                    return (
+                      <div className="relative w-full h-full flex flex-col items-center justify-center bg-black">
+                        <iframe
+                          key={`${activeReel.id}-${igParsed.embedUrl}`}
+                          src={igParsed.embedUrl}
+                          title="Instagram Reel Preview"
+                          className="w-full h-full border-0"
+                          allow="autoplay; encrypted-media; picture-in-picture"
+                          allowFullScreen
+                        />
+                        <div className="absolute top-14 right-2 z-20">
+                          <a
+                            href={igParsed.directUrl || rawUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="px-2.5 py-1 rounded-full bg-black/75 hover:bg-black text-white text-[10px] font-semibold border border-white/20 flex items-center gap-1 shadow-lg backdrop-blur-sm"
+                            title="Open directly on Instagram"
+                          >
+                            <span>Open on Instagram</span>
+                            <ExternalLink className="w-3 h-3" />
+                          </a>
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div className="flex flex-col items-center justify-center text-center p-6 text-white space-y-3">
+                      <Video className="w-12 h-12 text-pink-500 opacity-80" />
+                      <p className="text-sm font-semibold">Instagram Video Notice</p>
+                      <p className="text-xs text-white/70 max-w-xs">
+                        This Instagram reel requires viewing directly on Instagram.
+                      </p>
+                      <a
+                        href={rawUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="px-4 py-2 bg-gradient-to-r from-purple-600 via-pink-600 to-amber-600 hover:opacity-90 text-white rounded-xl text-xs font-bold inline-flex items-center gap-1.5 shadow-md"
+                      >
+                        <span>Watch on Instagram</span>
+                        <ExternalLink className="w-3.5 h-3.5" />
+                      </a>
+                    </div>
                   );
                 }
 

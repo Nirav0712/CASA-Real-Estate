@@ -12,10 +12,9 @@ import {
   GenericAuthResponse,
 } from '@/types';
 
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL ||
-  process.env.NEXT_PUBLIC_API_URL ||
-  'http://localhost:5000/api/v1';
+import { getApiBaseUrl } from '@/lib/api-client';
+
+const API_BASE_URL = getApiBaseUrl();
 
 /**
  * Step 3A.1: Register a new account with email & password

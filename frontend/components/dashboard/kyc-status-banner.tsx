@@ -32,22 +32,14 @@ export function KycStatusBanner({ className = '', onRefresh }: KycStatusBannerPr
   const fetchLiveStatus = React.useCallback(async () => {
     setIsRefreshing(true);
     try {
-      const [verifRes] = await Promise.allSettled([
-        getMyVerification(),
-        refreshUser(),
-      ]);
-      if (verifRes.status === 'fulfilled') {
-        setVerification(verifRes.value);
-      }
+      const res = await getMyVerification();
+      setVerification(res);
     } catch {
       // Keep existing data on transient error
     } finally {
       setIsRefreshing(false);
-      if (onRefresh) {
-        onRefresh();
-      }
     }
-  }, [refreshUser, onRefresh]);
+  }, []);
 
   React.useEffect(() => {
     fetchLiveStatus();

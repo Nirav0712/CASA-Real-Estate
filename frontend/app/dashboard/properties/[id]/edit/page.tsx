@@ -20,6 +20,7 @@ import {
   validateReraNumber,
 } from '@/lib/property-categories';
 import { PropertyUnitsManager } from '@/components/property/property-units-manager';
+import { PropertyVideoManager } from '@/components/property/property-video-manager';
 import {
   PropertyStructureType,
   PropertyUnitDetails,
@@ -183,6 +184,9 @@ export default function EditPropertyPage() {
     // Media & Amenities
     amenities: [] as string[],
     uploadedImages: [] as string[],
+    videoUrl: '',
+    videoType: '' as string | undefined,
+    isReelFormat: true,
   });
 
   const fileInputRef = React.useRef<HTMLInputElement>(null);
@@ -317,6 +321,9 @@ export default function EditPropertyPage() {
 
         amenities: data.amenities || [],
         uploadedImages: data.media?.images || (data.media?.thumbnailUrl ? [data.media.thumbnailUrl] : []),
+        videoUrl: data.media?.videoUrl || (data as any).videoUrl || (data.media?.videos && data.media.videos[0]) || '',
+        videoType: data.media?.videoType || (data as any).videoType || '',
+        isReelFormat: data.media?.isReelFormat !== undefined ? Boolean(data.media.isReelFormat) : true,
       });
 
       // Hydrate multi-unit states
@@ -505,7 +512,14 @@ export default function EditPropertyPage() {
         thumbnailUrl: primaryImg,
         coverImage: primaryImg,
         images: formData.uploadedImages.length > 0 ? formData.uploadedImages : [primaryImg],
+        videos: formData.videoUrl ? [formData.videoUrl] : [],
+        videoUrl: formData.videoUrl || undefined,
+        videoType: formData.videoType || undefined,
+        isReelFormat: formData.isReelFormat || Boolean(formData.videoUrl),
+        primaryMediaType: formData.videoUrl ? 'VIDEO' : 'IMAGE',
       },
+      videoUrl: formData.videoUrl || undefined,
+      videoType: formData.videoType || undefined,
     };
   };
 
@@ -1202,6 +1216,23 @@ export default function EditPropertyPage() {
               ))}
             </div>
           )}
+
+          {/* Dedicated Property Video / 9:16 Vertical Reel Section */}
+          <div className="pt-4 border-t border-casa-border-light">
+            <PropertyVideoManager
+              videoUrl={formData.videoUrl}
+              videoType={formData.videoType}
+              isReelFormat={formData.isReelFormat}
+              onChange={({ videoUrl, isReelFormat, videoType }) =>
+                setFormData((prev) => ({
+                  ...prev,
+                  videoUrl,
+                  isReelFormat,
+                  videoType,
+                }))
+              }
+            />
+          </div>
         </div>
       </div>
     </div>

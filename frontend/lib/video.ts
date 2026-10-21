@@ -10,6 +10,17 @@ export interface ParsedYouTubeResult {
   error?: string;
 }
 
+export interface ParsedInstagramResult {
+  isValid: boolean;
+  shortcode?: string;
+  type?: 'reel' | 'post' | 'tv';
+  embedUrl?: string;
+  directUrl?: string;
+  error?: string;
+}
+
+export type VideoSourceType = 'YOUTUBE' | 'INSTAGRAM' | 'LOCAL' | 'UNKNOWN';
+
 export function parseYouTubeUrl(rawUrl: string): ParsedYouTubeResult {
   if (!rawUrl || typeof rawUrl !== 'string') {
     return { isValid: false, error: 'Empty video URL provided' };
@@ -65,11 +76,70 @@ export function parseYouTubeUrl(rawUrl: string): ParsedYouTubeResult {
 
   return {
     isValid: false,
-    error: 'Please enter a valid YouTube URL (e.g., https://www.youtube.com/watch?v=... or https://youtu.be/...)',
+    error: 'Please enter a valid YouTube URL (e.g., https://www.youtube.com/shorts/... or https://youtu.be/...)',
   };
 }
 
-export function validateVideoFile(file: File, maxMb = 50): { isValid: boolean; error?: string } {
+export function parseInstagramUrl(rawUrl: string): ParsedInstagramResult {
+  if (!rawUrl || typeof rawUrl !== 'string') {
+    return { isValid: false, error: 'Empty Instagram URL provided' };
+  }
+
+  const url = rawUrl.trim();
+
+  // Pattern matching Instagram Reel, Post, or TV URLs:
+  // e.g. https://www.instagram.com/reel/C-xyz123/
+  // e.g. https://instagram.com/p/C-xyz123/?igsh=...
+  // e.g. https://instagr.am/reel/C-xyz123/
+  const regex = /(?:https?:\/\/)?(?:www\.|m\.)?(?:instagram\.com|instagr\.am)\/(?:p|reel|reels|tv)\/([a-zA-Z0-9_-]+)/;
+  const match = url.match(regex);
+
+  if (match && match[1]) {
+    const shortcode = match[1];
+    let type: 'reel' | 'post' | 'tv' = 'reel';
+    if (url.includes('/tv/')) type = 'tv';
+    else if (url.includes('/p/')) type = 'post';
+
+    return {
+      isValid: true,
+      shortcode,
+      type,
+      embedUrl: `https://www.instagram.com/reel/${shortcode}/embed/`,
+      directUrl: `https://www.instagram.com/reel/${shortcode}/`,
+    };
+  }
+
+  return {
+    isValid: false,
+    error: 'Please enter a valid Instagram Reel or video URL (e.g., https://www.instagram.com/reel/C-xyz123/ or https://www.instagram.com/p/...)',
+  };
+}
+
+export function detectVideoSource(url: string): VideoSourceType {
+  if (!url || typeof url !== 'string') return 'UNKNOWN';
+  const trimmed = url.trim().toLowerCase();
+  if (
+    trimmed.includes('youtube.com') ||
+    trimmed.includes('youtu.be') ||
+    trimmed.includes('youtube-nocookie.com')
+  ) {
+    return 'YOUTUBE';
+  }
+  if (trimmed.includes('instagram.com') || trimmed.includes('instagr.am')) {
+    return 'INSTAGRAM';
+  }
+  if (
+    trimmed.match(/\.(mp4|webm|mov|ogg|m4v)(\?|$)/i) ||
+    trimmed.includes('imagekit.io') ||
+    trimmed.includes('cloudinary.com') ||
+    trimmed.includes('amazonaws.com')
+  ) {
+    return 'LOCAL';
+  }
+  return 'UNKNOWN';
+}
+
+export function validateVideoFile(file: File, maxMb = 100): { isValid: boolean; error?: string } {
   if (!file) {
     return { isValid: false, error: 'No video file selected' };
   }

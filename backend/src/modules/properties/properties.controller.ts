@@ -9,9 +9,12 @@ import {
   Param,
   Query,
   UseGuards,
+  UseInterceptors,
+  UploadedFile,
   Req,
   Ip,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { PropertiesService } from './properties.service';
 import { SearchPropertiesDto } from './dto/search-properties.dto';
@@ -157,6 +160,24 @@ export class PropertiesController {
   findBySlug(@Param('slug') slug: string, @Req() req: any, @Ip() ip: string) {
     const user = this.extractOptionalUser(req);
     return this.propertiesService.findBySlug(slug, user, ip);
+  }
+
+  @Post('upload-video')
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @RequirePermissions(Permission.PROPERTY_CREATE)
+  @UseInterceptors(
+    FileInterceptor('file', {
+      limits: { fileSize: 100 * 1024 * 1024 }, // 100 MB max video size
+    }),
+  )
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Upload a property video file to persistent storage' })
+  @ApiResponse({ status: 201, description: 'Video file uploaded successfully' })
+  uploadVideo(
+    @UploadedFile() file: any,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.propertiesService.uploadVideoFile(file, user);
   }
 
   @Post()

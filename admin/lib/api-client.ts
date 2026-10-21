@@ -1,7 +1,24 @@
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL ||
-  process.env.NEXT_PUBLIC_API_URL ||
-  'http://localhost:5000/api/v1';
+export function getAdminApiBaseUrl(): string {
+  if (process.env.NEXT_PUBLIC_API_BASE_URL) {
+    return process.env.NEXT_PUBLIC_API_BASE_URL.replace(/\/+$/, '');
+  }
+  if (process.env.NEXT_PUBLIC_API_URL) {
+    return process.env.NEXT_PUBLIC_API_URL.replace(/\/+$/, '');
+  }
+  if (
+    typeof window !== 'undefined' &&
+    !window.location.hostname.includes('localhost') &&
+    !window.location.hostname.includes('127.0.0.1')
+  ) {
+    return 'https://snow-cod-326067.hostingersite.com/api/v1';
+  }
+  if (process.env.NODE_ENV === 'production') {
+    return 'https://snow-cod-326067.hostingersite.com/api/v1';
+  }
+  return 'http://localhost:5000/api/v1';
+}
+
+export const API_BASE_URL = getAdminApiBaseUrl();
 
 export async function fetchAdminApi<T>(
   endpoint: string,
