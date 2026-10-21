@@ -50,6 +50,17 @@ export default function AdminLoginPage() {
   React.useEffect(() => {
     if (isAuthenticated) {
       router.push('/');
+    } else if (typeof window !== 'undefined') {
+      const isDeactivated = window.location.search.includes('deactivated=1');
+      const notice = localStorage.getItem('casa_admin_deactivated_notice');
+      if (isDeactivated || notice) {
+        setErrorMsg('Your account has been deactivated by the administrator.');
+        try {
+          localStorage.removeItem('casa_admin_deactivated_notice');
+        } catch {
+          // ignore
+        }
+      }
     }
   }, [isAuthenticated, router]);
 

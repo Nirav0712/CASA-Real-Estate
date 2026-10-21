@@ -330,6 +330,22 @@ export class AuthController {
   }
 
   @UseGuards(JwtAuthGuard)
+  @Get('session-status')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Real-time session status heartbeat for active invalidation detection' })
+  @ApiResponse({ status: 200, description: 'Active session confirmed' })
+  @ApiResponse({ status: 401, description: 'Session invalid or deactivated' })
+  async getSessionStatus(@CurrentUser() user: AuthenticatedUser) {
+    return {
+      success: true,
+      active: true,
+      userId: user.id,
+      status: user.status,
+      timestamp: Date.now(),
+    };
+  }
+
+  @UseGuards(JwtAuthGuard)
   @Get('me')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Retrieve authenticated user identity and verified status' })

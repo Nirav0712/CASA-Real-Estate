@@ -82,7 +82,7 @@ export class JwtAuthGuard implements CanActivate {
         }
 
         if (user.status === AccountStatus.DEACTIVATED) {
-          throw new UnauthorizedException('Your account has been deactivated. Please contact support.');
+          throw new UnauthorizedException('Your account has been deactivated by the administrator.');
         }
       } else {
         // Fallback for isolated unit tests without injected user model
@@ -91,7 +91,7 @@ export class JwtAuthGuard implements CanActivate {
         }
 
         if (payload.status === AccountStatus.DEACTIVATED) {
-          throw new UnauthorizedException('Your account has been deactivated. Please contact support.');
+          throw new UnauthorizedException('Your account has been deactivated by the administrator.');
         }
       }
 

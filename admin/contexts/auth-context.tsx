@@ -4,6 +4,7 @@ import * as React from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { AdminUser, OtpRequestResponse, LinkCredentialsPayload } from '@/types';
 import * as authService from '@/services/auth-service';
+import { fetchAdminApi } from '@/lib/api-client';
 import { useToast } from './toast-context';
 
 interface AdminAuthContextType {
@@ -60,6 +61,81 @@ export function AdminAuthProvider({ children }: { children: React.ReactNode }) {
 
     restoreSession();
   }, []);
+
+  // Real-time status detection short-interval polling for admin sessions
+  React.useEffect(() => {
+    if (!adminUser && !token) return;
+    if (typeof window === 'undefined') return;
+
+    let isMounted = true;
+    let isChecking = false;
+
+    const checkAdminSessionStatus = async () => {
+      if (isChecking) return;
+      const currentToken = token || localStorage.getItem('casa_admin_access_token');
+      if (!currentToken) return;
+
+      isChecking = true;
+      try {
+        const res = await fetchAdminApi<{ active: boolean; status: string }>('/auth/session-status', {
+          headers: { Authorization: `Bearer ${currentToken}` },
+        });
+
+        if (!isMounted) return;
+
+        if (res.status === 401 || (res.data && res.data.active === false)) {
+          setAdminUser(null);
+          setToken(null);
+          try {
+            localStorage.removeItem('casa_admin_access_token');
+            localStorage.setItem(
+              'casa_admin_deactivated_notice',
+              'Your account has been deactivated by the administrator.',
+            );
+          } catch {
+            // ignore
+          }
+          toast.error(
+            'Account Deactivated',
+            'Your account has been deactivated by the administrator.',
+          );
+          if (!window.location.pathname.startsWith('/login')) {
+            window.location.href = '/login?deactivated=1';
+          }
+        }
+      } catch {
+        // network fallback
+      } finally {
+        isChecking = false;
+      }
+    };
+
+    checkAdminSessionStatus();
+    const interval = setInterval(checkAdminSessionStatus, 2500);
+
+    // Cross-tab storage synchronization
+    const handleStorage = (event: StorageEvent) => {
+      if (event.key === 'casa_admin_deactivated_notice' && event.newValue) {
+        setAdminUser(null);
+        setToken(null);
+        try {
+          localStorage.removeItem('casa_admin_access_token');
+        } catch {
+          // ignore
+        }
+        if (!window.location.pathname.startsWith('/login')) {
+          window.location.href = '/login?deactivated=1';
+        }
+      }
+    };
+    window.addEventListener('storage', handleStorage);
+
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+      window.removeEventListener('storage', handleStorage);
+    };
+  }, [adminUser, token, toast]);
 
   const login = React.useCallback(
     async (email: string, password: string): Promise<void> => {

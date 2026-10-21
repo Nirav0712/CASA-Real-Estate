@@ -749,7 +749,7 @@ export class AuthService implements OnModuleInit {
             throw new ForbiddenException('Your account has been suspended.');
           }
           if (user.status === AccountStatus.DEACTIVATED) {
-            throw new ForbiddenException('Your account has been deactivated. Please contact support.');
+            throw new ForbiddenException('Your account has been deactivated by the administrator.');
           }
 
           if (isDesignatedAdmin) {
@@ -847,7 +847,7 @@ export class AuthService implements OnModuleInit {
           throw new ForbiddenException('Your account has been suspended.');
         }
         if (memUser.status === AccountStatus.DEACTIVATED) {
-          throw new ForbiddenException('Your account has been deactivated. Please contact support.');
+          throw new ForbiddenException('Your account has been deactivated by the administrator.');
         }
         if (isDesignatedAdmin) {
           memUser.platformRole = PlatformRole.SUPER_ADMIN;
@@ -1368,7 +1368,7 @@ export class AuthService implements OnModuleInit {
     }
 
     if (user.status === AccountStatus.DEACTIVATED) {
-      throw new ForbiddenException('Your account has been deactivated. Please contact support.');
+      throw new ForbiddenException('Your account has been deactivated by the administrator.');
     }
 
     // Auto-activate any legacy pending accounts upon login

@@ -185,7 +185,7 @@ describe('JwtAuthGuard (Authentication & Token Validation)', () => {
     });
 
     await expect(guard.canActivate(context)).rejects.toThrow(
-      'Your account has been deactivated. Please contact support.',
+      'Your account has been deactivated by the administrator.',
     );
   });
 
@@ -217,7 +217,7 @@ describe('JwtAuthGuard (Authentication & Token Validation)', () => {
     });
 
     await expect(guardWithDb.canActivate(context)).rejects.toThrow(
-      'Your account has been deactivated. Please contact support.',
+      'Your account has been deactivated by the administrator.',
     );
   });
 });

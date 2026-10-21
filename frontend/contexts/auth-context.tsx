@@ -3,6 +3,7 @@
 import * as React from 'react';
 import { User, OtpRequestResponse, RegisterData, RegisterResponse } from '@/types';
 import * as authService from '@/services/auth-service';
+import { fetchApi } from '@/lib/api-client';
 import { useToast } from './toast-context';
 
 export type AuthModalMode = 'SIGN_IN' | 'REGISTER' | 'FORGOT_PASSWORD';
@@ -176,45 +177,118 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [token]);
 
-  // Instantly handle real-time deactivation event emitted by fetchApi on any 401 response
+  // Instantly handle real-time deactivation event emitted by fetchApi or session heartbeat
   React.useEffect(() => {
     if (typeof window === 'undefined') return;
-    const handleDeactivated = (e: any) => {
+
+    const handleDeactivated = (e?: any) => {
       setUser(null);
       setToken(null);
       try {
         localStorage.removeItem('casa_access_token');
         localStorage.removeItem('casa_user');
+        localStorage.setItem(
+          'casa_deactivated_notice',
+          'Your account has been deactivated by the administrator.',
+        );
       } catch {
         // ignore
       }
       toast.error(
         'Account Deactivated',
-        e?.detail?.message || 'Your account has been deactivated. Please contact support.',
+        e?.detail?.message || 'Your account has been deactivated by the administrator.',
       );
-      if (window.location.pathname.startsWith('/dashboard')) {
-        window.location.href = '/';
+      if (!window.location.pathname.startsWith('/auth/login')) {
+        window.location.href = '/auth/login?deactivated=1';
       }
     };
+
     window.addEventListener('casa:auth:deactivated', handleDeactivated);
-    return () => window.removeEventListener('casa:auth:deactivated', handleDeactivated);
+
+    // Cross-tab synchronization via localStorage storage event
+    const handleStorageEvent = (event: StorageEvent) => {
+      if (event.key === 'casa_deactivated_notice' && event.newValue) {
+        setUser(null);
+        setToken(null);
+        try {
+          localStorage.removeItem('casa_access_token');
+          localStorage.removeItem('casa_user');
+        } catch {
+          // ignore
+        }
+        if (!window.location.pathname.startsWith('/auth/login')) {
+          window.location.href = '/auth/login?deactivated=1';
+        }
+      }
+    };
+    window.addEventListener('storage', handleStorageEvent);
+
+    return () => {
+      window.removeEventListener('casa:auth:deactivated', handleDeactivated);
+      window.removeEventListener('storage', handleStorageEvent);
+    };
   }, [toast]);
 
-  // Periodic and focus validation for active dashboard sessions
+  // Real-time status detection (short-interval heartbeat polling every 2.5s)
   React.useEffect(() => {
-    if (!user || typeof window === 'undefined') return;
-    const checkStatus = () => {
-      if (window.location.pathname.startsWith('/dashboard')) {
-        refreshUser();
+    if (!user && !token) return;
+    if (typeof window === 'undefined') return;
+
+    let isMounted = true;
+    let isChecking = false;
+
+    const checkSessionStatus = async () => {
+      if (isChecking) return;
+      const currentToken =
+        token || localStorage.getItem('casa_access_token');
+      if (!currentToken) return;
+
+      isChecking = true;
+      try {
+        const res = await fetchApi<{ active: boolean; status: string }>('/auth/session-status', {
+          headers: { Authorization: `Bearer ${currentToken}` },
+        });
+
+        if (!isMounted) return;
+
+        if (res.status === 401 || (res.data && res.data.active === false)) {
+          setUser(null);
+          setToken(null);
+          try {
+            localStorage.removeItem('casa_access_token');
+            localStorage.removeItem('casa_user');
+            localStorage.setItem(
+              'casa_deactivated_notice',
+              'Your account has been deactivated by the administrator.',
+            );
+          } catch {
+            // ignore
+          }
+          toast.error(
+            'Account Deactivated',
+            'Your account has been deactivated by the administrator.',
+          );
+          if (!window.location.pathname.startsWith('/auth/login')) {
+            window.location.href = '/auth/login?deactivated=1';
+          }
+        }
+      } catch {
+        // network error handled gracefully
+      } finally {
+        isChecking = false;
       }
     };
-    window.addEventListener('focus', checkStatus);
-    const interval = setInterval(checkStatus, 15000);
+
+    // Immediate check
+    checkSessionStatus();
+    // Heartbeat check every 2.5 seconds for real-time deactivation detection
+    const interval = setInterval(checkSessionStatus, 2500);
+
     return () => {
-      window.removeEventListener('focus', checkStatus);
+      isMounted = false;
       clearInterval(interval);
     };
-  }, [user, refreshUser]);
+  }, [user, token, toast]);
 
   // Compute trial status dynamically
   const trialStatus = React.useMemo(() => {
