@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Button, Card } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Logo } from '@/components/ui/logo';
 import { useAdminAuth } from '@/contexts/auth-context';
 import {
   Building2,
@@ -148,12 +149,10 @@ export default function AdminLoginPage() {
     <div className="min-h-screen bg-casa-canvas flex flex-col items-center justify-center p-4">
       <div className="w-full max-w-md space-y-6 text-start">
         {/* Brand Header */}
-        <div className="text-center space-y-2">
-          <div className="w-12 h-12 rounded-2xl bg-casa-brand text-white flex items-center justify-center mx-auto shadow-subtle">
-            <Building2 className="w-6 h-6" />
-          </div>
+        <div className="text-center space-y-3 flex flex-col items-center">
+          <Logo size="lg" height={60} href={null} />
           <h1 className="text-xl font-bold text-casa-text-primary tracking-tight">
-            myproperty Governance Portal
+            Governance & Operations Portal
           </h1>
           <p className="text-xs text-casa-text-muted">
             Internal administrative operations, moderation queue & RBAC governance.

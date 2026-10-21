@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useTheme } from '@/contexts/theme-context';
 import { useAdminAuth } from '@/contexts/auth-context';
+import { Logo } from '@/components/ui/logo';
 import {
   LucideIcon,
   Building2,
@@ -118,20 +119,8 @@ export function AdminSidebar() {
   return (
     <aside className="w-64 bg-casa-surface border-r border-casa-border-light flex flex-col flex-shrink-0 min-h-screen transition-colors duration-200">
       {/* Brand Header */}
-      <div className="h-16 border-b border-casa-border-light px-5 flex items-center justify-between">
-        <Link href="/" className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-xl bg-casa-brand flex items-center justify-center text-white font-bold shadow-subtle">
-            <Building2 className="w-4 h-4" />
-          </div>
-          <div>
-            <span className="font-bold text-sm text-casa-text-primary block leading-none">
-              myproperty Admin
-            </span>
-            <span className="text-[10px] text-casa-text-muted font-medium uppercase tracking-wider">
-              Governance Portal
-            </span>
-          </div>
-        </Link>
+      <div className="h-16 border-b border-casa-border-light px-4 flex items-center justify-between">
+        <Logo size="md" height={38} href="/" />
         <span className="text-[10px] bg-casa-brand-subtle text-casa-brand font-bold px-1.5 py-0.5 rounded-md">
           v1.0
         </span>

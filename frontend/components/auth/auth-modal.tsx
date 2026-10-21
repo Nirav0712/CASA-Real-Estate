@@ -4,6 +4,7 @@ import * as React from 'react';
 import { Modal } from '@/components/ui/modal';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Logo } from '@/components/ui/logo';
 import { useAuth, AuthModalMode } from '@/contexts/auth-context';
 import {
   Mail,
@@ -290,6 +291,10 @@ export function AuthModal() {
       size={mode === 'REGISTER' && !registeredEmail ? 'lg' : 'md'}
     >
       <div className="space-y-4 pt-1 text-start">
+        <div className="flex justify-center pb-1">
+          <Logo size="sm" height={36} href={null} />
+        </div>
+
         {/* Top Mode Selector Tabs (only when not in registered/forgot confirmation state) */}
         {!registeredEmail && mode !== 'FORGOT_PASSWORD' && (
           <div className="grid grid-cols-2 gap-1 p-1 bg-casa-subtle rounded-xl border border-casa-border-light text-xs font-semibold">

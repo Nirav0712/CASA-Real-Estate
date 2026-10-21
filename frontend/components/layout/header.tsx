@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Container } from '@/components/ui/card';
 import { Modal } from '@/components/ui/modal';
 import { Drawer } from '@/components/ui/drawer';
+import { Logo } from '@/components/ui/logo';
 import { GlobalLocationSelector, SelectedLocationData } from '@/components/ui/global-location-selector';
 import { useLanguage } from '@/contexts/language-context';
 import { useTheme } from '@/contexts/theme-context';
@@ -97,19 +98,7 @@ export function Header() {
         <Container>
           <div className="flex items-center justify-between min-h-[4.75rem] py-2">
             {/* Logo & Brand Identity */}
-            <Link href="/" className="flex items-center gap-2.5 group">
-              <div className="w-10 h-10 rounded-2xl bg-casa-brand flex items-center justify-center text-white shadow-subtle transition-transform duration-200 group-hover:scale-105">
-                <Building2 className="w-5 h-5" />
-              </div>
-              <div className="text-start">
-                <span className="text-xl font-extrabold tracking-tight text-casa-text-primary block leading-none">
-                  {t('brand')}
-                </span>
-                <span className="text-[10px] text-casa-text-muted uppercase tracking-wider font-semibold">
-                  {t('tagline')}
-                </span>
-              </div>
-            </Link>
+            <Logo size="md" height={48} href="/" />
 
             {/* Desktop Navigation Links */}
             <nav className="hidden lg:flex items-center gap-6 text-sm font-medium text-casa-text-secondary">
@@ -704,7 +693,7 @@ export function Header() {
       <Drawer
         isOpen={isMobileMenuOpen}
         onClose={() => setIsMobileMenuOpen(false)}
-        title={t('brand')}
+        title={<Logo size="sm" height={32} href="/" />}
       >
         <div className="flex flex-col gap-6 text-start">
           <div className="flex flex-col gap-1">
@@ -1077,13 +1066,10 @@ export function Footer() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-8 mb-10 text-start">
           {/* Brand & Mission Column */}
           <div className="lg:col-span-2">
-            <div className="flex items-center gap-2 mb-4">
-              <div className="w-8 h-8 rounded-xl bg-casa-brand flex items-center justify-center text-white shadow-subtle">
-                <Building2 className="w-4 h-4" />
-              </div>
-              <span className="font-extrabold text-lg text-casa-text-primary">{t('brand')}</span>
+            <div className="flex items-center gap-3 mb-4">
+              <Logo size="md" height={44} href="/" />
               <span className="text-[10px] uppercase font-bold tracking-wider text-casa-brand bg-casa-brand-subtle px-2 py-0.5 rounded-full border border-blue-100 dark:border-blue-900">
-                Phase 05
+                Verified
               </span>
             </div>
             <p className="text-xs text-casa-text-muted leading-relaxed mb-4 max-w-sm">

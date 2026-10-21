@@ -5,6 +5,7 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Logo } from '@/components/ui/logo';
 import { useAuth } from '@/contexts/auth-context';
 import {
   CheckCircle2,
@@ -118,13 +119,8 @@ function VerifyEmailContent() {
     <div className="min-h-[80vh] flex items-center justify-center p-4 sm:p-6 bg-gradient-to-b from-casa-canvas via-casa-surface to-casa-canvas">
       <div className="w-full max-w-md bg-casa-surface border border-casa-border-medium rounded-3xl p-6 sm:p-8 shadow-xl text-center space-y-6">
         {/* Brand Header */}
-        <div className="flex items-center justify-center gap-2">
-          <div className="w-10 h-10 bg-casa-brand/10 border border-casa-brand/20 rounded-xl flex items-center justify-center text-casa-brand font-bold text-lg">
-            C
-          </div>
-          <span className="text-xl font-black tracking-tight text-casa-text-primary">
-            CASA<span className="text-casa-brand">.</span>
-          </span>
+        <div className="flex items-center justify-center pb-2">
+          <Logo size="lg" height={52} href="/" />
         </div>
 
         {/* Status Views */}
