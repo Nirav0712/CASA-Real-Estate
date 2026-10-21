@@ -48,8 +48,32 @@ interface NavGroup {
   items: NavItem[];
 }
 
+import { getPendingModerationQueue } from '@/services/admin-service';
+
 export function AdminSidebar() {
   const pathname = usePathname();
+  const [pendingCount, setPendingCount] = React.useState<number>(0);
+
+  React.useEffect(() => {
+    let isMounted = true;
+    const fetchPending = () => {
+      getPendingModerationQueue()
+        .then((res) => {
+          if (isMounted) {
+            setPendingCount(res.queue?.length ?? 0);
+          }
+        })
+        .catch(() => {
+          if (isMounted) setPendingCount(0);
+        });
+    };
+    fetchPending();
+    window.addEventListener('casa_pending_updated', fetchPending);
+    return () => {
+      isMounted = false;
+      window.removeEventListener('casa_pending_updated', fetchPending);
+    };
+  }, []);
 
   const navGroups: NavGroup[] = [
     {
@@ -65,10 +89,15 @@ export function AdminSidebar() {
       items: [
         { label: 'All Properties', href: '/properties', icon: Home, active: pathname === '/properties' },
         { label: '9:16 Video Reels', href: '/reels', icon: Video, active: pathname?.startsWith('/reels') },
-        { label: 'Pending Approvals', href: '/moderation', icon: CheckSquare, badge: '3', active: pathname?.startsWith('/moderation') },
+        {
+          label: 'Pending Approvals',
+          href: '/moderation',
+          icon: CheckSquare,
+          badge: pendingCount > 0 ? String(pendingCount) : undefined,
+          active: pathname?.startsWith('/moderation'),
+        },
         { label: 'Property Reports', href: '/reports', icon: ShieldAlert, active: pathname?.startsWith('/reports') },
         { label: 'Categories', href: '/categories', icon: Layers, active: pathname?.startsWith('/categories') },
-        { label: 'Locations', href: '/locations', icon: MapPin, active: pathname?.startsWith('/locations') },
       ],
     },
     {

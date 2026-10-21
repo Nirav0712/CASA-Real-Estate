@@ -10,9 +10,11 @@ import { useToast } from '@/contexts/toast-context';
 import {
   getAdminDashboardStats,
   getPendingModerationQueue,
+  getAllAdminProperties,
   approveModerationProperty,
   rejectModerationProperty,
 } from '@/services/admin-service';
+import { EngagementAdminService } from '@/services/engagement-service';
 import { formatPrice } from '@/lib/utils';
 import { AdminDashboardStats, AdminPropertyItem } from '@/types';
 import {
@@ -32,6 +34,7 @@ export default function AdminDashboardPage() {
   const toast = useToast();
   const [stats, setStats] = React.useState<AdminDashboardStats | null>(null);
   const [queue, setQueue] = React.useState<AdminPropertyItem[]>([]);
+  const [flaggedCount, setFlaggedCount] = React.useState<number>(0);
   const [isLoading, setIsLoading] = React.useState(true);
   const [isProcessing, setIsProcessing] = React.useState(false);
   const [isFallback, setIsFallback] = React.useState(false);
@@ -48,10 +51,28 @@ export default function AdminDashboardPage() {
   React.useEffect(() => {
     async function loadData() {
       setIsLoading(true);
-      const statsRes = await getAdminDashboardStats();
-      const queueRes = await getPendingModerationQueue();
+      const [statsRes, queueRes] = await Promise.all([
+        getAdminDashboardStats(),
+        getPendingModerationQueue(),
+      ]);
       setStats(statsRes.stats);
       setQueue(queueRes.queue);
+
+      let actualFlagged = 0;
+      try {
+        const reportsRes = await EngagementAdminService.getAllReports('PENDING');
+        if (reportsRes.success && Array.isArray(reportsRes.data)) {
+          actualFlagged += reportsRes.data.length;
+        }
+      } catch (_) {}
+      try {
+        const litigatedList = await getAllAdminProperties({ category: 'Litigated' });
+        if (Array.isArray(litigatedList)) {
+          actualFlagged += litigatedList.length;
+        }
+      } catch (_) {}
+      setFlaggedCount(actualFlagged);
+
       setIsFallback(statsRes.source === 'fallback_dev' || queueRes.source === 'fallback_dev');
       setIsLoading(false);
     }
@@ -70,6 +91,9 @@ export default function AdminDashboardPage() {
       );
       const statsRes = await getAdminDashboardStats();
       if (statsRes.stats) setStats(statsRes.stats);
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new Event('casa_pending_updated'));
+      }
       setIsApproveModalOpen(false);
       setSelectedListing(null);
       setAdminNote('');
@@ -93,6 +117,9 @@ export default function AdminDashboardPage() {
       );
       const statsRes = await getAdminDashboardStats();
       if (statsRes.stats) setStats(statsRes.stats);
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new Event('casa_pending_updated'));
+      }
       setIsRejectModalOpen(false);
       setSelectedListing(null);
       setAdminNote('');
@@ -252,8 +279,8 @@ export default function AdminDashboardPage() {
         <div className="px-5 py-2.5 bg-casa-canvas/50 border-b border-casa-border-light">
           <Tabs
             items={[
-              { id: 'pending', label: 'Pending Approvals', badge: queue.length },
-              { id: 'flagged', label: 'Flagged / Litigated Disclosures', badge: '1' },
+              { id: 'pending', label: 'Pending Approvals', badge: queue.length > 0 ? queue.length : 0 },
+              { id: 'flagged', label: 'Flagged / Litigated Disclosures', badge: flaggedCount > 0 ? flaggedCount : 0 },
               { id: 'approved', label: 'Recently Approved' },
             ]}
             activeTab={activeTab}
