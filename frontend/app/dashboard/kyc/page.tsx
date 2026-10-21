@@ -57,14 +57,33 @@ export default function KycVerificationDashboard() {
     agencyName?: string;
   } | null>(null);
 
+  // Determine fixed document type based on user account type
+  const rawAccount = (user?.accountType || user?.role || '').toUpperCase();
+  const isCommercialProfessional =
+    rawAccount === 'BROKER' ||
+    rawAccount === 'BROKER_AGENCY' ||
+    rawAccount === 'BROKER_AGENT' ||
+    rawAccount === 'AGENT' ||
+    rawAccount === 'DEVELOPER';
+
+  const fixedDocType = isCommercialProfessional ? 'RERA_CERTIFICATE' : 'AADHAAR_CARD';
+  const fixedDocLabel = isCommercialProfessional
+    ? 'RERA Registration Certificate / License'
+    : 'Aadhaar Card (National ID)';
+  const fixedRequiresBack = !isCommercialProfessional;
+
   // Form State
-  const [documentType, setDocumentType] = React.useState('GST_CERTIFICATE');
+  const [documentType, setDocumentType] = React.useState<string>(fixedDocType);
   const [documentNumber, setDocumentNumber] = React.useState('');
   const [agencyName, setAgencyName] = React.useState('');
   const [frontFileUrl, setFrontFileUrl] = React.useState<string | null>(null);
   const [frontFileName, setFrontFileName] = React.useState<string>('');
   const [backFileUrl, setBackFileUrl] = React.useState<string | null>(null);
   const [backFileName, setBackFileName] = React.useState<string>('');
+
+  React.useEffect(() => {
+    setDocumentType(fixedDocType);
+  }, [fixedDocType]);
 
   const loadData = React.useCallback(async () => {
     if (!isAuthenticated) return;
@@ -149,17 +168,16 @@ export default function KycVerificationDashboard() {
       return;
     }
 
-    const selectedDocTypeObj = DOC_TYPES.find((d) => d.id === documentType);
-    if (selectedDocTypeObj?.requiresBack && !backFileUrl) {
-      toast.warning('Back Side Required', `Please upload both front and back sides for ${selectedDocTypeObj.label}.`);
+    if (fixedRequiresBack && !backFileUrl) {
+      toast.warning('Back Side Required', `Please upload both front and back sides for ${fixedDocLabel}.`);
       return;
     }
 
     setSubmitting(true);
     try {
       await uploadVerificationDocument({
-        documentType,
-        documentName: frontFileName || `${documentType}_document`,
+        documentType: fixedDocType,
+        documentName: frontFileName || `${fixedDocType}_document`,
         documentNumber: documentNumber.trim(),
         documentUrl: frontFileUrl,
         frontDocumentUrl: frontFileUrl,
@@ -411,32 +429,32 @@ export default function KycVerificationDashboard() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Document Type Selection */}
+            {/* Fixed Document Type Field (Dropdown hidden per requirements) */}
             <div className="space-y-1.5">
-              <label className="text-xs font-bold text-casa-text-primary uppercase tracking-wider">
-                Select Document Proof Type *
+              <label className="text-xs font-bold text-casa-text-primary uppercase tracking-wider flex items-center justify-between">
+                <span>Required Verification Document *</span>
+                <span className="text-[10px] text-casa-brand font-semibold uppercase tracking-wider bg-casa-brand-subtle px-2 py-0.5 rounded-md">
+                  {isCommercialProfessional ? 'Professional Credential' : 'National Identity'}
+                </span>
               </label>
-              <select
-                value={documentType}
-                onChange={(e) => setDocumentType(e.target.value)}
-                className="w-full bg-casa-canvas border border-casa-border-medium rounded-xl px-3.5 py-2.5 text-xs text-casa-text-primary focus:outline-none focus:ring-2 focus:ring-casa-brand font-medium"
-              >
-                {DOC_TYPES.map((dt) => (
-                  <option key={dt.id} value={dt.id}>
-                    {dt.label}
-                  </option>
-                ))}
-              </select>
+              <div className="w-full bg-casa-canvas/80 border border-casa-border-medium rounded-xl px-3.5 py-2.5 text-xs text-casa-text-primary font-bold flex items-center gap-2.5 shadow-2xs">
+                <ShieldCheck className="w-4 h-4 text-casa-brand flex-shrink-0" />
+                <span>{fixedDocLabel}</span>
+              </div>
             </div>
 
             {/* Document Number */}
             <div className="space-y-1.5">
               <label className="text-xs font-bold text-casa-text-primary uppercase tracking-wider">
-                Registration / Certificate / ID Number
+                {isCommercialProfessional ? 'RERA License / Registration Number' : 'Aadhaar Card Number'}
               </label>
               <input
                 type="text"
-                placeholder="e.g. 09AAAAA0000A1Z5 or UPRERAAGT12345"
+                placeholder={
+                  isCommercialProfessional
+                    ? 'e.g. UPRERAAGT12345 or RERA Registration Number'
+                    : 'e.g. 12-digit Aadhaar Number (XXXX XXXX XXXX)'
+                }
                 value={documentNumber}
                 onChange={(e) => setDocumentNumber(e.target.value)}
                 className="w-full bg-casa-canvas border border-casa-border-medium rounded-xl px-3.5 py-2.5 text-xs text-casa-text-primary focus:outline-none focus:ring-2 focus:ring-casa-brand font-mono"
@@ -495,10 +513,10 @@ export default function KycVerificationDashboard() {
               <FileText className="w-8 h-8 text-casa-text-muted mx-auto" />
               <div>
                 <p className="text-xs font-bold text-casa-text-primary">
-                  Document Back Side {documentType === 'AADHAAR_CARD' ? '*' : '(Optional)'}
+                  Document Back Side {fixedRequiresBack ? '*' : '(Optional)'}
                 </p>
                 <p className="text-[11px] text-casa-text-muted mt-0.5">
-                  Required for Aadhaar, optional for certificates
+                  {fixedRequiresBack ? 'Required for Aadhaar Card' : 'Optional for single-page RERA certificate'}
                 </p>
               </div>
 

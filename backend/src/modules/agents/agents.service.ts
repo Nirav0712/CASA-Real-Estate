@@ -453,6 +453,28 @@ export class AgentsService {
    * Upload / Attach a verification document
    */
   async uploadDocument(user: AuthenticatedUser, dto: UploadDocumentDto) {
+    const rawAccount = (dto.accountType || user.accountType || user.role || '').toUpperCase();
+    const isCommercial =
+      rawAccount === 'BROKER' ||
+      rawAccount === 'BROKER_AGENCY' ||
+      rawAccount === 'BROKER_AGENT' ||
+      rawAccount === 'AGENT' ||
+      rawAccount === 'DEVELOPER';
+
+    if (isCommercial) {
+      if (dto.documentType !== 'RERA_CERTIFICATE') {
+        throw new BadRequestException(
+          'Invalid document type for your account type. Only "RERA Registration Certificate / License" (RERA_CERTIFICATE) is permitted for Broker, Broker Agency, Broker Agent, and Developer accounts.',
+        );
+      }
+    } else {
+      if (dto.documentType !== 'AADHAAR_CARD') {
+        throw new BadRequestException(
+          'Invalid document type for your account type. Only "Aadhaar Card (National ID)" (AADHAAR_CARD) is permitted for Buyer, Tenant, and normal property user accounts.',
+        );
+      }
+    }
+
     const profile = await this.getOrCreateProfile(user);
     const primaryUrl = dto.frontDocumentUrl || dto.documentUrl || '';
 

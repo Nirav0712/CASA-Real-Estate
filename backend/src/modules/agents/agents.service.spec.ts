@@ -8,6 +8,7 @@ import { Property } from '../properties/schemas/property.schema';
 import { Lead } from '../leads/schemas/lead.schema';
 import { AuditLog } from '../admin/schemas/audit-log.schema';
 import { UserRole, AccountStatus, PlatformRole, AccountType } from '../auth/enums/auth.enums';
+import { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
 import { WhatsAppService } from '../leads/whatsapp.service';
 
 describe('AgentsService', () => {
@@ -245,9 +246,9 @@ describe('AgentsService', () => {
     };
 
     const res = await service.uploadDocument(authUser, {
-      documentType: 'GST_CERTIFICATE',
-      documentName: 'gst.png',
-      documentNumber: 'GSTIN09ABCDE1234F',
+      documentType: 'RERA_CERTIFICATE',
+      documentName: 'rera.png',
+      documentNumber: 'UPRERAAGT12345',
       documentUrl: 'data:image/png;base64,dummy',
       accountType: 'BROKER',
     });
@@ -260,11 +261,55 @@ describe('AgentsService', () => {
       expect.objectContaining({
         $set: expect.objectContaining({
           kycStatus: 'PENDING',
-          kycDocumentType: 'GST_CERTIFICATE',
-          kycDocumentNumber: 'GSTIN09ABCDE1234F',
+          kycDocumentType: 'RERA_CERTIFICATE',
+          kycDocumentNumber: 'UPRERAAGT12345',
         }),
         $unset: { kycRejectionReason: 1 },
       }),
     );
+  });
+
+  it('should reject invalid document type for Broker/Developer', async () => {
+    const authUser: AuthenticatedUser = {
+      id: 'user-agent-1',
+      name: 'Test Broker',
+      mobile: '+919925843531',
+      normalizedMobile: '+919925843531',
+      role: UserRole.BROKER,
+      platformRole: PlatformRole.USER,
+      accountType: AccountType.BROKER,
+      status: AccountStatus.ACTIVE,
+      isVerifiedAgent: false,
+    };
+
+    await expect(
+      service.uploadDocument(authUser, {
+        documentType: 'AADHAAR_CARD', // Prohibited for Broker
+        documentName: 'aadhaar.png',
+        documentUrl: 'data:image/png;base64,dummy',
+      }),
+    ).rejects.toThrow('Only "RERA Registration Certificate / License"');
+  });
+
+  it('should reject invalid document type for Buyer/Tenant', async () => {
+    const authUser: AuthenticatedUser = {
+      id: 'user-buyer-1',
+      name: 'Test Buyer',
+      mobile: '+919925843599',
+      normalizedMobile: '+919925843599',
+      role: UserRole.BUYER,
+      platformRole: PlatformRole.USER,
+      accountType: AccountType.BUYER,
+      status: AccountStatus.ACTIVE,
+      isVerifiedAgent: false,
+    };
+
+    await expect(
+      service.uploadDocument(authUser, {
+        documentType: 'RERA_CERTIFICATE', // Prohibited for Buyer
+        documentName: 'rera.png',
+        documentUrl: 'data:image/png;base64,dummy',
+      }),
+    ).rejects.toThrow('Only "Aadhaar Card (National ID)"');
   });
 });
