@@ -18,6 +18,7 @@ import {
   SlidersHorizontal,
   Compass,
   ArrowRight,
+  Video,
 } from 'lucide-react';
 
 export default function BrokerDashboardPage() {
@@ -43,10 +44,16 @@ export default function BrokerDashboardPage() {
                 {user?.name || user?.agencyName || 'Brokerage Firm'}
               </h1>
               <p className="text-slate-300 text-sm max-w-2xl">
-                Manage commercial portfolios, high-ticket residential listings, verified agent partnerships, and active client pipeline.
+                Manage commercial portfolios, high-ticket residential listings, 9:16 walkthrough reels, verified agent partnerships, and active client pipeline.
               </p>
             </div>
             <div className="flex flex-wrap gap-3">
+              <Link href="/dashboard/reels">
+                <Button variant="outline" size="md" className="border-amber-400 text-amber-200 hover:bg-amber-800/40">
+                  <Video className="w-4 h-4 mr-2 text-red-400" />
+                  <span>9:16 Reels Studio</span>
+                </Button>
+              </Link>
               <Link href="/dashboard/properties/new">
                 <Button variant="primary" size="md" className="shadow-lg bg-amber-600 hover:bg-amber-700">
                   <PlusCircle className="w-4 h-4 mr-2" />

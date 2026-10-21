@@ -34,6 +34,7 @@ import {
   X,
   CreditCard,
   Lock,
+  Video,
 } from 'lucide-react';
 
 import { AccessDenied } from '@/components/dashboard/access-denied';
@@ -174,6 +175,14 @@ export default function MyPropertiesPage() {
         </div>
 
         <div className="flex items-center gap-2.5">
+          <Link
+            href="/dashboard/reels"
+            className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900/50 rounded-xl hover:bg-red-100 transition-colors"
+          >
+            <Video className="w-3.5 h-3.5" />
+            <span>9:16 Video Reels</span>
+          </Link>
+
           <button
             type="button"
             onClick={loadProperties}
