@@ -188,6 +188,16 @@ export default function MyPropertiesPage() {
         </div>
       </div>
 
+      {/* Account Suspended Notice */}
+      {Boolean(user && ['SUSPENDED', 'DEACTIVATED'].includes(String((user as any).status).toUpperCase())) && (
+        <div className="p-4 rounded-2xl bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900/50 flex items-center gap-3 text-red-700 dark:text-red-300">
+          <AlertCircle className="w-5 h-5 shrink-0" />
+          <div className="text-xs">
+            <strong>Account Suspended / Inactive:</strong> Your property listings have been temporarily hidden from the public marketplace searches and pages. When Super Admin reactivates your account, your eligible listings will be automatically restored.
+          </div>
+        </div>
+      )}
+
       {/* KYC Verification & Account Activation Status Banner */}
       <KycStatusBanner onRefresh={loadProperties} />
 

@@ -753,6 +753,15 @@ export class Property {
   @Prop()
   archivedAt?: Date;
 
+  @Prop({ default: false, index: true })
+  isSuspendedByAccount?: boolean;
+
+  @Prop()
+  suspendedAt?: Date;
+
+  @Prop()
+  restoredAt?: Date;
+
   @Prop({ type: ModerationMetadata, default: () => ({}) })
   moderation?: ModerationMetadata;
 
@@ -813,6 +822,7 @@ export const PropertySchema = SchemaFactory.createForClass(Property);
 
 PropertySchema.index({ createdAt: -1 });
 PropertySchema.index({ status: 1, isPublished: 1 });
+PropertySchema.index({ isSuspendedByAccount: 1, isPublished: 1 });
 PropertySchema.index({ category: 1, status: 1 });
 PropertySchema.index({ subcategory: 1, status: 1 });
 PropertySchema.index({ listingType: 1, status: 1 });

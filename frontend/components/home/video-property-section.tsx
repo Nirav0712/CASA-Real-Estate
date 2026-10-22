@@ -493,26 +493,6 @@ export function VideoPropertySection() {
   const [isLoading, setIsLoading] = React.useState(false);
   const [visibleCount, setVisibleCount] = React.useState(9);
 
-  // Eligible advertiser check: Only Brokers, Agents, Developers, Property Owners/Sellers can upload/manage reels
-  const canUploadReel = Boolean(
-    isAuthenticated &&
-      user &&
-      !['BUYER', 'TENANT', 'PURCHASER'].includes(
-        String(user.accountType || user.role).toUpperCase(),
-      ) &&
-      [
-        'AGENT',
-        'BROKER',
-        'BROKER_AGENCY',
-        'BROKER_AGENT',
-        'DEVELOPER',
-        'PROPERTY_OWNER',
-        'SELLER',
-        'VERIFIED_AGENT',
-        'ADMIN',
-        'SUPER_ADMIN',
-      ].includes(String(user.accountType || user.role).toUpperCase()),
-  );
 
   // Filters State
   const [locationFilter, setLocationFilter] = React.useState('ALL');
@@ -728,15 +708,6 @@ export function VideoPropertySection() {
           </div>
 
           <div className="flex flex-wrap items-center gap-2.5">
-            {canUploadReel && (
-              <Link
-                href="/dashboard/reels"
-                className="px-3.5 py-1.5 rounded-xl bg-casa-brand text-white hover:bg-casa-brand-hover text-xs font-bold transition-all shadow-subtle flex items-center gap-1.5"
-              >
-                <PlusCircle className="w-3.5 h-3.5" />
-                <span>Add / Manage Reels</span>
-              </Link>
-            )}
 
             <div className="flex items-center gap-1.5 text-xs font-semibold text-casa-text-muted px-2.5 py-1.5 rounded-xl bg-casa-surface border border-casa-border-light">
               <Video className="w-3.5 h-3.5 text-casa-brand" />

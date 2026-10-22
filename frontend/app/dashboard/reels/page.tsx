@@ -589,15 +589,16 @@ export default function BrokerReelsPage() {
             </Button>
 
             {canUploadReel && (
-              <Button
-                variant="primary"
-                size="sm"
-                onClick={() => setIsAddModalOpen(true)}
-                className="text-xs bg-red-600 hover:bg-red-700 text-white shadow-lg"
-              >
-                <PlusCircle className="w-3.5 h-3.5 mr-1.5" />
-                Upload New Video Reel
-              </Button>
+              <Link href="/dashboard/properties/new">
+                <Button
+                  variant="primary"
+                  size="sm"
+                  className="text-xs bg-casa-brand hover:bg-casa-brand-hover text-white shadow-lg"
+                >
+                  <PlusCircle className="w-3.5 h-3.5 mr-1.5" />
+                  Post Property with Video
+                </Button>
+              </Link>
             )}
           </div>
         </div>
@@ -674,18 +675,19 @@ export default function BrokerReelsPage() {
             No 9:16 Video Reels Yet
           </h3>
           <p className="text-xs text-casa-text-secondary max-w-md mx-auto">
-            You have not uploaded any vertical video walkthroughs. Uploading reels boosts your property enquiries by over 3x!
+            Videos and walkthrough reels are uploaded directly when creating your property listing via Post Property.
           </p>
           {canUploadReel && (
-            <Button
-              variant="primary"
-              size="sm"
-              onClick={() => setIsAddModalOpen(true)}
-              className="text-xs bg-red-600 hover:bg-red-700 text-white"
-            >
-              <PlusCircle className="w-3.5 h-3.5 mr-1.5" />
-              Upload Your First Video Reel
-            </Button>
+            <Link href="/dashboard/properties/new">
+              <Button
+                variant="primary"
+                size="sm"
+                className="text-xs bg-casa-brand hover:bg-casa-brand-hover text-white"
+              >
+                <PlusCircle className="w-3.5 h-3.5 mr-1.5" />
+                Post Property with Video Tour
+              </Button>
+            </Link>
           )}
         </Card>
       ) : (

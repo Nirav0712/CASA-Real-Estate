@@ -25,7 +25,7 @@ import { Roles } from '../auth/decorators/roles.decorator';
 import { PermissionsGuard } from '../entitlements/guards/permissions.guard';
 import { RequirePermissions } from '../entitlements/decorators/require-permissions.decorator';
 import { Permission } from '../entitlements/enums/permissions.enum';
-import { UserRole, PlatformRole, AccountType } from '../auth/enums/auth.enums';
+import { UserRole, PlatformRole, AccountType, AccountStatus } from '../auth/enums/auth.enums';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
 
@@ -185,6 +185,12 @@ export class PropertiesController {
     @UploadedFile() file: any,
     @CurrentUser() user: AuthenticatedUser,
   ) {
+    if (user?.status === AccountStatus.SUSPENDED || user?.status === AccountStatus.DEACTIVATED) {
+      throw new ForbiddenException(
+        'Your account is currently suspended or inactive. Please contact administration.',
+      );
+    }
+
     const roleStr = String(user?.role || user?.accountType || '').toUpperCase();
     const isConsumer =
       roleStr === 'BUYER' ||
@@ -231,6 +237,57 @@ export class PropertiesController {
   @ApiOperation({ summary: 'Create a new property listing / draft (Seller, Agent, Broker, Developer)' })
   @ApiResponse({ status: 201, description: 'Property created' })
   create(@Body() createPropertyDto: any, @CurrentUser() user: AuthenticatedUser) {
+    if (user?.status === AccountStatus.SUSPENDED || user?.status === AccountStatus.DEACTIVATED) {
+      throw new ForbiddenException(
+        'Your account is currently suspended or inactive. Please contact administration.',
+      );
+    }
+
+    const isDirectAdmin =
+      user?.role === UserRole.SUPER_ADMIN ||
+      user?.role === UserRole.ADMIN ||
+      user?.platformRole === PlatformRole.SUPER_ADMIN ||
+      user?.platformRole === PlatformRole.ADMIN ||
+      (user as any)?.role === 'SUPER_ADMIN' ||
+      (user as any)?.platformRole === 'SUPER_ADMIN';
+
+    if (isDirectAdmin) {
+      throw new ForbiddenException(
+        'Super Admin and platform administrators manage listings, moderation, and approvals via the Admin Portal, and cannot create marketplace listings directly.',
+      );
+    }
+
+    const roleStr = String(user?.role || user?.accountType || '').toUpperCase();
+    const isConsumer =
+      roleStr === 'BUYER' ||
+      roleStr === 'TENANT' ||
+      roleStr === 'PURCHASER' ||
+      user?.accountType === AccountType.BUYER ||
+      user?.accountType === AccountType.TENANT;
+
+    if (isConsumer) {
+      throw new ForbiddenException(
+        'Property creation is restricted. Property Buyers and Rental Tenants are not permitted to list properties.',
+      );
+    }
+
+    const isAuthorizedAdvertiser = [
+      'BROKER',
+      'AGENT',
+      'BROKER_AGENCY',
+      'BROKER_AGENT',
+      'DEVELOPER',
+      'PROPERTY_OWNER',
+      'SELLER',
+      'VERIFIED_AGENT',
+    ].includes(roleStr);
+
+    if (!isAuthorizedAdvertiser) {
+      throw new ForbiddenException(
+        'Only eligible property advertisers (Brokers, Agents, Developers, and Property Owners) can create property listings.',
+      );
+    }
+
     return this.propertiesService.createProperty(createPropertyDto, user);
   }
 

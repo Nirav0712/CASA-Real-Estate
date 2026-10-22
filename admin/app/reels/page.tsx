@@ -618,16 +618,6 @@ export default function VideoReelsAdminPage() {
             <RefreshCw className={`w-3.5 h-3.5 mr-1.5 ${isLoading ? 'animate-spin' : ''}`} />
             Refresh
           </Button>
-
-          <Button
-            variant="primary"
-            size="sm"
-            onClick={() => setIsAddModalOpen(true)}
-            className="text-xs bg-red-600 hover:bg-red-700 text-white"
-          >
-            <PlusCircle className="w-3.5 h-3.5 mr-1.5" />
-            Add New Video Reel
-          </Button>
         </div>
       </div>
 
@@ -725,17 +715,8 @@ export default function VideoReelsAdminPage() {
           <Video className="w-12 h-12 text-casa-text-muted mx-auto" />
           <h3 className="text-sm font-bold text-casa-text-primary">No Video Reels Found</h3>
           <p className="text-xs text-casa-text-secondary max-w-md mx-auto">
-            No 9:16 vertical video reels match your search query. You can add a new reel using the button below.
+            No 9:16 vertical video reels match your search query. Video reels are uploaded by property advertisers directly inside property listings.
           </p>
-          <Button
-            variant="primary"
-            size="sm"
-            onClick={() => setIsAddModalOpen(true)}
-            className="text-xs"
-          >
-            <PlusCircle className="w-3.5 h-3.5 mr-1.5" />
-            Add First Video Reel
-          </Button>
         </Card>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
@@ -1132,8 +1113,8 @@ export default function VideoReelsAdminPage() {
         </div>
       )}
 
-      {/* + Add New Video Reel Modal (Full Add Property Format) */}
-      {isAddModalOpen && (
+      {/* Add New Video Reel Modal removed per requirement 3 */}
+      {false && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
           <Card className="max-w-2xl w-full p-6 bg-casa-surface border border-casa-border-light shadow-2xl space-y-5 my-8 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-casa-border-light pb-3">

@@ -353,6 +353,7 @@ export class AdminService implements OnModuleInit {
       advertiser: raw.advertiser,
       status: raw.status,
       isPublished: !!raw.isPublished,
+      isSuspendedByAccount: Boolean(raw.isSuspendedByAccount),
       publishedAt: raw.publishedAt,
       unpublishedAt: raw.unpublishedAt,
       archivedAt: raw.archivedAt,
@@ -1440,6 +1441,7 @@ export class AdminService implements OnModuleInit {
           throw new BadRequestException('Cannot deactivate the sole remaining active Super Administrator account.');
         }
       }
+      const previousStatus = user.status;
       user.status = dto.status;
       if (dto.status === AccountStatus.SUSPENDED || dto.status === AccountStatus.DEACTIVATED) {
         try {
@@ -1451,6 +1453,11 @@ export class AdminService implements OnModuleInit {
           this.logger.warn(`Session revocation note: ${err?.message}`);
         }
       }
+      await this.syncUserPropertyVisibility(
+        [user._id.toString(), (user as any).id].filter(Boolean),
+        dto.status,
+        previousStatus,
+      );
     }
 
     if (dto.role || dto.customRoleId !== undefined) {
@@ -1647,6 +1654,13 @@ export class AdminService implements OnModuleInit {
     } catch (memErr: any) {
       this.logger.warn(`In-memory status sync note: ${memErr?.message}`);
     }
+
+    // Immediately synchronize property listing visibility
+    await this.syncUserPropertyVisibility(
+      [user._id.toString(), (user as any).id].filter(Boolean),
+      dto.status,
+      previousStatus,
+    );
 
     // Record Audit Log
     await this.recordAuditLog({
@@ -1982,6 +1996,77 @@ export class AdminService implements OnModuleInit {
       message: `Bulk status update completed. ${updatedCount} user(s) set to ${status}, ${skippedCount} skipped.`,
       errors: errors.length > 0 ? errors : undefined,
     };
+  }
+
+  /**
+   * Immediately synchronizes property listing visibility based on user account status.
+   * When a user is suspended or deactivated, immediately hide all their properties publicly (isPublished: false, isSuspendedByAccount: true).
+   * When reactivated to ACTIVE, restore their eligible listings (isPublished: true, isSuspendedByAccount: false).
+   */
+  async syncUserPropertyVisibility(
+    userIds: string[],
+    newStatus: AccountStatus,
+    previousStatus?: AccountStatus,
+  ) {
+    if (!Array.isArray(userIds) || userIds.length === 0) return;
+
+    try {
+      if (
+        newStatus === AccountStatus.SUSPENDED ||
+        newStatus === AccountStatus.DEACTIVATED
+      ) {
+        const hideRes = await this.propertyModel.updateMany(
+          {
+            $or: [
+              { ownerId: { $in: userIds } },
+              { advertiserId: { $in: userIds } },
+              { createdBy: { $in: userIds } },
+            ],
+            isPublished: true,
+          },
+          {
+            $set: {
+              isPublished: false,
+              isSuspendedByAccount: true,
+              suspendedAt: new Date(),
+            },
+          },
+        );
+        this.logger.log(
+          `User suspension: hid ${hideRes.modifiedCount} property listings publicly for users [${userIds.join(', ')}]`,
+        );
+      } else if (
+        newStatus === AccountStatus.ACTIVE &&
+        (previousStatus === AccountStatus.SUSPENDED ||
+          previousStatus === AccountStatus.DEACTIVATED ||
+          !previousStatus)
+      ) {
+        const restoreRes = await this.propertyModel.updateMany(
+          {
+            $or: [
+              { ownerId: { $in: userIds } },
+              { advertiserId: { $in: userIds } },
+              { createdBy: { $in: userIds } },
+            ],
+            isSuspendedByAccount: true,
+          },
+          {
+            $set: {
+              isPublished: true,
+              isSuspendedByAccount: false,
+              restoredAt: new Date(),
+            },
+          },
+        );
+        this.logger.log(
+          `User reactivation: restored ${restoreRes.modifiedCount} property listings publicly for users [${userIds.join(', ')}]`,
+        );
+      }
+    } catch (err: any) {
+      this.logger.error(
+        `Failed to sync property visibility for user account status change: ${err?.message}`,
+      );
+    }
   }
 
   async getAgents(dto: AdminUserQueryDto) {

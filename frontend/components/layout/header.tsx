@@ -97,9 +97,11 @@ export function Header() {
       ),
   );
 
-  const canPostProperty =
-    !user ||
-    (!isBuyerOrTenant &&
+  const canPostProperty = Boolean(
+    isAuthenticated &&
+      user &&
+      !isBuyerOrTenant &&
+      !isAdmin &&
       [
         'AGENT',
         'BROKER',
@@ -109,9 +111,8 @@ export function Header() {
         'PROPERTY_OWNER',
         'SELLER',
         'VERIFIED_AGENT',
-        'ADMIN',
-        'SUPER_ADMIN',
-      ].includes(String(user.accountType || user.role).toUpperCase()));
+      ].includes(String(user.accountType || user.role).toUpperCase()),
+  );
 
   const isTrialEligible = Boolean(
     user &&
@@ -584,15 +585,6 @@ export function Header() {
                       )}
 
                       <div className="py-1 border-b border-casa-border-light">
-                        {!isBuyerOrTenant && (
-                          <Link
-                            href="/dashboard/reels"
-                            className="flex items-center gap-2 px-3.5 py-1.5 text-xs text-casa-text-secondary hover:text-casa-text-primary hover:bg-casa-subtle transition-colors"
-                          >
-                            <Video className="w-3.5 h-3.5 text-red-500" />
-                            <span>My 9:16 Video Reels</span>
-                          </Link>
-                        )}
                         {!isBuyerOrTenant && !isAdmin && (
                           <>
                             <Link
@@ -1152,6 +1144,36 @@ export function Header() {
 
 export function Footer() {
   const { locale, setLocale, t } = useLanguage();
+  const { isAuthenticated, user } = useAuth();
+
+  const isBuyerOrTenant = Boolean(
+    user &&
+      ['BUYER', 'TENANT', 'PURCHASER'].includes(
+        String(user.accountType || user.role).toUpperCase(),
+      ),
+  );
+  const isAdmin = Boolean(
+    user &&
+      ['ADMIN', 'SUPER_ADMIN'].includes(
+        String(user.platformRole || user.role).toUpperCase(),
+      ),
+  );
+  const canPostProperty = Boolean(
+    isAuthenticated &&
+      user &&
+      !isBuyerOrTenant &&
+      !isAdmin &&
+      [
+        'AGENT',
+        'BROKER',
+        'BROKER_AGENCY',
+        'BROKER_AGENT',
+        'DEVELOPER',
+        'PROPERTY_OWNER',
+        'SELLER',
+        'VERIFIED_AGENT',
+      ].includes(String(user.accountType || user.role).toUpperCase()),
+  );
 
   return (
     <footer className="mt-auto bg-casa-surface border-t border-casa-border-light py-12 text-sm text-casa-text-secondary transition-colors duration-200">
@@ -1192,14 +1214,16 @@ export function Footer() {
                   {t('rentLease')}
                 </Link>
               </li>
-              <li>
-                <Link
-                  href="/dashboard/properties/new"
-                  className="text-casa-text-muted hover:text-casa-brand transition-colors block"
-                >
-                  {t('postAd')}
-                </Link>
-              </li>
+              {canPostProperty && (
+                <li>
+                  <Link
+                    href="/dashboard/properties/new"
+                    className="text-casa-text-muted hover:text-casa-brand transition-colors block"
+                  >
+                    {t('postAd')}
+                  </Link>
+                </li>
+              )}
               <li>
                 <Link
                   href="/properties"

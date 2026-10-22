@@ -280,8 +280,8 @@ export default async function CityLocationPage({ params }: CityPageProps) {
                 <p className="text-xs text-casa-text-secondary max-w-sm mx-auto mt-1 mb-4">
                   Be the first to list your residential or commercial property in {cityInfo.name}.
                 </p>
-                <Link href="/dashboard/properties/new">
-                  <Button className="bg-casa-brand text-white text-xs">Post Property</Button>
+                <Link href="/properties">
+                  <Button className="bg-casa-brand text-white text-xs">Explore All Properties</Button>
                 </Link>
               </div>
             ) : (

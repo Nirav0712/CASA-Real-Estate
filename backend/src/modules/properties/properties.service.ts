@@ -12,8 +12,9 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types, isValidObjectId } from 'mongoose';
 import { Property, PropertyDocument, PropertyStructureType } from './schemas/property.schema';
 import { Category, CategoryDocument } from './schemas/category.schema';
+import { User, UserDocument } from '../auth/schemas/user.schema';
 import { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
-import { UserRole, AccountType, PlatformRole } from '../auth/enums/auth.enums';
+import { UserRole, AccountType, PlatformRole, AccountStatus } from '../auth/enums/auth.enums';
 import {
   SearchPropertiesDto,
   PropertySortOption,
@@ -271,6 +272,7 @@ export class PropertiesService implements OnModuleInit {
   constructor(
     @InjectModel(Property.name) private readonly propertyModel: Model<PropertyDocument>,
     @InjectModel(Category.name) private readonly categoryModel: Model<CategoryDocument>,
+    @InjectModel(User.name) private readonly userModel: Model<UserDocument>,
     private readonly entitlementsService: EntitlementsService,
   ) {}
 
@@ -657,6 +659,23 @@ export class PropertiesService implements OnModuleInit {
         filter.status = { $in: ['PUBLISHED', 'ACTIVE'] };
       }
       filter.isPublished = true;
+      // Requirement 1: Immediately hide listings of suspended/inactive users from public searches and pages
+      filter.isSuspendedByAccount = { $ne: true };
+
+      try {
+        const inactiveUsers = await this.userModel
+          .find({ status: { $in: [AccountStatus.SUSPENDED, AccountStatus.DEACTIVATED] } })
+          .select('_id id')
+          .lean();
+        if (inactiveUsers && inactiveUsers.length > 0) {
+          const inactiveIds = inactiveUsers.flatMap((u: any) => [u._id?.toString(), u.id].filter(Boolean));
+          filter.ownerId = { $nin: inactiveIds };
+          filter.advertiserId = { $nin: inactiveIds };
+          filter.createdBy = { $nin: inactiveIds };
+        }
+      } catch (uErr: any) {
+        this.logger.warn(`Inactive user filter note: ${uErr?.message}`);
+      }
 
       if (query.featured === true || query.featured === 'true') {
         filter.isFeatured = true;
@@ -1129,6 +1148,49 @@ export class PropertiesService implements OnModuleInit {
         throw new NotFoundException(`Property with identifier "${slug}" not found`);
       }
 
+      const isPrivileged =
+        user &&
+        (user.platformRole === PlatformRole.SUPER_ADMIN ||
+          user.role === UserRole.SUPER_ADMIN ||
+          (user as any).role === 'SUPER_ADMIN' ||
+          (user as any).platformRole === 'SUPER_ADMIN' ||
+          user.platformRole === PlatformRole.ADMIN ||
+          user.role === UserRole.ADMIN);
+
+      if ((property as any).isSuspendedByAccount && !isPrivileged) {
+        throw new NotFoundException(`Property with identifier "${slug}" not found`);
+      }
+
+      if (!isPrivileged) {
+        const ownerCandidateId = property.ownerId || property.advertiserId || property.createdBy;
+        if (ownerCandidateId) {
+          try {
+            const ownerDoc = await this.userModel
+              .findOne({
+                $or: [
+                  ...(isValidObjectId(ownerCandidateId)
+                    ? [{ _id: new Types.ObjectId(ownerCandidateId) }]
+                    : []),
+                  { _id: ownerCandidateId },
+                  { id: ownerCandidateId },
+                ],
+              })
+              .select('status')
+              .lean();
+
+            if (
+              ownerDoc &&
+              (ownerDoc.status === AccountStatus.SUSPENDED ||
+                ownerDoc.status === AccountStatus.DEACTIVATED)
+            ) {
+              throw new NotFoundException(`Property with identifier "${slug}" not found`);
+            }
+          } catch (oErr: any) {
+            if (oErr instanceof NotFoundException) throw oErr;
+          }
+        }
+      }
+
       let resultProperty: any = { ...property };
 
       if (property.isChildUnit && property.parentPropertyId) {
@@ -1186,16 +1248,9 @@ export class PropertiesService implements OnModuleInit {
   async createProperty(dto: any, user?: AuthenticatedUser) {
     // 1. Role Enforcement (Backend check so hiding button cannot be bypassed)
     if (user) {
-      const isConsumer =
-        user.role === UserRole.BUYER ||
-        user.role === UserRole.TENANT ||
-        user.role === UserRole.PURCHASER ||
-        user.accountType === AccountType.BUYER ||
-        user.accountType === AccountType.TENANT;
-
-      if (isConsumer) {
+      if (user.status === AccountStatus.SUSPENDED || user.status === AccountStatus.DEACTIVATED) {
         throw new ForbiddenException(
-          'Property creation is restricted. Buyer and Tenant accounts are not permitted to list properties.'
+          'Your account is currently suspended or inactive. Please contact administration.',
         );
       }
 
@@ -1203,7 +1258,46 @@ export class PropertiesService implements OnModuleInit {
         user.role === UserRole.ADMIN ||
         user.role === UserRole.SUPER_ADMIN ||
         user.platformRole === PlatformRole.SUPER_ADMIN ||
-        user.platformRole === PlatformRole.ADMIN;
+        user.platformRole === PlatformRole.ADMIN ||
+        (user as any).role === 'SUPER_ADMIN' ||
+        (user as any).platformRole === 'SUPER_ADMIN';
+
+      if (isDirectAdmin) {
+        throw new ForbiddenException(
+          'Super Admin and platform administrators manage listings, moderation, and approvals via the Admin Portal, and cannot create marketplace listings directly.',
+        );
+      }
+
+      const roleStr = String(user.role || user.accountType || '').toUpperCase();
+      const isConsumer =
+        roleStr === 'BUYER' ||
+        roleStr === 'TENANT' ||
+        roleStr === 'PURCHASER' ||
+        user.accountType === AccountType.BUYER ||
+        user.accountType === AccountType.TENANT;
+
+      if (isConsumer) {
+        throw new ForbiddenException(
+          'Property creation is restricted. Buyer and Tenant accounts are not permitted to list properties.',
+        );
+      }
+
+      const isAuthorizedAdvertiser = [
+        'BROKER',
+        'AGENT',
+        'BROKER_AGENCY',
+        'BROKER_AGENT',
+        'DEVELOPER',
+        'PROPERTY_OWNER',
+        'SELLER',
+        'VERIFIED_AGENT',
+      ].includes(roleStr);
+
+      if (!isAuthorizedAdvertiser) {
+        throw new ForbiddenException(
+          'Only eligible property advertisers (Brokers, Agents, Developers, and Property Owners) can create property listings.',
+        );
+      }
 
       // 2. Trial & Subscription Enforcement for Supply-Side Users
       if (!isDirectAdmin) {
@@ -1829,6 +1923,12 @@ export class PropertiesService implements OnModuleInit {
   async uploadVideoFile(file: any, user: AuthenticatedUser) {
     if (!file) {
       throw new BadRequestException('Please select a video file to upload.');
+    }
+
+    if (user?.status === AccountStatus.SUSPENDED || user?.status === AccountStatus.DEACTIVATED) {
+      throw new ForbiddenException(
+        'Your account is currently suspended or inactive. Please contact administration.',
+      );
     }
 
     const roleStr = String(user?.role || user?.accountType || '').toUpperCase();

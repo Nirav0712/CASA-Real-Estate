@@ -1222,7 +1222,13 @@ export default function AdminPropertiesPage() {
                         </div>
                       </td>
                       <td className="px-4 py-3.5 whitespace-nowrap">
-                        {isPublished && (
+                        {(item as any).isSuspendedByAccount && (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-purple-50 text-purple-700 dark:bg-purple-950 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
+                            <span className="w-1.5 h-1.5 rounded-full bg-purple-500" />
+                            Account Suspended (Hidden)
+                          </span>
+                        )}
+                        {isPublished && !(item as any).isSuspendedByAccount && (
                           <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
                             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
                             Published Live

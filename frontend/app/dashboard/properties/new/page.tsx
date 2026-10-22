@@ -272,9 +272,48 @@ const LOCATION_HIERARCHY_DATA: Record<
 };
 
 export default function NewPropertyWizardPage() {
-  const { isAuthenticated, isLoading: isAuthLoading, openAuthModal } = useAuth();
+  const { user, isAuthenticated, isLoading: isAuthLoading, openAuthModal } = useAuth();
   const toast = useToast();
   const router = useRouter();
+
+  const isSuperAdminOrAdmin = Boolean(
+    user &&
+      ['SUPER_ADMIN', 'ADMIN'].includes(
+        String(user.platformRole || user.role).toUpperCase(),
+      ),
+  );
+
+  const isConsumer = Boolean(
+    user &&
+      ['BUYER', 'TENANT', 'PURCHASER'].includes(
+        String(user.accountType || user.role).toUpperCase(),
+      ),
+  );
+
+  const isSuspendedOrInactive = Boolean(
+    user &&
+      ['SUSPENDED', 'DEACTIVATED'].includes(
+        String((user as any).status).toUpperCase(),
+      ),
+  );
+
+  const isAuthorizedAdvertiser = Boolean(
+    isAuthenticated &&
+      user &&
+      !isConsumer &&
+      !isSuperAdminOrAdmin &&
+      !isSuspendedOrInactive &&
+      [
+        'AGENT',
+        'BROKER',
+        'BROKER_AGENCY',
+        'BROKER_AGENT',
+        'DEVELOPER',
+        'PROPERTY_OWNER',
+        'SELLER',
+        'VERIFIED_AGENT',
+      ].includes(String(user.accountType || user.role).toUpperCase()),
+  );
 
   const [currentStep, setCurrentStep] = React.useState(1);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
@@ -886,6 +925,101 @@ export default function NewPropertyWizardPage() {
           >
             Sign In with Mobile OTP
           </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (isAuthenticated && isSuperAdminOrAdmin) {
+    return (
+      <div className="min-h-[70vh] max-w-xl mx-auto px-4 flex items-center justify-center">
+        <div className="text-center p-8 bg-casa-surface border border-casa-border-light rounded-2xl shadow-subtle space-y-4">
+          <div className="w-14 h-14 rounded-full bg-blue-50 dark:bg-blue-950/40 flex items-center justify-center text-casa-brand mx-auto">
+            <ShieldCheck className="w-7 h-7" />
+          </div>
+          <h2 className="text-xl font-bold text-casa-text-primary">Super Administrator Workspace</h2>
+          <p className="text-xs text-casa-text-secondary leading-relaxed max-w-md mx-auto">
+            Super Administrators manage users, account statuses, property approvals, reports, and moderation through the Admin Portal. Public marketplace listings are created exclusively by verified property advertisers (Brokers, Agents, Developers, and Property Owners/Sellers).
+          </p>
+          <div className="pt-2 flex flex-col sm:flex-row justify-center gap-3">
+            <a
+              href="http://localhost:3002/properties"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center justify-center gap-2 py-2.5 px-5 rounded-xl bg-casa-brand hover:bg-casa-brand-hover text-white text-xs font-semibold transition-all shadow-sm"
+            >
+              <span>Open Admin Portal</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </a>
+            <Link
+              href="/dashboard"
+              className="inline-flex items-center justify-center py-2.5 px-4 rounded-xl border border-casa-border-light hover:bg-casa-subtle text-casa-text-primary text-xs font-semibold transition-colors"
+            >
+              Back to Overview
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (isAuthenticated && isSuspendedOrInactive) {
+    return (
+      <div className="min-h-[70vh] max-w-xl mx-auto px-4 flex items-center justify-center">
+        <div className="text-center p-8 bg-casa-surface border border-casa-border-light rounded-2xl shadow-subtle space-y-4">
+          <div className="w-14 h-14 rounded-full bg-amber-50 dark:bg-amber-950/40 flex items-center justify-center text-amber-600 mx-auto">
+            <AlertCircle className="w-7 h-7" />
+          </div>
+          <h2 className="text-xl font-bold text-casa-text-primary">Account Suspended or Inactive</h2>
+          <p className="text-xs text-casa-text-secondary leading-relaxed max-w-md mx-auto">
+            Your advertiser account is currently suspended or inactive. All active listings have been temporarily hidden from the public marketplace. Please contact administration for status review.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (isAuthenticated && isConsumer) {
+    return (
+      <div className="min-h-[70vh] max-w-xl mx-auto px-4 flex items-center justify-center">
+        <div className="text-center p-8 bg-casa-surface border border-casa-border-light rounded-2xl shadow-subtle space-y-4">
+          <div className="w-14 h-14 rounded-full bg-red-50 dark:bg-red-950/40 flex items-center justify-center text-red-600 mx-auto">
+            <AlertCircle className="w-7 h-7" />
+          </div>
+          <h2 className="text-xl font-bold text-casa-text-primary">Access Restricted</h2>
+          <p className="text-xs text-casa-text-secondary leading-relaxed max-w-md mx-auto">
+            Property listing creation is reserved for verified property advertisers (Brokers, Agents, Developers, and Property Owners/Sellers). Property Buyers and Rental Tenants are not permitted to post marketplace listings.
+          </p>
+          <div className="pt-2 flex flex-col sm:flex-row justify-center gap-3">
+            <Link
+              href="/properties"
+              className="inline-flex items-center justify-center py-2.5 px-5 rounded-xl bg-casa-brand hover:bg-casa-brand-hover text-white text-xs font-semibold transition-all shadow-sm"
+            >
+              Explore Properties
+            </Link>
+            <Link
+              href="/dashboard/purchaser"
+              className="inline-flex items-center justify-center py-2.5 px-4 rounded-xl border border-casa-border-light hover:bg-casa-subtle text-casa-text-primary text-xs font-semibold transition-colors"
+            >
+              Buyer Dashboard
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (isAuthenticated && !isAuthorizedAdvertiser) {
+    return (
+      <div className="min-h-[70vh] max-w-xl mx-auto px-4 flex items-center justify-center">
+        <div className="text-center p-8 bg-casa-surface border border-casa-border-light rounded-2xl shadow-subtle space-y-4">
+          <div className="w-14 h-14 rounded-full bg-red-50 dark:bg-red-950/40 flex items-center justify-center text-red-600 mx-auto">
+            <AlertCircle className="w-7 h-7" />
+          </div>
+          <h2 className="text-xl font-bold text-casa-text-primary">Advertiser Role Required</h2>
+          <p className="text-xs text-casa-text-secondary leading-relaxed max-w-md mx-auto">
+            Only eligible property advertisers (Brokers, Agents, Developers, and Property Owners/Sellers) can access property creation.
+          </p>
         </div>
       </div>
     );
