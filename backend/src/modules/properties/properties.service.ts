@@ -1234,6 +1234,7 @@ export class PropertiesService implements OnModuleInit {
             coordinates: [80.9462, 26.8467] as [number, number],
           }
         : {
+            country: dto.location?.country || 'India',
             state: dto.location?.state || 'Uttar Pradesh',
             district: dto.location?.district || dto.location?.city || 'Lucknow',
             city: dto.location?.city || 'Lucknow',

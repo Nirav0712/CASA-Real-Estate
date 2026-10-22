@@ -136,7 +136,7 @@ export function GlobalLocationSelector({
       if (value.state !== undefined && value.state !== selectedState) setSelectedState(value.state);
       if (value.city !== undefined && value.city !== selectedCity) setSelectedCity(value.city);
     }
-  }, [value]);
+  }, [value?.country, value?.state, value?.city]);
 
   // Deduplicate array by slug
   const dedupeBySlug = React.useCallback(<T extends { slug: string }>(items: T[]): T[] => {

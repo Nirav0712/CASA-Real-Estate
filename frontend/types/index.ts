@@ -342,6 +342,7 @@ export interface Property {
     includedFacilities?: string[];
   };
   location: {
+    country?: string;
     state?: string;
     district?: string;
     city?: string;

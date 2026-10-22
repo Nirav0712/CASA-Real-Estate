@@ -36,7 +36,33 @@ const BUDGET_PRESETS = [
   { label: '₹5 Crore+ Ultra Luxury', min: 50000000, max: undefined },
 ];
 
-export function HeroSection() {
+export interface HeroFilters {
+  listingMode: 'SALE' | 'RENT' | 'LEASE';
+  category: string;
+  country?: string;
+  state?: string;
+  city?: string;
+  minPrice?: number;
+  maxPrice?: number;
+}
+
+interface HeroSectionProps {
+  onFilterChange?: (filters: HeroFilters) => void;
+  initialLocation?: SelectedLocationData;
+  detectedCityName?: string;
+  detectedStateName?: string;
+  onRequestGps?: () => void;
+  isGpsLoading?: boolean;
+}
+
+export function HeroSection({
+  onFilterChange,
+  initialLocation,
+  detectedCityName,
+  detectedStateName,
+  onRequestGps,
+  isGpsLoading,
+}: HeroSectionProps = {}) {
   const router = useRouter();
   const { locale, t } = useLanguage();
   const { user, isAuthenticated, openAuthModal } = useAuth();
@@ -64,33 +90,77 @@ export function HeroSection() {
   const [budgetIndex, setBudgetIndex] = React.useState(0);
   const [keyword, setKeyword] = React.useState('');
 
+  // Sync with auto-detected location when resolved
+  React.useEffect(() => {
+    if (initialLocation && initialLocation.country) {
+      setSelectedLocation({
+        country: initialLocation.country,
+        state: initialLocation.state || 'all',
+        city: initialLocation.city || 'all',
+      });
+    }
+  }, [initialLocation?.country, initialLocation?.state, initialLocation?.city]);
+
+  // Helper to notify parent of filter changes in real-time
+  const emitFilterChange = React.useCallback(
+    (override?: Partial<HeroFilters>) => {
+      if (!onFilterChange) return;
+      const budget = BUDGET_PRESETS[budgetIndex];
+      const filters: HeroFilters = {
+        listingMode,
+        category: selectedCategory,
+        country: selectedLocation.country !== 'all' ? selectedLocation.country : undefined,
+        state: selectedLocation.state !== 'all' ? selectedLocation.state : undefined,
+        city: selectedLocation.city !== 'all' ? selectedLocation.city : undefined,
+        minPrice: budget.min,
+        maxPrice: budget.max,
+        ...override,
+      };
+      onFilterChange(filters);
+    },
+    [onFilterChange, listingMode, selectedCategory, selectedLocation, budgetIndex]
+  );
+
+  const handleModeChange = (mode: 'SALE' | 'RENT' | 'LEASE') => {
+    setListingMode(mode);
+    emitFilterChange({ listingMode: mode });
+  };
+
+  const handleCategoryChange = (cat: string) => {
+    setSelectedCategory(cat);
+    emitFilterChange({ category: cat });
+  };
+
+  const handleLocationChange = (loc: SelectedLocationData) => {
+    setSelectedLocation(loc);
+    emitFilterChange({
+      country: loc.country !== 'all' ? loc.country : undefined,
+      state: loc.state !== 'all' ? loc.state : undefined,
+      city: loc.city !== 'all' ? loc.city : undefined,
+    });
+  };
+
+  const handleBudgetChange = (idx: number) => {
+    setBudgetIndex(idx);
+    const budget = BUDGET_PRESETS[idx];
+    emitFilterChange({
+      minPrice: budget.min,
+      maxPrice: budget.max,
+    });
+  };
+
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const params = new URLSearchParams();
+    emitFilterChange();
 
-    if (listingMode) params.set('listingType', listingMode);
-    if (selectedCategory && selectedCategory !== 'all') {
-      const catObj = CASA_CATEGORIES.find((c) => c.slug === selectedCategory || c.name === selectedCategory);
-      params.set('category', catObj ? catObj.name : selectedCategory);
+    // Smoothly scroll down to real-time property listings
+    const targetSection =
+      document.getElementById('marketplace-properties') ||
+      document.getElementById('latest') ||
+      document.getElementById('featured');
+    if (targetSection) {
+      targetSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
-    if (selectedLocation.country && selectedLocation.country !== 'all') {
-      params.set('country', selectedLocation.country);
-    }
-    if (selectedLocation.state && selectedLocation.state !== 'all') {
-      params.set('state', selectedLocation.state);
-    }
-    if (selectedLocation.city && selectedLocation.city !== 'all') {
-      params.set('city', selectedLocation.city);
-    }
-    if (keyword.trim()) {
-      params.set('q', keyword.trim());
-    }
-
-    const budget = BUDGET_PRESETS[budgetIndex];
-    if (budget.min !== undefined) params.set('minPrice', String(budget.min));
-    if (budget.max !== undefined) params.set('maxPrice', String(budget.max));
-
-    router.push(`/properties?${params.toString()}`);
   };
 
   const modeTabs = [
@@ -194,12 +264,45 @@ export function HeroSection() {
           {/* Right Column: Glassmorphic Property Discovery Filter Panel + Future Ad Ready */}
           <div className="lg:col-span-6 xl:col-span-5">
             <div className="bg-casa-surface/95 backdrop-blur-md rounded-3xl p-5 sm:p-6 border border-casa-border-light shadow-elevated transition-all duration-300 hover:shadow-2xl">
+              {/* Detected Location Status Badge */}
+              {detectedCityName && (
+                <div className="mb-3.5 px-3 py-2 rounded-2xl bg-gradient-to-r from-blue-50 to-sky-50 dark:from-blue-950/60 dark:to-sky-950/40 border border-blue-200/70 dark:border-blue-800/70 flex items-center justify-between gap-2 shadow-2xs">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="relative flex h-2.5 w-2.5 flex-shrink-0">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+                    </span>
+                    <div className="truncate">
+                      <div className="text-[9px] uppercase font-bold text-casa-text-muted tracking-wider">Client Detected Location</div>
+                      <div className="text-xs font-bold text-casa-text-primary truncate flex items-center gap-1">
+                        <MapPin className="w-3.5 h-3.5 text-casa-brand flex-shrink-0" />
+                        <span>{detectedCityName}{detectedStateName ? `, ${detectedStateName}` : ''}</span>
+                        <span className="text-[9px] font-semibold text-emerald-700 dark:text-emerald-300 bg-emerald-100/70 dark:bg-emerald-950/70 px-1.5 py-0.5 rounded-full">
+                          Live Auto
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  {onRequestGps && (
+                    <button
+                      type="button"
+                      onClick={onRequestGps}
+                      disabled={isGpsLoading}
+                      className="text-[10px] font-bold text-casa-brand hover:underline px-2 py-1 rounded-lg hover:bg-blue-100/50 dark:hover:bg-blue-900/40 transition-colors flex-shrink-0"
+                      title="Detect exact coordinates via GPS"
+                    >
+                      {isGpsLoading ? 'Locating...' : 'GPS Detect'}
+                    </button>
+                  )}
+                </div>
+              )}
+
               {/* Buy / Rent / Lease Mode Switcher */}
               <div className="mb-4 pb-3 border-b border-casa-border-light flex items-center justify-between flex-wrap gap-2">
                 <Tabs
                   items={modeTabs}
                   activeTab={listingMode}
-                  onChange={(mode) => setListingMode(mode as 'SALE' | 'RENT' | 'LEASE')}
+                  onChange={(mode) => handleModeChange(mode as 'SALE' | 'RENT' | 'LEASE')}
                   variant="pill"
                 />
                 <span className="text-[11px] text-casa-brand font-semibold hidden sm:inline">
@@ -217,7 +320,7 @@ export function HeroSection() {
                   </label>
                   <select
                     value={selectedCategory}
-                    onChange={(e) => setSelectedCategory(e.target.value)}
+                    onChange={(e) => handleCategoryChange(e.target.value)}
                     aria-label="Property Category"
                     className="w-full px-3 py-2 text-xs bg-casa-canvas border border-casa-border-light rounded-xl text-casa-text-primary font-medium focus:outline-none focus:ring-2 focus:ring-casa-brand/30 cursor-pointer"
                   >
@@ -234,7 +337,7 @@ export function HeroSection() {
                 <div className="p-3 bg-casa-canvas/60 rounded-2xl border border-casa-border-light/70 space-y-2">
                   <GlobalLocationSelector
                     value={selectedLocation}
-                    onChange={setSelectedLocation}
+                    onChange={handleLocationChange}
                     variant="hero"
                   />
                 </div>
@@ -247,7 +350,7 @@ export function HeroSection() {
                   </label>
                   <select
                     value={budgetIndex}
-                    onChange={(e) => setBudgetIndex(Number(e.target.value))}
+                    onChange={(e) => handleBudgetChange(Number(e.target.value))}
                     aria-label="Budget Range"
                     className="w-full px-3 py-2 text-xs bg-casa-canvas border border-casa-border-light rounded-xl text-casa-text-primary font-medium focus:outline-none focus:ring-2 focus:ring-casa-brand/30 cursor-pointer"
                   >
@@ -270,6 +373,17 @@ export function HeroSection() {
                   <Search className="w-4 h-4" />
                   <span>Search Verified Properties</span>
                 </Button>
+
+                <div className="flex items-center justify-between text-[11px] text-casa-text-muted px-1 pt-0.5">
+                  <span className="flex items-center gap-1">
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 inline-block"></span>
+                    <span>Real-time local listings</span>
+                  </span>
+                  <Link href="/properties" className="text-casa-brand font-semibold hover:underline flex items-center gap-0.5 text-xs">
+                    <span>Full Filters</span>
+                    <ArrowRight className="w-3 h-3" />
+                  </Link>
+                </div>
               </form>
 
               {/* 4. Future Campaign / Sponsored Spotlight Slot (Configurable & Responsive) */}

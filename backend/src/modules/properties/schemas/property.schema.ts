@@ -93,6 +93,9 @@ export class PropertyPrice {
 
 @Schema({ _id: false })
 export class PropertyLocation {
+  @Prop({ default: 'India' })
+  country?: string;
+
   @Prop({ default: 'Uttar Pradesh' })
   state: string;
 
