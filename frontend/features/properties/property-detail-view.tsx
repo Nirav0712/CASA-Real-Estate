@@ -20,6 +20,7 @@ import { recordRecentlyViewed } from '@/services/purchaser-service';
 import { createLead } from '@/services/lead-service';
 import { EngagementService, Review } from '@/services/engagement-service';
 import { trackMarketplaceEvent } from '@/lib/analytics';
+import { fetchApi } from '@/lib/api-client';
 import {
   MapPin,
   Bed,
@@ -71,13 +72,33 @@ export function PropertyDetailView({
   const { locale, t, isRtl } = useLanguage();
   const toast = useToast();
   const router = useRouter();
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, openLoginProtection } = useAuth();
   const { isSaved, toggleSave } = useSavedProperties();
   const { isCompared, addToCompare, removeFromCompare } = useComparison();
   const [selectedImageIndex, setSelectedImageIndex] = React.useState(0);
+  const [liveProperty, setLiveProperty] = React.useState<Property | null>(null);
+  const currentProperty = liveProperty || property;
 
-  const hasVideo = Boolean(property.media?.videoUrl);
-  const isVideoPrimary = property.media?.primaryMediaType === 'VIDEO' || (hasVideo && (!property.media?.images || property.media.images.length === 0));
+  // Silently fetch full unredacted property specs if authenticated user lands on page
+  React.useEffect(() => {
+    if (!isAuthenticated) return;
+    let isMounted = true;
+    async function fetchFullDetails() {
+      try {
+        const res = await fetchApi<Property>(`/properties/${property.slug}`);
+        if (isMounted && res.data) {
+          setLiveProperty(res.data);
+        }
+      } catch {}
+    }
+    fetchFullDetails();
+    return () => {
+      isMounted = false;
+    };
+  }, [isAuthenticated, property.slug]);
+
+  const hasVideo = Boolean(currentProperty.media?.videoUrl);
+  const isVideoPrimary = currentProperty.media?.primaryMediaType === 'VIDEO' || (hasVideo && (!currentProperty.media?.images || currentProperty.media.images.length === 0));
   const [activeMediaMode, setActiveMediaMode] = React.useState<'VIDEO' | 'IMAGE'>(
     hasVideo && isVideoPrimary ? 'VIDEO' : 'IMAGE'
   );
@@ -204,24 +225,115 @@ export function PropertyDetailView({
   const localizedCategory = getCategoryLabel(property.category, locale);
 
   const formattedPrice = formatPrice(
-    property.price.amount,
-    property.price.currency,
+    currentProperty.price.amount,
+    currentProperty.price.currency,
   );
 
   // Price per sqft calculation
   const pricePerSqFt =
-    property.specs?.carpetAreaSqFt && property.specs.carpetAreaSqFt > 0
-      ? Math.round((property.price?.amount || 0) / property.specs.carpetAreaSqFt)
+    currentProperty.specs?.carpetAreaSqFt && currentProperty.specs.carpetAreaSqFt > 0
+      ? Math.round((currentProperty.price?.amount || 0) / currentProperty.specs.carpetAreaSqFt)
       : null;
 
-  const whatsappUrl = buildWhatsAppEnquiryUrl({
-    phone: property.advertiser.phone,
-    propertyTitle: localizedTitle,
-    priceText: formattedPrice,
-    propertySlug: property.slug,
-    category: localizedCategory,
-    location: `${property.location.locality}, ${property.location.city}`,
-  });
+  const whatsappUrl = currentProperty.advertiser?.phone
+    ? buildWhatsAppEnquiryUrl({
+        phone: currentProperty.advertiser.phone,
+        propertyTitle: localizedTitle,
+        priceText: formattedPrice,
+        propertySlug: currentProperty.slug,
+        category: localizedCategory,
+        location: `${currentProperty.location.locality}, ${currentProperty.location.city}`,
+      })
+    : null;
+
+  const hasAdvertiserContact = Boolean(
+    currentProperty.advertiser?.phone ||
+    (currentProperty.advertiser as any)?.hasPhone ||
+    currentProperty.advertiser?.name
+  );
+
+  const handleProtectedAction = (type: 'WHATSAPP' | 'CALL' | 'VIEW_DETAILS', e?: React.MouseEvent) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    if (!isAuthenticated) {
+      openLoginProtection({
+        type,
+        propertySlug: property.slug,
+        propertyTitle: localizedTitle,
+      });
+      return false;
+    }
+    return true;
+  };
+
+  // Seamless continuation of WhatsApp enquiry or Call after sign in / registration
+  const hasContinuedRef = React.useRef(false);
+  React.useEffect(() => {
+    if (!isAuthenticated || hasContinuedRef.current) return;
+    if (typeof window === 'undefined') return;
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const continueAction = urlParams.get('continueAction');
+    let storedIntent: any = null;
+    try {
+      const stored = sessionStorage.getItem('casa_login_intent');
+      if (stored) storedIntent = JSON.parse(stored);
+    } catch {}
+
+    const action =
+      continueAction ||
+      (storedIntent?.propertySlug === property.slug ? storedIntent.type?.toLowerCase() : null);
+
+    if (action === 'whatsapp') {
+      hasContinuedRef.current = true;
+      try {
+        sessionStorage.removeItem('casa_login_intent');
+      } catch {}
+      const targetPhone = currentProperty.advertiser?.phone;
+      if (targetPhone) {
+        const waUrl = buildWhatsAppEnquiryUrl({
+          phone: targetPhone,
+          propertyTitle: localizedTitle,
+          priceText: formattedPrice,
+          propertySlug: currentProperty.slug,
+          category: localizedCategory,
+          location: `${currentProperty.location.locality}, ${currentProperty.location.city}`,
+        });
+        toast.success('Continuing Enquiry', 'Opening WhatsApp chat with verified advertiser...');
+        setTimeout(() => {
+          window.open(waUrl, '_blank', 'noopener,noreferrer');
+        }, 500);
+      }
+    } else if (action === 'call') {
+      hasContinuedRef.current = true;
+      try {
+        sessionStorage.removeItem('casa_login_intent');
+      } catch {}
+      const targetPhone = currentProperty.advertiser?.phone;
+      if (targetPhone) {
+        toast.info('Connecting Call', `Connecting to verified advertiser: ${targetPhone}`);
+        setTimeout(() => {
+          window.location.href = `tel:${targetPhone}`;
+        }, 500);
+      }
+    } else if (action === 'view_details') {
+      hasContinuedRef.current = true;
+      try {
+        sessionStorage.removeItem('casa_login_intent');
+      } catch {}
+      toast.success('Welcome Back', 'Full property specifications unlocked.');
+    }
+  }, [
+    isAuthenticated,
+    currentProperty,
+    localizedTitle,
+    formattedPrice,
+    localizedCategory,
+    property.slug,
+    toast,
+  ]);
 
   const toggleFavorite = async () => {
     await toggleSave(propertyId, localizedTitle);
@@ -445,6 +557,56 @@ export function PropertyDetailView({
   return (
     <div className="py-8 md:py-12 bg-casa-canvas text-start transition-colors duration-200">
       <Container>
+        {/* Unauthenticated Login Protection Notice Banner */}
+        {!isAuthenticated && (
+          <div className="mb-6 p-4 md:p-5 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-start shadow-sm animate-in fade-in duration-200">
+            <div className="flex items-start sm:items-center gap-3.5">
+              <div className="w-10 h-10 rounded-xl bg-amber-500 text-white flex items-center justify-center shrink-0 shadow-sm">
+                <Lock className="w-5 h-5" />
+              </div>
+              <div className="space-y-0.5">
+                <h3 className="text-sm md:text-base font-extrabold text-casa-text-primary">
+                  Please Sign In or Create an Account to continue.
+                </h3>
+                <p className="text-xs text-casa-text-secondary leading-relaxed">
+                  Sign in to unlock verified advertiser direct contacts, WhatsApp chat, and complete property specifications.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2.5 shrink-0">
+              <Button
+                type="button"
+                size="sm"
+                variant="primary"
+                className="font-bold text-xs shadow-sm"
+                onClick={() =>
+                  openLoginProtection({
+                    type: 'VIEW_DETAILS',
+                    propertySlug: property.slug,
+                    propertyTitle: localizedTitle,
+                  })
+                }
+              >
+                Sign In
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="font-bold text-xs border-casa-brand/40 text-casa-brand hover:bg-casa-brand/5"
+                onClick={() =>
+                  openLoginProtection({
+                    type: 'VIEW_DETAILS',
+                    propertySlug: property.slug,
+                    propertyTitle: localizedTitle,
+                  })
+                }
+              >
+                Create Account
+              </Button>
+            </div>
+          </div>
+        )}
         {/* Controlled dev notice */}
         {source === 'fallback_dev' && (
           <div className="mb-6 p-3.5 rounded-2xl bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800 text-blue-900 dark:text-blue-200 text-xs flex items-center justify-between">
@@ -1492,24 +1654,49 @@ export function PropertyDetailView({
                   </div>
                 </div>
 
-                {/* Locked Contact Banner when Limits / Entitlements apply */}
-                {(property as any).contactLocked && (
+                {/* Locked Contact Banner when Limits / Entitlements apply or unauthenticated */}
+                {(!isAuthenticated || (currentProperty as any).contactLocked) && (
                   <div className="p-3.5 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-start space-y-2 mb-3">
                     <div className="flex items-center gap-1.5 text-xs font-bold text-amber-800 dark:text-amber-300">
                       <Lock className="w-4 h-4 text-amber-600 shrink-0" />
                       <span>Direct Contact Locked</span>
                     </div>
                     <p className="text-[11px] text-amber-700 dark:text-amber-300/90 leading-relaxed">
-                      {(property as any).contactMessage ||
-                        'Sign in or upgrade your subscription package to view verified direct phone and WhatsApp contact.'}
+                      Please Sign In or Create an Account to continue to verified direct phone and WhatsApp contact.
                     </p>
-                    <div className="pt-1">
-                      <Link
-                        href={isAuthenticated ? '/dashboard/billing' : '/login'}
-                        className="inline-flex items-center justify-center w-full py-1.5 px-3 rounded-lg text-xs font-semibold bg-amber-600 hover:bg-amber-700 text-white shadow-2xs transition-colors"
+                    <div className="pt-1 flex items-center gap-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="primary"
+                        fullWidth
+                        className="text-xs font-bold"
+                        onClick={() =>
+                          openLoginProtection({
+                            type: 'CALL',
+                            propertySlug: property.slug,
+                            propertyTitle: localizedTitle,
+                          })
+                        }
                       >
-                        {isAuthenticated ? 'Upgrade Package' : 'Sign In to View Contact'}
-                      </Link>
+                        Sign In
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        fullWidth
+                        className="text-xs font-bold"
+                        onClick={() =>
+                          openLoginProtection({
+                            type: 'CALL',
+                            propertySlug: property.slug,
+                            propertyTitle: localizedTitle,
+                          })
+                        }
+                      >
+                        Create Account
+                      </Button>
                     </div>
                   </div>
                 )}
@@ -1518,7 +1705,11 @@ export function PropertyDetailView({
                 <div className="space-y-2.5">
                   {/* Site Visit Booking Button */}
                   <Button
-                    onClick={() => setShowSiteVisitModal(true)}
+                    onClick={(e) => {
+                      if (handleProtectedAction('VIEW_DETAILS', e)) {
+                        setShowSiteVisitModal(true);
+                      }
+                    }}
                     variant="primary"
                     size="lg"
                     fullWidth
@@ -1528,60 +1719,49 @@ export function PropertyDetailView({
                     <span>Book a Site Visit</span>
                   </Button>
 
-                  {/* Direct Chat with Agent Button (temporarily commented out) */}
-                  {/*
+                  {/* WhatsApp Enquiry Button */}
                   <Button
-                    onClick={handleStartChat}
-                    variant="outline"
+                    type="button"
+                    variant="success"
                     size="md"
                     fullWidth
-                    className="text-xs font-semibold flex items-center justify-center gap-2 hover:bg-casa-brand/5 border-casa-brand/40 text-casa-brand"
+                    className="shadow-subtle text-xs font-bold flex items-center justify-center gap-2"
+                    onClick={(e) => {
+                      if (handleProtectedAction('WHATSAPP', e)) {
+                        if (whatsappUrl) {
+                          window.open(whatsappUrl, '_blank', 'noopener,noreferrer');
+                        }
+                      }
+                    }}
                   >
-                    <MessageCircle className="w-4 h-4" />
-                    <span>Chat with Agent</span>
+                    <MessageSquare className="w-4 h-4" />
+                    <span>{t('whatsApp')}</span>
                   </Button>
-                  */}
 
-                  {whatsappUrl ? (
-                    <a
-                      href={whatsappUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="block w-full"
+                  {/* Call Advertiser Button */}
+                  {hasAdvertiserContact ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="md"
+                      fullWidth
+                      className="text-xs font-semibold flex items-center justify-center gap-2"
+                      onClick={(e) => {
+                        if (handleProtectedAction('CALL', e)) {
+                          if (currentProperty.advertiser?.phone) {
+                            window.location.href = `tel:${currentProperty.advertiser.phone}`;
+                          }
+                        }
+                      }}
                     >
-                      <Button
-                        variant="success"
-                        size="md"
-                        fullWidth
-                        className="shadow-subtle text-xs font-bold"
-                      >
-                        <MessageSquare className="w-4 h-4" />
-                        <span>{t('whatsApp')}</span>
-                      </Button>
-                    </a>
-                  ) : (
-                    !(property as any).contactLocked && (
-                      <Button variant="outline" size="md" disabled fullWidth>
-                        <span>WhatsApp Unavailable</span>
-                      </Button>
-                    )
-                  )}
-
-                  {property.advertiser.phone ? (
-                    <a
-                      href={`tel:${property.advertiser.phone}`}
-                      className="block w-full"
-                    >
-                      <Button
-                        variant="outline"
-                        size="md"
-                        fullWidth
-                        className="text-xs font-semibold"
-                      >
-                        <Phone className="w-4 h-4 text-casa-brand" />
-                        <span>{t('call')}: {property.advertiser.phone}</span>
-                      </Button>
-                    </a>
+                      <Phone className="w-4 h-4 text-casa-brand" />
+                      <span>
+                        {t('call')}
+                        {isAuthenticated && currentProperty.advertiser?.phone
+                          ? `: ${currentProperty.advertiser.phone}`
+                          : ''}
+                      </span>
+                    </Button>
                   ) : null}
                 </div>
 

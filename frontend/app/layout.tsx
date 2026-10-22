@@ -12,6 +12,7 @@ import { AuthModal } from '@/components/auth/auth-modal';
 import { ComparisonBar } from '@/components/property/comparison-bar';
 import { PlanSelectionModal } from '@/components/pricing/plan-selection-modal';
 import { TrialExpiredModal } from '@/components/pricing/trial-expired-modal';
+import { LoginProtectionModal } from '@/components/auth/login-protection-modal';
 
 const inter = Inter({
   subsets: ['latin'],
@@ -52,6 +53,7 @@ export default function RootLayout({
                     <ComparisonBar />
                     <PlanSelectionModal />
                     <TrialExpiredModal />
+                    <LoginProtectionModal />
                   </ComparisonProvider>
                 </SavedPropertiesProvider>
               </AuthProvider>

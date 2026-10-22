@@ -1412,9 +1412,11 @@ export class EntitlementsService implements OnModuleInit {
       name: raw.advertiser.name || 'Verified Advertiser',
       role: raw.advertiser.role || 'AGENT',
       isVerifiedAgent: !!raw.advertiser.isVerifiedAgent,
+      agencyName: raw.advertiser.agencyName,
       phone: null,
       whatsapp: null,
       email: null,
+      hasPhone: Boolean(raw.advertiser.phone),
     } : null;
 
     return {
@@ -1422,7 +1424,8 @@ export class EntitlementsService implements OnModuleInit {
       advertiser: sanitizedAdvertiser,
       owner: null,
       contactLocked: true,
-      contactMessage: 'Login or upgrade package to view owner and agent contact details.',
+      whatsappUrl: null,
+      contactMessage: 'Please Sign In or Create an Account to continue.',
     };
   }
 

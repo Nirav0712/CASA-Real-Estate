@@ -8,6 +8,13 @@ import { useToast } from './toast-context';
 
 export type AuthModalMode = 'SIGN_IN' | 'REGISTER' | 'FORGOT_PASSWORD';
 
+export interface LoginProtectionIntent {
+  type: 'VIEW_DETAILS' | 'WHATSAPP' | 'CALL' | 'GENERAL';
+  propertySlug?: string;
+  propertyTitle?: string;
+  returnUrl?: string;
+}
+
 interface AuthContextType {
   user: User | null;
   token: string | null;
@@ -35,6 +42,12 @@ interface AuthContextType {
     agencyName?: string,
   ) => Promise<void>;
 
+  // Login Protection Modal (for unauthenticated visitors clicking View Details, WhatsApp, Call Advertiser)
+  isLoginProtectionOpen: boolean;
+  loginProtectionIntent: LoginProtectionIntent | null;
+  openLoginProtection: (intent?: LoginProtectionIntent) => void;
+  closeLoginProtection: () => void;
+
   // Pricing Plan & 3-Day Trial Modals
   isPlanSelectionModalOpen: boolean;
   openPlanSelectionModal: () => void;
@@ -58,6 +71,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = React.useState<boolean>(true);
   const [isAuthModalOpen, setIsAuthModalOpen] = React.useState<boolean>(false);
   const [authModalMode, setAuthModalMode] = React.useState<AuthModalMode>('SIGN_IN');
+  const [isLoginProtectionOpen, setIsLoginProtectionOpen] = React.useState<boolean>(false);
+  const [loginProtectionIntent, setLoginProtectionIntent] = React.useState<LoginProtectionIntent | null>(null);
   const [isPlanSelectionModalOpen, setIsPlanSelectionModalOpen] = React.useState<boolean>(false);
   const [isTrialExpiredModalOpen, setIsTrialExpiredModalOpen] = React.useState<boolean>(false);
   const toast = useToast();
@@ -127,6 +142,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const closeTrialExpiredModal = React.useCallback(() => {
     setIsTrialExpiredModalOpen(false);
+  }, []);
+
+  const openLoginProtection = React.useCallback((intent?: LoginProtectionIntent) => {
+    const finalIntent = intent || { type: 'GENERAL' };
+    setLoginProtectionIntent(finalIntent);
+    setIsLoginProtectionOpen(true);
+    if (typeof window !== 'undefined') {
+      try {
+        sessionStorage.setItem('casa_login_intent', JSON.stringify(finalIntent));
+      } catch {}
+    }
+  }, []);
+
+  const closeLoginProtection = React.useCallback(() => {
+    setIsLoginProtectionOpen(false);
   }, []);
 
   const refreshUser = React.useCallback(async () => {
@@ -554,6 +584,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         logout,
         requestOtp,
         verifyOtp,
+        isLoginProtectionOpen,
+        loginProtectionIntent,
+        openLoginProtection,
+        closeLoginProtection,
         isPlanSelectionModalOpen,
         openPlanSelectionModal,
         closePlanSelectionModal,

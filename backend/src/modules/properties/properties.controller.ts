@@ -40,10 +40,15 @@ export class PropertiesController {
 
   private extractOptionalUser(req: any): any {
     if (req.user) return req.user;
+    let token: string | null = null;
     const authHeader = req.headers?.authorization;
     if (authHeader && authHeader.startsWith('Bearer ')) {
+      token = authHeader.substring(7).trim();
+    } else if (req.cookies?.access_token) {
+      token = req.cookies.access_token;
+    }
+    if (token) {
       try {
-        const token = authHeader.substring(7).trim();
         const decoded: any = this.jwtService.decode(token);
         if (decoded) {
           return {
@@ -66,15 +71,17 @@ export class PropertiesController {
   @Get('search')
   @ApiOperation({ summary: 'Phase 07 — Public multi-facet search & discovery endpoint' })
   @ApiResponse({ status: 200, description: 'Paginated search results returned from MongoDB Atlas' })
-  search(@Query() searchDto: SearchPropertiesDto) {
-    return this.propertiesService.search(searchDto);
+  search(@Query() searchDto: SearchPropertiesDto, @Req() req: any) {
+    const user = this.extractOptionalUser(req);
+    return this.propertiesService.search(searchDto, user);
   }
 
   @Get()
   @ApiOperation({ summary: 'Search and filter active published properties from live MongoDB Atlas' })
   @ApiResponse({ status: 200, description: 'Property list returned' })
-  findAll(@Query() query: any) {
-    return this.propertiesService.findAll(query);
+  findAll(@Query() query: any, @Req() req: any) {
+    const user = this.extractOptionalUser(req);
+    return this.propertiesService.findAll(query, user);
   }
 
   @Get('categories/all')

@@ -3,6 +3,7 @@
 import * as React from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { Property } from '@/types';
 import { Card, Badge } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -11,6 +12,7 @@ import { buildWhatsAppEnquiryUrl } from '@/lib/whatsapp';
 import { getCategoryLabel } from '@/lib/categories';
 import { useLanguage } from '@/contexts/language-context';
 import { useToast } from '@/contexts/toast-context';
+import { useAuth } from '@/contexts/auth-context';
 import { useSavedProperties } from '@/contexts/saved-properties-context';
 import { useComparison } from '@/contexts/comparison-context';
 import {
@@ -31,8 +33,10 @@ import {
 import { parseYouTubeUrl } from '@/lib/video';
 
 export function PropertyCard({ property }: { property: Property }) {
+  const router = useRouter();
   const { locale, t, isRtl } = useLanguage();
   const toast = useToast();
+  const { isAuthenticated, openLoginProtection } = useAuth();
   const { isSaved, toggleSave } = useSavedProperties();
   const { isCompared, addToCompare, removeFromCompare } = useComparison();
   const [isHovered, setIsHovered] = React.useState(false);
@@ -82,14 +86,74 @@ export function PropertyCard({ property }: { property: Property }) {
 
   const localizedCategory = getCategoryLabel(property.category, locale);
 
-  const whatsappUrl = buildWhatsAppEnquiryUrl({
-    phone: property.advertiser.phone,
-    propertyTitle: localizedTitle,
-    priceText: propertyPriceFormatted,
-    propertySlug: property.slug,
-    category: localizedCategory,
-    location: `${property.location.locality}, ${property.location.city}`,
-  });
+  const whatsappUrl = property.advertiser?.phone
+    ? buildWhatsAppEnquiryUrl({
+        phone: property.advertiser.phone,
+        propertyTitle: localizedTitle,
+        priceText: propertyPriceFormatted,
+        propertySlug: property.slug,
+        category: localizedCategory,
+        location: `${property.location.locality}, ${property.location.city}`,
+      })
+    : null;
+
+  const hasAdvertiserContact = Boolean(
+    property.advertiser?.phone ||
+    (property.advertiser as any)?.hasPhone ||
+    (property.advertiser as any)?.name
+  );
+
+  const handleViewDetails = (e?: React.MouseEvent) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    if (!isAuthenticated) {
+      openLoginProtection({
+        type: 'VIEW_DETAILS',
+        propertySlug: property.slug,
+        propertyTitle: localizedTitle,
+      });
+      return;
+    }
+    router.push(`/property/${property.slug}`);
+  };
+
+  const handleWhatsAppClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!isAuthenticated) {
+      openLoginProtection({
+        type: 'WHATSAPP',
+        propertySlug: property.slug,
+        propertyTitle: localizedTitle,
+      });
+      return;
+    }
+    if (whatsappUrl) {
+      window.open(whatsappUrl, '_blank', 'noopener,noreferrer');
+    } else {
+      router.push(`/property/${property.slug}?continueAction=whatsapp`);
+    }
+  };
+
+  const handleCallClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!isAuthenticated) {
+      openLoginProtection({
+        type: 'CALL',
+        propertySlug: property.slug,
+        propertyTitle: localizedTitle,
+      });
+      return;
+    }
+    if (property.advertiser?.phone) {
+      window.location.href = `tel:${property.advertiser.phone}`;
+    } else {
+      router.push(`/property/${property.slug}?continueAction=call`);
+    }
+  };
 
   return (
     <Card
@@ -100,7 +164,11 @@ export function PropertyCard({ property }: { property: Property }) {
     >
       {/* Thumbnail / Video Container */}
       <div className="relative aspect-[16/10] w-full bg-casa-subtle overflow-hidden">
-        <Link href={`/property/${property.slug}`} className="block w-full h-full relative">
+        <Link
+          href={`/property/${property.slug}`}
+          onClick={handleViewDetails}
+          className="block w-full h-full relative"
+        >
           {/* Base Poster/Thumbnail Image */}
           <Image
             src={property.media.thumbnailUrl || 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=800&q=80'}
@@ -244,7 +312,7 @@ export function PropertyCard({ property }: { property: Property }) {
         </div>
 
         {/* Title */}
-        <Link href={`/property/${property.slug}`}>
+        <Link href={`/property/${property.slug}`} onClick={handleViewDetails}>
           <h3 className="font-bold text-casa-text-primary line-clamp-2 text-sm leading-snug mb-1.5 group-hover:text-casa-brand transition-colors cursor-pointer">
             {localizedTitle}
           </h3>
@@ -314,40 +382,47 @@ export function PropertyCard({ property }: { property: Property }) {
         {/* Action Buttons */}
         <div className="mt-auto flex flex-col gap-2">
           <div className="flex items-center gap-2">
-            {whatsappUrl ? (
-              <a
-                href={whatsappUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex-1"
-              >
-                <Button variant="success" size="sm" fullWidth className="text-xs">
-                  <MessageSquare className="w-3.5 h-3.5" />
-                  <span>{t('whatsApp')}</span>
-                </Button>
-              </a>
-            ) : (
-              <Button variant="outline" size="sm" disabled fullWidth className="text-xs">
-                <span>WhatsApp N/A</span>
-              </Button>
-            )}
+            {/* WhatsApp Enquiry Button */}
+            <Button
+              type="button"
+              variant="success"
+              size="sm"
+              fullWidth
+              className="text-xs flex-1"
+              onClick={handleWhatsAppClick}
+            >
+              <MessageSquare className="w-3.5 h-3.5" />
+              <span>{t('whatsApp')}</span>
+            </Button>
 
-            {property.advertiser.phone ? (
-              <a href={`tel:${property.advertiser.phone}`} className="flex-1">
-                <Button variant="outline" size="sm" fullWidth className="text-xs">
-                  <Phone className="w-3.5 h-3.5 text-casa-brand" />
-                  <span>{t('call')}</span>
-                </Button>
-              </a>
+            {/* Call Advertiser Button */}
+            {hasAdvertiserContact ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                fullWidth
+                className="text-xs flex-1"
+                onClick={handleCallClick}
+              >
+                <Phone className="w-3.5 h-3.5 text-casa-brand" />
+                <span>{t('call')}</span>
+              </Button>
             ) : null}
           </div>
 
-          <Link href={`/property/${property.slug}`} className="w-full">
-            <Button variant="secondary" size="sm" fullWidth className="text-xs justify-between group/btn">
-              <span>{t('viewDetails')}</span>
-              <ArrowRight className={`w-3.5 h-3.5 transition-transform duration-150 group-hover/btn:translate-x-1 ${isRtl ? 'rtl-flip' : ''}`} />
-            </Button>
-          </Link>
+          {/* View Details Button */}
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            fullWidth
+            className="text-xs justify-between group/btn w-full"
+            onClick={handleViewDetails}
+          >
+            <span>{t('viewDetails')}</span>
+            <ArrowRight className={`w-3.5 h-3.5 transition-transform duration-150 group-hover/btn:translate-x-1 ${isRtl ? 'rtl-flip' : ''}`} />
+          </Button>
         </div>
       </div>
     </Card>

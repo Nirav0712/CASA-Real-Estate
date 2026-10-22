@@ -609,26 +609,44 @@ export class PropertiesService implements OnModuleInit {
   // PUBLIC PROPERTY APIS
   // ==========================================
 
-  async findAll(query: {
-    category?: string;
-    type?: string;
-    country?: string;
-    state?: string;
-    city?: string;
-    area?: string;
-    subArea?: string;
-    society?: string;
-    hasVideo?: boolean | string;
-    q?: string;
-    featured?: boolean | string;
-    status?: string;
-    minPrice?: number | string;
-    maxPrice?: number | string;
-    bedrooms?: number | string;
-    limit?: number | string;
-    skip?: number | string;
-    page?: number | string;
-  }) {
+  private sanitizeAdvertiserForVisitor(prop: any): any {
+    const p = prop && typeof prop.toObject === 'function' ? prop.toObject() : { ...prop };
+    if (p && p.advertiser) {
+      const hasPhone = Boolean(p.advertiser.phone);
+      p.advertiser = {
+        ...p.advertiser,
+        phone: null,
+        email: null,
+        whatsapp: null,
+        hasPhone,
+      };
+    }
+    return p;
+  }
+
+  async findAll(
+    query: {
+      category?: string;
+      type?: string;
+      country?: string;
+      state?: string;
+      city?: string;
+      area?: string;
+      subArea?: string;
+      society?: string;
+      hasVideo?: boolean | string;
+      q?: string;
+      featured?: boolean | string;
+      status?: string;
+      minPrice?: number | string;
+      maxPrice?: number | string;
+      bedrooms?: number | string;
+      limit?: number | string;
+      skip?: number | string;
+      page?: number | string;
+    },
+    user?: AuthenticatedUser,
+  ) {
     try {
       const filter: any = {};
 
@@ -730,7 +748,7 @@ export class PropertiesService implements OnModuleInit {
           .lean(),
       ]);
 
-      return properties;
+      return user ? properties : properties.map((p) => this.sanitizeAdvertiserForVisitor(p));
     } catch (err: any) {
       this.logger.error(`Failed to query properties: ${err?.message}`);
       return [];
@@ -740,7 +758,7 @@ export class PropertiesService implements OnModuleInit {
   /**
    * Phase 07 — Dedicated Multi-Facet Search & Discovery Engine
    */
-  async search(dto: SearchPropertiesDto) {
+  async search(dto: SearchPropertiesDto, user?: AuthenticatedUser) {
     try {
       const filter: any = {};
 
@@ -1067,9 +1085,10 @@ export class PropertiesService implements OnModuleInit {
       ]);
 
       const totalPages = Math.ceil(total / limit) || 1;
+      const sanitizedItems = user ? items : items.map((p) => this.sanitizeAdvertiserForVisitor(p));
 
       return {
-        data: items,
+        data: sanitizedItems,
         pagination: {
           page,
           limit,

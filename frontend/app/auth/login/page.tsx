@@ -38,11 +38,25 @@ function LoginContent() {
     }
   }, [isDeactivated, isTrialExpired]);
 
-  const redirectUrl =
-    searchParams.get('redirect') ||
-    searchParams.get('callbackUrl') ||
-    searchParams.get('returnUrl') ||
-    '/dashboard/properties/new';
+  const redirectUrl = React.useMemo(() => {
+    const fromQuery =
+      searchParams.get('redirect') ||
+      searchParams.get('callbackUrl') ||
+      searchParams.get('returnUrl');
+    if (fromQuery) return fromQuery;
+
+    if (typeof window !== 'undefined') {
+      try {
+        const stored = sessionStorage.getItem('casa_login_intent');
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (parsed?.continueUrl) return parsed.continueUrl;
+          if (parsed?.propertySlug) return `/property/${parsed.propertySlug}`;
+        }
+      } catch {}
+    }
+    return '/dashboard/properties/new';
+  }, [searchParams]);
 
   React.useEffect(() => {
     if (isAuthenticated) {
