@@ -51,6 +51,8 @@ export interface AuthenticatedUser {
   trialRemainingLabel?: string;
   activePackageId?: string | null;
   kycStatus?: string;
+  isKycExempt?: boolean;
+  isKycRequired?: boolean;
   kycRejectionReason?: string | null;
   kycApprovedAt?: Date | string | null;
   kycApprovedBy?: string | null;

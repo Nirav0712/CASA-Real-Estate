@@ -1622,6 +1622,10 @@ export class AdminService implements OnModuleInit {
     // Invalidate all active sessions if user is suspended or deactivated
     if (dto.status === AccountStatus.SUSPENDED || dto.status === AccountStatus.DEACTIVATED) {
       try {
+        await this.refreshSessionModel.updateMany(
+          { userId: user._id },
+          { $set: { isRevoked: true } },
+        );
         await this.refreshSessionModel.deleteMany({
           $or: [{ userId: user._id }, { userId: user._id.toString() }],
         });
@@ -2228,6 +2232,10 @@ export class AdminService implements OnModuleInit {
       throw new NotFoundException(`Agent with ID "${id}" was not found.`);
     }
 
+    if (user.platformRole === PlatformRole.SUPER_ADMIN || user.role === UserRole.SUPER_ADMIN) {
+      throw new BadRequestException('Super Administrator accounts cannot be modified via agent KYC verification.');
+    }
+
     const previousState = {
       isVerifiedAgent: user.isVerifiedAgent,
       role: user.role,
@@ -2360,6 +2368,10 @@ export class AdminService implements OnModuleInit {
 
     if (!user) {
       throw new NotFoundException(`Agent with ID "${id}" was not found.`);
+    }
+
+    if (user.platformRole === PlatformRole.SUPER_ADMIN || user.role === UserRole.SUPER_ADMIN) {
+      throw new BadRequestException('Super Administrator accounts cannot be modified via agent KYC verification.');
     }
 
     const userId = user._id.toString();
@@ -2505,14 +2517,38 @@ export class AdminService implements OnModuleInit {
       });
     }
 
+    const exemptAccountTypes = [AccountType.BUYER, AccountType.TENANT];
+    const exemptRoles = [
+      UserRole.BUYER,
+      UserRole.TENANT,
+      UserRole.PURCHASER,
+      UserRole.SUPER_ADMIN,
+      UserRole.ADMIN,
+    ];
+    const exemptPlatformRoles = [PlatformRole.SUPER_ADMIN, PlatformRole.ADMIN];
+
+    filter.$and = filter.$and || [];
+    filter.$and.push(
+      { accountType: { $nin: exemptAccountTypes } },
+      { role: { $nin: exemptRoles } },
+      { platformRole: { $nin: exemptPlatformRoles } },
+    );
+
+    const baseExemptFilter = {
+      accountType: { $nin: exemptAccountTypes },
+      role: { $nin: exemptRoles },
+      platformRole: { $nin: exemptPlatformRoles },
+    };
+
     // Prioritize PENDING requests at the very top of the queue, followed by REJECTED, APPROVED, NOT_SUBMITTED
     const [total, pendingCount, approvedCount, rejectedCount] = await Promise.all([
       this.userModel.countDocuments(filter),
       this.userModel.countDocuments({
+        ...baseExemptFilter,
         $or: [{ kycStatus: 'PENDING' }, { _id: { $in: allPendingUserIds } }],
       }),
-      this.userModel.countDocuments({ kycStatus: 'APPROVED' }),
-      this.userModel.countDocuments({ kycStatus: 'REJECTED' }),
+      this.userModel.countDocuments({ ...baseExemptFilter, kycStatus: 'APPROVED' }),
+      this.userModel.countDocuments({ ...baseExemptFilter, kycStatus: 'REJECTED' }),
     ]);
 
     const pipeline: any[] = [

@@ -23,13 +23,37 @@ interface KycStatusBannerProps {
   onRefresh?: () => void;
 }
 
+export function isKycExempt(
+  user: { role?: string; accountType?: string | null; platformRole?: string | null; isKycExempt?: boolean } | null | undefined,
+): boolean {
+  if (!user) return false;
+  if (user.isKycExempt !== undefined) return user.isKycExempt;
+
+  const role = (user.role || '').toUpperCase();
+  const accountType = (user.accountType || '').toUpperCase();
+  const platformRole = (user.platformRole || '').toUpperCase();
+
+  const isBuyer = role === 'BUYER' || role === 'PURCHASER' || accountType === 'BUYER';
+  const isTenant = role === 'TENANT' || accountType === 'TENANT';
+  const isSuperAdmin =
+    platformRole === 'SUPER_ADMIN' ||
+    platformRole === 'ADMIN' ||
+    role === 'SUPER_ADMIN' ||
+    role === 'ADMIN';
+
+  return isBuyer || isTenant || isSuperAdmin;
+}
+
 export function KycStatusBanner({ className = '', onRefresh }: KycStatusBannerProps) {
   const { user, refreshUser } = useAuth();
+  const isExempt = isKycExempt(user);
+
   const [verification, setVerification] = React.useState<AgentVerificationResponse | null>(null);
   const [isRefreshing, setIsRefreshing] = React.useState(false);
 
   // Fetch real authoritative status from backend
   const fetchLiveStatus = React.useCallback(async () => {
+    if (isExempt) return;
     setIsRefreshing(true);
     try {
       const res = await getMyVerification();
@@ -39,11 +63,17 @@ export function KycStatusBanner({ className = '', onRefresh }: KycStatusBannerPr
     } finally {
       setIsRefreshing(false);
     }
-  }, []);
+  }, [isExempt]);
 
   React.useEffect(() => {
-    fetchLiveStatus();
-  }, [fetchLiveStatus]);
+    if (!isExempt) {
+      fetchLiveStatus();
+    }
+  }, [fetchLiveStatus, isExempt]);
+
+  if (isExempt) {
+    return null;
+  }
 
   // Derive consolidated status prioritizing fresh verification API, then user session
   const kycStatus = (

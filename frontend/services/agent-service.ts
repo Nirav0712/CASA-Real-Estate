@@ -54,7 +54,9 @@ export interface AgentVerificationResponse {
   isVerifiedAgent: boolean;
   rejectionReason?: string;
   verifiedAt?: string;
-  kycStatus?: 'NOT_SUBMITTED' | 'PENDING' | 'APPROVED' | 'REJECTED';
+  kycStatus?: 'NOT_SUBMITTED' | 'PENDING' | 'APPROVED' | 'REJECTED' | 'EXEMPT' | string;
+  isKycExempt?: boolean;
+  isKycRequired?: boolean;
   kycRejectionReason?: string;
   kycApprovedAt?: string;
   isTrialActive?: boolean;

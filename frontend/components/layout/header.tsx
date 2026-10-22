@@ -225,8 +225,8 @@ export function Header() {
                 <span className="uppercase">{locale}</span>
               </button>
 
-              {/* 3-Day Trial Status Pill (Active or Expired) */}
-              {isAuthenticated && isTrialActive && (
+              {/* 3-Day Trial Status Pill (Active or Expired for Supply-side accounts) */}
+              {isAuthenticated && isTrialActive && !isBuyerOrTenant && !isAdmin && (
                 <button
                   type="button"
                   onClick={openPlanSelectionModal}
@@ -238,7 +238,7 @@ export function Header() {
                 </button>
               )}
 
-              {isAuthenticated && isTrialExpired && (
+              {isAuthenticated && isTrialExpired && !isBuyerOrTenant && !isAdmin && (
                 <button
                   type="button"
                   onClick={openTrialExpiredModal}
@@ -292,16 +292,48 @@ export function Header() {
                         </div>
                       </div>
 
-                      {/* Trial & Membership Card in Dropdown */}
-                      <div className="px-3.5 py-2 border-b border-casa-border-light bg-casa-canvas/50">
-                        {isTrialActive ? (
-                          <div className="space-y-1">
-                            <div className="flex items-center justify-between text-[11px]">
-                              <span className="font-bold text-emerald-600 flex items-center gap-1">
-                                <Sparkles className="w-3 h-3" /> 3-Day Trial Active
-                              </span>
-                              <span className="font-mono text-casa-text-muted">{trialDaysRemaining}d remaining</span>
+                      {/* Trial & Membership Card in Dropdown (Supply-side accounts only) */}
+                      {!isBuyerOrTenant && !isAdmin && (
+                        <div className="px-3.5 py-2 border-b border-casa-border-light bg-casa-canvas/50">
+                          {isTrialActive ? (
+                            <div className="space-y-1">
+                              <div className="flex items-center justify-between text-[11px]">
+                                <span className="font-bold text-emerald-600 flex items-center gap-1">
+                                  <Sparkles className="w-3 h-3" /> 3-Day Trial Active
+                                </span>
+                                <span className="font-mono text-casa-text-muted">{trialDaysRemaining}d remaining</span>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setIsUserMenuOpen(false);
+                                  openPlanSelectionModal();
+                                }}
+                                className="text-[10px] text-casa-brand hover:underline font-semibold block text-start"
+                              >
+                                View all membership tiers →
+                              </button>
                             </div>
+                          ) : isTrialExpired ? (
+                            <div className="space-y-1.5">
+                              <div className="text-[11px] font-bold text-red-600 flex items-center gap-1">
+                                <PhoneCall className="w-3 h-3 text-red-500 animate-bounce" /> 3-Day Trial Expired
+                              </div>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setIsUserMenuOpen(false);
+                                  openTrialExpiredModal();
+                                }}
+                                className="w-full py-1.5 px-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-[11px] text-center shadow-sm flex items-center justify-center gap-1.5"
+                              >
+                                <PhoneCall className="w-3 h-3" />
+                                <span>Call Sales Desk to Renew</span>
+                              </button>
+                            </div>
+                          ) : (
                             <button
                               type="button"
                               onClick={(e) => {
@@ -309,46 +341,16 @@ export function Header() {
                                 setIsUserMenuOpen(false);
                                 openPlanSelectionModal();
                               }}
-                              className="text-[10px] text-casa-brand hover:underline font-semibold block text-start"
+                              className="w-full flex items-center justify-between text-xs text-casa-brand font-bold hover:underline"
                             >
-                              View all membership tiers →
+                              <span className="flex items-center gap-1">
+                                <Sparkles className="w-3 h-3" /> Membership Plans
+                              </span>
+                              <span>→</span>
                             </button>
-                          </div>
-                        ) : isTrialExpired ? (
-                          <div className="space-y-1.5">
-                            <div className="text-[11px] font-bold text-red-600 flex items-center gap-1">
-                              <PhoneCall className="w-3 h-3 text-red-500 animate-bounce" /> 3-Day Trial Expired
-                            </div>
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setIsUserMenuOpen(false);
-                                openTrialExpiredModal();
-                              }}
-                              className="w-full py-1.5 px-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-[11px] text-center shadow-sm flex items-center justify-center gap-1.5"
-                            >
-                              <PhoneCall className="w-3 h-3" />
-                              <span>Call Sales Desk to Renew</span>
-                            </button>
-                          </div>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setIsUserMenuOpen(false);
-                              openPlanSelectionModal();
-                            }}
-                            className="w-full flex items-center justify-between text-xs text-casa-brand font-bold hover:underline"
-                          >
-                            <span className="flex items-center gap-1">
-                              <Sparkles className="w-3 h-3" /> Membership Plans
-                            </span>
-                            <span>→</span>
-                          </button>
-                        )}
-                      </div>
+                          )}
+                        </div>
+                      )}
 
                       {/* 1. Admin / Super Admin Portal Link */}
                       {isAdmin && (
@@ -846,8 +848,8 @@ export function Header() {
                   {user?.role}
                 </span>
 
-                {/* Mobile Trial Pill */}
-                {isTrialActive && (
+                {/* Mobile Trial Pill (Supply-side accounts only) */}
+                {isTrialActive && !isBuyerOrTenant && !isAdmin && (
                   <button
                     type="button"
                     onClick={() => {
@@ -864,7 +866,7 @@ export function Header() {
                   </button>
                 )}
 
-                {isTrialExpired && (
+                {isTrialExpired && !isBuyerOrTenant && !isAdmin && (
                   <button
                     type="button"
                     onClick={() => {
@@ -1146,22 +1148,67 @@ export function Footer() {
   return (
     <footer className="mt-auto bg-casa-surface border-t border-casa-border-light py-12 text-sm text-casa-text-secondary transition-colors duration-200">
       <Container>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-8 mb-10 text-start">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 mb-10 text-start">
           {/* Brand & Mission Column */}
-          <div className="lg:col-span-2">
-            <div className="flex items-center gap-3 mb-4">
-              <Logo size="md" height={44} href="/" />
+          <div className="space-y-3">
+            <div className="flex items-center gap-3">
+              <Logo size="md" height={42} href="/" />
               <span className="text-[10px] uppercase font-bold tracking-wider text-casa-brand bg-casa-brand-subtle px-2 py-0.5 rounded-full border border-blue-100 dark:border-blue-900">
                 Verified
               </span>
             </div>
-            <p className="text-xs text-casa-text-muted leading-relaxed mb-4 max-w-sm">
+            <p className="text-xs text-casa-text-muted leading-relaxed max-w-sm">
               {t('aboutDesc')}
             </p>
-            <div className="text-xs text-casa-text-muted space-y-1">
-              <div>📍 Support Office: Lucknow, Uttar Pradesh, India</div>
-              <div>⚡ Direct Marketplace Gateway</div>
-            </div>
+          </div>
+
+          {/* Real Estate Marketplace Links */}
+          <div>
+            <h4 className="font-semibold text-casa-text-primary mb-3 text-xs uppercase tracking-wider">
+              {t('marketplaceLinks')}
+            </h4>
+            <ul className="space-y-2 text-xs">
+              <li>
+                <Link
+                  href="/properties?type=SALE"
+                  className="text-casa-text-muted hover:text-casa-brand transition-colors block"
+                >
+                  {t('buyProperty')}
+                </Link>
+              </li>
+              <li>
+                <Link
+                  href="/properties?type=RENT"
+                  className="text-casa-text-muted hover:text-casa-brand transition-colors block"
+                >
+                  {t('rentLease')}
+                </Link>
+              </li>
+              <li>
+                <Link
+                  href="/dashboard/properties/new"
+                  className="text-casa-text-muted hover:text-casa-brand transition-colors block"
+                >
+                  {t('postAd')}
+                </Link>
+              </li>
+              <li>
+                <Link
+                  href="/properties"
+                  className="text-casa-text-muted hover:text-casa-brand transition-colors block"
+                >
+                  {t('exploreProperties')}
+                </Link>
+              </li>
+              <li>
+                <Link
+                  href="/#agents"
+                  className="text-casa-text-muted hover:text-casa-brand transition-colors block"
+                >
+                  {t('verifiedAgents')}
+                </Link>
+              </li>
+            </ul>
           </div>
 
           {/* Canonical Categories Sitemap */}
@@ -1169,12 +1216,12 @@ export function Footer() {
             <h4 className="font-semibold text-casa-text-primary mb-3 text-xs uppercase tracking-wider">
               {t('popularCategories')}
             </h4>
-            <ul className="space-y-1.5 text-xs">
+            <ul className="space-y-2 text-xs">
               {CASA_CATEGORIES.slice(0, 5).map((cat) => (
                 <li key={cat.id}>
                   <Link
-                    href={`/#categories`}
-                    className="text-casa-text-muted hover:text-casa-brand transition-colors"
+                    href="/#categories"
+                    className="text-casa-text-muted hover:text-casa-brand transition-colors block"
                   >
                     {getCategoryLabel(cat.name, locale)}
                   </Link>
@@ -1183,36 +1230,16 @@ export function Footer() {
             </ul>
           </div>
 
-          <div>
-            <h4 className="font-semibold text-casa-text-primary mb-3 text-xs uppercase tracking-wider">
-              Land & Commercial
-            </h4>
-            <ul className="space-y-1.5 text-xs">
-              {CASA_CATEGORIES.slice(5, 10).map((cat) => (
-                <li key={cat.id}>
-                  <Link
-                    href={`/#categories`}
-                    className="text-casa-text-muted hover:text-casa-brand transition-colors"
-                  >
-                    {getCategoryLabel(cat.name, locale)}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          {/* Platform Architecture & Multilingual */}
-          <div>
-            <h4 className="font-semibold text-casa-text-primary mb-3 text-xs uppercase tracking-wider">
+          {/* Multilingual Support & Legal */}
+          <div className="space-y-3">
+            <h4 className="font-semibold text-casa-text-primary text-xs uppercase tracking-wider">
               {t('multilingualReach')}
             </h4>
-            <p className="text-xs text-casa-text-muted leading-relaxed mb-3">
-              {t('multilingualDesc')}
-            </p>
             <div className="flex flex-wrap gap-1.5">
               {(Object.keys(SUPPORTED_LOCALES) as Locale[]).map((loc) => (
                 <button
                   key={loc}
+                  type="button"
                   onClick={() => setLocale(loc)}
                   className={`text-[10px] px-2.5 py-1 rounded-lg border transition-all cursor-pointer ${
                     locale === loc
@@ -1224,15 +1251,32 @@ export function Footer() {
                 </button>
               ))}
             </div>
+            <div className="pt-2 border-t border-casa-border-light space-y-1.5 text-xs">
+              <div>
+                <Link href="/#about" className="text-casa-text-muted hover:text-casa-brand transition-colors">
+                  {t('aboutUs')}
+                </Link>
+              </div>
+              <div>
+                <Link href="/#privacy" className="text-casa-text-muted hover:text-casa-brand transition-colors">
+                  {t('privacyPolicy')}
+                </Link>
+              </div>
+              <div>
+                <Link href="/#terms" className="text-casa-text-muted hover:text-casa-brand transition-colors">
+                  {t('termsOfService')}
+                </Link>
+              </div>
+            </div>
           </div>
         </div>
 
         <div className="pt-6 border-t border-casa-border-light flex flex-col sm:flex-row items-center justify-between text-xs text-casa-text-muted gap-4">
           <p>© {new Date().getFullYear()} {t('brand')} Real Estate Marketplace. {t('allRightsReserved')}</p>
           <div className="flex gap-6">
-            <Link href="/" className="hover:text-casa-brand">{t('privacyPolicy')}</Link>
-            <Link href="/" className="hover:text-casa-brand">{t('termsOfService')}</Link>
-            <Link href="/" className="hover:text-casa-brand">{t('trustSafety')}</Link>
+            <Link href="/#privacy" className="hover:text-casa-brand transition-colors">{t('privacyPolicy')}</Link>
+            <Link href="/#terms" className="hover:text-casa-brand transition-colors">{t('termsOfService')}</Link>
+            <Link href="/#trust" className="hover:text-casa-brand transition-colors">{t('trustSafety')}</Link>
           </div>
         </div>
       </Container>

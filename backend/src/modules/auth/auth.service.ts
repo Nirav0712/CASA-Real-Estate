@@ -1206,7 +1206,7 @@ export class AuthService implements OnModuleInit {
     }
 
     // 4. Verify email provider is properly configured
-    if (!this.mailService.isConfigured()) {
+    if (typeof this.mailService?.isConfigured === 'function' && !this.mailService.isConfigured()) {
       throw new BadRequestException('Email service provider is not configured. Verification email cannot be sent.');
     }
 
@@ -1965,6 +1965,7 @@ export class AuthService implements OnModuleInit {
       norm.platformRole === PlatformRole.ADMIN ||
       norm.platformRole === PlatformRole.MODERATOR;
 
+    const isKycExempt = isConsumer || isPlatformAdmin;
     const isKycApproved = user.kycStatus === 'APPROVED' || norm.isVerifiedAgent === true;
 
     const isTrialEligible =
@@ -2002,8 +2003,10 @@ export class AuthService implements OnModuleInit {
       trialRemainingLabel: isConsumer ? '' : trialRemainingLabel,
       trialUsed: Boolean(user.trialUsed || user.trialStartedAt),
       activePackageId: user.activePackageId || null,
-      kycStatus: user.kycStatus || 'NOT_SUBMITTED',
-      kycRejectionReason: user.kycRejectionReason || null,
+      kycStatus: isKycExempt ? 'EXEMPT' : (user.kycStatus || 'NOT_SUBMITTED'),
+      isKycExempt,
+      isKycRequired: !isKycExempt,
+      kycRejectionReason: isKycExempt ? null : (user.kycRejectionReason || null),
       kycApprovedAt: user.kycApprovedAt || null,
       kycApprovedBy: user.kycApprovedBy || null,
       kycDocumentType: user.kycDocumentType || null,

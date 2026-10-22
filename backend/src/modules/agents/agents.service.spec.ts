@@ -310,6 +310,6 @@ describe('AgentsService', () => {
         documentName: 'rera.png',
         documentUrl: 'data:image/png;base64,dummy',
       }),
-    ).rejects.toThrow('Only "Aadhaar Card (National ID)"');
+    ).rejects.toThrow('KYC verification is not required or applicable for Property Buyer, Rental Tenant, or Super Admin accounts.');
   });
 });

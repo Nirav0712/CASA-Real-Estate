@@ -350,6 +350,37 @@ export class AgentsService {
    * Fetch current agent's verification status and documents
    */
   async getMyVerification(user: AuthenticatedUser) {
+    const rawAccount = (user.accountType || user.role || '').toUpperCase();
+    const platformRole = (user.platformRole || '').toUpperCase();
+    const isExempt =
+      rawAccount === 'BUYER' ||
+      rawAccount === 'PURCHASER' ||
+      rawAccount === 'TENANT' ||
+      platformRole === 'SUPER_ADMIN' ||
+      platformRole === 'ADMIN' ||
+      rawAccount === 'SUPER_ADMIN' ||
+      rawAccount === 'ADMIN';
+
+    if (isExempt) {
+      return {
+        verificationStatus: 'EXEMPT',
+        isVerifiedAgent: false,
+        verifiedAt: null,
+        kycStatus: 'EXEMPT',
+        isKycExempt: true,
+        isKycRequired: false,
+        kycRejectionReason: null,
+        kycApprovedAt: null,
+        isTrialActive: false,
+        trialStartedAt: null,
+        trialExpiresAt: null,
+        accountType: user.accountType || user.role,
+        reraNumber: null,
+        agencyName: null,
+        documents: [],
+      };
+    }
+
     const profile = await this.getOrCreateProfile(user);
     const userDoc = await this.userModel.findById(user.id).lean();
     const documents = await this.agentDocumentModel
@@ -362,6 +393,8 @@ export class AgentsService {
       isVerifiedAgent: profile.isVerifiedAgent,
       verifiedAt: profile.verifiedAt,
       kycStatus: userDoc?.kycStatus || profile.verificationStatus || 'NOT_SUBMITTED',
+      isKycExempt: false,
+      isKycRequired: true,
       kycRejectionReason: userDoc?.kycRejectionReason || (profile.rejectionReasons && profile.rejectionReasons[0]),
       kycApprovedAt: userDoc?.kycApprovedAt,
       isTrialActive: Boolean(userDoc?.isTrialActive || (userDoc?.trialExpiresAt && new Date() <= new Date(userDoc.trialExpiresAt))),
@@ -395,6 +428,23 @@ export class AgentsService {
    * Submit RERA Verification Application
    */
   async submitVerification(user: AuthenticatedUser, dto: SubmitVerificationDto) {
+    const rawAccount = (user.accountType || user.role || '').toUpperCase();
+    const platformRole = (user.platformRole || '').toUpperCase();
+    const isExempt =
+      rawAccount === 'BUYER' ||
+      rawAccount === 'PURCHASER' ||
+      rawAccount === 'TENANT' ||
+      platformRole === 'SUPER_ADMIN' ||
+      platformRole === 'ADMIN' ||
+      rawAccount === 'SUPER_ADMIN' ||
+      rawAccount === 'ADMIN';
+
+    if (isExempt) {
+      throw new BadRequestException(
+        'KYC verification is not required or applicable for Property Buyer, Rental Tenant, or Super Admin accounts.'
+      );
+    }
+
     const profile = await this.getOrCreateProfile(user);
 
     if (profile.verificationStatus === 'VERIFIED') {
@@ -454,6 +504,22 @@ export class AgentsService {
    */
   async uploadDocument(user: AuthenticatedUser, dto: UploadDocumentDto) {
     const rawAccount = (dto.accountType || user.accountType || user.role || '').toUpperCase();
+    const platformRole = (user.platformRole || '').toUpperCase();
+    const isExempt =
+      rawAccount === 'BUYER' ||
+      rawAccount === 'PURCHASER' ||
+      rawAccount === 'TENANT' ||
+      platformRole === 'SUPER_ADMIN' ||
+      platformRole === 'ADMIN' ||
+      rawAccount === 'SUPER_ADMIN' ||
+      rawAccount === 'ADMIN';
+
+    if (isExempt) {
+      throw new BadRequestException(
+        'KYC verification is not required or applicable for Property Buyer, Rental Tenant, or Super Admin accounts.'
+      );
+    }
+
     const isCommercial =
       rawAccount === 'BROKER' ||
       rawAccount === 'BROKER_AGENCY' ||
@@ -470,7 +536,7 @@ export class AgentsService {
     } else {
       if (dto.documentType !== 'AADHAAR_CARD') {
         throw new BadRequestException(
-          'Invalid document type for your account type. Only "Aadhaar Card (National ID)" (AADHAAR_CARD) is permitted for Buyer, Tenant, and normal property user accounts.',
+          'Invalid document type for your account type. Only "Aadhaar Card (National ID)" (AADHAAR_CARD) is permitted for Property Owner / Seller verification.',
         );
       }
     }

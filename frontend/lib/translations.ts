@@ -145,6 +145,8 @@ export const DICTIONARY = {
 
     // Footer
     aboutDesc: 'myproperty is the next-generation open real estate marketplace for property owners, buyers, tenants, and certified brokers.',
+    aboutUs: 'About Us',
+    marketplaceLinks: 'Marketplace',
     popularCategories: 'Categories',
     platformArchitecture: 'Platform Overview',
     multilingualReach: 'Multilingual Support',
@@ -258,6 +260,8 @@ export const DICTIONARY = {
 
     // Footer
     aboutDesc: 'माईप्रॉपर्टी संपत्ति मालिकों, खरीदारों, किरायेदारों और प्रमाणित ब्रोकर्स के लिए अगली पीढ़ी का खुला रियल एस्टेट प्लेटफॉर्म है।',
+    aboutUs: 'हमारे बारे में',
+    marketplaceLinks: 'मार्केटप्लेस',
     popularCategories: 'श्रेणियाँ',
     platformArchitecture: 'प्लेटफ़ॉर्म वास्तुकला',
     multilingualReach: 'बहुभाषी समर्थन',
@@ -371,6 +375,8 @@ export const DICTIONARY = {
 
     // Footer
     aboutDesc: 'ماي بروبرتي هي المنصة العقارية الرائدة للملاك والمشترين والمستأجرين والوسطاء المعتمدين.',
+    aboutUs: 'من نحن',
+    marketplaceLinks: 'السوق العقاري',
     popularCategories: 'التصنيفات',
     platformArchitecture: 'بنية المنصة',
     multilingualReach: 'دعم اللغات',
@@ -484,6 +490,8 @@ export const DICTIONARY = {
 
     // Footer
     aboutDesc: 'مائی پراپرٹی پراپرٹی مالکان، خریداروں، کرایہ داروں اور تصدیق شدہ بروکرز کے لیے جدید ترین اوپن ریئل اسٹیٹ پلیٹ فارم ہے۔',
+    aboutUs: 'ہمارے بارے میں',
+    marketplaceLinks: 'مارکیٹ پلیس',
     popularCategories: 'اقسام',
     platformArchitecture: 'پلیٹ فارم کا جائزہ',
     multilingualReach: 'کثیر لسانی سپورٹ',

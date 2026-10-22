@@ -10,6 +10,7 @@ import {
   uploadVerificationDocument,
   submitVerification,
 } from '@/services/agent-service';
+import { isKycExempt } from '@/components/dashboard/kyc-status-banner';
 import { AgentDocument, AgentVerificationStatus } from '@/types';
 import {
   ShieldCheck,
@@ -85,8 +86,14 @@ export default function KycVerificationDashboard() {
     setDocumentType(fixedDocType);
   }, [fixedDocType]);
 
+  const isExempt = isKycExempt(user);
+
   const loadData = React.useCallback(async () => {
     if (!isAuthenticated) return;
+    if (isExempt) {
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     try {
       const res = await getMyVerification();
@@ -113,7 +120,7 @@ export default function KycVerificationDashboard() {
     } finally {
       setLoading(false);
     }
-  }, [isAuthenticated, toast]);
+  }, [isAuthenticated, isExempt, toast]);
 
   React.useEffect(() => {
     if (isAuthenticated) {
@@ -238,6 +245,81 @@ export default function KycVerificationDashboard() {
         >
           Sign In / Register
         </button>
+      </div>
+    );
+  }
+
+  // Exempt Accounts: Property Buyer, Rental Tenant, Super Admin (KYC verification NOT required or displayed)
+  if (isExempt) {
+    const isSuperAdmin =
+      user?.platformRole === 'SUPER_ADMIN' ||
+      user?.platformRole === 'ADMIN' ||
+      user?.role === 'SUPER_ADMIN' ||
+      user?.role === 'ADMIN';
+
+    return (
+      <div className="max-w-3xl mx-auto px-4 py-12 space-y-6">
+        <div className="bg-casa-surface border border-casa-border-light rounded-3xl p-8 shadow-subtle text-center space-y-6">
+          <div className="w-16 h-16 rounded-3xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center mx-auto shadow-subtle">
+            <ShieldCheck className="w-8 h-8" />
+          </div>
+
+          <div className="space-y-2 max-w-lg mx-auto">
+            <span className="px-3 py-1 rounded-full text-[11px] font-extrabold uppercase tracking-wider bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700">
+              KYC Exempt Account
+            </span>
+            <h1 className="text-2xl font-extrabold text-casa-text-primary">
+              {isSuperAdmin
+                ? 'Super Admin Governance Access'
+                : 'KYC Verification Not Required'}
+            </h1>
+            <p className="text-xs md:text-sm text-casa-text-secondary leading-relaxed">
+              {isSuperAdmin
+                ? 'System Administrator accounts have unrestricted platform authority and are exempt from KYC verification requirements. You manage verification applications submitted by agents and brokers.'
+                : 'Your account (Property Buyer / Rental Tenant) is fully exempt from KYC verification. You can search, browse, bookmark favorites, and communicate directly with verified property owners and brokers without submitting verification documents.'}
+            </p>
+          </div>
+
+          <div className="pt-4 flex flex-wrap items-center justify-center gap-3">
+            {isSuperAdmin ? (
+              <>
+                <a
+                  href={process.env.NEXT_PUBLIC_ADMIN_URL || 'http://localhost:3001'}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-6 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold shadow-sm inline-flex items-center gap-2"
+                >
+                  <ShieldCheck className="w-4 h-4" />
+                  <span>Open Admin Governance Queue</span>
+                  <ExternalLink className="w-3.5 h-3.5" />
+                </a>
+                <Link
+                  href="/dashboard"
+                  className="px-6 py-2.5 rounded-xl border border-casa-border-medium hover:bg-casa-subtle text-casa-text-primary text-xs font-bold inline-flex items-center gap-2"
+                >
+                  <span>Go to Command Hub</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </Link>
+              </>
+            ) : (
+              <>
+                <Link
+                  href="/properties"
+                  className="px-6 py-2.5 rounded-xl bg-casa-brand hover:bg-casa-brand-hover text-white text-xs font-bold shadow-sm inline-flex items-center gap-2"
+                >
+                  <span>Explore Properties</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </Link>
+                <Link
+                  href="/dashboard"
+                  className="px-6 py-2.5 rounded-xl border border-casa-border-medium hover:bg-casa-subtle text-casa-text-primary text-xs font-bold inline-flex items-center gap-2"
+                >
+                  <span>Go to Dashboard</span>
+                </Link>
+              </>
+            )}
+          </div>
+        </div>
       </div>
     );
   }

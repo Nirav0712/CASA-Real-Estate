@@ -14,6 +14,7 @@ import {
 import { getPublicCompanySettings, CompanySettings } from '@/services/entitlements-service';
 import { PaymentItem, PaymentStatus, PaymentPurpose } from '@/types';
 import { formatPrice } from '@/lib/utils';
+import { isKycExempt } from '@/components/dashboard/kyc-status-banner';
 import {
   CreditCard,
   Sparkles,
@@ -117,6 +118,8 @@ export default function BillingDashboardPage() {
   } = useAuth();
   const toast = useToast();
   const router = useRouter();
+
+  const isExempt = isKycExempt(user);
 
   const [recentPayments, setRecentPayments] = React.useState<PaymentItem[]>([]);
   const [companySettings, setCompanySettings] = React.useState<CompanySettings>({
@@ -339,29 +342,31 @@ export default function BillingDashboardPage() {
           </div>
         </div>
 
-        {/* KYC Verification Call Advisory Notice */}
-        <div className="mt-6 p-4 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-amber-900 dark:text-amber-200 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
-          <div className="flex items-start gap-2.5">
-            <PhoneCall className="w-4 h-4 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
-            <div>
-              <span className="font-bold">KYC & Account Verification Support: </span>
-              <span>
-                Users may receive a verification call from{' '}
-                <strong className="underline font-bold text-amber-950 dark:text-white">
-                  7069754589
-                </strong>{' '}
-                to complete identity checks and activate the 3-day Free Trial.
-              </span>
+        {/* KYC Verification Call Advisory Notice (Only for KYC-required accounts) */}
+        {!isExempt && (
+          <div className="mt-6 p-4 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-amber-900 dark:text-amber-200 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
+            <div className="flex items-start gap-2.5">
+              <PhoneCall className="w-4 h-4 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
+              <div>
+                <span className="font-bold">KYC & Account Verification Support: </span>
+                <span>
+                  Users may receive a verification call from{' '}
+                  <strong className="underline font-bold text-amber-950 dark:text-white">
+                    7069754589
+                  </strong>{' '}
+                  to complete identity checks and activate the 3-day Free Trial.
+                </span>
+              </div>
             </div>
+            <Link
+              href="/dashboard/kyc"
+              className="text-xs font-bold text-amber-800 dark:text-amber-200 hover:underline flex items-center gap-1 whitespace-nowrap self-start sm:self-auto"
+            >
+              <span>View KYC Status</span>
+              <ChevronRight className="w-3.5 h-3.5" />
+            </Link>
           </div>
-          <Link
-            href="/dashboard/kyc"
-            className="text-xs font-bold text-amber-800 dark:text-amber-200 hover:underline flex items-center gap-1 whitespace-nowrap self-start sm:self-auto"
-          >
-            <span>View KYC Status</span>
-            <ChevronRight className="w-3.5 h-3.5" />
-          </Link>
-        </div>
+        )}
       </div>
 
       {/* Subscription Pricing Tiers */}

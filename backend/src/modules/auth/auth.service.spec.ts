@@ -404,9 +404,8 @@ describe('AuthService (Security-First Unit & Integration Tests)', () => {
 
       expect(res.success).toBe(true);
       expect(res.email).toBe('newuser@example.com');
-      expect(res.isEmailVerified).toBe(true);
-      expect(res.tokens).toBeDefined();
-      expect(mockMailService.sendVerificationEmail).not.toHaveBeenCalled();
+      expect(res.user).toBeDefined();
+      expect(mockMailService.sendVerificationEmail).toHaveBeenCalled();
     });
 
     it('18. should reject registration when passwords do not match', async () => {
@@ -521,7 +520,7 @@ describe('AuthService (Security-First Unit & Integration Tests)', () => {
       ).rejects.toThrow(UnauthorizedException);
     });
 
-    it('24. should allow immediate login without requiring email verification', async () => {
+    it('24. should reject login if email is not verified', async () => {
       const hashedPassword = await hashPassword('ValidPassword123!');
       const unverifiedUser = {
         _id: 'unverified_1',
@@ -542,14 +541,12 @@ describe('AuthService (Security-First Unit & Integration Tests)', () => {
         select: jest.fn().mockResolvedValue(unverifiedUser),
       });
 
-      const res = await service.login({
-        email: 'unverified@example.com',
-        password: 'ValidPassword123!',
-      });
-
-      expect(res.success).toBe(true);
-      expect(res.tokens).toBeDefined();
-      expect(res.user.status).toBe(AccountStatus.ACTIVE);
+      await expect(
+        service.login({
+          email: 'unverified@example.com',
+          password: 'ValidPassword123!',
+        }),
+      ).rejects.toThrow('Please verify your email address before signing in. Check your inbox for the verification link.');
     });
 
     it('25. should reject login for suspended accounts with ForbiddenException', async () => {

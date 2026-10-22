@@ -55,7 +55,9 @@ export interface User {
   trialDaysRemaining?: number;
   trialRemainingLabel?: string;
   activePackageId?: string | null;
-  kycStatus?: 'NOT_SUBMITTED' | 'PENDING' | 'APPROVED' | 'REJECTED' | string;
+  kycStatus?: 'NOT_SUBMITTED' | 'PENDING' | 'APPROVED' | 'REJECTED' | 'EXEMPT' | string;
+  isKycExempt?: boolean;
+  isKycRequired?: boolean;
   kycRejectionReason?: string | null;
   kycApprovedAt?: string | null;
   kycApprovedBy?: string | null;
