@@ -6,7 +6,8 @@ import { Container } from '@/components/ui/card';
 import { formatPrice } from '@/lib/utils';
 import { parseYouTubeUrl, parseInstagramUrl, detectVideoSource } from '@/lib/video';
 import { useToast } from '@/contexts/toast-context';
-import { searchProperties, deleteProperty, getProperties } from '@/services/property-service';
+import { useAuth } from '@/contexts/auth-context';
+import { searchProperties, getProperties } from '@/services/property-service';
 import { Property } from '@/types';
 import {
   Play,
@@ -487,9 +488,31 @@ const FALLBACK_VIDEO_PROPERTIES: Property[] = [
 
 export function VideoPropertySection() {
   const toast = useToast();
+  const { user, isAuthenticated } = useAuth();
   const [properties, setProperties] = React.useState<Property[]>([]);
   const [isLoading, setIsLoading] = React.useState(false);
   const [visibleCount, setVisibleCount] = React.useState(9);
+
+  // Eligible advertiser check: Only Brokers, Agents, Developers, Property Owners/Sellers can upload/manage reels
+  const canUploadReel = Boolean(
+    isAuthenticated &&
+      user &&
+      !['BUYER', 'TENANT', 'PURCHASER'].includes(
+        String(user.accountType || user.role).toUpperCase(),
+      ) &&
+      [
+        'AGENT',
+        'BROKER',
+        'BROKER_AGENCY',
+        'BROKER_AGENT',
+        'DEVELOPER',
+        'PROPERTY_OWNER',
+        'SELLER',
+        'VERIFIED_AGENT',
+        'ADMIN',
+        'SUPER_ADMIN',
+      ].includes(String(user.accountType || user.role).toUpperCase()),
+  );
 
   // Filters State
   const [locationFilter, setLocationFilter] = React.useState('ALL');
@@ -592,80 +615,6 @@ export function VideoPropertySection() {
       window.removeEventListener('storage', handleReelsUpdated);
     };
   }, [loadVideos]);
-
-  // Delete / Remove individual reel
-  const handleDeleteReel = async (property: Property) => {
-    try {
-      // 1. Add to deleted IDs
-      let deletedList: string[] = [];
-      try {
-        const stored = localStorage.getItem('casa_deleted_reels');
-        if (stored) deletedList = JSON.parse(stored);
-      } catch (_) {}
-
-      if (!deletedList.includes(property.id)) {
-        deletedList.push(property.id);
-        localStorage.setItem('casa_deleted_reels', JSON.stringify(deletedList));
-      }
-
-      // 2. Remove from custom reels if stored
-      try {
-        const storedCustom = localStorage.getItem('casa_custom_reels');
-        if (storedCustom) {
-          const customList: Property[] = JSON.parse(storedCustom);
-          const filtered = customList.filter((p) => p.id !== property.id);
-          localStorage.setItem('casa_custom_reels', JSON.stringify(filtered));
-        }
-      } catch (_) {}
-
-      // 3. Trigger backend delete if not demo ID
-      if (!property.id.startsWith('vid-reel-')) {
-        deleteProperty(property.id).catch(() => {});
-      }
-
-      // 4. Update local state
-      setProperties((prev) => prev.filter((p) => p.id !== property.id));
-
-      if (activeVideoIndex !== null && displayedProperties[activeVideoIndex]?.id === property.id) {
-        setActiveVideoIndex(null);
-      }
-
-      window.dispatchEvent(new Event('casa_reels_updated'));
-      toast.success(
-        'Reel Removed',
-        `"${typeof property.title === 'string' ? property.title : property.title?.en || 'Property'}" removed successfully.`
-      );
-    } catch (_) {
-      toast.error('Notice', 'Failed to remove reel.');
-    }
-  };
-
-  // Clear all demo reels permanently
-  const handleClearAllDemoReels = () => {
-    try {
-      let deletedList: string[] = [];
-      try {
-        const stored = localStorage.getItem('casa_deleted_reels');
-        if (stored) deletedList = JSON.parse(stored);
-      } catch (_) {}
-
-      FALLBACK_VIDEO_PROPERTIES.forEach((demo) => {
-        if (!deletedList.includes(demo.id)) {
-          deletedList.push(demo.id);
-        }
-      });
-
-      localStorage.setItem('casa_deleted_reels', JSON.stringify(deletedList));
-      localStorage.setItem('casa_hide_demo_reels', 'true');
-
-      setProperties((prev) => prev.filter((p) => !p.id.startsWith('vid-reel-')));
-      window.dispatchEvent(new Event('casa_reels_updated'));
-
-      toast.success('Demo Reels Removed', 'All 12 dummy demo video reels have been removed.');
-    } catch (_) {
-      toast.error('Notice', 'Failed to remove demo reels.');
-    }
-  };
 
   // Filter logic
   const filteredProperties = React.useMemo(() => {
@@ -779,24 +728,14 @@ export function VideoPropertySection() {
           </div>
 
           <div className="flex flex-wrap items-center gap-2.5">
-            <Link
-              href="/dashboard/reels"
-              className="px-3.5 py-1.5 rounded-xl bg-casa-brand text-white hover:bg-casa-brand-hover text-xs font-bold transition-all shadow-subtle flex items-center gap-1.5"
-            >
-              <PlusCircle className="w-3.5 h-3.5" />
-              <span>Add / Manage Reels</span>
-            </Link>
-
-            {properties.some((p) => p.id.startsWith('vid-reel-')) && (
-              <button
-                type="button"
-                onClick={handleClearAllDemoReels}
-                className="px-3 py-1.5 rounded-xl bg-red-600/10 hover:bg-red-600 text-red-600 hover:text-white dark:bg-red-950/40 dark:text-red-300 border border-red-500/30 text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5"
-                title="Remove all dummy demo reels from the website"
+            {canUploadReel && (
+              <Link
+                href="/dashboard/reels"
+                className="px-3.5 py-1.5 rounded-xl bg-casa-brand text-white hover:bg-casa-brand-hover text-xs font-bold transition-all shadow-subtle flex items-center gap-1.5"
               >
-                <Trash2 className="w-3.5 h-3.5" />
-                <span>Remove All Dummy Reels</span>
-              </button>
+                <PlusCircle className="w-3.5 h-3.5" />
+                <span>Add / Manage Reels</span>
+              </Link>
             )}
 
             <div className="flex items-center gap-1.5 text-xs font-semibold text-casa-text-muted px-2.5 py-1.5 rounded-xl bg-casa-surface border border-casa-border-light">
@@ -983,20 +922,6 @@ export function VideoPropertySection() {
                       <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-casa-brand text-white shadow-xs">
                         {property.listingType === 'SALE' ? 'BUY' : 'RENT'}
                       </span>
-
-                      {/* Quick Delete / Purge button on each reel card */}
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDeleteReel(property);
-                        }}
-                        className="w-7 h-7 rounded-full bg-black/60 hover:bg-red-600 active:scale-95 text-white/80 hover:text-white flex items-center justify-center transition-all border border-white/20 cursor-pointer shadow-md"
-                        title={isDemo ? 'Remove this dummy demo reel' : 'Delete this video reel'}
-                        aria-label="Delete Reel"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
                     </div>
                   </div>
 

@@ -584,13 +584,15 @@ export function Header() {
                       )}
 
                       <div className="py-1 border-b border-casa-border-light">
-                        <Link
-                          href="/dashboard/reels"
-                          className="flex items-center gap-2 px-3.5 py-1.5 text-xs text-casa-text-secondary hover:text-casa-text-primary hover:bg-casa-subtle transition-colors"
-                        >
-                          <Video className="w-3.5 h-3.5 text-red-500" />
-                          <span>My 9:16 Video Reels</span>
-                        </Link>
+                        {!isBuyerOrTenant && (
+                          <Link
+                            href="/dashboard/reels"
+                            className="flex items-center gap-2 px-3.5 py-1.5 text-xs text-casa-text-secondary hover:text-casa-text-primary hover:bg-casa-subtle transition-colors"
+                          >
+                            <Video className="w-3.5 h-3.5 text-red-500" />
+                            <span>My 9:16 Video Reels</span>
+                          </Link>
+                        )}
                         {!isBuyerOrTenant && !isAdmin && (
                           <>
                             <Link

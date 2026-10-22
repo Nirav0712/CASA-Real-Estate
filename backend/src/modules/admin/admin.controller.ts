@@ -206,7 +206,8 @@ export class AdminController {
   }
 
   @Delete('properties/:id')
-  @ApiOperation({ summary: 'Admin delete property listing' })
+  @Roles(UserRole.SUPER_ADMIN)
+  @ApiOperation({ summary: 'Super Admin only permanently delete property listing or reel' })
   deleteProperty(@Param('id') id: string) {
     return this.adminService.deleteProperty(id);
   }

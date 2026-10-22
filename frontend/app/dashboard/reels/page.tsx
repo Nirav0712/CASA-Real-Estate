@@ -12,14 +12,12 @@ import {
   getMyProperties,
   createProperty,
   updateProperty,
-  deleteProperty,
 } from '@/services/property-service';
 import { Property } from '@/types';
 import {
   Video,
   Play,
   PlusCircle,
-  Trash2,
   Edit,
   ExternalLink,
   ChevronLeft,
@@ -46,6 +44,31 @@ export default function BrokerReelsPage() {
   const { user, isAuthenticated, isLoading: isAuthLoading, openAuthModal } = useAuth();
   const toast = useToast();
 
+  const isConsumer = Boolean(
+    user &&
+      ['BUYER', 'TENANT', 'PURCHASER'].includes(
+        String(user.accountType || user.role).toUpperCase(),
+      ),
+  );
+
+  const canUploadReel = Boolean(
+    isAuthenticated &&
+      user &&
+      !isConsumer &&
+      [
+        'AGENT',
+        'BROKER',
+        'BROKER_AGENCY',
+        'BROKER_AGENT',
+        'DEVELOPER',
+        'PROPERTY_OWNER',
+        'SELLER',
+        'VERIFIED_AGENT',
+        'ADMIN',
+        'SUPER_ADMIN',
+      ].includes(String(user.accountType || user.role).toUpperCase()),
+  );
+
   const [reels, setReels] = React.useState<Property[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
   const [searchQuery, setSearchQuery] = React.useState('');
@@ -62,9 +85,6 @@ export default function BrokerReelsPage() {
   // Edit Reel Modal State
   const [editingReel, setEditingReel] = React.useState<Property | null>(null);
   const [isUpdating, setIsUpdating] = React.useState(false);
-
-  // Delete Confirmation State
-  const [deletingReel, setDeletingReel] = React.useState<Property | null>(null);
 
   // Add Form State (Add Property Format)
   const [formData, setFormData] = React.useState({
@@ -491,47 +511,6 @@ export default function BrokerReelsPage() {
     }
   };
 
-  // 4. Delete Reel Submit
-  const handleDeleteReel = async () => {
-    if (!deletingReel) return;
-
-    try {
-      // 1. Backend delete
-      await deleteProperty(deletingReel.id).catch(() => {});
-
-      // 2. Add to deleted IDs in local storage
-      let deletedList: string[] = [];
-      try {
-        const stored = localStorage.getItem('casa_deleted_reels');
-        if (stored) deletedList = JSON.parse(stored);
-      } catch (_) {}
-      if (!deletedList.includes(deletingReel.id)) {
-        deletedList.push(deletingReel.id);
-        localStorage.setItem('casa_deleted_reels', JSON.stringify(deletedList));
-      }
-
-      // 3. Remove from custom reels
-      try {
-        const storedCustom = localStorage.getItem('casa_custom_reels');
-        if (storedCustom) {
-          const parsed = JSON.parse(storedCustom).filter(
-            (p: Property) => p.id !== deletingReel.id,
-          );
-          localStorage.setItem('casa_custom_reels', JSON.stringify(parsed));
-        }
-      } catch (_) {}
-
-      // 4. Update UI
-      setReels((prev) => prev.filter((r) => r.id !== deletingReel.id));
-      toast.success(
-        'Reel Deleted',
-        'Video reel removed from your account and the homepage reels section.',
-      );
-      setDeletingReel(null);
-    } catch (err: unknown) {
-      toast.error('Delete Failed', 'Failed to remove reel.');
-    }
-  };
 
   if (!isAuthenticated && !isAuthLoading) {
     return (
@@ -546,6 +525,34 @@ export default function BrokerReelsPage() {
         <Button variant="primary" onClick={openAuthModal}>
           Sign In to Access
         </Button>
+      </Container>
+    );
+  }
+
+  if (isConsumer) {
+    return (
+      <Container className="py-16 text-center space-y-4 max-w-xl mx-auto">
+        <div className="w-16 h-16 rounded-full bg-red-50 dark:bg-red-950/40 text-red-600 flex items-center justify-center mx-auto">
+          <AlertCircle className="w-8 h-8" />
+        </div>
+        <h2 className="text-xl font-bold text-casa-text-primary">
+          Access Restricted: Reels Upload
+        </h2>
+        <p className="text-xs text-casa-text-secondary max-w-md mx-auto">
+          Property Buyers and Rental Tenants are not permitted to upload or post video reels. 9:16 Video Property Walkthroughs are reserved for verified property advertisers (Brokers, Agents, Developers, and Property Owners).
+        </p>
+        <div className="pt-2 flex justify-center gap-3">
+          <Link href="/properties">
+            <Button variant="primary" size="sm">
+              Explore Property Listings
+            </Button>
+          </Link>
+          <Link href="/dashboard/purchaser">
+            <Button variant="outline" size="sm">
+              Go to Buyer Dashboard
+            </Button>
+          </Link>
+        </div>
       </Container>
     );
   }
@@ -581,15 +588,17 @@ export default function BrokerReelsPage() {
               Refresh
             </Button>
 
-            <Button
-              variant="primary"
-              size="sm"
-              onClick={() => setIsAddModalOpen(true)}
-              className="text-xs bg-red-600 hover:bg-red-700 text-white shadow-lg"
-            >
-              <PlusCircle className="w-3.5 h-3.5 mr-1.5" />
-              Upload New Video Reel
-            </Button>
+            {canUploadReel && (
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={() => setIsAddModalOpen(true)}
+                className="text-xs bg-red-600 hover:bg-red-700 text-white shadow-lg"
+              >
+                <PlusCircle className="w-3.5 h-3.5 mr-1.5" />
+                Upload New Video Reel
+              </Button>
+            )}
           </div>
         </div>
       </div>
@@ -667,15 +676,17 @@ export default function BrokerReelsPage() {
           <p className="text-xs text-casa-text-secondary max-w-md mx-auto">
             You have not uploaded any vertical video walkthroughs. Uploading reels boosts your property enquiries by over 3x!
           </p>
-          <Button
-            variant="primary"
-            size="sm"
-            onClick={() => setIsAddModalOpen(true)}
-            className="text-xs bg-red-600 hover:bg-red-700 text-white"
-          >
-            <PlusCircle className="w-3.5 h-3.5 mr-1.5" />
-            Upload Your First Video Reel
-          </Button>
+          {canUploadReel && (
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={() => setIsAddModalOpen(true)}
+              className="text-xs bg-red-600 hover:bg-red-700 text-white"
+            >
+              <PlusCircle className="w-3.5 h-3.5 mr-1.5" />
+              Upload Your First Video Reel
+            </Button>
+          )}
         </Card>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
@@ -721,16 +732,6 @@ export default function BrokerReelsPage() {
                       title="Edit Video Reel Details"
                     >
                       <Edit className="w-3.5 h-3.5" />
-                    </button>
-
-                    {/* Delete button */}
-                    <button
-                      type="button"
-                      onClick={() => setDeletingReel(reel)}
-                      className="w-7 h-7 rounded-full bg-red-600/80 hover:bg-red-600 text-white flex items-center justify-center transition-colors cursor-pointer"
-                      title="Delete Video Reel"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
                     </button>
                   </div>
                 </div>
@@ -1082,50 +1083,6 @@ export default function BrokerReelsPage() {
               </div>
             )}
           </div>
-        </div>
-      )}
-
-      {/* Delete Confirmation Modal */}
-      {deletingReel && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <Card className="max-w-md w-full p-6 bg-casa-surface border border-casa-border-light shadow-2xl space-y-4">
-            <div className="flex items-center gap-3 text-red-600">
-              <div className="p-3 bg-red-100 dark:bg-red-950/50 rounded-2xl">
-                <Trash2 className="w-6 h-6" />
-              </div>
-              <div>
-                <h3 className="text-base font-bold text-casa-text-primary">Delete Video Reel?</h3>
-                <p className="text-xs text-casa-text-secondary">
-                  This will remove the reel from your account and the homepage video reels section.
-                </p>
-              </div>
-            </div>
-
-            <p className="text-xs text-casa-text-secondary">
-              Are you sure you want to delete <strong className="text-casa-text-primary">
-                "{typeof deletingReel.title === 'string' ? deletingReel.title : deletingReel.title?.en}"
-              </strong>?
-            </p>
-
-            <div className="flex items-center justify-end gap-2 pt-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setDeletingReel(null)}
-                className="text-xs"
-              >
-                Cancel
-              </Button>
-              <Button
-                variant="primary"
-                size="sm"
-                onClick={handleDeleteReel}
-                className="text-xs bg-red-600 hover:bg-red-700 text-white"
-              >
-                Yes, Delete Reel
-              </Button>
-            </div>
-          </Card>
         </div>
       )}
 

@@ -8,7 +8,6 @@ import { formatPrice } from '@/lib/utils';
 import {
   getMyProperties,
   submitPropertyForApproval,
-  deleteProperty,
 } from '@/services/property-service';
 import {
   createPaymentOrder,
@@ -19,7 +18,6 @@ import {
   Home,
   Plus,
   Edit,
-  Trash2,
   Send,
   Eye,
   AlertCircle,
@@ -97,19 +95,6 @@ export default function MyPropertiesPage() {
     }
   };
 
-  const handleDelete = async (prop: Property) => {
-    const title = typeof prop.title === 'string' ? prop.title : prop.title.en;
-    if (!confirm(`Are you sure you want to delete or archive "${title}"?`)) return;
-
-    try {
-      await deleteProperty(prop.id);
-      toast.success('Property Removed', `"${title}" has been deleted.`);
-      setProperties((prev) => prev.filter((p) => p.id !== prop.id));
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Delete failed';
-      toast.error('Action Failed', msg);
-    }
-  };
 
   if (isAuthLoading) {
     return (
@@ -373,16 +358,6 @@ export default function MyPropertiesPage() {
                       >
                         <Edit className="w-4 h-4" />
                       </Link>
-
-                      {/* Delete / Archive */}
-                      <button
-                        type="button"
-                        onClick={() => handleDelete(item)}
-                        title="Delete or Archive Listing"
-                        className="p-1.5 text-red-600 hover:bg-red-50 dark:hover:bg-red-950/50 rounded-lg transition-colors cursor-pointer"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
                     </div>
 
                     {/* Submit / Resubmit Action Button */}

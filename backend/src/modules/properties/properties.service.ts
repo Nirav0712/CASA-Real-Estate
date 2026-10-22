@@ -1731,6 +1731,18 @@ export class PropertiesService implements OnModuleInit {
   }
 
   async deleteProperty(id: string, user?: AuthenticatedUser) {
+    const isSuperAdmin =
+      user?.role === UserRole.SUPER_ADMIN ||
+      user?.platformRole === PlatformRole.SUPER_ADMIN ||
+      (user as any)?.role === 'SUPER_ADMIN' ||
+      (user as any)?.platformRole === 'SUPER_ADMIN';
+
+    if (!isSuperAdmin) {
+      throw new ForbiddenException(
+        'Only Super Admin authenticated in the Admin Portal is authorized to delete property listings or reels.',
+      );
+    }
+
     const query: any = { $or: [{ id }, { slug: id }] };
     if (isValidObjectId(id)) {
       query.$or.push({ _id: id });
@@ -1739,38 +1751,6 @@ export class PropertiesService implements OnModuleInit {
     const existing = await this.propertyModel.findOne(query);
     if (!existing) {
       throw new NotFoundException(`Property "${id}" not found`);
-    }
-
-    const isPrivileged =
-      user?.role === UserRole.ADMIN ||
-      user?.role === UserRole.SUPER_ADMIN;
-
-    if (user && !isPrivileged) {
-      const isOwner =
-        existing.ownerId === user.id ||
-        existing.advertiserId === user.id ||
-        existing.createdBy === user.id;
-
-      if (!isOwner) {
-        throw new ForbiddenException('You cannot delete another user’s property.');
-      }
-
-      // If already published, soft-delete to ARCHIVED
-      if (existing.status === 'PUBLISHED' || existing.isPublished) {
-        existing.status = 'ARCHIVED';
-        existing.isPublished = false;
-        existing.archivedAt = new Date();
-        await existing.save();
-
-        if (existing.isParentProject) {
-          await this.propertyModel.updateMany(
-            { parentPropertyId: existing.id },
-            { $set: { status: 'ARCHIVED', isPublished: false, archivedAt: new Date() } },
-          );
-        }
-
-        return { success: true, message: 'Published property has been archived safely.' };
-      }
     }
 
     // Hard delete draft or admin deletion
@@ -1849,6 +1829,42 @@ export class PropertiesService implements OnModuleInit {
   async uploadVideoFile(file: any, user: AuthenticatedUser) {
     if (!file) {
       throw new BadRequestException('Please select a video file to upload.');
+    }
+
+    const roleStr = String(user?.role || user?.accountType || '').toUpperCase();
+    const isConsumer =
+      roleStr === 'BUYER' ||
+      roleStr === 'TENANT' ||
+      roleStr === 'PURCHASER' ||
+      user?.accountType === AccountType.BUYER ||
+      user?.accountType === AccountType.TENANT;
+
+    if (isConsumer) {
+      throw new ForbiddenException(
+        'Reel and video upload is restricted. Property Buyers and Rental Tenants are not permitted to upload video reels.',
+      );
+    }
+
+    const isAuthorizedAdvertiser =
+      user?.role === UserRole.SUPER_ADMIN ||
+      user?.role === UserRole.ADMIN ||
+      user?.platformRole === PlatformRole.SUPER_ADMIN ||
+      user?.platformRole === PlatformRole.ADMIN ||
+      [
+        'BROKER',
+        'AGENT',
+        'BROKER_AGENCY',
+        'BROKER_AGENT',
+        'DEVELOPER',
+        'PROPERTY_OWNER',
+        'SELLER',
+        'VERIFIED_AGENT',
+      ].includes(roleStr);
+
+    if (!isAuthorizedAdvertiser) {
+      throw new ForbiddenException(
+        'Only eligible property advertisers (Brokers, Agents, Developers, and Property Owners) can access reel-upload functionality.',
+      );
     }
 
     // 1. Validation: Mime Type and Extension

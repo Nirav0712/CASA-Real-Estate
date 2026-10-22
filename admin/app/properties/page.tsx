@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { Card, Button } from '@/components/ui/button';
 import { Modal } from '@/components/ui/modal';
 import { useToast } from '@/contexts/toast-context';
+import { useAdminAuth } from '@/contexts/auth-context';
 import { formatPrice } from '@/lib/utils';
 import {
   Home,
@@ -63,6 +64,8 @@ const FRONTEND_URL =
 
 export default function AdminPropertiesPage() {
   const toast = useToast();
+  const { adminUser } = useAdminAuth();
+  const isSuperAdmin = adminUser?.role === 'SUPER_ADMIN' || adminUser?.platformRole === 'SUPER_ADMIN';
   const [properties, setProperties] = React.useState<AdminPropertyItem[]>([]);
   const [categories, setCategories] = React.useState<string[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
@@ -420,6 +423,10 @@ export default function AdminPropertiesPage() {
   };
 
   const handleDelete = async (prop: AdminPropertyItem) => {
+    if (!isSuperAdmin) {
+      toast.error('Permission Denied', 'Only Super Admin can permanently delete properties.');
+      return;
+    }
     if (!confirm(`Are you sure you want to permanently delete "${prop.title}" from MongoDB Atlas?`)) return;
     try {
       await deleteAdminProperty(prop.id);
@@ -450,6 +457,10 @@ export default function AdminPropertiesPage() {
   };
 
   const handleBulkDelete = async () => {
+    if (!isSuperAdmin) {
+      toast.error('Permission Denied', 'Only Super Admin can permanently delete properties.');
+      return;
+    }
     if (selectedIds.length === 0) return;
     const confirmMsg = `Are you sure you want to permanently delete ${selectedIds.length} selected properties from MongoDB Atlas? This action cannot be undone.`;
     if (!confirm(confirmMsg)) return;

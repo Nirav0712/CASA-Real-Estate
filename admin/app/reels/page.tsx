@@ -4,6 +4,7 @@ import * as React from 'react';
 import Link from 'next/link';
 import { Card, Button } from '@/components/ui/button';
 import { useToast } from '@/contexts/toast-context';
+import { useAdminAuth } from '@/contexts/auth-context';
 import { fetchAdminApi } from '@/lib/api-client';
 import { parseYouTubeUrl } from '@/lib/video';
 import { formatPrice } from '@/lib/utils';
@@ -246,6 +247,8 @@ const PUBLIC_FRONTEND_URL =
 
 export default function VideoReelsAdminPage() {
   const toast = useToast();
+  const { adminUser } = useAdminAuth();
+  const isSuperAdmin = adminUser?.role === 'SUPER_ADMIN' || adminUser?.platformRole === 'SUPER_ADMIN';
 
   const [reels, setReels] = React.useState<any[]>(INITIAL_REELS);
   const [isLoading, setIsLoading] = React.useState(false);
@@ -540,6 +543,10 @@ export default function VideoReelsAdminPage() {
 
   // Handle Delete Reel
   const handleDeleteReel = async () => {
+    if (!isSuperAdmin) {
+      toast.error('Permission Denied', 'Only Super Admin can permanently delete video reels.');
+      return;
+    }
     if (!deletingReel) return;
 
     try {
@@ -765,14 +772,16 @@ export default function VideoReelsAdminPage() {
                     <span>{reel.listingType === 'SALE' ? 'BUY' : 'RENT'}</span>
                   </span>
 
-                  <button
-                    type="button"
-                    onClick={() => setDeletingReel(reel)}
-                    className="w-7 h-7 rounded-full bg-red-600/80 hover:bg-red-600 text-white flex items-center justify-center transition-colors cursor-pointer shadow-md"
-                    title="Delete this Video Reel"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
+                  {isSuperAdmin && (
+                    <button
+                      type="button"
+                      onClick={() => setDeletingReel(reel)}
+                      className="w-7 h-7 rounded-full bg-red-600/80 hover:bg-red-600 text-white flex items-center justify-center transition-colors cursor-pointer shadow-md"
+                      title="Delete this Video Reel"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  )}
                 </div>
 
                 {/* Center Play Button Overlay */}

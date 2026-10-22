@@ -8,14 +8,12 @@ import { useToast } from '@/contexts/toast-context';
 import {
   getMyPropertyById,
   submitPropertyForApproval,
-  deleteProperty,
 } from '@/services/property-service';
 import { Property } from '@/types';
 import { formatPrice } from '@/lib/utils';
 import {
   ArrowLeft,
   Edit,
-  Trash2,
   Send,
   MapPin,
   Clock,
@@ -73,18 +71,6 @@ export default function PropertyDossierPage() {
     }
   };
 
-  const handleDelete = async () => {
-    if (!property) return;
-    if (!confirm('Are you sure you want to delete this property?')) return;
-    try {
-      await deleteProperty(property.id);
-      toast.success('Deleted', 'Property removed successfully.');
-      router.push('/dashboard/properties');
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Delete failed';
-      toast.error('Error', msg);
-    }
-  };
 
   if (!isAuthenticated && !isAuthLoading) {
     return (
@@ -177,13 +163,6 @@ export default function PropertyDossierPage() {
             </button>
           )}
 
-          <button
-            type="button"
-            onClick={handleDelete}
-            className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-950/50 rounded-xl"
-          >
-            <Trash2 className="w-4 h-4" />
-          </button>
         </div>
       </div>
 

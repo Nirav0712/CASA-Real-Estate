@@ -13,6 +13,7 @@ import {
   UploadedFile,
   Req,
   Ip,
+  ForbiddenException,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
@@ -24,7 +25,7 @@ import { Roles } from '../auth/decorators/roles.decorator';
 import { PermissionsGuard } from '../entitlements/guards/permissions.guard';
 import { RequirePermissions } from '../entitlements/decorators/require-permissions.decorator';
 import { Permission } from '../entitlements/enums/permissions.enum';
-import { UserRole } from '../auth/enums/auth.enums';
+import { UserRole, PlatformRole, AccountType } from '../auth/enums/auth.enums';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
 
@@ -184,6 +185,42 @@ export class PropertiesController {
     @UploadedFile() file: any,
     @CurrentUser() user: AuthenticatedUser,
   ) {
+    const roleStr = String(user?.role || user?.accountType || '').toUpperCase();
+    const isConsumer =
+      roleStr === 'BUYER' ||
+      roleStr === 'TENANT' ||
+      roleStr === 'PURCHASER' ||
+      user?.accountType === AccountType.BUYER ||
+      user?.accountType === AccountType.TENANT;
+
+    if (isConsumer) {
+      throw new ForbiddenException(
+        'Reel and video upload is restricted. Property Buyers and Rental Tenants are not permitted to upload video reels.',
+      );
+    }
+
+    const isAuthorizedAdvertiser =
+      user?.role === UserRole.SUPER_ADMIN ||
+      user?.role === UserRole.ADMIN ||
+      user?.platformRole === PlatformRole.SUPER_ADMIN ||
+      user?.platformRole === PlatformRole.ADMIN ||
+      [
+        'BROKER',
+        'AGENT',
+        'BROKER_AGENCY',
+        'BROKER_AGENT',
+        'DEVELOPER',
+        'PROPERTY_OWNER',
+        'SELLER',
+        'VERIFIED_AGENT',
+      ].includes(roleStr);
+
+    if (!isAuthorizedAdvertiser) {
+      throw new ForbiddenException(
+        'Only eligible property advertisers (Brokers, Agents, Developers, and Property Owners) can access reel-upload functionality.',
+      );
+    }
+
     return this.propertiesService.uploadVideoFile(file, user);
   }
 
@@ -234,11 +271,23 @@ export class PropertiesController {
   }
 
   @Delete(':id')
-  @UseGuards(JwtAuthGuard, PermissionsGuard)
-  @RequirePermissions(Permission.PROPERTY_DELETE)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.SUPER_ADMIN)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Delete or archive a property listing' })
+  @ApiOperation({ summary: 'Super Admin only delete or archive a property listing or reel' })
   delete(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
+    const isSuperAdmin =
+      user?.role === UserRole.SUPER_ADMIN ||
+      user?.platformRole === PlatformRole.SUPER_ADMIN ||
+      (user as any)?.role === 'SUPER_ADMIN' ||
+      (user as any)?.platformRole === 'SUPER_ADMIN';
+
+    if (!isSuperAdmin) {
+      throw new ForbiddenException(
+        'Only Super Admin authenticated in the Admin Portal is authorized to delete property listings or reels.',
+      );
+    }
+
     return this.propertiesService.deleteProperty(id, user);
   }
 }
