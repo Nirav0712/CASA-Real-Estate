@@ -12,7 +12,13 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model, isValidObjectId } from 'mongoose';
 import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
 import { JwtAccessPayload, AuthenticatedUser } from '../interfaces/jwt-payload.interface';
-import { AccountStatus, normalizeUserRoleModel } from '../enums/auth.enums';
+import {
+  AccountStatus,
+  AccountType,
+  PlatformRole,
+  UserRole,
+  normalizeUserRoleModel,
+} from '../enums/auth.enums';
 import { User, UserDocument } from '../schemas/user.schema';
 import { AuthService } from '../auth.service';
 
@@ -63,7 +69,9 @@ export class JwtAuthGuard implements CanActivate {
             : { normalizedMobile: payload.normalizedMobile || userId };
           user = await this.userModel
             .findOne(query)
-            .select('status role platformRole accountType isVerifiedAgent permissions name mobile normalizedMobile')
+            .select(
+              'status role platformRole accountType isVerifiedAgent permissions name mobile normalizedMobile isTrialActive trialStartedAt trialExpiresAt activePackageId kycStatus trialUsed trialExpired isTrialEligible'
+            )
             .lean();
         } catch {
           // Fallback to in-memory store if DB query fails
@@ -101,6 +109,41 @@ export class JwtAuthGuard implements CanActivate {
         accountType: user?.accountType || payload.accountType,
         isVerifiedAgent: user?.isVerifiedAgent ?? payload.isVerifiedAgent,
       });
+
+      // Requirement 1 & 2: Trial expiry session termination
+      // Buyer and Tenant accounts must NEVER require KYC or free trial, and must not have trial restrictions applied.
+      const isConsumerAccount =
+        norm.accountType === AccountType.BUYER ||
+        norm.accountType === AccountType.TENANT ||
+        norm.role === UserRole.BUYER ||
+        norm.role === UserRole.TENANT ||
+        norm.role === UserRole.PURCHASER;
+
+      const isPlatformAdmin =
+        norm.platformRole === PlatformRole.SUPER_ADMIN ||
+        norm.platformRole === PlatformRole.ADMIN ||
+        norm.platformRole === PlatformRole.MODERATOR;
+
+      if (!isConsumerAccount && !isPlatformAdmin && user) {
+        const hasActivePackage = Boolean(user.activePackageId);
+        const hasExpiredTrial = Boolean(
+          user.trialExpiresAt && new Date() > new Date(user.trialExpiresAt)
+        );
+
+        if (hasExpiredTrial && !hasActivePackage) {
+          if (this.userModel && user.isTrialActive) {
+            try {
+              await this.userModel.updateOne(
+                { _id: user._id },
+                { $set: { isTrialActive: false, trialExpired: true } }
+              );
+            } catch {}
+          }
+          throw new UnauthorizedException(
+            'Your 3-day free trial has expired. Complete KYC verification and get an active plan to continue.'
+          );
+        }
+      }
 
       const authenticatedUser: AuthenticatedUser = {
         id: (user as any)?._id ? (user as any)._id.toString() : userId,

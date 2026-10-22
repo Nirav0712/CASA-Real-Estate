@@ -46,6 +46,8 @@ interface AuthContextType {
   isTrialActive: boolean;
   isTrialExpired: boolean;
   trialDaysRemaining: number;
+  trialRemainingLabel: string;
+  startTrial: () => Promise<void>;
 }
 
 const AuthContext = React.createContext<AuthContextType | undefined>(undefined);
@@ -252,24 +254,45 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (!isMounted) return;
 
         if (res.status === 401 || (res.data && res.data.active === false)) {
+          const errMsg = String((res as any)?.error || (res as any)?.message || '').toLowerCase();
+          const isTrialExpired = errMsg.includes('free trial has expired') || errMsg.includes('trial has expired');
           setUser(null);
           setToken(null);
           try {
             localStorage.removeItem('casa_access_token');
             localStorage.removeItem('casa_user');
-            localStorage.setItem(
-              'casa_deactivated_notice',
-              'Your account has been deactivated by the administrator.',
-            );
+            if (isTrialExpired) {
+              localStorage.setItem(
+                'casa_trial_expired_notice',
+                'Your 3-day free trial has expired. Complete KYC verification and get an active plan to continue.'
+              );
+              localStorage.setItem('casa_trial_expired_kyc_status', user?.kycStatus || 'NOT_SUBMITTED');
+            } else {
+              localStorage.setItem(
+                'casa_deactivated_notice',
+                'Your account has been deactivated by the administrator.'
+              );
+            }
           } catch {
             // ignore
           }
-          toast.error(
-            'Account Deactivated',
-            'Your account has been deactivated by the administrator.',
-          );
-          if (!window.location.pathname.startsWith('/auth/login')) {
-            window.location.href = '/auth/login?deactivated=1';
+
+          if (isTrialExpired) {
+            toast.error(
+              'Trial Expired',
+              'Your 3-day free trial has expired. Complete KYC verification and get an active plan to continue.'
+            );
+            if (!window.location.pathname.startsWith('/auth/login')) {
+              window.location.href = '/auth/login?trial_expired=1';
+            }
+          } else {
+            toast.error(
+              'Account Deactivated',
+              'Your account has been deactivated by the administrator.'
+            );
+            if (!window.location.pathname.startsWith('/auth/login')) {
+              window.location.href = '/auth/login?deactivated=1';
+            }
           }
         }
       } catch {
@@ -292,21 +315,66 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Compute trial status dynamically
   const trialStatus = React.useMemo(() => {
-    if (!user || !user.trialExpiresAt) {
-      return { isTrialActive: false, isTrialExpired: false, daysRemaining: 0 };
+    if (!user) {
+      return { isTrialActive: false, isTrialExpired: false, daysRemaining: 0, remainingLabel: '' };
+    }
+    const isConsumer =
+      user.role === 'BUYER' ||
+      user.role === 'TENANT' ||
+      user.role === 'PURCHASER' ||
+      user.accountType === 'BUYER' ||
+      user.accountType === 'TENANT';
+    if (isConsumer) {
+      return { isTrialActive: false, isTrialExpired: false, daysRemaining: 0, remainingLabel: '' };
+    }
+
+    if (!user.trialExpiresAt) {
+      return { isTrialActive: false, isTrialExpired: false, daysRemaining: 0, remainingLabel: '' };
     }
     const expires = new Date(user.trialExpiresAt).getTime();
     const now = Date.now();
-    const isExpired = now > expires;
-    const daysRemaining = isExpired
-      ? 0
-      : Math.max(1, Math.ceil((expires - now) / (1000 * 60 * 60 * 24)));
+    const msRemaining = expires - now;
+    const isExpired = msRemaining <= 0;
+    let daysRemaining = 0;
+    let remainingLabel = '';
+
+    if (!isExpired && Boolean(user.isTrialActive)) {
+      if (msRemaining > 2 * 24 * 60 * 60 * 1000) {
+        daysRemaining = 3;
+        remainingLabel = '3 Days Remaining';
+      } else if (msRemaining > 1 * 24 * 60 * 60 * 1000) {
+        daysRemaining = 2;
+        remainingLabel = '2 Days Remaining';
+      } else {
+        daysRemaining = 1;
+        remainingLabel = '1 Day Remaining';
+      }
+    }
+
     return {
-      isTrialActive: !isExpired,
-      isTrialExpired: isExpired,
+      isTrialActive: !isExpired && Boolean(user.isTrialActive),
+      isTrialExpired: isExpired || Boolean(user.trialExpired),
       daysRemaining,
+      remainingLabel,
     };
   }, [user]);
+
+  const startTrial = React.useCallback(async () => {
+    const currentToken =
+      token || (typeof window !== 'undefined' ? localStorage.getItem('casa_access_token') : null);
+    if (!currentToken) {
+      throw new Error('Please sign in to start your trial.');
+    }
+    const res = await authService.startFreeTrial(currentToken);
+    if (res && res.user) {
+      setUser(res.user);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('casa_user', JSON.stringify(res.user));
+      }
+    }
+    toast.success('3-Day Free Trial Started', 'Your 3-day free trial is now active!');
+    return res;
+  }, [token, toast]);
 
   // Auto-prompt trial expired modal once per session if trial has passed
   const hasPromptedExpiryRef = React.useRef(false);
@@ -496,6 +564,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         isTrialActive: trialStatus.isTrialActive,
         isTrialExpired: trialStatus.isTrialExpired,
         trialDaysRemaining: trialStatus.daysRemaining,
+        trialRemainingLabel: trialStatus.remainingLabel,
+        startTrial,
       }}
     >
       {children}

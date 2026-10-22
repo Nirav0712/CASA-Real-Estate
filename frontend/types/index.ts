@@ -49,6 +49,12 @@ export interface User {
   trialExpiresAt?: string | null;
   trialPackageId?: string | null;
   isTrialActive?: boolean;
+  trialUsed?: boolean;
+  trialExpired?: boolean;
+  isTrialEligible?: boolean;
+  trialDaysRemaining?: number;
+  trialRemainingLabel?: string;
+  activePackageId?: string | null;
   kycStatus?: 'NOT_SUBMITTED' | 'PENDING' | 'APPROVED' | 'REJECTED' | string;
   kycRejectionReason?: string | null;
   kycApprovedAt?: string | null;

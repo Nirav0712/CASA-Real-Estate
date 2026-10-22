@@ -136,14 +136,15 @@ export function AuthModal() {
       return;
     }
 
-    if (!email.trim()) {
+    const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+    if (!email.trim() || !emailRegex.test(email.trim())) {
       setErrorMsg('Please enter a valid email address.');
       return;
     }
 
     const cleanMobile = mobile.replace(/[^0-9]/g, '');
-    if (cleanMobile.length < 10) {
-      setErrorMsg('Please enter a valid 10-digit mobile number.');
+    if (cleanMobile.length !== 10) {
+      setErrorMsg('Mobile number must contain exactly 10 digits.');
       return;
     }
 
@@ -186,12 +187,20 @@ export function AuthModal() {
       });
 
       if (!(res as any).tokens?.accessToken) {
-        setMode('SIGN_IN');
-        setAuthModalMode('SIGN_IN');
+        setRegisteredEmail(email.trim());
       }
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Registration failed. Please try again.';
-      setErrorMsg(message);
+      const rawMsg = err instanceof Error ? err.message : 'Registration failed. Please try again.';
+      if (
+        rawMsg.toLowerCase().includes('already registered') ||
+        rawMsg.toLowerCase().includes('already exists') ||
+        rawMsg.toLowerCase().includes('duplicate') ||
+        rawMsg.toLowerCase().includes('email already')
+      ) {
+        setErrorMsg('Email already registered');
+      } else {
+        setErrorMsg(rawMsg);
+      }
     } finally {
       setLoading(false);
     }

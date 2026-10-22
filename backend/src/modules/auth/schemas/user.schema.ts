@@ -125,6 +125,15 @@ export class User {
   @Prop({ type: Boolean, default: false })
   isTrialActive?: boolean;
 
+  @Prop({ type: Boolean, default: false })
+  trialUsed?: boolean;
+
+  @Prop({ type: Boolean, default: false })
+  trialExpired?: boolean;
+
+  @Prop({ type: Boolean, default: false })
+  isTrialEligible?: boolean;
+
   @Prop({
     type: String,
     enum: ['NOT_SUBMITTED', 'PENDING', 'APPROVED', 'REJECTED'],

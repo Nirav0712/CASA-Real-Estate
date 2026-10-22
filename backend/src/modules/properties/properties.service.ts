@@ -3,16 +3,17 @@ import {
   NotFoundException,
   BadRequestException,
   ForbiddenException,
+  UnauthorizedException,
   ServiceUnavailableException,
   Logger,
   OnModuleInit,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model, isValidObjectId } from 'mongoose';
+import { Model, Types, isValidObjectId } from 'mongoose';
 import { Property, PropertyDocument, PropertyStructureType } from './schemas/property.schema';
 import { Category, CategoryDocument } from './schemas/category.schema';
 import { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
-import { UserRole } from '../auth/enums/auth.enums';
+import { UserRole, AccountType, PlatformRole } from '../auth/enums/auth.enums';
 import {
   SearchPropertiesDto,
   PropertySortOption,
@@ -1164,6 +1165,67 @@ export class PropertiesService implements OnModuleInit {
   // ==========================================
 
   async createProperty(dto: any, user?: AuthenticatedUser) {
+    // 1. Role Enforcement (Backend check so hiding button cannot be bypassed)
+    if (user) {
+      const isConsumer =
+        user.role === UserRole.BUYER ||
+        user.role === UserRole.TENANT ||
+        user.role === UserRole.PURCHASER ||
+        user.accountType === AccountType.BUYER ||
+        user.accountType === AccountType.TENANT;
+
+      if (isConsumer) {
+        throw new ForbiddenException(
+          'Property creation is restricted. Buyer and Tenant accounts are not permitted to list properties.'
+        );
+      }
+
+      const isDirectAdmin =
+        user.role === UserRole.ADMIN ||
+        user.role === UserRole.SUPER_ADMIN ||
+        user.platformRole === PlatformRole.SUPER_ADMIN ||
+        user.platformRole === PlatformRole.ADMIN;
+
+      // 2. Trial & Subscription Enforcement for Supply-Side Users
+      if (!isDirectAdmin) {
+        let userDoc: any = null;
+        try {
+          userDoc = await this.propertyModel.db.collection('users').findOne({
+            $or: [
+              ...(isValidObjectId(user.id) ? [{ _id: new Types.ObjectId(user.id) }] : []),
+              { _id: user.id },
+              { normalizedMobile: user.normalizedMobile || user.id },
+            ],
+          } as any);
+        } catch {}
+
+        const activePackageId = userDoc?.activePackageId || user.activePackageId;
+        const isTrialActive = Boolean(userDoc?.isTrialActive);
+        const trialExpiresAt = userDoc?.trialExpiresAt ? new Date(userDoc.trialExpiresAt) : null;
+        const isTrialExpired = Boolean(
+          userDoc?.trialExpired || (trialExpiresAt && new Date() > trialExpiresAt)
+        );
+
+        if (isTrialExpired && !activePackageId) {
+          throw new UnauthorizedException(
+            'Your 3-day free trial has expired. Complete KYC verification and get an active plan to continue.'
+          );
+        }
+
+        // Allow maximum of ONE property listing per account during the trial
+        if (isTrialActive && !activePackageId) {
+          const ownerPropertiesCount = await this.propertyModel.countDocuments({
+            $or: [{ ownerId: user.id }, { createdBy: user.id }, { advertiserId: user.id }],
+          });
+          if (ownerPropertiesCount >= 1) {
+            throw new ForbiddenException(
+              'Free trial allows a maximum of 1 property listing per account. Please complete KYC and obtain an active subscription plan to post additional properties.'
+            );
+          }
+        }
+      }
+    }
+
     const titleEn = typeof dto.title === 'string' ? dto.title : dto.title?.en || 'New Property Listing';
     const slug =
       dto.slug ||

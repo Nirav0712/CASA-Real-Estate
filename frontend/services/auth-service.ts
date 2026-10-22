@@ -279,3 +279,26 @@ export async function verifyOtp(
   return json.data || json;
 }
 
+/**
+ * Start 3-Day Free Trial for eligible supply-side accounts
+ */
+export async function startFreeTrial(token: string): Promise<any> {
+  const response = await fetch(`${API_BASE_URL}/auth/trial/start`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    credentials: 'include',
+  });
+
+  const json = await response.json();
+
+  if (!response.ok) {
+    const errorMsg = json.message || 'Failed to start free trial';
+    throw new Error(Array.isArray(errorMsg) ? errorMsg[0] : errorMsg);
+  }
+
+  return json.data || json;
+}
+

@@ -117,9 +117,9 @@ export class AuthController {
     const userAgent = req.headers['user-agent'];
     const result = await this.authService.register(dto, { ipAddress, userAgent });
 
-    if (result.tokens) {
-      this.setRefreshTokenCookie(res, result.tokens.refreshToken);
-      this.setAccessTokenCookie(res, result.tokens.accessToken);
+    if ((result as any).tokens) {
+      this.setRefreshTokenCookie(res, (result as any).tokens.refreshToken);
+      this.setAccessTokenCookie(res, (result as any).tokens.accessToken);
     }
 
     return result;
@@ -353,6 +353,19 @@ export class AuthController {
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   async getMe(@CurrentUser() user: AuthenticatedUser) {
     return this.authService.getMe(user.id);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('trial/start')
+  @HttpCode(HttpStatus.OK)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Start 3-Day Free Trial for eligible supply-side accounts with KYC approval',
+  })
+  @ApiResponse({ status: 200, description: '3-Day Free Trial started successfully' })
+  @ApiResponse({ status: 400, description: 'Ineligible role, missing KYC approval, or trial already used' })
+  async startTrial(@CurrentUser('id') userId: string) {
+    return this.authService.startTrial(userId);
   }
 
   @UseGuards(JwtAuthGuard)

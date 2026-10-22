@@ -9,8 +9,8 @@ export class RequestOtpDto {
   })
   @IsNotEmpty({ message: 'Mobile number is required' })
   @IsString({ message: 'Mobile number must be a string' })
-  @Matches(/^(\+?[0-9]{1,4})?[0-9]{10}$/, {
-    message: 'Please provide a valid 10-digit mobile number with optional country code',
+  @Matches(/^(?:\+91|91|0)?[0-9]{10}$/, {
+    message: 'Mobile number must contain exactly 10 digits.',
   })
   mobile: string;
 

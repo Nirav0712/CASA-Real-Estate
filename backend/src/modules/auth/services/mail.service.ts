@@ -1,4 +1,4 @@
-import { Injectable, Logger, InternalServerErrorException } from '@nestjs/common';
+import { Injectable, Logger, InternalServerErrorException, BadRequestException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as nodemailer from 'nodemailer';
 
@@ -23,6 +23,13 @@ export class MailService {
 
   constructor(private readonly configService: ConfigService) {
     this.initTransporter();
+  }
+
+  isConfigured(): boolean {
+    const host = this.configService.get<string>('mail.host') || process.env.SMTP_HOST;
+    const user = this.configService.get<string>('mail.user') || process.env.SMTP_USER;
+    const pass = this.configService.get<string>('mail.pass') || process.env.SMTP_PASS;
+    return Boolean(host && user && pass);
   }
 
   private initTransporter() {
@@ -160,13 +167,18 @@ export class MailService {
    * Dispatches an account activation & email verification link
    */
   async sendVerificationEmail(to: string, name: string, token: string): Promise<SendMailResult> {
-    const verificationLink = this.generateVerificationLink(to, token);
-    const from = this.configService.get<string>('mail.from') || '"myproperty" <no-reply@myproperty.com>';
-    const isProduction = this.configService.get<string>('nodeEnv') === 'production';
+    if (!this.isConfigured()) {
+      const msg = 'Email service is not configured. Verification email cannot be sent.';
+      this.logger.error(msg);
+      throw new BadRequestException(msg);
+    }
 
-    const subject = 'Activate Your myproperty Account — Verify Email';
+    const verificationLink = this.generateVerificationLink(to, token);
+    const from = this.configService.get<string>('mail.from') || '"CASA Real Estate" <no-reply@casarealestate.com>';
+
+    const subject = 'Activate Your CASA Account — Verify Email';
     const html = this.buildVerificationEmailTemplate(name, verificationLink);
-    const text = `Hello ${name || 'User'},\n\nThank you for joining myproperty Marketplace.\n\nPlease verify your email address by visiting this link:\n${verificationLink}\n\nThis verification link will expire in 24 hours.\n\nBest regards,\nThe myproperty Team`;
+    const text = `Hello ${name || 'User'},\n\nThank you for joining CASA Real Estate.\n\nPlease verify your email address by visiting this link:\n${verificationLink}\n\nThis verification link will expire in 24 hours.\n\nBest regards,\nThe CASA Team`;
 
     if (this.transporter) {
       try {
@@ -181,26 +193,11 @@ export class MailService {
         return { success: true, messageId: info.messageId, isMock: false };
       } catch (err: any) {
         this.logger.error(`SMTP delivery failed for ${to}: ${err?.message}`);
-        if (isProduction) {
-          throw new InternalServerErrorException('Failed to deliver verification email. Please try again later.');
-        }
+        throw new BadRequestException(`Failed to deliver verification email: ${err?.message || 'SMTP delivery failure'}`);
       }
     }
 
-    if (isProduction) {
-      this.logger.error(`Cannot send verification email to ${to}: SMTP is not configured in production.`);
-      throw new InternalServerErrorException('Email delivery service is currently unavailable.');
-    }
-
-    // Development fallback logger
-    this.logger.warn(
-      `[DEV EMAIL DISPATCH] Verification Email for [${to}]\n` +
-      `Recipient: ${name} <${to}>\n` +
-      `Verification Link: ${verificationLink}\n` +
-      `Token: ${token}`
-    );
-
-    return { success: true, messageId: `dev_mock_${Date.now()}`, isMock: true };
+    throw new BadRequestException('Email transporter is not available. Please verify email provider configuration.');
   }
 
   /**

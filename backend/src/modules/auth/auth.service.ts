@@ -4,11 +4,12 @@ import {
   UnauthorizedException,
   ForbiddenException,
   ConflictException,
+  NotFoundException,
   Logger,
   OnModuleInit,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model, Types } from 'mongoose';
+import { Model, Types, isValidObjectId } from 'mongoose';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import * as crypto from 'crypto';
@@ -1168,11 +1169,46 @@ export class AuthService implements OnModuleInit {
       throw new BadRequestException(strength.message);
     }
 
+    // 1. Strict 10-digit Indian mobile validation
+    const rawMobile = String(dto.mobile || '').trim();
+    const cleanDigits = rawMobile.replace(/\D/g, '');
+    let nationalDigits = cleanDigits;
+    if (cleanDigits.startsWith('91') && cleanDigits.length === 12) {
+      nationalDigits = cleanDigits.slice(2);
+    } else if (cleanDigits.startsWith('0') && cleanDigits.length === 11) {
+      nationalDigits = cleanDigits.slice(1);
+    }
+    if (nationalDigits.length !== 10) {
+      throw new BadRequestException('Mobile number must contain exactly 10 digits.');
+    }
+
+    // 2. Strict email format validation
+    const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+    if (!dto.email || !emailRegex.test(dto.email.trim())) {
+      throw new BadRequestException('Please enter a valid email address.');
+    }
+
     const normalizedEmail = normalizeEmail(dto.email);
-    const normalizedMobile = this.normalizeMobile(dto.mobile);
+    const normalizedMobile = `+91${nationalDigits}`;
     const passwordHash = await hashPassword(dto.password);
     const fullName = dto.fullName.trim();
     const now = new Date();
+
+    // 3. Duplicate email check: Show exact message "Email already registered"
+    if (this.isDbConnected()) {
+      const existingByEmail = await this.userModel.findOne({ email: normalizedEmail });
+      if (existingByEmail) {
+        throw new ConflictException('Email already registered');
+      }
+    }
+    if (this.memUsers.has(normalizedEmail)) {
+      throw new ConflictException('Email already registered');
+    }
+
+    // 4. Verify email provider is properly configured
+    if (!this.mailService.isConfigured()) {
+      throw new BadRequestException('Email service provider is not configured. Verification email cannot be sent.');
+    }
 
     // Security & Role mapping: Support both standard system roles and dynamic custom roles
     const rawRole = dto.role || (dto.accountType as any) || UserRole.BUYER;
@@ -1232,21 +1268,18 @@ export class AuthService implements OnModuleInit {
         ? dynamicPermissions
         : this.getDefaultPermissions(finalPlatformRole, finalAccountType);
 
-    // Generate single-use email verification token
+    // 5. Generate single-use email verification token
     const rawVerificationToken = crypto.randomBytes(32).toString('hex');
     const verificationTokenHash = hashToken(rawVerificationToken);
     const verificationExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+
+    // Send real verification email via configured email provider
+    await this.mailService.sendVerificationEmail(normalizedEmail, fullName, rawVerificationToken);
 
     let user: any = null;
 
     if (this.isDbConnected()) {
       try {
-        const existingByEmail = await this.userModel.findOne({ email: normalizedEmail });
-
-        if (existingByEmail) {
-          throw new ConflictException('An account with this email address already exists. Please sign in.');
-        }
-
         // Check if mobile number is already in use by a different email
         const existingByMobile = await this.userModel.findOne({ normalizedMobile });
         if (existingByMobile) {
@@ -1256,43 +1289,47 @@ export class AuthService implements OnModuleInit {
           if (existingByMobile.passwordHash) {
             throw new ConflictException('An account with this mobile number already exists. Please sign in.');
           }
-          // Attach email and password to existing mobile-verified account
           existingByMobile.email = normalizedEmail;
           existingByMobile.name = fullName;
           existingByMobile.passwordHash = passwordHash;
-          existingByMobile.isEmailVerified = true;
-          existingByMobile.status = AccountStatus.ACTIVE;
+          existingByMobile.isEmailVerified = false;
+          existingByMobile.status = AccountStatus.PENDING_VERIFICATION;
           existingByMobile.platformRole = finalPlatformRole;
           existingByMobile.accountType = finalAccountType;
           existingByMobile.role = finalRole;
           existingByMobile.permissions = finalPermissions;
           existingByMobile.customRoleId = customRoleId || null;
-          existingByMobile.emailVerificationTokenHash = undefined;
-          existingByMobile.emailVerificationExpiresAt = undefined;
+          existingByMobile.emailVerificationTokenHash = verificationTokenHash;
+          existingByMobile.emailVerificationExpiresAt = verificationExpiresAt;
           await existingByMobile.save();
           user = existingByMobile;
         } else {
-          // Create brand new active user directly without requiring email verification
+          // Create new user in PENDING_VERIFICATION state until email is confirmed
           user = await this.userModel.create({
             name: fullName,
             email: normalizedEmail,
-            mobile: dto.mobile.trim(),
+            mobile: nationalDigits,
             normalizedMobile,
             passwordHash,
-            isEmailVerified: true,
+            isEmailVerified: false,
             isMobileVerified: false,
+            emailVerificationTokenHash: verificationTokenHash,
+            emailVerificationExpiresAt: verificationExpiresAt,
             platformRole: finalPlatformRole,
             accountType: finalAccountType,
             role: finalRole,
             permissions: finalPermissions,
             customRoleId: customRoleId || null,
-            status: AccountStatus.ACTIVE,
+            status: AccountStatus.PENDING_VERIFICATION,
             agencyName: dto.agencyName?.trim() || undefined,
           });
         }
       } catch (err: any) {
         if (err instanceof ConflictException || err instanceof BadRequestException) throw err;
         if (err.code === 11000 || err.codeName === 'DuplicateKey' || err.message?.includes('duplicate key')) {
+          if (err.message?.includes('email') || err.keyPattern?.email) {
+            throw new ConflictException('Email already registered');
+          }
           throw new ConflictException('An account with this email address or mobile number already exists.');
         }
         this.logger.error(`Database registration error: ${err?.message}`);
@@ -1305,16 +1342,18 @@ export class AuthService implements OnModuleInit {
       _id: user?._id?.toString() || new Types.ObjectId().toString(),
       name: fullName,
       email: normalizedEmail,
-      mobile: dto.mobile.trim(),
+      mobile: nationalDigits,
       normalizedMobile,
       passwordHash,
-      isEmailVerified: true,
+      isEmailVerified: false,
       isMobileVerified: false,
+      emailVerificationTokenHash: verificationTokenHash,
+      emailVerificationExpiresAt: verificationExpiresAt,
       platformRole: finalPlatformRole,
       accountType: finalAccountType,
       role: finalRole,
       permissions: finalPermissions,
-      status: AccountStatus.ACTIVE,
+      status: AccountStatus.PENDING_VERIFICATION,
       isVerifiedAgent: false,
       agencyName: dto.agencyName?.trim() || undefined,
       createdAt: now,
@@ -1323,15 +1362,12 @@ export class AuthService implements OnModuleInit {
     this.memUsers.set(normalizedEmail, memUserObj);
     if (!user) user = memUserObj;
 
-    const tokens = await this.generateTokens(user, metadata);
-
     return {
       success: true,
-      message: 'Registration successful! Your account is active.',
+      message: 'Registration successful! A verification link has been sent to your email. Please verify your email before signing in.',
       email: normalizedEmail,
-      isEmailVerified: true,
+      isEmailVerified: false,
       user: this.sanitizeUser(user),
-      tokens,
     };
   }
 
@@ -1363,18 +1399,16 @@ export class AuthService implements OnModuleInit {
       throw new UnauthorizedException('Invalid email or password.');
     }
 
+    if (!user.isEmailVerified) {
+      throw new UnauthorizedException('Please verify your email address before signing in. Check your inbox for the verification link.');
+    }
+
     if (user.status === AccountStatus.SUSPENDED) {
       throw new ForbiddenException('Your account has been suspended. Please contact support.');
     }
 
     if (user.status === AccountStatus.DEACTIVATED) {
       throw new ForbiddenException('Your account has been deactivated by the administrator.');
-    }
-
-    // Auto-activate any legacy pending accounts upon login
-    if (user.status === AccountStatus.PENDING_VERIFICATION) {
-      user.status = AccountStatus.ACTIVE;
-      user.isEmailVerified = true;
     }
 
     user.lastLoginAt = new Date();
@@ -1770,6 +1804,113 @@ export class AuthService implements OnModuleInit {
   }
 
   /**
+   * Starts 3-Day Free Trial for eligible supply-side accounts with Super Admin / KYC approval
+   */
+  async startTrial(userId: string) {
+    let user: any = null;
+    if (this.isDbConnected()) {
+      user = isValidObjectId(userId)
+        ? await this.userModel.findById(userId)
+        : await this.userModel.findOne({
+            $or: [{ _id: userId }, { normalizedMobile: userId }],
+          });
+    }
+    if (!user) {
+      user = this.memUsers.get(userId);
+    }
+    if (!user) {
+      throw new NotFoundException('User account not found.');
+    }
+
+    const norm = normalizeUserRoleModel({
+      role: user.role,
+      platformRole: user.platformRole,
+      accountType: user.accountType,
+      isVerifiedAgent: user.isVerifiedAgent,
+    });
+
+    const isConsumer =
+      norm.accountType === AccountType.BUYER ||
+      norm.accountType === AccountType.TENANT ||
+      norm.role === UserRole.BUYER ||
+      norm.role === UserRole.TENANT ||
+      norm.role === UserRole.PURCHASER;
+
+    if (isConsumer) {
+      throw new BadRequestException('Free trial is not applicable for Buyer or Tenant accounts.');
+    }
+
+    const isPlatformAdmin =
+      norm.platformRole === PlatformRole.SUPER_ADMIN ||
+      norm.platformRole === PlatformRole.ADMIN ||
+      norm.platformRole === PlatformRole.MODERATOR;
+
+    if (isPlatformAdmin) {
+      throw new BadRequestException('Platform administrators have full access and do not require a trial.');
+    }
+
+    if (user.activePackageId) {
+      throw new BadRequestException('Account already has an active subscription plan.');
+    }
+
+    // Do not restart trial by logging out, signing in again, or creating duplicate requests
+    if (user.trialStartedAt || user.trialUsed || user.isTrialActive || user.trialExpired) {
+      throw new BadRequestException(
+        'Free trial has already been initiated or used for this account. Free trial cannot be restarted.'
+      );
+    }
+
+    // Start the trial only when the account meets existing Super Admin approval / KYC requirements
+    const isApproved =
+      user.kycStatus === 'APPROVED' || norm.isVerifiedAgent === true;
+
+    if (!isApproved) {
+      throw new BadRequestException(
+        `KYC verification and Super Admin approval are required before starting the 3-day free trial. Current status: ${user.kycStatus || 'NOT_SUBMITTED'}.`
+      );
+    }
+
+    const now = new Date();
+    const expiresAt = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000); // 3 days (72 hours)
+
+    user.isTrialActive = true;
+    user.trialStartedAt = now;
+    user.trialExpiresAt = expiresAt;
+    user.trialUsed = true;
+    user.trialExpired = false;
+
+    if (typeof user.save === 'function') {
+      await user.save();
+    } else if (this.isDbConnected()) {
+      await this.userModel.updateOne(
+        { _id: user._id },
+        {
+          $set: {
+            isTrialActive: true,
+            trialStartedAt: now,
+            trialExpiresAt: expiresAt,
+            trialUsed: true,
+            trialExpired: false,
+          },
+        }
+      );
+    }
+
+    return {
+      success: true,
+      message: '3-Day Free Trial activated successfully!',
+      trial: {
+        isTrialActive: true,
+        trialStartedAt: now,
+        trialExpiresAt: expiresAt,
+        daysRemaining: 3,
+        remainingLabel: '3 Days Remaining',
+      },
+      user: this.sanitizeUser(user),
+    };
+  }
+
+  /**
    * Helper: Sanitizes user model removing internal attributes and guaranteeing authoritative structure
    */
   sanitizeUser(user: any): AuthenticatedUser {
@@ -1784,6 +1925,56 @@ export class AuthService implements OnModuleInit {
       user.permissions && user.permissions.length > 0
         ? user.permissions
         : this.getDefaultPermissions(norm.platformRole, norm.accountType);
+
+    const now = new Date();
+    const msRemaining = user.trialExpiresAt
+      ? new Date(user.trialExpiresAt).getTime() - now.getTime()
+      : 0;
+
+    let trialDaysRemaining = 0;
+    let trialRemainingLabel = '';
+    const isTrialActive = Boolean(
+      user.isTrialActive && user.trialExpiresAt && msRemaining > 0
+    );
+    const isTrialExpired = Boolean(
+      user.trialExpired || (user.trialExpiresAt && msRemaining <= 0)
+    );
+
+    if (isTrialActive) {
+      if (msRemaining > 2 * 24 * 60 * 60 * 1000) {
+        trialDaysRemaining = 3;
+        trialRemainingLabel = '3 Days Remaining';
+      } else if (msRemaining > 1 * 24 * 60 * 60 * 1000) {
+        trialDaysRemaining = 2;
+        trialRemainingLabel = '2 Days Remaining';
+      } else {
+        trialDaysRemaining = 1;
+        trialRemainingLabel = '1 Day Remaining';
+      }
+    }
+
+    const isConsumer =
+      norm.accountType === AccountType.BUYER ||
+      norm.accountType === AccountType.TENANT ||
+      norm.role === UserRole.BUYER ||
+      norm.role === UserRole.TENANT ||
+      norm.role === UserRole.PURCHASER;
+
+    const isPlatformAdmin =
+      norm.platformRole === PlatformRole.SUPER_ADMIN ||
+      norm.platformRole === PlatformRole.ADMIN ||
+      norm.platformRole === PlatformRole.MODERATOR;
+
+    const isKycApproved = user.kycStatus === 'APPROVED' || norm.isVerifiedAgent === true;
+
+    const isTrialEligible =
+      !isConsumer &&
+      !isPlatformAdmin &&
+      !user.activePackageId &&
+      !user.trialStartedAt &&
+      !user.trialUsed &&
+      !user.trialExpired &&
+      isKycApproved;
 
     return {
       id: user._id ? user._id.toString() : user.id,
@@ -1801,10 +1992,16 @@ export class AuthService implements OnModuleInit {
       hasPassword: !!user.passwordHash,
       agencyName: user.agencyName,
       avatar: user.avatar,
+      isTrialEligible,
       trialStartedAt: user.trialStartedAt || null,
       trialExpiresAt: user.trialExpiresAt || null,
       trialPackageId: user.trialPackageId || null,
-      isTrialActive: Boolean(user.trialExpiresAt && new Date() <= new Date(user.trialExpiresAt)),
+      isTrialActive: isConsumer ? false : isTrialActive,
+      isTrialExpired: isConsumer ? false : isTrialExpired,
+      trialDaysRemaining: isConsumer ? 0 : trialDaysRemaining,
+      trialRemainingLabel: isConsumer ? '' : trialRemainingLabel,
+      trialUsed: Boolean(user.trialUsed || user.trialStartedAt),
+      activePackageId: user.activePackageId || null,
       kycStatus: user.kycStatus || 'NOT_SUBMITTED',
       kycRejectionReason: user.kycRejectionReason || null,
       kycApprovedAt: user.kycApprovedAt || null,

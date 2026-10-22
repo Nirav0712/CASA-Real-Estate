@@ -43,6 +43,13 @@ export interface AuthenticatedUser {
   trialExpiresAt?: Date | string | null;
   trialPackageId?: string | null;
   isTrialActive?: boolean;
+  isTrialExpired?: boolean;
+  trialUsed?: boolean;
+  trialExpired?: boolean;
+  isTrialEligible?: boolean;
+  trialDaysRemaining?: number;
+  trialRemainingLabel?: string;
+  activePackageId?: string | null;
   kycStatus?: string;
   kycRejectionReason?: string | null;
   kycApprovedAt?: Date | string | null;

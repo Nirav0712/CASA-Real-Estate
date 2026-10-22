@@ -12,6 +12,7 @@ import { GlobalLocationSelector, SelectedLocationData } from '@/components/ui/gl
 import { useLanguage } from '@/contexts/language-context';
 import { useTheme } from '@/contexts/theme-context';
 import { useAuth } from '@/contexts/auth-context';
+import { useToast } from '@/contexts/toast-context';
 import { SUPPORTED_LOCALES, Locale } from '@/lib/translations';
 import { CASA_CATEGORIES, getCategoryLabel } from '@/lib/categories';
 import {
@@ -61,7 +62,10 @@ export function Header() {
     isTrialActive,
     isTrialExpired,
     trialDaysRemaining,
+    trialRemainingLabel,
+    startTrial,
   } = useAuth();
+  const toast = useToast();
   const [isLangModalOpen, setIsLangModalOpen] = React.useState(false);
   const [isLocationModalOpen, setIsLocationModalOpen] = React.useState(false);
   const [headerLocation, setHeaderLocation] = React.useState<SelectedLocationData>({
@@ -85,6 +89,61 @@ export function Header() {
         user.role === 'PURCHASER' ||
         (!isAdmin && !isDeveloper && !isBroker && !isAgent && !isSeller && !isTenant)),
   );
+
+  const isBuyerOrTenant = Boolean(
+    user &&
+      ['BUYER', 'TENANT', 'PURCHASER'].includes(
+        String(user.accountType || user.role).toUpperCase(),
+      ),
+  );
+
+  const canPostProperty =
+    !user ||
+    (!isBuyerOrTenant &&
+      [
+        'AGENT',
+        'BROKER',
+        'BROKER_AGENCY',
+        'BROKER_AGENT',
+        'DEVELOPER',
+        'PROPERTY_OWNER',
+        'SELLER',
+        'VERIFIED_AGENT',
+        'ADMIN',
+        'SUPER_ADMIN',
+      ].includes(String(user.accountType || user.role).toUpperCase()));
+
+  const isTrialEligible = Boolean(
+    user &&
+      user.isTrialEligible &&
+      !isBuyerOrTenant &&
+      !user.activePackageId &&
+      !user.trialStartedAt &&
+      !user.isTrialActive &&
+      (user.kycStatus === 'APPROVED' || user.isVerifiedAgent),
+  );
+
+  const [startingTrial, setStartingTrial] = React.useState(false);
+  const handleStartTrial = async () => {
+    setStartingTrial(true);
+    try {
+      await startTrial();
+    } catch (err: any) {
+      toast.error('Error', err?.message || 'Failed to start free trial');
+    } finally {
+      setStartingTrial(false);
+    }
+  };
+
+  const showTrialCountdown = Boolean(
+    user &&
+      !isBuyerOrTenant &&
+      !user.activePackageId &&
+      (isTrialActive || (user.isTrialActive && !user.trialExpired)) &&
+      (trialRemainingLabel || user.trialRemainingLabel),
+  );
+  const activeRemainingLabel =
+    trialRemainingLabel || user?.trialRemainingLabel || `${trialDaysRemaining} Days Remaining`;
 
   const toggleTheme = () => {
     if (theme === 'light') setTheme('dark');
@@ -569,14 +628,36 @@ export function Header() {
                 </Button>
               )}
 
-              {/* Post Free Property CTA */}
-              <Link href="/dashboard/properties/new">
-                <Button variant="primary" size="sm" className="shadow-sm">
-                  <PlusCircle className="w-4 h-4" />
-                  <span className="hidden sm:inline">{t('postAd')}</span>
-                  <span className="sm:hidden">{t('postAd')}</span>
+              {/* 3-Day Free Trial Start CTA */}
+              {isTrialEligible && (
+                <Button
+                  size="sm"
+                  onClick={handleStartTrial}
+                  loading={startingTrial}
+                  className="bg-amber-500 hover:bg-amber-600 text-white font-semibold shadow-sm text-xs px-3 py-1.5 rounded-full"
+                >
+                  Start 3-Day Free Trial
                 </Button>
-              </Link>
+              )}
+
+              {/* Active Trial Countdown Header Badge */}
+              {showTrialCountdown && (
+                <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 shadow-sm animate-pulse">
+                  <Clock className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                  <span>{activeRemainingLabel}</span>
+                </div>
+              )}
+
+              {/* Post Free Property CTA (Role-based: hidden for Buyer & Tenant) */}
+              {canPostProperty && (
+                <Link href="/dashboard/properties/new">
+                  <Button variant="primary" size="sm" className="shadow-sm">
+                    <PlusCircle className="w-4 h-4" />
+                    <span className="hidden sm:inline">{t('postAd')}</span>
+                    <span className="sm:hidden">{t('postAd')}</span>
+                  </Button>
+                </Link>
+              )}
 
               {/* Mobile Hamburger Button */}
               <button
@@ -1044,12 +1125,14 @@ export function Header() {
               <span>{SUPPORTED_LOCALES[locale].nativeName} ({locale.toUpperCase()})</span>
             </Button>
 
-            <Link href="/dashboard/properties/new" onClick={() => setIsMobileMenuOpen(false)}>
-              <Button variant="primary" size="md" fullWidth>
-                <PlusCircle className="w-4 h-4" />
-                <span>{t('postAd')}</span>
-              </Button>
-            </Link>
+            {canPostProperty && (
+              <Link href="/dashboard/properties/new" onClick={() => setIsMobileMenuOpen(false)}>
+                <Button variant="primary" size="md" fullWidth>
+                  <PlusCircle className="w-4 h-4" />
+                  <span>{t('postAd')}</span>
+                </Button>
+              </Link>
+            )}
           </div>
         </div>
       </Drawer>
