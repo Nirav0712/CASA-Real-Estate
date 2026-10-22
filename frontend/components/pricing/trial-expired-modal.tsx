@@ -61,7 +61,16 @@ export function TrialExpiredModal() {
     };
   }, [isTrialExpiredModalOpen]);
 
-  if (!isTrialExpiredModalOpen) return null;
+  const role = String(user?.role || '').toUpperCase();
+  const accountType = String(user?.accountType || '').toUpperCase();
+  const platformRole = String(user?.platformRole || '').toUpperCase();
+  const isExempt =
+    ['BUYER', 'TENANT', 'PURCHASER'].includes(role) ||
+    ['BUYER', 'TENANT'].includes(accountType) ||
+    ['SUPER_ADMIN', 'ADMIN'].includes(platformRole) ||
+    ['SUPER_ADMIN', 'ADMIN'].includes(role);
+
+  if (!isTrialExpiredModalOpen || isExempt) return null;
 
   const salesPhone = settings.companySalesNumber || '+91 98765 43210';
   const servicePhone = settings.companyServiceNumber || '+91 98765 43211';

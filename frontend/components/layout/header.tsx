@@ -117,6 +117,7 @@ export function Header() {
     user &&
       user.isTrialEligible &&
       !isBuyerOrTenant &&
+      !isAdmin &&
       !user.activePackageId &&
       !user.trialStartedAt &&
       !user.isTrialActive &&
@@ -138,6 +139,7 @@ export function Header() {
   const showTrialCountdown = Boolean(
     user &&
       !isBuyerOrTenant &&
+      !isAdmin &&
       !user.activePackageId &&
       (isTrialActive || (user.isTrialActive && !user.trialExpired)) &&
       (trialRemainingLabel || user.trialRemainingLabel),
@@ -589,20 +591,24 @@ export function Header() {
                           <Video className="w-3.5 h-3.5 text-red-500" />
                           <span>My 9:16 Video Reels</span>
                         </Link>
-                        <Link
-                          href="/dashboard/billing"
-                          className="flex items-center gap-2 px-3.5 py-1.5 text-xs text-casa-text-secondary hover:text-casa-text-primary hover:bg-casa-subtle transition-colors"
-                        >
-                          <CreditCard className="w-3.5 h-3.5 text-casa-brand" />
-                          <span>Billing & Plans</span>
-                        </Link>
-                        <Link
-                          href="/dashboard/payments"
-                          className="flex items-center gap-2 px-3.5 py-1.5 text-xs text-casa-text-secondary hover:text-casa-text-primary hover:bg-casa-subtle transition-colors"
-                        >
-                          <Receipt className="w-3.5 h-3.5 text-casa-text-muted" />
-                          <span>Payment Invoices</span>
-                        </Link>
+                        {!isBuyerOrTenant && !isAdmin && (
+                          <>
+                            <Link
+                              href="/dashboard/billing"
+                              className="flex items-center gap-2 px-3.5 py-1.5 text-xs text-casa-text-secondary hover:text-casa-text-primary hover:bg-casa-subtle transition-colors"
+                            >
+                              <CreditCard className="w-3.5 h-3.5 text-casa-brand" />
+                              <span>Billing & Plans</span>
+                            </Link>
+                            <Link
+                              href="/dashboard/payments"
+                              className="flex items-center gap-2 px-3.5 py-1.5 text-xs text-casa-text-secondary hover:text-casa-text-primary hover:bg-casa-subtle transition-colors"
+                            >
+                              <Receipt className="w-3.5 h-3.5 text-casa-text-muted" />
+                              <span>Payment Invoices</span>
+                            </Link>
+                          </>
+                        )}
                       </div>
 
                       <div className="pt-1">

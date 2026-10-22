@@ -905,25 +905,115 @@ export class EntitlementsService implements OnModuleInit {
       };
     }
 
-    // 1. Super Admin is always unrestricted
-    if (user.platformRole === PlatformRole.SUPER_ADMIN || user.role === UserRole.SUPER_ADMIN) {
+    // 1. Super Admin is always unrestricted and free from billing, subscription plans, and trials
+    const userRole = String(user.role || '').toUpperCase();
+    const userPlatformRole = String(user.platformRole || '').toUpperCase();
+    const userAccountType = String(user.accountType || '').toUpperCase();
+
+    if (
+      userPlatformRole === PlatformRole.SUPER_ADMIN ||
+      userRole === UserRole.SUPER_ADMIN ||
+      userPlatformRole === PlatformRole.ADMIN ||
+      userRole === UserRole.ADMIN
+    ) {
       return {
-        platformRole: PlatformRole.SUPER_ADMIN,
+        platformRole: user.platformRole || PlatformRole.SUPER_ADMIN,
         accountType: null,
         dataScope: DataScope.ALL,
         permissions: ['*'],
-        limits: { propertyViews: -1, propertyListings: -1, savedProperties: -1, savedSearches: -1, monthlyLeads: -1, enquiries: -1, chats: -1, teamMembers: -1 },
+        limits: {
+          propertyViews: -1,
+          propertyListings: -1,
+          savedProperties: -1,
+          savedSearches: -1,
+          monthlyLeads: -1,
+          enquiries: -1,
+          chats: -1,
+          teamMembers: -1,
+        },
         usage: { propertyViews: 0, propertyListings: 0, monthlyLeads: 0, enquiries: 0, chats: 0 },
         dashboardConfig: {
-          overview: true, properties: true, leads: true, enquiries: true, chat: true,
-          crm: true, siteVisits: true, analytics: true, reviews: true, promotions: true, profile: true,
+          overview: true,
+          properties: true,
+          leads: true,
+          enquiries: true,
+          chat: true,
+          crm: true,
+          siteVisits: true,
+          analytics: true,
+          reviews: true,
+          promotions: true,
+          profile: true,
         },
-        package: { name: 'Super Admin Privileges', slug: 'super-admin' },
-        subscription: { status: 'ACTIVE' },
+        package: null,
+        subscription: null,
+        trial: {
+          isTrialActive: false,
+          isTrialExpired: false,
+          trialExpiresAt: null,
+          daysRemaining: 0,
+          trialPackageId: null,
+        },
       };
     }
 
-    // 2. Resolve Role (Custom Role or Default System Role)
+    // 2. Property Buyers and Rental Tenants access the marketplace directly without trial, subscription, or billing restrictions
+    const isConsumer =
+      ['BUYER', 'TENANT', 'PURCHASER'].includes(userRole) ||
+      ['BUYER', 'TENANT'].includes(userAccountType);
+
+    if (isConsumer) {
+      return {
+        platformRole: user.platformRole || PlatformRole.USER,
+        accountType: user.accountType || (userRole === 'TENANT' ? AccountType.TENANT : AccountType.BUYER),
+        role: { id: 'consumer-role', name: 'Marketplace Consumer', slug: userRole.toLowerCase() },
+        dataScope: DataScope.OWN,
+        permissions: [
+          Permission.PROPERTY_VIEW,
+          Permission.PROPERTY_CONTACT_VIEW,
+          Permission.ENQUIRY_CREATE,
+          Permission.ENQUIRY_VIEW,
+          Permission.CHAT_START,
+          Permission.CHAT_REPLY,
+          Permission.CHAT_VIEW,
+        ],
+        limits: {
+          propertyViews: -1,
+          propertyListings: 0,
+          savedProperties: -1,
+          savedSearches: -1,
+          monthlyLeads: 0,
+          enquiries: -1,
+          chats: -1,
+          teamMembers: 1,
+        },
+        usage: { propertyViews: 0, propertyListings: 0, monthlyLeads: 0, enquiries: 0, chats: 0 },
+        dashboardConfig: {
+          overview: true,
+          properties: false,
+          leads: false,
+          enquiries: true,
+          chat: true,
+          crm: false,
+          siteVisits: true,
+          analytics: false,
+          reviews: false,
+          promotions: false,
+          profile: true,
+        },
+        package: null,
+        subscription: null,
+        trial: {
+          isTrialActive: false,
+          isTrialExpired: false,
+          trialExpiresAt: null,
+          daysRemaining: 0,
+          trialPackageId: null,
+        },
+      };
+    }
+
+    // 3. Resolve Role (Custom Role or Default System Role)
     let roleDoc: any = null;
     let customRoleId = user.customRoleId;
     const userId = user._id ? user._id.toString() : user.id;
@@ -1086,8 +1176,20 @@ export class EntitlementsService implements OnModuleInit {
       return { allowed: true, contactVisible: false, remainingViews: 0, totalViewsUsed: 0, limit: 0 };
     }
 
-    // Super Admin / Platform Admin has infinite access
-    if (user.platformRole === PlatformRole.SUPER_ADMIN || user.platformRole === PlatformRole.ADMIN) {
+    const userRole = String(user.role || '').toUpperCase();
+    const userPlatformRole = String(user.platformRole || '').toUpperCase();
+    const userAccountType = String(user.accountType || '').toUpperCase();
+
+    // Super Admin / Platform Admin and Property Buyers / Rental Tenants have direct infinite marketplace access without view limits
+    const isExempt =
+      userPlatformRole === PlatformRole.SUPER_ADMIN ||
+      userPlatformRole === PlatformRole.ADMIN ||
+      userRole === UserRole.SUPER_ADMIN ||
+      userRole === UserRole.ADMIN ||
+      ['BUYER', 'TENANT', 'PURCHASER'].includes(userRole) ||
+      ['BUYER', 'TENANT'].includes(userAccountType);
+
+    if (isExempt) {
       return { allowed: true, contactVisible: true, remainingViews: 999999, totalViewsUsed: 0, limit: -1 };
     }
 
@@ -1436,6 +1538,24 @@ export class EntitlementsService implements OnModuleInit {
   async startTrial(userId: string, packageId: string) {
     const user = await this.userModel.findById(userId);
     if (!user) throw new NotFoundException('User not found.');
+
+    const userRole = String(user.role || '').toUpperCase();
+    const userPlatformRole = String(user.platformRole || '').toUpperCase();
+    const userAccountType = String(user.accountType || '').toUpperCase();
+
+    const isExempt =
+      userPlatformRole === PlatformRole.SUPER_ADMIN ||
+      userPlatformRole === PlatformRole.ADMIN ||
+      userRole === UserRole.SUPER_ADMIN ||
+      userRole === UserRole.ADMIN ||
+      ['BUYER', 'TENANT', 'PURCHASER'].includes(userRole) ||
+      ['BUYER', 'TENANT'].includes(userAccountType);
+
+    if (isExempt) {
+      throw new BadRequestException(
+        'Billing, subscription plans, and free trial options are not applicable to your account. You have direct unrestricted marketplace access.',
+      );
+    }
 
     const pkg = await this.packageModel.findById(packageId);
     if (!pkg) throw new NotFoundException('Selected pricing plan was not found.');

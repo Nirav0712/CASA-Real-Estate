@@ -16,6 +16,20 @@ export interface LocationSearchParams {
   limit?: number;
 }
 
+function extractArray<T>(data: any): T[] {
+  if (!data) return [];
+  if (Array.isArray(data)) return data;
+  if (Array.isArray(data.data)) return data.data;
+  if (Array.isArray(data.items)) return data.items;
+  return [];
+}
+
+function extractItem<T>(data: any): T | null {
+  if (!data) return null;
+  if (data.data !== undefined && data.data !== null) return data.data;
+  return data;
+}
+
 export async function fetchLocations(params?: LocationSearchParams): Promise<LocationItem[]> {
   const searchParams = new URLSearchParams();
   if (params?.q) searchParams.set('q', params.q);
@@ -25,22 +39,22 @@ export async function fetchLocations(params?: LocationSearchParams): Promise<Loc
   if (params?.stateCode) searchParams.set('stateCode', params.stateCode);
   if (params?.isFeatured !== undefined) searchParams.set('isFeatured', String(params.isFeatured));
   if (params?.page) searchParams.set('page', String(params.page));
-  if (params?.limit) searchParams.set('limit', String(params.limit));
+  searchParams.set('limit', String(params?.limit || 200));
 
   const queryStr = searchParams.toString() ? `?${searchParams.toString()}` : '';
   const res = await fetchApi<any>(`/locations${queryStr}`);
   if (res.error || !res.data) {
     return [];
   }
-  return Array.isArray(res.data) ? res.data : res.data.items || [];
+  return extractArray<LocationItem>(res.data);
 }
 
 export async function fetchLocationTree(): Promise<LocationItem[]> {
-  const res = await fetchApi<LocationItem[]>('/locations/tree');
+  const res = await fetchApi<any>('/locations/tree');
   if (res.error || !res.data) {
     return [];
   }
-  return res.data;
+  return extractArray<LocationItem>(res.data);
 }
 
 export async function fetchLocationAutocomplete(
@@ -57,38 +71,38 @@ export async function fetchLocationAutocomplete(
   if (parentId) searchParams.set('parentId', parentId);
   searchParams.set('limit', String(limit));
 
-  const res = await fetchApi<LocationAutocompleteItem[]>(
+  const res = await fetchApi<any>(
     `/locations/autocomplete?${searchParams.toString()}`,
   );
   if (res.error || !res.data) {
     return [];
   }
-  return res.data;
+  return extractArray<LocationAutocompleteItem>(res.data);
 }
 
 export async function fetchLocationChildren(parentId?: string): Promise<LocationItem[]> {
   const endpoint = parentId ? `/locations/${parentId}/children` : '/locations';
-  const res = await fetchApi<LocationItem[]>(endpoint);
+  const res = await fetchApi<any>(endpoint);
   if (res.error || !res.data) {
     return [];
   }
-  return Array.isArray(res.data) ? res.data : (res.data as any).items || [];
+  return extractArray<LocationItem>(res.data);
 }
 
 export async function fetchLocationById(id: string): Promise<LocationItem | null> {
-  const res = await fetchApi<LocationItem>(`/locations/${id}`);
+  const res = await fetchApi<any>(`/locations/${id}`);
   if (res.error || !res.data) {
     return null;
   }
-  return res.data;
+  return extractItem<LocationItem>(res.data);
 }
 
 export async function fetchLocationBySlug(slug: string): Promise<LocationItem | null> {
-  const res = await fetchApi<LocationItem>(`/locations/slug/${slug}`);
+  const res = await fetchApi<any>(`/locations/slug/${slug}`);
   if (res.error || !res.data) {
     return null;
   }
-  return res.data;
+  return extractItem<LocationItem>(res.data);
 }
 
 export async function addCustomLocation(payload: {
@@ -98,13 +112,13 @@ export async function addCustomLocation(payload: {
   cityName?: string;
   stateName?: string;
 }): Promise<LocationItem | null> {
-  const res = await fetchApi<LocationItem>('/locations/add-custom', {
+  const res = await fetchApi<any>('/locations/add-custom', {
     method: 'POST',
     body: JSON.stringify(payload),
   });
   if (res.error || !res.data) {
     return null;
   }
-  return res.data;
+  return extractItem<LocationItem>(res.data);
 }
 

@@ -118,8 +118,16 @@ export default function BillingDashboardPage() {
   } = useAuth();
   const toast = useToast();
   const router = useRouter();
-
   const isExempt = isKycExempt(user);
+  const role = String(user?.role || '').toUpperCase();
+  const accountType = String(user?.accountType || '').toUpperCase();
+  const platformRole = String(user?.platformRole || '').toUpperCase();
+  const isBillingExempt =
+    isExempt ||
+    ['BUYER', 'TENANT', 'PURCHASER'].includes(role) ||
+    ['BUYER', 'TENANT'].includes(accountType) ||
+    ['SUPER_ADMIN', 'ADMIN'].includes(platformRole) ||
+    ['SUPER_ADMIN', 'ADMIN'].includes(role);
 
   const [recentPayments, setRecentPayments] = React.useState<PaymentItem[]>([]);
   const [companySettings, setCompanySettings] = React.useState<CompanySettings>({
@@ -134,8 +142,18 @@ export default function BillingDashboardPage() {
   const [loading, setLoading] = React.useState(true);
   const [processingPlanId, setProcessingPlanId] = React.useState<string | null>(null);
 
+  React.useEffect(() => {
+    if (isAuthenticated && !isAuthLoading && isBillingExempt) {
+      toast.info(
+        'Billing & Subscriptions Not Required',
+        'Your account has direct unrestricted access without subscription or billing restrictions.',
+      );
+      router.replace('/dashboard');
+    }
+  }, [isAuthenticated, isAuthLoading, isBillingExempt, router, toast]);
+
   const loadBillingData = React.useCallback(async () => {
-    if (!isAuthenticated) return;
+    if (!isAuthenticated || isBillingExempt) return;
     setLoading(true);
     try {
       const [paymentsRes, settingsRes] = await Promise.allSettled([
@@ -154,15 +172,45 @@ export default function BillingDashboardPage() {
     } finally {
       setLoading(false);
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated, isBillingExempt]);
 
   React.useEffect(() => {
-    if (isAuthenticated) {
+    if (isAuthenticated && !isBillingExempt) {
       loadBillingData();
     } else if (!isAuthLoading) {
       setLoading(false);
     }
-  }, [isAuthenticated, isAuthLoading, loadBillingData]);
+  }, [isAuthenticated, isAuthLoading, isBillingExempt, loadBillingData]);
+
+  if (isBillingExempt) {
+    return (
+      <div className="max-w-2xl mx-auto py-20 px-4 text-center space-y-5">
+        <div className="w-16 h-16 rounded-3xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center mx-auto shadow-sm">
+          <CheckCircle2 className="w-8 h-8" />
+        </div>
+        <div className="space-y-2">
+          <h1 className="text-2xl font-bold text-casa-text-primary">
+            Direct Marketplace Access
+          </h1>
+          <p className="text-sm text-casa-text-secondary max-w-md mx-auto">
+            Billing, pricing plans, subscriptions, and free trials are not required for your account. You have full access to explore properties and contact advertisers.
+          </p>
+        </div>
+        <div className="pt-2 flex justify-center gap-3">
+          <Link href="/properties">
+            <button className="px-5 py-2.5 rounded-xl bg-casa-brand hover:bg-casa-brand-hover text-white text-xs font-bold transition-colors">
+              Browse Marketplace
+            </button>
+          </Link>
+          <Link href="/dashboard">
+            <button className="px-5 py-2.5 rounded-xl border border-casa-border-light hover:bg-casa-subtle text-casa-text-primary text-xs font-semibold transition-colors">
+              Go to Dashboard
+            </button>
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   const handleSubscribe = async (plan: PlanCard) => {
     if (!isAuthenticated) {

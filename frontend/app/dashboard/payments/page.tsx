@@ -32,8 +32,17 @@ const STATUS_FILTERS: { label: string; value?: PaymentStatus }[] = [
 ];
 
 export default function UserPaymentsPage() {
-  const { isAuthenticated, isLoading: isAuthLoading, openAuthModal } = useAuth();
+  const { user, isAuthenticated, isLoading: isAuthLoading, openAuthModal } = useAuth();
   const toast = useToast();
+
+  const role = String(user?.role || '').toUpperCase();
+  const accountType = String(user?.accountType || '').toUpperCase();
+  const platformRole = String(user?.platformRole || '').toUpperCase();
+  const isPaymentExempt =
+    ['BUYER', 'TENANT', 'PURCHASER'].includes(role) ||
+    ['BUYER', 'TENANT'].includes(accountType) ||
+    ['SUPER_ADMIN', 'ADMIN'].includes(platformRole) ||
+    ['SUPER_ADMIN', 'ADMIN'].includes(role);
 
   const [paymentsData, setPaymentsData] = React.useState<PaginatedResponse<PaymentItem>>({
     data: [],
@@ -46,7 +55,7 @@ export default function UserPaymentsPage() {
   const [selectedPayment, setSelectedPayment] = React.useState<PaymentItem | null>(null);
 
   const loadPayments = React.useCallback(async () => {
-    if (!isAuthenticated) return;
+    if (!isAuthenticated || isPaymentExempt) return;
     setIsLoading(true);
     try {
       const res = await getMyPayments({
@@ -61,21 +70,49 @@ export default function UserPaymentsPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [isAuthenticated, page, selectedStatus, toast]);
+  }, [isAuthenticated, isPaymentExempt, page, selectedStatus, toast]);
 
   React.useEffect(() => {
-    if (isAuthenticated) {
+    if (isAuthenticated && !isPaymentExempt) {
       loadPayments();
     } else if (!isAuthLoading) {
       setIsLoading(false);
     }
-  }, [isAuthenticated, isAuthLoading, loadPayments]);
+  }, [isAuthenticated, isAuthLoading, isPaymentExempt, loadPayments]);
 
-  if (isAuthLoading || isLoading) {
+  if (isAuthLoading || (isLoading && !isPaymentExempt)) {
     return (
       <div className="min-h-[70vh] flex flex-col items-center justify-center space-y-4">
         <div className="w-12 h-12 border-4 border-casa-600 border-t-transparent rounded-full animate-spin"></div>
         <p className="text-slate-500 font-medium">Loading Billing History...</p>
+      </div>
+    );
+  }
+
+  if (isPaymentExempt) {
+    return (
+      <div className="min-h-[60vh] flex flex-col items-center justify-center p-6 text-center space-y-4">
+        <div className="w-16 h-16 rounded-3xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center mx-auto shadow-sm">
+          <CheckCircle2 className="w-8 h-8" />
+        </div>
+        <h2 className="text-2xl font-bold text-casa-text-primary">
+          Payment Invoices Not Applicable
+        </h2>
+        <p className="text-sm text-casa-text-secondary max-w-md mx-auto">
+          Your account has direct unrestricted access without payment, fee, or subscription requirements.
+        </p>
+        <div className="pt-2 flex justify-center gap-3">
+          <Link href="/properties">
+            <button className="px-5 py-2.5 rounded-xl bg-casa-brand hover:bg-casa-brand-hover text-white text-xs font-bold transition-colors">
+              Browse Properties
+            </button>
+          </Link>
+          <Link href="/dashboard">
+            <button className="px-5 py-2.5 rounded-xl border border-casa-border-light hover:bg-casa-subtle text-casa-text-primary text-xs font-semibold transition-colors">
+              Go to Dashboard
+            </button>
+          </Link>
+        </div>
       </div>
     );
   }

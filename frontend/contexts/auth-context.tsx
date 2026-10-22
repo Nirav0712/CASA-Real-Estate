@@ -128,17 +128,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
+  const isUserExempt = React.useMemo(() => {
+    if (!user) return false;
+    const role = String(user.role || '').toUpperCase();
+    const accountType = String(user.accountType || '').toUpperCase();
+    const platformRole = String(user.platformRole || '').toUpperCase();
+    return (
+      ['BUYER', 'TENANT', 'PURCHASER'].includes(role) ||
+      ['BUYER', 'TENANT'].includes(accountType) ||
+      ['SUPER_ADMIN', 'ADMIN'].includes(platformRole) ||
+      ['SUPER_ADMIN', 'ADMIN'].includes(role)
+    );
+  }, [user]);
+
   const openPlanSelectionModal = React.useCallback(() => {
+    if (isUserExempt) return;
     setIsPlanSelectionModalOpen(true);
-  }, []);
+  }, [isUserExempt]);
 
   const closePlanSelectionModal = React.useCallback(() => {
     setIsPlanSelectionModalOpen(false);
   }, []);
 
   const openTrialExpiredModal = React.useCallback(() => {
+    if (isUserExempt) return;
     setIsTrialExpiredModalOpen(true);
-  }, []);
+  }, [isUserExempt]);
 
   const closeTrialExpiredModal = React.useCallback(() => {
     setIsTrialExpiredModalOpen(false);
@@ -345,16 +360,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Compute trial status dynamically
   const trialStatus = React.useMemo(() => {
-    if (!user) {
-      return { isTrialActive: false, isTrialExpired: false, daysRemaining: 0, remainingLabel: '' };
-    }
-    const isConsumer =
-      user.role === 'BUYER' ||
-      user.role === 'TENANT' ||
-      user.role === 'PURCHASER' ||
-      user.accountType === 'BUYER' ||
-      user.accountType === 'TENANT';
-    if (isConsumer) {
+    if (!user || isUserExempt) {
       return { isTrialActive: false, isTrialExpired: false, daysRemaining: 0, remainingLabel: '' };
     }
 
@@ -387,9 +393,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       daysRemaining,
       remainingLabel,
     };
-  }, [user]);
+  }, [user, isUserExempt]);
 
   const startTrial = React.useCallback(async () => {
+    if (isUserExempt) {
+      toast.info('Trial Not Required', 'Your account has full marketplace access without subscription restrictions.');
+      return;
+    }
     const currentToken =
       token || (typeof window !== 'undefined' ? localStorage.getItem('casa_access_token') : null);
     if (!currentToken) {
@@ -404,16 +414,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
     toast.success('3-Day Free Trial Started', 'Your 3-day free trial is now active!');
     return res;
-  }, [token, toast]);
+  }, [token, toast, isUserExempt]);
 
   // Auto-prompt trial expired modal once per session if trial has passed
   const hasPromptedExpiryRef = React.useRef(false);
   React.useEffect(() => {
-    if (user && trialStatus.isTrialExpired && !hasPromptedExpiryRef.current) {
+    if (user && !isUserExempt && trialStatus.isTrialExpired && !hasPromptedExpiryRef.current) {
       hasPromptedExpiryRef.current = true;
       setIsTrialExpiredModalOpen(true);
     }
-  }, [user, trialStatus.isTrialExpired]);
+  }, [user, isUserExempt, trialStatus.isTrialExpired]);
 
   const openAuthModal = React.useCallback((initialMode?: any) => {
     if (initialMode && typeof initialMode === 'string') {
@@ -481,8 +491,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setIsAuthModalOpen(false);
         }
 
-        // Open pricing plan selection popup for 3-day trial activation immediately after signup
-        setIsPlanSelectionModalOpen(true);
+        // Open pricing plan selection popup for 3-day trial activation immediately after signup only for supply-side roles
+        const regRole = String(data.role || (res as any)?.user?.role || '').toUpperCase();
+        const isRegExempt = ['BUYER', 'TENANT', 'PURCHASER', 'SUPER_ADMIN', 'ADMIN'].includes(regRole);
+        if (!isRegExempt) {
+          setIsPlanSelectionModalOpen(true);
+        }
 
         return res;
       } catch (err: unknown) {
@@ -540,8 +554,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           `Signed in as ${res.user.name || res.user.normalizedMobile}${roleLabel}`,
         );
 
-        // If user has not started their 3-day trial yet, present plan selection popup
-        if (!res.user.trialStartedAt && !res.user.trialPackageId) {
+        // If supply-side user has not started their 3-day trial yet, present plan selection popup
+        const otpRole = String(res.user?.role || role || '').toUpperCase();
+        const otpAccountType = String(res.user?.accountType || '').toUpperCase();
+        const otpPlatformRole = String(res.user?.platformRole || '').toUpperCase();
+        const isOtpExempt =
+          ['BUYER', 'TENANT', 'PURCHASER'].includes(otpRole) ||
+          ['BUYER', 'TENANT'].includes(otpAccountType) ||
+          ['SUPER_ADMIN', 'ADMIN'].includes(otpPlatformRole) ||
+          ['SUPER_ADMIN', 'ADMIN'].includes(otpRole);
+
+        if (!isOtpExempt && !res.user?.trialStartedAt && !res.user?.trialPackageId) {
           setIsPlanSelectionModalOpen(true);
         }
       } catch (err: unknown) {

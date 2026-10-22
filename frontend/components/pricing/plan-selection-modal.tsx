@@ -59,7 +59,16 @@ export function PlanSelectionModal() {
     };
   }, [isPlanSelectionModalOpen, toast]);
 
-  if (!isPlanSelectionModalOpen) return null;
+  const role = String(user?.role || '').toUpperCase();
+  const accountType = String(user?.accountType || '').toUpperCase();
+  const platformRole = String(user?.platformRole || '').toUpperCase();
+  const isExempt =
+    ['BUYER', 'TENANT', 'PURCHASER'].includes(role) ||
+    ['BUYER', 'TENANT'].includes(accountType) ||
+    ['SUPER_ADMIN', 'ADMIN'].includes(platformRole) ||
+    ['SUPER_ADMIN', 'ADMIN'].includes(role);
+
+  if (!isPlanSelectionModalOpen || isExempt) return null;
 
   // Calculate remaining trial days
   const isTrialActive = Boolean(user?.isTrialActive);

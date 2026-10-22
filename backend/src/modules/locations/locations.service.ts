@@ -1945,6 +1945,366 @@ export class LocationsService implements OnModuleInit {
       });
     }
 
+    // 1.6 Additional Indian States & Union Territories (Complete 28 States & 8 UTs)
+    const otherIndianStates: Array<{
+      name: string;
+      slug: string;
+      code: string;
+      cities: Array<{ name: string; slug: string; cityCode?: string }>;
+    }> = [
+      {
+        name: 'Andhra Pradesh',
+        slug: 'andhra-pradesh',
+        code: 'AP',
+        cities: [
+          { name: 'Visakhapatnam', slug: 'visakhapatnam', cityCode: 'VTZ' },
+          { name: 'Vijayawada', slug: 'vijayawada', cityCode: 'VGA' },
+          { name: 'Guntur', slug: 'guntur', cityCode: 'GNT' },
+          { name: 'Nellore', slug: 'nellore', cityCode: 'NLR' },
+          { name: 'Tirupati', slug: 'tirupati', cityCode: 'TPTY' },
+          { name: 'Amaravati', slug: 'amaravati', cityCode: 'AMR' },
+        ],
+      },
+      {
+        name: 'Arunachal Pradesh',
+        slug: 'arunachal-pradesh',
+        code: 'AR',
+        cities: [
+          { name: 'Itanagar', slug: 'itanagar', cityCode: 'ITA' },
+          { name: 'Naharlagun', slug: 'naharlagun', cityCode: 'NHL' },
+          { name: 'Pasighat', slug: 'pasighat', cityCode: 'PSG' },
+        ],
+      },
+      {
+        name: 'Assam',
+        slug: 'assam',
+        code: 'AS',
+        cities: [
+          { name: 'Guwahati', slug: 'guwahati', cityCode: 'GAU' },
+          { name: 'Silchar', slug: 'silchar', cityCode: 'IXS' },
+          { name: 'Dibrugarh', slug: 'dibrugarh', cityCode: 'DIB' },
+          { name: 'Jorhat', slug: 'jorhat', cityCode: 'JRH' },
+        ],
+      },
+      {
+        name: 'Bihar',
+        slug: 'bihar',
+        code: 'BR',
+        cities: [
+          { name: 'Patna', slug: 'patna', cityCode: 'PAT' },
+          { name: 'Gaya', slug: 'gaya', cityCode: 'GAY' },
+          { name: 'Bhagalpur', slug: 'bhagalpur', cityCode: 'BGP' },
+          { name: 'Muzaffarpur', slug: 'muzaffarpur', cityCode: 'MZU' },
+        ],
+      },
+      {
+        name: 'Chhattisgarh',
+        slug: 'chhattisgarh',
+        code: 'CG',
+        cities: [
+          { name: 'Raipur', slug: 'raipur', cityCode: 'RPR' },
+          { name: 'Bhilai', slug: 'bhilai', cityCode: 'BHI' },
+          { name: 'Bilaspur', slug: 'bilaspur', cityCode: 'BSP' },
+        ],
+      },
+      {
+        name: 'Goa',
+        slug: 'goa',
+        code: 'GA',
+        cities: [
+          { name: 'Panaji', slug: 'panaji', cityCode: 'GOI' },
+          { name: 'Margao', slug: 'margao', cityCode: 'MAO' },
+          { name: 'Vasco da Gama', slug: 'vasco-da-gama', cityCode: 'VAS' },
+          { name: 'Mapusa', slug: 'mapusa', cityCode: 'MAP' },
+        ],
+      },
+      {
+        name: 'Haryana',
+        slug: 'haryana',
+        code: 'HR',
+        cities: [
+          { name: 'Faridabad', slug: 'faridabad', cityCode: 'FBD' },
+          { name: 'Panipat', slug: 'panipat', cityCode: 'PNP' },
+          { name: 'Ambala', slug: 'ambala', cityCode: 'AMB' },
+          { name: 'Karnal', slug: 'karnal', cityCode: 'KNL' },
+          { name: 'Panchkula', slug: 'panchkula', cityCode: 'PCK' },
+        ],
+      },
+      {
+        name: 'Himachal Pradesh',
+        slug: 'himachal-pradesh',
+        code: 'HP',
+        cities: [
+          { name: 'Shimla', slug: 'shimla', cityCode: 'SLV' },
+          { name: 'Dharamshala', slug: 'dharamshala', cityCode: 'DHM' },
+          { name: 'Solan', slug: 'solan', cityCode: 'SOL' },
+          { name: 'Manali', slug: 'manali', cityCode: 'MNL' },
+        ],
+      },
+      {
+        name: 'Jharkhand',
+        slug: 'jharkhand',
+        code: 'JH',
+        cities: [
+          { name: 'Ranchi', slug: 'ranchi', cityCode: 'IXR' },
+          { name: 'Jamshedpur', slug: 'jamshedpur', cityCode: 'IXW' },
+          { name: 'Dhanbad', slug: 'dhanbad', cityCode: 'DHN' },
+          { name: 'Bokaro Steel City', slug: 'bokaro-steel-city', cityCode: 'BOK' },
+        ],
+      },
+      {
+        name: 'Kerala',
+        slug: 'kerala',
+        code: 'KL',
+        cities: [
+          { name: 'Kochi', slug: 'kochi', cityCode: 'COK' },
+          { name: 'Thiruvananthapuram', slug: 'thiruvananthapuram', cityCode: 'TRV' },
+          { name: 'Kozhikode', slug: 'kozhikode', cityCode: 'CCJ' },
+          { name: 'Thrissur', slug: 'thrissur', cityCode: 'TCR' },
+        ],
+      },
+      {
+        name: 'Madhya Pradesh',
+        slug: 'madhya-pradesh',
+        code: 'MP',
+        cities: [
+          { name: 'Indore', slug: 'indore', cityCode: 'IDR' },
+          { name: 'Bhopal', slug: 'bhopal', cityCode: 'BHO' },
+          { name: 'Jabalpur', slug: 'jabalpur', cityCode: 'JLR' },
+          { name: 'Gwalior', slug: 'gwalior', cityCode: 'GWL' },
+          { name: 'Ujjain', slug: 'ujjain', cityCode: 'UJN' },
+        ],
+      },
+      {
+        name: 'Manipur',
+        slug: 'manipur',
+        code: 'MN',
+        cities: [
+          { name: 'Imphal', slug: 'imphal', cityCode: 'IMF' },
+          { name: 'Thoubal', slug: 'thoubal', cityCode: 'THB' },
+        ],
+      },
+      {
+        name: 'Meghalaya',
+        slug: 'meghalaya',
+        code: 'ML',
+        cities: [
+          { name: 'Shillong', slug: 'shillong', cityCode: 'SHL' },
+          { name: 'Tura', slug: 'tura', cityCode: 'TUR' },
+        ],
+      },
+      {
+        name: 'Mizoram',
+        slug: 'mizoram',
+        code: 'MZ',
+        cities: [
+          { name: 'Aizawl', slug: 'aizawl', cityCode: 'AJL' },
+          { name: 'Lunglei', slug: 'lunglei', cityCode: 'LGL' },
+        ],
+      },
+      {
+        name: 'Nagaland',
+        slug: 'nagaland',
+        code: 'NL',
+        cities: [
+          { name: 'Kohima', slug: 'kohima', cityCode: 'KOH' },
+          { name: 'Dimapur', slug: 'dimapur', cityCode: 'DMU' },
+        ],
+      },
+      {
+        name: 'Odisha',
+        slug: 'odisha',
+        code: 'OR',
+        cities: [
+          { name: 'Bhubaneswar', slug: 'bhubaneswar', cityCode: 'BBI' },
+          { name: 'Cuttack', slug: 'cuttack', cityCode: 'CTC' },
+          { name: 'Rourkela', slug: 'rourkela', cityCode: 'RRK' },
+          { name: 'Puri', slug: 'puri', cityCode: 'PURI' },
+        ],
+      },
+      {
+        name: 'Punjab',
+        slug: 'punjab',
+        code: 'PB',
+        cities: [
+          { name: 'Ludhiana', slug: 'ludhiana', cityCode: 'LUH' },
+          { name: 'Amritsar', slug: 'amritsar', cityCode: 'ATQ' },
+          { name: 'Jalandhar', slug: 'jalandhar', cityCode: 'JUC' },
+          { name: 'Mohali', slug: 'mohali', cityCode: 'MHL' },
+          { name: 'Patiala', slug: 'patiala', cityCode: 'PTL' },
+        ],
+      },
+      {
+        name: 'Rajasthan',
+        slug: 'rajasthan',
+        code: 'RJ',
+        cities: [
+          { name: 'Jaipur', slug: 'jaipur', cityCode: 'JAI' },
+          { name: 'Jodhpur', slug: 'jodhpur', cityCode: 'JDH' },
+          { name: 'Kota', slug: 'kota', cityCode: 'KOTA' },
+          { name: 'Udaipur', slug: 'udaipur', cityCode: 'UDR' },
+          { name: 'Ajmer', slug: 'ajmer', cityCode: 'AJM' },
+          { name: 'Bhiwadi', slug: 'bhiwadi', cityCode: 'BHW' },
+        ],
+      },
+      {
+        name: 'Sikkim',
+        slug: 'sikkim',
+        code: 'SK',
+        cities: [
+          { name: 'Gangtok', slug: 'gangtok', cityCode: 'GTK' },
+          { name: 'Namchi', slug: 'namchi', cityCode: 'NMC' },
+        ],
+      },
+      {
+        name: 'Tamil Nadu',
+        slug: 'tamil-nadu',
+        code: 'TN',
+        cities: [
+          { name: 'Chennai', slug: 'chennai', cityCode: 'MAA' },
+          { name: 'Coimbatore', slug: 'coimbatore', cityCode: 'CJB' },
+          { name: 'Madurai', slug: 'madurai', cityCode: 'IXM' },
+          { name: 'Tiruchirappalli', slug: 'tiruchirappalli', cityCode: 'TRZ' },
+          { name: 'Salem', slug: 'salem', cityCode: 'SXV' },
+        ],
+      },
+      {
+        name: 'Telangana',
+        slug: 'telangana',
+        code: 'TS',
+        cities: [
+          { name: 'Hyderabad', slug: 'hyderabad', cityCode: 'HYD' },
+          { name: 'Warangal', slug: 'warangal', cityCode: 'WGL' },
+          { name: 'Nizamabad', slug: 'nizamabad', cityCode: 'NZB' },
+          { name: 'Secunderabad', slug: 'secunderabad', cityCode: 'SCB' },
+        ],
+      },
+      {
+        name: 'Tripura',
+        slug: 'tripura',
+        code: 'TR',
+        cities: [
+          { name: 'Agartala', slug: 'agartala', cityCode: 'IXA' },
+          { name: 'Udaipur (Tripura)', slug: 'udaipur-tripura', cityCode: 'UDP' },
+        ],
+      },
+      {
+        name: 'Uttarakhand',
+        slug: 'uttarakhand',
+        code: 'UK',
+        cities: [
+          { name: 'Dehradun', slug: 'dehradun', cityCode: 'DED' },
+          { name: 'Haridwar', slug: 'haridwar', cityCode: 'HW' },
+          { name: 'Rishikesh', slug: 'rishikesh', cityCode: 'RSK' },
+          { name: 'Haldwani', slug: 'haldwani', cityCode: 'HDW' },
+        ],
+      },
+      {
+        name: 'West Bengal',
+        slug: 'west-bengal',
+        code: 'WB',
+        cities: [
+          { name: 'Kolkata', slug: 'kolkata', cityCode: 'CCU' },
+          { name: 'Howrah', slug: 'howrah', cityCode: 'HWH' },
+          { name: 'Siliguri', slug: 'siliguri', cityCode: 'IXB' },
+          { name: 'Durgapur', slug: 'durgapur', cityCode: 'RDP' },
+          { name: 'New Town / Rajarhat', slug: 'new-town-rajarhat', cityCode: 'NTW' },
+        ],
+      },
+      // Union Territories
+      {
+        name: 'Andaman and Nicobar Islands',
+        slug: 'andaman-and-nicobar-islands',
+        code: 'AN',
+        cities: [
+          { name: 'Port Blair', slug: 'port-blair', cityCode: 'IXZ' },
+          { name: 'Havelock Island', slug: 'havelock-island', cityCode: 'HVL' },
+        ],
+      },
+      {
+        name: 'Chandigarh',
+        slug: 'chandigarh',
+        code: 'CH',
+        cities: [
+          { name: 'Chandigarh City', slug: 'chandigarh-city', cityCode: 'IXC' },
+        ],
+      },
+      {
+        name: 'Dadra and Nagar Haveli and Daman and Diu',
+        slug: 'dadra-and-nagar-haveli-and-daman-and-diu',
+        code: 'DN',
+        cities: [
+          { name: 'Daman', slug: 'daman', cityCode: 'DMN' },
+          { name: 'Silvassa', slug: 'silvassa', cityCode: 'SLV' },
+        ],
+      },
+      {
+        name: 'Jammu and Kashmir',
+        slug: 'jammu-and-kashmir',
+        code: 'JK',
+        cities: [
+          { name: 'Srinagar', slug: 'srinagar', cityCode: 'SXR' },
+          { name: 'Jammu', slug: 'jammu', cityCode: 'IXJ' },
+          { name: 'Katra', slug: 'katra', cityCode: 'KTR' },
+        ],
+      },
+      {
+        name: 'Ladakh',
+        slug: 'ladakh',
+        code: 'LA',
+        cities: [
+          { name: 'Leh', slug: 'leh', cityCode: 'IXL' },
+          { name: 'Kargil', slug: 'kargil', cityCode: 'KGL' },
+        ],
+      },
+      {
+        name: 'Lakshadweep',
+        slug: 'lakshadweep',
+        code: 'LD',
+        cities: [
+          { name: 'Kavaratti', slug: 'kavaratti', cityCode: 'KVR' },
+        ],
+      },
+      {
+        name: 'Puducherry',
+        slug: 'puducherry',
+        code: 'PY',
+        cities: [
+          { name: 'Puducherry City', slug: 'puducherry-city', cityCode: 'PNY' },
+          { name: 'Karaikal', slug: 'karaikal', cityCode: 'KRK' },
+        ],
+      },
+    ];
+
+    for (let i = 0; i < otherIndianStates.length; i++) {
+      const stateData = otherIndianStates[i];
+      const stateNode = await this.ensureLocationNode({
+        name: stateData.name,
+        slug: stateData.slug,
+        type: LocationType.STATE,
+        parentId: india._id,
+        ancestorIds: [india._id],
+        countryCode: 'IN',
+        stateCode: stateData.code,
+        sortOrder: 10 + i,
+      });
+
+      for (let j = 0; j < stateData.cities.length; j++) {
+        const cityData = stateData.cities[j];
+        await this.ensureLocationNode({
+          name: cityData.name,
+          slug: cityData.slug,
+          type: LocationType.CITY,
+          parentId: stateNode._id,
+          ancestorIds: [india._id, stateNode._id],
+          countryCode: 'IN',
+          stateCode: stateData.code,
+          cityCode: cityData.cityCode,
+          sortOrder: j + 1,
+        });
+      }
+    }
+
     // 2. UNITED ARAB EMIRATES (AE)
     const uae = await this.ensureLocationNode({
       name: 'United Arab Emirates',
