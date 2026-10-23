@@ -2804,9 +2804,9 @@ export default function NewPropertyWizardPage() {
             </div>
 
             <div className="space-y-1.5">
-              <h2 className="text-xl font-bold text-casa-text-primary">Ready for CASA Moderation</h2>
+              <h2 className="text-xl font-bold text-casa-text-primary">Ready for MyProperty Moderation</h2>
               <p className="text-xs text-casa-text-secondary leading-relaxed">
-                Your listing details, RERA compliance filings, and PC photos have been validated. Submit now to send to CASA admin review, or save as a draft to edit later.
+                Your listing details, RERA compliance filings, and PC photos have been validated. Submit now to send to MyProperty admin review, or save as a draft to edit later.
               </p>
             </div>
 
@@ -2856,7 +2856,7 @@ export default function NewPropertyWizardPage() {
                 className="px-6 py-2.5 rounded-xl bg-casa-brand hover:bg-casa-brand-hover text-white text-xs font-bold transition-colors shadow-2xs cursor-pointer flex items-center justify-center gap-1.5"
               >
                 <Send className="w-4 h-4" />
-                <span>{isSubmitting ? 'Submitting to Review...' : 'Submit for CASA Review'}</span>
+                <span>{isSubmitting ? 'Submitting to Review...' : 'Submit for MyProperty Review'}</span>
               </button>
             </div>
           </div>

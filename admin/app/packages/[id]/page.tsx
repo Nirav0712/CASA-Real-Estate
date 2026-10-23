@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { ArrowLeft, Save, CreditCard } from 'lucide-react';
 import { getPackage, updatePackage } from '@/services/entitlements-service';
+import { useAdminAuth } from '@/contexts/auth-context';
 import { PackageRecord, BillingPeriod, AccountType } from '@/types';
 
 const ACCOUNT_TYPES: AccountType[] = [
@@ -12,14 +13,14 @@ const ACCOUNT_TYPES: AccountType[] = [
   'BROKER',
   'DEVELOPER',
   'PROPERTY_OWNER',
-  'BUYER',
-  'TENANT',
 ];
 
 export default function EditPackagePage() {
   const router = useRouter();
   const params = useParams();
   const pkgId = params.id as string;
+  const { adminUser } = useAdminAuth();
+  const isSuperAdmin = adminUser?.role === 'SUPER_ADMIN' || adminUser?.platformRole === 'SUPER_ADMIN';
 
   const [pkg, setPkg] = useState<PackageRecord | null>(null);
   const [loading, setLoading] = useState(true);
@@ -105,6 +106,10 @@ export default function EditPackagePage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!isSuperAdmin) {
+      setError('Only Super Administrators are authorized to update packages.');
+      return;
+    }
     if (!name.trim()) {
       setError('Package name is required');
       return;
@@ -172,13 +177,20 @@ export default function EditPackagePage() {
 
         <button
           type="submit"
-          disabled={saving}
+          disabled={saving || !isSuperAdmin}
           className="flex items-center gap-2 px-5 py-2.5 text-xs font-semibold rounded-xl bg-casa-brand text-white shadow-subtle hover:bg-casa-brand/90 transition-colors disabled:opacity-50"
         >
           <Save className="w-4 h-4" />
-          <span>{saving ? 'Updating...' : 'Save Changes'}</span>
+          <span>{saving ? 'Updating...' : !isSuperAdmin ? 'Read-only (Super Admin Only)' : 'Save Changes'}</span>
         </button>
       </div>
+
+      {!isSuperAdmin && (
+        <div className="p-4 rounded-xl bg-amber-50 dark:bg-amber-950/50 border border-amber-200 text-amber-700 dark:text-amber-300 text-xs flex items-center justify-between">
+          <span>Only Super Administrators have permission to modify pricing packages. This package is shown in read-only mode.</span>
+          <span className="font-mono text-xs font-semibold px-2 py-0.5 bg-amber-200/50 dark:bg-amber-800/50 rounded">SUPER_ADMIN ONLY</span>
+        </div>
+      )}
 
       {error && (
         <div className="p-4 rounded-xl bg-red-50 dark:bg-red-950/50 border border-red-200 text-red-700 text-xs">

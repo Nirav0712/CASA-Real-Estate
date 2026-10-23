@@ -84,7 +84,7 @@ export default function MyPropertiesPage() {
       await submitPropertyForApproval(prop.id);
       toast.success(
         'Submitted for Review',
-        `"${typeof prop.title === 'string' ? prop.title : prop.title.en}" is now in CASA Moderation Queue.`,
+        `"${typeof prop.title === 'string' ? prop.title : prop.title.en}" is now in MyProperty Moderation Queue.`,
       );
       await loadProperties();
     } catch (err: unknown) {

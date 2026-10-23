@@ -9,6 +9,7 @@ import { Subscription, SubscriptionSchema } from './schemas/subscription.schema'
 import { Property, PropertySchema } from '../properties/schemas/property.schema';
 import { User, UserSchema } from '../auth/schemas/user.schema';
 import { AuditLog, AuditLogSchema } from '../admin/schemas/audit-log.schema';
+import { Package, PackageSchema } from '../entitlements/schemas/package.schema';
 import { AuthModule } from '../auth/auth.module';
 
 @Module({
@@ -19,6 +20,7 @@ import { AuthModule } from '../auth/auth.module';
       { name: Property.name, schema: PropertySchema },
       { name: User.name, schema: UserSchema },
       { name: AuditLog.name, schema: AuditLogSchema },
+      { name: Package.name, schema: PackageSchema },
     ]),
     AuthModule,
   ],

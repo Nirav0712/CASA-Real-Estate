@@ -562,7 +562,7 @@ export default function EditPropertyPage() {
       const payload = buildPayload();
       await updateProperty(id, payload);
       await submitPropertyForApproval(id);
-      toast.success('Listing Resubmitted', 'Property has been submitted for CASA review.');
+      toast.success('Listing Resubmitted', 'Property has been submitted for MyProperty review.');
       router.push('/dashboard/properties');
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Resubmission failed';
@@ -648,7 +648,7 @@ export default function EditPropertyPage() {
         <div className="p-4 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900 rounded-2xl text-xs space-y-1 text-red-700 dark:text-red-300">
           <div className="font-bold flex items-center gap-1.5">
             <AlertCircle className="w-4 h-4" />
-            <span>This Listing Was Rejected by CASA Moderation</span>
+            <span>This Listing Was Rejected by MyProperty Moderation</span>
           </div>
           <p className="text-[11px]">
             Reason: <strong>{property.moderation?.rejectionReason || 'INSUFFICIENT_DOCS'}</strong>

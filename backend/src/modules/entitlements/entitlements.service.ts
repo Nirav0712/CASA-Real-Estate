@@ -300,13 +300,7 @@ export class EntitlementsService implements OnModuleInit {
         },
       ];
 
-      for (const pkg of defaultPackages) {
-        await this.packageModel.findOneAndUpdate(
-          { slug: pkg.slug },
-          { $setOnInsert: pkg },
-          { upsert: true, new: true },
-        );
-      }
+      // Note: Packages are managed strictly by Super Admin. Do not auto-seed sample packages.
 
       // System Roles
       const systemRoles = [
@@ -799,6 +793,10 @@ export class EntitlementsService implements OnModuleInit {
   }
 
   async createPackage(dto: CreatePackageDto, actorUser: any) {
+    if (actorUser?.platformRole !== PlatformRole.SUPER_ADMIN && actorUser?.role !== UserRole.SUPER_ADMIN) {
+      throw new ForbiddenException('Only Super Admins can manage subscription packages.');
+    }
+
     const slug = dto.slug ? dto.slug.toLowerCase().trim() : dto.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
 
     const existing = await this.packageModel.findOne({ slug });
@@ -828,6 +826,10 @@ export class EntitlementsService implements OnModuleInit {
   }
 
   async updatePackage(id: string, dto: UpdatePackageDto, actorUser: any): Promise<any> {
+    if (actorUser?.platformRole !== PlatformRole.SUPER_ADMIN && actorUser?.role !== UserRole.SUPER_ADMIN) {
+      throw new ForbiddenException('Only Super Admins can manage subscription packages.');
+    }
+
     const pkg = await this.packageModel.findById(id);
     if (!pkg) {
       throw new NotFoundException(`Package with ID "${id}" was not found.`);
@@ -865,6 +867,10 @@ export class EntitlementsService implements OnModuleInit {
   }
 
   async deletePackage(id: string, actorUser: any): Promise<any> {
+    if (actorUser?.platformRole !== PlatformRole.SUPER_ADMIN && actorUser?.role !== UserRole.SUPER_ADMIN) {
+      throw new ForbiddenException('Only Super Admins can manage subscription packages.');
+    }
+
     const pkg = await this.packageModel.findById(id);
     if (!pkg) {
       throw new NotFoundException(`Package with ID "${id}" was not found.`);

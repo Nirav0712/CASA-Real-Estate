@@ -8,7 +8,7 @@ import { AlertCircle } from 'lucide-react';
 function LoginContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { openAuthModal, isAuthenticated } = useAuth();
+  const { openAuthModal, isAuthenticated, user } = useAuth();
   const [deactivatedMsg, setDeactivatedMsg] = React.useState<string | null>(null);
   const [trialExpiredNotice, setTrialExpiredNotice] = React.useState<string | null>(null);
   const [kycStatus, setKycStatus] = React.useState<string>('NOT_SUBMITTED');
@@ -39,24 +39,43 @@ function LoginContent() {
   }, [isDeactivated, isTrialExpired]);
 
   const redirectUrl = React.useMemo(() => {
+    const isConsumer =
+      user &&
+      ['BUYER', 'TENANT', 'PURCHASER'].includes(
+        String(user.accountType || user.role).toUpperCase(),
+      );
+
     const fromQuery =
       searchParams.get('redirect') ||
       searchParams.get('callbackUrl') ||
       searchParams.get('returnUrl');
-    if (fromQuery) return fromQuery;
+
+    if (fromQuery) {
+      if (isConsumer && (fromQuery.includes('/billing') || fromQuery.includes('/pricing'))) {
+        return '/';
+      }
+      return fromQuery;
+    }
 
     if (typeof window !== 'undefined') {
       try {
         const stored = sessionStorage.getItem('casa_login_intent');
         if (stored) {
+          sessionStorage.removeItem('casa_login_intent');
           const parsed = JSON.parse(stored);
-          if (parsed?.continueUrl) return parsed.continueUrl;
+          if (parsed?.continueUrl) {
+            if (isConsumer && (parsed.continueUrl.includes('/billing') || parsed.continueUrl.includes('/pricing'))) {
+              return '/';
+            }
+            return parsed.continueUrl;
+          }
           if (parsed?.propertySlug) return `/property/${parsed.propertySlug}`;
         }
       } catch {}
     }
-    return '/dashboard/properties/new';
-  }, [searchParams]);
+    // Default login destination is always the homepage
+    return '/';
+  }, [searchParams, user]);
 
   React.useEffect(() => {
     if (isAuthenticated) {

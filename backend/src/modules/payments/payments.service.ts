@@ -21,13 +21,14 @@ import {
   SubscriptionPlan,
   SubscriptionStatus,
 } from './enums/payment.enums';
-import { PRICING_CATALOG, resolvePricingProduct } from './config/pricing.config';
+import { PRICING_CATALOG, resolvePricingProduct, PricingProduct } from './config/pricing.config';
 import { CreatePaymentOrderDto } from './dto/create-order.dto';
 import { VerifyPaymentDto } from './dto/verify-payment.dto';
 import { RefundPaymentDto } from './dto/refund-payment.dto';
 import { PaymentQueryDto } from './dto/payment-query.dto';
 import { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
 import { UserRole } from '../auth/enums/auth.enums';
+import { Package, PackageDocument } from '../entitlements/schemas/package.schema';
 
 @Injectable()
 export class PaymentsService {
@@ -39,6 +40,7 @@ export class PaymentsService {
     @InjectModel(Property.name) private readonly propertyModel: Model<PropertyDocument>,
     @InjectModel(User.name) private readonly userModel: Model<UserDocument>,
     @InjectModel(AuditLog.name) private readonly auditLogModel: Model<AuditLogDocument>,
+    @InjectModel(Package.name) private readonly packageModel: Model<PackageDocument>,
     private readonly razorpayProvider: RazorpayPaymentProvider,
   ) {}
 
@@ -66,7 +68,67 @@ export class PaymentsService {
       throw new BadRequestException('Payment purpose is required.');
     }
 
-    const product = resolvePricingProduct(dto.purpose, dto.productCode);
+    let product: PricingProduct | null = null;
+
+    if (dto.purpose === PaymentPurpose.SUBSCRIPTION) {
+      const lookupCode = dto.productCode || dto.referenceId;
+      let pkgDoc: PackageDocument | null = null;
+
+      if (lookupCode) {
+        if (isValidObjectId(lookupCode)) {
+          pkgDoc = await this.packageModel.findOne({ $or: [{ _id: lookupCode }, { slug: lookupCode }] });
+        } else {
+          pkgDoc = await this.packageModel.findOne({ slug: lookupCode });
+        }
+      }
+
+      if (pkgDoc) {
+        if (!pkgDoc.isActive) {
+          throw new BadRequestException('This subscription plan is currently inactive and cannot be purchased.');
+        }
+
+        const userRole = String(user.role || '').toUpperCase();
+        const userAccountType = String(user.accountType || '').toUpperCase();
+        const isConsumer =
+          ['BUYER', 'TENANT', 'PURCHASER'].includes(userRole) ||
+          ['BUYER', 'TENANT'].includes(userAccountType);
+
+        if (isConsumer) {
+          throw new ForbiddenException('Property buyers and rental tenants do not require subscription plans.');
+        }
+
+        if (pkgDoc.targetAccountTypes && pkgDoc.targetAccountTypes.length > 0 && !pkgDoc.targetAccountTypes.includes('ALL')) {
+          const isEligible = pkgDoc.targetAccountTypes.some(
+            (t) =>
+              t.toUpperCase() === userRole ||
+              t.toUpperCase() === userAccountType ||
+              (t.toUpperCase() === 'PROPERTY_OWNER' && (userRole === 'OWNER' || userAccountType === 'OWNER')) ||
+              (t.toUpperCase() === 'DEVELOPER' && (userRole === 'BUILDER' || userAccountType === 'BUILDER')),
+          );
+          if (!isEligible) {
+            throw new ForbiddenException(
+              `This subscription plan is not available for ${userRole || userAccountType} accounts.`,
+            );
+          }
+        }
+
+        product = {
+          code: pkgDoc.slug,
+          purpose: PaymentPurpose.SUBSCRIPTION,
+          name: pkgDoc.name,
+          description: pkgDoc.description || `${pkgDoc.name} Subscription`,
+          amount: pkgDoc.price,
+          currency: pkgDoc.currency || 'INR',
+          durationDays: pkgDoc.durationDays || 30,
+          active: pkgDoc.isActive,
+        };
+      } else {
+        product = resolvePricingProduct(dto.purpose, dto.productCode);
+      }
+    } else {
+      product = resolvePricingProduct(dto.purpose, dto.productCode);
+    }
+
     if (!product) {
       throw new BadRequestException(`Invalid or inactive payment product for purpose "${dto.purpose}".`);
     }
@@ -342,6 +404,26 @@ export class PaymentsService {
         this.logger.log(`🌟 Property ${property.id} is now FEATURED until ${expiryDate.toISOString()}`);
       }
     } else if (payment.purpose === PaymentPurpose.SUBSCRIPTION) {
+      const lookupCode = payment.productCode;
+      let pkgDoc: PackageDocument | null = null;
+      if (lookupCode) {
+        if (isValidObjectId(lookupCode)) {
+          pkgDoc = await this.packageModel.findOne({ $or: [{ _id: lookupCode }, { slug: lookupCode }] });
+        } else {
+          pkgDoc = await this.packageModel.findOne({ slug: lookupCode });
+        }
+      }
+
+      if (pkgDoc) {
+        await this.userModel.findByIdAndUpdate(payment.userId, {
+          $set: {
+            activePackageId: pkgDoc._id.toString(),
+            isTrialActive: false,
+            trialExpired: false,
+          },
+        });
+      }
+
       const plan = payment.productCode === 'SUBSCRIPTION_BUSINESS'
         ? SubscriptionPlan.BUSINESS
         : SubscriptionPlan.PRO;
@@ -356,12 +438,18 @@ export class PaymentsService {
           endDate: expiryDate,
           paymentId: payment._id.toString(),
           orderId: payment.orderId,
-          metadata: { productName: payment.productName, amount: payment.amount },
+          packageId: pkgDoc ? pkgDoc._id.toString() : undefined,
+          metadata: {
+            productName: payment.productName,
+            amount: payment.amount,
+            packageName: pkgDoc?.name,
+            packageSlug: pkgDoc?.slug,
+          },
         },
         { upsert: true, new: true },
       );
 
-      this.logger.log(`⭐ Subscription ${plan} activated for user ${payment.userId} until ${expiryDate.toISOString()}`);
+      this.logger.log(`⭐ Subscription ${pkgDoc?.name || plan} activated for user ${payment.userId} until ${expiryDate.toISOString()}`);
     }
   }
 

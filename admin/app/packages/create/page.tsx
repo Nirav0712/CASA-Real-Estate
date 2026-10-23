@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, Save, CreditCard, Sparkles } from 'lucide-react';
 import { createPackage } from '@/services/entitlements-service';
+import { useAdminAuth } from '@/contexts/auth-context';
 import { BillingPeriod, AccountType } from '@/types';
 
 const ACCOUNT_TYPES: AccountType[] = [
@@ -12,12 +13,13 @@ const ACCOUNT_TYPES: AccountType[] = [
   'BROKER',
   'DEVELOPER',
   'PROPERTY_OWNER',
-  'BUYER',
-  'TENANT',
 ];
 
 export default function CreatePackagePage() {
   const router = useRouter();
+  const { adminUser } = useAdminAuth();
+  const isSuperAdmin = adminUser?.role === 'SUPER_ADMIN' || adminUser?.platformRole === 'SUPER_ADMIN';
+
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 

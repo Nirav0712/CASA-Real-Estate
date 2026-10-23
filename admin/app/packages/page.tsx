@@ -14,9 +14,13 @@ import {
   Search,
 } from 'lucide-react';
 import { getPackages, deletePackage, updatePackage } from '@/services/entitlements-service';
+import { useAdminAuth } from '@/contexts/auth-context';
 import { PackageRecord } from '@/types';
 
 export default function PackagesManagementPage() {
+  const { adminUser } = useAdminAuth();
+  const isSuperAdmin = adminUser?.role === 'SUPER_ADMIN' || adminUser?.platformRole === 'SUPER_ADMIN';
+
   const [packages, setPackages] = useState<PackageRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -41,6 +45,10 @@ export default function PackagesManagementPage() {
   }, []);
 
   const handleToggleActive = async (pkg: PackageRecord) => {
+    if (!isSuperAdmin) {
+      alert('Permission denied: Only Super Admins can activate or deactivate plans.');
+      return;
+    }
     const pkgId = pkg.id || pkg._id || '';
     try {
       setActionLoading(pkgId);
@@ -56,6 +64,10 @@ export default function PackagesManagementPage() {
   };
 
   const handleDelete = async (id: string, name: string) => {
+    if (!isSuperAdmin) {
+      alert('Permission denied: Only Super Admins can delete plans.');
+      return;
+    }
     if (!window.confirm(`Are you sure you want to delete package "${name}"?`)) return;
     try {
       setActionLoading(id);
@@ -98,15 +110,24 @@ export default function PackagesManagementPage() {
           >
             Monitor Usage & Quotas
           </Link>
-          <Link
-            href="/packages/create"
-            className="flex items-center gap-2 px-4 py-2.5 text-xs font-semibold rounded-xl bg-casa-brand text-white shadow-subtle hover:bg-casa-brand/90 transition-colors"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Create New Package</span>
-          </Link>
+          {isSuperAdmin && (
+            <Link
+              href="/packages/create"
+              className="flex items-center gap-2 px-4 py-2.5 text-xs font-semibold rounded-xl bg-casa-brand text-white shadow-subtle hover:bg-casa-brand/90 transition-colors"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Create New Package</span>
+            </Link>
+          )}
         </div>
       </div>
+
+      {!isSuperAdmin && (
+        <div className="p-3.5 rounded-xl bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800 text-blue-900 dark:text-blue-200 text-xs flex items-center gap-2">
+          <Sparkles className="w-4 h-4 text-blue-600 flex-shrink-0" />
+          <span>Viewing packages in read-only mode. Only authenticated Super Admins can create, modify, or activate plans.</span>
+        </div>
+      )}
 
       {/* Search */}
       <div className="flex items-center justify-between gap-3">
@@ -253,17 +274,20 @@ export default function PackagesManagementPage() {
                     href={`/packages/${pkgId}`}
                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-casa-subtle hover:bg-casa-canvas text-casa-text-primary transition-colors"
                   >
-                    <Edit2 className="w-3.5 h-3.5" />
-                    <span>Configure</span>
+                    {isSuperAdmin ? <Edit2 className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                    <span>{isSuperAdmin ? 'Configure' : 'View Details'}</span>
                   </Link>
 
-                  <button
-                    onClick={() => handleDelete(pkgId, pkg.name)}
-                    disabled={actionLoading === pkgId}
-                    className="p-1.5 rounded-lg text-casa-text-muted hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950 transition-colors"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
+                  {isSuperAdmin && (
+                    <button
+                      onClick={() => handleDelete(pkgId, pkg.name)}
+                      disabled={actionLoading === pkgId}
+                      className="p-1.5 rounded-lg text-casa-text-muted hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950 transition-colors"
+                      title="Delete Package"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  )}
                 </div>
               </div>
             );

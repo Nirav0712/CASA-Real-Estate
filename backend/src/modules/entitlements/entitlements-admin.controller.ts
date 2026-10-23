@@ -104,14 +104,14 @@ export class EntitlementsAdminController {
   }
 
   @Post('packages')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN)
+  @Roles(UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'Create a new subscription package' })
   createPackage(@Body() dto: CreatePackageDto, @Req() req: any): Promise<any> {
     return this.entitlementsService.createPackage(dto, req.user);
   }
 
   @Patch('packages/:id')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN)
+  @Roles(UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'Update an existing subscription package' })
   updatePackage(@Param('id') id: string, @Body() dto: UpdatePackageDto, @Req() req: any): Promise<any> {
     return this.entitlementsService.updatePackage(id, dto, req.user);

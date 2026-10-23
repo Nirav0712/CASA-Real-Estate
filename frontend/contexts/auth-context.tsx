@@ -97,6 +97,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     async function restoreSession() {
+      const cachedToken = typeof window !== 'undefined' ? localStorage.getItem('casa_access_token') : null;
+      if (cachedToken) {
+        try {
+          const profile = await authService.getCurrentUser(cachedToken);
+          if (isMounted && profile && profile.user) {
+            setUser(profile.user);
+            setToken(cachedToken);
+            if (typeof window !== 'undefined') {
+              localStorage.setItem('casa_user', JSON.stringify(profile.user));
+            }
+            if (isMounted) setIsLoading(false);
+            return;
+          }
+        } catch {
+          // Cached token may need refresh
+        }
+      }
+
       try {
         const authData = await authService.refreshAccessToken();
         if (isMounted && authData && authData.user && authData.tokens) {
@@ -254,7 +272,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     // Cross-tab synchronization via localStorage storage event
     const handleStorageEvent = (event: StorageEvent) => {
-      if (event.key === 'casa_deactivated_notice' && event.newValue) {
+      if (event.key === 'casa_access_token') {
+        if (event.newValue) {
+          setToken(event.newValue);
+          const cachedUserStr = localStorage.getItem('casa_user');
+          if (cachedUserStr) {
+            try {
+              setUser(JSON.parse(cachedUserStr));
+            } catch {}
+          }
+        } else {
+          // Explicit logout in another tab
+          setUser(null);
+          setToken(null);
+        }
+      } else if (event.key === 'casa_user') {
+        if (event.newValue) {
+          try {
+            setUser(JSON.parse(event.newValue));
+          } catch {}
+        } else {
+          setUser(null);
+        }
+      } else if (event.key === 'casa_deactivated_notice' && event.newValue) {
         setUser(null);
         setToken(null);
         try {
@@ -276,7 +316,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, [toast]);
 
-  // Real-time status detection (short-interval heartbeat polling every 2.5s)
+  // Real-time status detection (heartbeat polling every 15s)
   React.useEffect(() => {
     if (!user && !token) return;
     if (typeof window === 'undefined') return;
@@ -300,37 +340,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         if (res.status === 401 || (res.data && res.data.active === false)) {
           const errMsg = String((res as any)?.error || (res as any)?.message || '').toLowerCase();
-          const isTrialExpired = errMsg.includes('free trial has expired') || errMsg.includes('trial has expired');
-          setUser(null);
-          setToken(null);
-          try {
-            localStorage.removeItem('casa_access_token');
-            localStorage.removeItem('casa_user');
-            if (isTrialExpired) {
-              localStorage.setItem(
-                'casa_trial_expired_notice',
-                'Your 3-day free trial has expired. Complete KYC verification and get an active plan to continue.'
-              );
-              localStorage.setItem('casa_trial_expired_kyc_status', user?.kycStatus || 'NOT_SUBMITTED');
-            } else {
+          // Explicit deactivation/suspension by administrator
+          if (errMsg.includes('deactivated') || errMsg.includes('suspended')) {
+            setUser(null);
+            setToken(null);
+            try {
+              localStorage.removeItem('casa_access_token');
+              localStorage.removeItem('casa_user');
               localStorage.setItem(
                 'casa_deactivated_notice',
                 'Your account has been deactivated by the administrator.'
               );
+            } catch {
+              // ignore
             }
-          } catch {
-            // ignore
-          }
 
-          if (isTrialExpired) {
-            toast.error(
-              'Trial Expired',
-              'Your 3-day free trial has expired. Complete KYC verification and get an active plan to continue.'
-            );
-            if (!window.location.pathname.startsWith('/auth/login')) {
-              window.location.href = '/auth/login?trial_expired=1';
-            }
-          } else {
             toast.error(
               'Account Deactivated',
               'Your account has been deactivated by the administrator.'
@@ -338,6 +362,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             if (!window.location.pathname.startsWith('/auth/login')) {
               window.location.href = '/auth/login?deactivated=1';
             }
+            return;
+          }
+
+          // If ordinary 401 (e.g. access token expired), attempt silent refresh before concluding session is dead
+          try {
+            const authData = await authService.refreshAccessToken();
+            if (isMounted && authData?.tokens?.accessToken && authData?.user) {
+              setToken(authData.tokens.accessToken);
+              setUser(authData.user);
+              if (typeof window !== 'undefined') {
+                localStorage.setItem('casa_access_token', authData.tokens.accessToken);
+                localStorage.setItem('casa_user', JSON.stringify(authData.user));
+              }
+              return;
+            }
+          } catch {
+            // Truly unauthenticated (refresh token expired/revoked)
+            setUser(null);
+            setToken(null);
+            try {
+              localStorage.removeItem('casa_access_token');
+              localStorage.removeItem('casa_user');
+            } catch {}
           }
         }
       } catch {
@@ -349,8 +396,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     // Immediate check
     checkSessionStatus();
-    // Heartbeat check every 2.5 seconds for real-time deactivation detection
-    const interval = setInterval(checkSessionStatus, 2500);
+    // Heartbeat check every 15 seconds for real-time deactivation detection
+    const interval = setInterval(checkSessionStatus, 15000);
 
     return () => {
       isMounted = false;
@@ -491,13 +538,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setIsAuthModalOpen(false);
         }
 
-        // Open pricing plan selection popup for 3-day trial activation immediately after signup only for supply-side roles
-        const regRole = String(data.role || (res as any)?.user?.role || '').toUpperCase();
-        const isRegExempt = ['BUYER', 'TENANT', 'PURCHASER', 'SUPER_ADMIN', 'ADMIN'].includes(regRole);
-        if (!isRegExempt) {
-          setIsPlanSelectionModalOpen(true);
-        }
-
         return res;
       } catch (err: unknown) {
         const message = err instanceof Error ? err.message : 'Registration failed. Please try again.';
@@ -553,20 +593,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           'Welcome to myproperty',
           `Signed in as ${res.user.name || res.user.normalizedMobile}${roleLabel}`,
         );
-
-        // If supply-side user has not started their 3-day trial yet, present plan selection popup
-        const otpRole = String(res.user?.role || role || '').toUpperCase();
-        const otpAccountType = String(res.user?.accountType || '').toUpperCase();
-        const otpPlatformRole = String(res.user?.platformRole || '').toUpperCase();
-        const isOtpExempt =
-          ['BUYER', 'TENANT', 'PURCHASER'].includes(otpRole) ||
-          ['BUYER', 'TENANT'].includes(otpAccountType) ||
-          ['SUPER_ADMIN', 'ADMIN'].includes(otpPlatformRole) ||
-          ['SUPER_ADMIN', 'ADMIN'].includes(otpRole);
-
-        if (!isOtpExempt && !res.user?.trialStartedAt && !res.user?.trialPackageId) {
-          setIsPlanSelectionModalOpen(true);
-        }
       } catch (err: unknown) {
         const message = err instanceof Error ? err.message : 'Invalid or expired OTP.';
         toast.error('Authentication Failed', message);

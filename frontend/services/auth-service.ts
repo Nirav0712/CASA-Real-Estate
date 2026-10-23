@@ -161,25 +161,39 @@ export async function resetPassword(
 }
 
 /**
- * Rotate and refresh access token via HttpOnly cookie
+ * Rotate and refresh access token via HttpOnly cookie (concurrent calls deduplicated)
  */
+let activeRefreshPromise: Promise<AuthResponse> | null = null;
+
 export async function refreshAccessToken(): Promise<AuthResponse> {
-  const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    credentials: 'include',
-    body: JSON.stringify({}),
-  });
-
-  const json = await response.json();
-
-  if (!response.ok) {
-    throw new Error(json.message || 'Session expired');
+  if (activeRefreshPromise) {
+    return activeRefreshPromise;
   }
 
-  return json.data || json;
+  activeRefreshPromise = (async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({}),
+      });
+
+      const json = await response.json();
+
+      if (!response.ok) {
+        throw new Error(json.message || 'Session expired');
+      }
+
+      return json.data || json;
+    } finally {
+      activeRefreshPromise = null;
+    }
+  })();
+
+  return activeRefreshPromise;
 }
 
 /**

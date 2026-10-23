@@ -61,7 +61,7 @@ export default function PropertyDossierPage() {
     setIsSubmitting(true);
     try {
       await submitPropertyForApproval(property.id);
-      toast.success('Submitted', 'Your listing is now in the CASA review queue.');
+      toast.success('Submitted', 'Your listing is now in the MyProperty review queue.');
       await loadData();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Submission failed';
@@ -182,7 +182,7 @@ export default function PropertyDossierPage() {
           <Clock className="w-5 h-5 flex-shrink-0 text-amber-600" />
           <div>
             <span className="font-bold block">In Moderation Review</span>
-            <span>CASA administrators are currently reviewing your documents and photos.</span>
+            <span>MyProperty administrators are currently reviewing your documents and photos.</span>
           </div>
         </div>
       )}
@@ -191,7 +191,7 @@ export default function PropertyDossierPage() {
         <div className="p-4 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900 rounded-2xl text-xs space-y-1.5 text-red-800 dark:text-red-300">
           <div className="font-bold flex items-center gap-1.5 text-red-700 dark:text-red-400">
             <AlertCircle className="w-4 h-4" />
-            <span>Listing Rejected by CASA Moderation</span>
+            <span>Listing Rejected by MyProperty Moderation</span>
           </div>
           <p className="text-[11px]">
             Reason: <strong>{property.moderation?.rejectionReason || 'INSUFFICIENT_DOCS'}</strong>

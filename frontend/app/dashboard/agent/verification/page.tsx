@@ -287,7 +287,7 @@ export default function AgentVerificationPage() {
 
             <div className="md:col-span-3">
               <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
-                Notes for CASA Moderation Team
+                Notes for MyProperty Moderation Team
               </label>
               <textarea
                 rows={2}

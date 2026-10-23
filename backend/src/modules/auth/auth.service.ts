@@ -917,6 +917,8 @@ export class AuthService implements OnModuleInit {
 
     let user: any = null;
 
+    const ROTATION_GRACE_PERIOD_MS = 30000; // 30-second grace window for multi-tab concurrency
+
     if (this.isDbConnected()) {
       try {
         const session = await this.refreshSessionModel.findOne({
@@ -925,11 +927,24 @@ export class AuthService implements OnModuleInit {
         });
 
         if (session && session.isRevoked) {
-          await this.refreshSessionModel.updateMany(
-            { familyId: payload.familyId },
-            { $set: { isRevoked: true, revokedAt: new Date() } },
-          );
-          throw new UnauthorizedException('Security alert: Refresh token reuse detected. All active sessions terminated.');
+          const isWithinGrace =
+            session.revokedAt &&
+            Date.now() - new Date(session.revokedAt).getTime() < ROTATION_GRACE_PERIOD_MS;
+
+          if (isWithinGrace) {
+            this.logger.debug(
+              `Refresh token rotated recently (${Date.now() - new Date(session.revokedAt!).getTime()}ms ago). Permitting multi-tab concurrency without revoking family.`,
+            );
+            user = await this.userModel.findById(payload.sub);
+          } else {
+            await this.refreshSessionModel.updateMany(
+              { familyId: payload.familyId },
+              { $set: { isRevoked: true, revokedAt: new Date() } },
+            );
+            throw new UnauthorizedException(
+              'Security alert: Refresh token reuse detected. All active sessions terminated.',
+            );
+          }
         }
 
         if (session && !session.isRevoked) {
@@ -940,21 +955,42 @@ export class AuthService implements OnModuleInit {
           user = await this.userModel.findById(payload.sub);
         }
       } catch (err: any) {
+        if (err instanceof UnauthorizedException) throw err;
         this.logger.warn(`Database session lookup fallback: ${err?.message}`);
       }
     }
 
     if (!user) {
       const memSession = this.memSessions.get(payload.sessionId);
-      if (memSession && !memSession.isRevoked && memSession.tokenHash === tokenHash) {
-        memSession.isRevoked = true;
-        memSession.revokedAt = new Date();
+      if (memSession && memSession.tokenHash === tokenHash) {
+        if (memSession.isRevoked) {
+          const isWithinGrace =
+            memSession.revokedAt &&
+            Date.now() - new Date(memSession.revokedAt).getTime() < ROTATION_GRACE_PERIOD_MS;
+          if (isWithinGrace) {
+            for (const u of this.memUsers.values()) {
+              if (u._id === payload.sub) {
+                user = u;
+                break;
+              }
+            }
+          } else {
+            throw new UnauthorizedException(
+              'Security alert: Refresh token reuse detected. All active sessions terminated.',
+            );
+          }
+        } else {
+          memSession.isRevoked = true;
+          memSession.revokedAt = new Date();
+        }
       }
 
-      for (const u of this.memUsers.values()) {
-        if (u._id === payload.sub) {
-          user = u;
-          break;
+      if (!user) {
+        for (const u of this.memUsers.values()) {
+          if (u._id === payload.sub) {
+            user = u;
+            break;
+          }
         }
       }
     }

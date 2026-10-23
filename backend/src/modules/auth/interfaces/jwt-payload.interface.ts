@@ -11,6 +11,10 @@ export interface JwtAccessPayload {
   permissions?: string[];
   status: AccountStatus;
   isVerifiedAgent: boolean;
+  isTrialActive?: boolean;
+  trialExpired?: boolean;
+  activePackageId?: string | null;
+  kycStatus?: string;
   iat?: number;
   exp?: number;
 }

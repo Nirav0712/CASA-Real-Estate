@@ -9,6 +9,7 @@ import { Subscription } from './schemas/subscription.schema';
 import { Property } from '../properties/schemas/property.schema';
 import { User } from '../auth/schemas/user.schema';
 import { AuditLog } from '../admin/schemas/audit-log.schema';
+import { Package } from '../entitlements/schemas/package.schema';
 import { PaymentStatus, PaymentPurpose, SubscriptionPlan, SubscriptionStatus } from './enums/payment.enums';
 import { UserRole } from '../auth/enums/auth.enums';
 
@@ -65,10 +66,16 @@ describe('PaymentsService (Phase 13 Payments & Monetization)', () => {
 
   const mockUserModel: any = {
     findOne: jest.fn(),
+    findByIdAndUpdate: jest.fn().mockResolvedValue(true),
   };
 
   const mockAuditLogModel: any = {
     create: jest.fn().mockResolvedValue(true),
+  };
+
+  const mockPackageModel: any = {
+    findOne: jest.fn().mockResolvedValue(null),
+    findById: jest.fn().mockResolvedValue(null),
   };
 
   const mockConfigService = {
@@ -93,6 +100,7 @@ describe('PaymentsService (Phase 13 Payments & Monetization)', () => {
         { provide: getModelToken(Property.name), useValue: mockPropertyModel },
         { provide: getModelToken(User.name), useValue: mockUserModel },
         { provide: getModelToken(AuditLog.name), useValue: mockAuditLogModel },
+        { provide: getModelToken(Package.name), useValue: mockPackageModel },
       ],
     }).compile();
 

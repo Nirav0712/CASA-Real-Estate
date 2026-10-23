@@ -11,7 +11,12 @@ import {
   verifyPayment,
   getPublicGatewayConfig,
 } from '@/services/payment-service';
-import { getPublicCompanySettings, CompanySettings } from '@/services/entitlements-service';
+import {
+  getActivePackages,
+  getPublicCompanySettings,
+  PackagePlan,
+  CompanySettings,
+} from '@/services/entitlements-service';
 import { PaymentItem, PaymentStatus, PaymentPurpose } from '@/types';
 import { formatPrice } from '@/lib/utils';
 import { isKycExempt } from '@/components/dashboard/kyc-status-banner';
@@ -33,76 +38,8 @@ import {
   Building,
   Check,
   Lock,
+  Phone,
 } from 'lucide-react';
-
-interface PlanCard {
-  id: string;
-  name: string;
-  price: number;
-  period: string;
-  purpose: PaymentPurpose;
-  productCode: string;
-  badge?: string;
-  isPopular?: boolean;
-  features: string[];
-  description: string;
-}
-
-const SUBSCRIPTION_PLANS: PlanCard[] = [
-  {
-    id: 'plan_starter',
-    name: 'Starter Agent',
-    price: 2499,
-    period: '/ month',
-    purpose: 'SUBSCRIPTION',
-    productCode: 'SUB_PRO_1M',
-    description: 'Ideal for independent property owners and solo agents starting out.',
-    features: [
-      '10 Active Property Listings',
-      'Direct WhatsApp & Call Lead Routing',
-      'Standard Search Placement',
-      'Basic Lead Management CRM',
-      'Community Support',
-    ],
-  },
-  {
-    id: 'plan_pro',
-    name: 'Featured Broker Pro',
-    price: 6999,
-    period: '/ month',
-    purpose: 'SUBSCRIPTION',
-    productCode: 'SUB_PRO_3M',
-    badge: 'Most Popular',
-    isPopular: true,
-    description: 'High-growth package for accredited brokers, teams, and high-volume sellers.',
-    features: [
-      '35 Active Property Listings',
-      'myproperty Verified Agent Badge',
-      'Top-of-Search Featured Boost',
-      'Instant SMS & WhatsApp Lead Dispatch',
-      'Priority Listing Moderation (< 2 hrs)',
-      'Sub-user & Team Management',
-    ],
-  },
-  {
-    id: 'plan_enterprise',
-    name: 'Developer & Enterprise',
-    price: 19999,
-    period: '/ month',
-    purpose: 'SUBSCRIPTION',
-    productCode: 'SUB_BIZ_1M',
-    badge: 'Enterprise',
-    description: 'Complete commercial scale for builder townships, developers, and corporate brokers.',
-    features: [
-      'Unlimited Project Phases & Inventory',
-      'Prominent Homepage Hero Showcase',
-      'Dedicated Account Manager',
-      '9:16 High-Res Reel Video Uploads',
-      'Custom 3D Virtual Tour Embeds',
-      'Full CRM API & Webhook Export',
-    ],
-  },
-];
 
 export default function BillingDashboardPage() {
   const {
@@ -130,6 +67,8 @@ export default function BillingDashboardPage() {
     ['SUPER_ADMIN', 'ADMIN'].includes(role);
 
   const [recentPayments, setRecentPayments] = React.useState<PaymentItem[]>([]);
+  const [packages, setPackages] = React.useState<PackagePlan[]>([]);
+  const [isPackagesLoading, setIsPackagesLoading] = React.useState(true);
   const [companySettings, setCompanySettings] = React.useState<CompanySettings>({
     appName: 'myproperty Marketplace',
     companySalesNumber: '+91 98765 43210',
@@ -155,10 +94,12 @@ export default function BillingDashboardPage() {
   const loadBillingData = React.useCallback(async () => {
     if (!isAuthenticated || isBillingExempt) return;
     setLoading(true);
+    setIsPackagesLoading(true);
     try {
-      const [paymentsRes, settingsRes] = await Promise.allSettled([
+      const [paymentsRes, settingsRes, packagesRes] = await Promise.allSettled([
         getMyPayments({ page: 1, limit: 5 }),
         getPublicCompanySettings(),
+        getActivePackages(),
       ]);
 
       if (paymentsRes.status === 'fulfilled' && paymentsRes.value?.data) {
@@ -167,10 +108,14 @@ export default function BillingDashboardPage() {
       if (settingsRes.status === 'fulfilled' && settingsRes.value) {
         setCompanySettings(settingsRes.value);
       }
+      if (packagesRes.status === 'fulfilled' && Array.isArray(packagesRes.value)) {
+        setPackages(packagesRes.value);
+      }
     } catch {
       // Non-blocking fallback
     } finally {
       setLoading(false);
+      setIsPackagesLoading(false);
     }
   }, [isAuthenticated, isBillingExempt]);
 
@@ -179,53 +124,52 @@ export default function BillingDashboardPage() {
       loadBillingData();
     } else if (!isAuthLoading) {
       setLoading(false);
+      setIsPackagesLoading(false);
     }
   }, [isAuthenticated, isAuthLoading, isBillingExempt, loadBillingData]);
 
-  if (isBillingExempt) {
-    return (
-      <div className="max-w-2xl mx-auto py-20 px-4 text-center space-y-5">
-        <div className="w-16 h-16 rounded-3xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center mx-auto shadow-sm">
-          <CheckCircle2 className="w-8 h-8" />
-        </div>
-        <div className="space-y-2">
-          <h1 className="text-2xl font-bold text-casa-text-primary">
-            Direct Marketplace Access
-          </h1>
-          <p className="text-sm text-casa-text-secondary max-w-md mx-auto">
-            Billing, pricing plans, subscriptions, and free trials are not required for your account. You have full access to explore properties and contact advertisers.
-          </p>
-        </div>
-        <div className="pt-2 flex justify-center gap-3">
-          <Link href="/properties">
-            <button className="px-5 py-2.5 rounded-xl bg-casa-brand hover:bg-casa-brand-hover text-white text-xs font-bold transition-colors">
-              Browse Marketplace
-            </button>
-          </Link>
-          <Link href="/dashboard">
-            <button className="px-5 py-2.5 rounded-xl border border-casa-border-light hover:bg-casa-subtle text-casa-text-primary text-xs font-semibold transition-colors">
-              Go to Dashboard
-            </button>
-          </Link>
-        </div>
-      </div>
-    );
-  }
+  // Role-based visibility: display only active plans applicable to current user's account type
+  const eligiblePackages = React.useMemo(() => {
+    if (!packages || packages.length === 0) return [];
+    return packages
+      .filter((pkg) => {
+        if (!pkg.isActive) return false;
+        if (
+          !pkg.targetAccountTypes ||
+          pkg.targetAccountTypes.length === 0 ||
+          pkg.targetAccountTypes.includes('ALL')
+        ) {
+          return true;
+        }
+        return pkg.targetAccountTypes.some((t) => {
+          const target = t.toUpperCase();
+          return (
+            target === role ||
+            target === accountType ||
+            (target === 'PROPERTY_OWNER' && (role === 'OWNER' || accountType === 'OWNER')) ||
+            (target === 'DEVELOPER' && (role === 'BUILDER' || accountType === 'BUILDER'))
+          );
+        });
+      })
+      .sort((a, b) => a.price - b.price);
+  }, [packages, role, accountType]);
 
-  const handleSubscribe = async (plan: PlanCard) => {
+  const handleSubscribe = async (plan: PackagePlan) => {
     if (!isAuthenticated) {
       openAuthModal();
       return;
     }
 
-    setProcessingPlanId(plan.id);
+    const planKey = plan.id || plan._id || plan.slug;
+    setProcessingPlanId(planKey);
     try {
       // 1. Create Order on Backend
       const order = await createPaymentOrder({
-        purpose: plan.purpose,
-        productCode: plan.productCode,
+        purpose: 'SUBSCRIPTION',
+        productCode: plan.slug || plan.id || plan._id || '',
         metadata: {
           planName: plan.name,
+          packageId: plan.id || plan._id,
           platform: 'web',
         },
       });
@@ -428,79 +372,116 @@ export default function BillingDashboardPage() {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {SUBSCRIPTION_PLANS.map((plan) => {
-            const isProcessing = processingPlanId === plan.id;
-            return (
-              <div
-                key={plan.id}
-                className={`rounded-3xl p-6 sm:p-7 flex flex-col justify-between transition-all relative ${
-                  plan.isPopular
-                    ? 'bg-casa-surface border-2 border-casa-brand shadow-elevated scale-[1.02]'
-                    : 'bg-casa-surface border border-casa-border-light shadow-subtle hover:border-casa-border-medium'
-                }`}
-              >
-                {plan.badge && (
-                  <div className="absolute -top-3 right-6 bg-casa-brand text-white text-[10px] font-extrabold uppercase tracking-wider px-3 py-1 rounded-full shadow-xs">
-                    {plan.badge}
-                  </div>
-                )}
-
-                <div className="space-y-4">
-                  <div>
-                    <h3 className="text-lg font-bold text-casa-text-primary">{plan.name}</h3>
-                    <p className="text-xs text-casa-text-muted mt-1 leading-relaxed">
-                      {plan.description}
-                    </p>
-                  </div>
-
-                  <div className="flex items-baseline gap-1 border-b border-casa-border-light pb-4">
-                    <span className="text-3xl font-extrabold text-casa-text-primary">
-                      ₹{plan.price.toLocaleString()}
-                    </span>
-                    <span className="text-xs text-casa-text-muted font-semibold">
-                      {plan.period}
-                    </span>
-                  </div>
-
-                  <ul className="space-y-2.5 text-xs text-casa-text-secondary">
-                    {plan.features.map((feat, i) => (
-                      <li key={i} className="flex items-start gap-2">
-                        <Check className="w-4 h-4 text-emerald-600 flex-shrink-0 mt-0.5" />
-                        <span>{feat}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-
-                <div className="pt-6 mt-6 border-t border-casa-border-light">
-                  <button
-                    type="button"
-                    onClick={() => handleSubscribe(plan)}
-                    disabled={isProcessing}
-                    className={`w-full py-2.5 px-4 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
-                      plan.isPopular
-                        ? 'bg-casa-brand hover:bg-casa-brand-hover text-white shadow-subtle'
-                        : 'bg-casa-subtle hover:bg-casa-border-light text-casa-text-primary'
-                    }`}
-                  >
-                    {isProcessing ? (
-                      <>
-                        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                        <span>Processing Order...</span>
-                      </>
-                    ) : (
-                      <>
-                        <span>Upgrade to {plan.name}</span>
-                        <ArrowRight className="w-3.5 h-3.5" />
-                      </>
-                    )}
-                  </button>
-                </div>
+        {isPackagesLoading ? (
+          <div className="p-12 text-center text-xs text-casa-text-muted bg-casa-surface border border-casa-border-light rounded-3xl">
+            <RefreshCw className="w-5 h-5 animate-spin mx-auto text-casa-brand mb-2" />
+            <span>Loading active subscription plans...</span>
+          </div>
+        ) : eligiblePackages.length === 0 ? (
+          <div className="p-12 text-center bg-casa-surface border border-casa-border-light rounded-3xl space-y-4">
+            <div className="w-14 h-14 rounded-2xl bg-casa-subtle text-casa-text-muted flex items-center justify-center mx-auto">
+              <CreditCard className="w-7 h-7" />
+            </div>
+            <div className="space-y-1">
+              <h3 className="text-base font-bold text-casa-text-primary">
+                No plans are currently available.
+              </h3>
+              <p className="text-xs text-casa-text-muted max-w-sm mx-auto leading-relaxed">
+                There are currently no active subscription packages configured for your account type. Please contact our corporate sales desk for bespoke enterprise arrangements.
+              </p>
+            </div>
+            {companySettings?.companySalesNumber && (
+              <div className="pt-2">
+                <a
+                  href={`tel:${companySettings.companySalesNumber}`}
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-casa-border-light text-xs font-semibold text-casa-text-primary hover:bg-casa-subtle transition-colors"
+                >
+                  <Phone className="w-3.5 h-3.5 text-casa-brand" />
+                  <span>Contact Sales Desk ({companySettings.companySalesNumber})</span>
+                </a>
               </div>
-            );
-          })}
-        </div>
+            )}
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {eligiblePackages.map((plan) => {
+              const planKey = plan.id || plan._id || plan.slug;
+              const isProcessing = processingPlanId === planKey;
+              return (
+                <div
+                  key={planKey}
+                  className={`rounded-3xl p-6 sm:p-7 flex flex-col justify-between transition-all relative ${
+                    plan.isPopular
+                      ? 'bg-casa-surface border-2 border-casa-brand shadow-elevated scale-[1.02]'
+                      : 'bg-casa-surface border border-casa-border-light shadow-subtle hover:border-casa-border-medium'
+                  }`}
+                >
+                  {plan.isPopular && (
+                    <div className="absolute -top-3 right-6 bg-casa-brand text-white text-[10px] font-extrabold uppercase tracking-wider px-3 py-1 rounded-full shadow-xs">
+                      Popular Plan
+                    </div>
+                  )}
+
+                  <div className="space-y-4">
+                    <div>
+                      <h3 className="text-lg font-bold text-casa-text-primary">{plan.name}</h3>
+                      {plan.description && (
+                        <p className="text-xs text-casa-text-muted mt-1 leading-relaxed">
+                          {plan.description}
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="flex items-baseline gap-1 border-b border-casa-border-light pb-4">
+                      <span className="text-3xl font-extrabold text-casa-text-primary">
+                        ₹{plan.price.toLocaleString()}
+                      </span>
+                      <span className="text-xs text-casa-text-muted font-semibold">
+                        /{plan.billingPeriod ? plan.billingPeriod.toLowerCase().replace(/_/g, ' ') : 'month'}
+                      </span>
+                    </div>
+
+                    {plan.features && plan.features.length > 0 && (
+                      <ul className="space-y-2.5 text-xs text-casa-text-secondary">
+                        {plan.features.map((feat, i) => (
+                          <li key={i} className="flex items-start gap-2">
+                            <Check className="w-4 h-4 text-emerald-600 flex-shrink-0 mt-0.5" />
+                            <span>{feat}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+
+                  <div className="pt-6 mt-6 border-t border-casa-border-light">
+                    <button
+                      type="button"
+                      onClick={() => handleSubscribe(plan)}
+                      disabled={isProcessing}
+                      className={`w-full py-2.5 px-4 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                        plan.isPopular
+                          ? 'bg-casa-brand hover:bg-casa-brand-hover text-white shadow-subtle'
+                          : 'bg-casa-subtle hover:bg-casa-border-light text-casa-text-primary'
+                      }`}
+                    >
+                      {isProcessing ? (
+                        <>
+                          <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                          <span>Processing Order...</span>
+                        </>
+                      ) : (
+                        <>
+                          <span>Upgrade to {plan.name}</span>
+                          <ArrowRight className="w-3.5 h-3.5" />
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* Recent Transactions & Billing Statements */}

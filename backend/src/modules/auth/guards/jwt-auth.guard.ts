@@ -124,6 +124,9 @@ export class JwtAuthGuard implements CanActivate {
         norm.platformRole === PlatformRole.ADMIN ||
         norm.platformRole === PlatformRole.MODERATOR;
 
+      let isTrialActive = Boolean(user?.isTrialActive ?? payload.isTrialActive);
+      let trialExpired = Boolean(user?.trialExpired ?? payload.trialExpired);
+
       if (!isConsumerAccount && !isPlatformAdmin && user) {
         const hasActivePackage = Boolean(user.activePackageId);
         const hasExpiredTrial = Boolean(
@@ -131,6 +134,8 @@ export class JwtAuthGuard implements CanActivate {
         );
 
         if (hasExpiredTrial && !hasActivePackage) {
+          isTrialActive = false;
+          trialExpired = true;
           if (this.userModel && user.isTrialActive) {
             try {
               await this.userModel.updateOne(
@@ -139,9 +144,6 @@ export class JwtAuthGuard implements CanActivate {
               );
             } catch {}
           }
-          throw new UnauthorizedException(
-            'Your 3-day free trial has expired. Complete KYC verification and get an active plan to continue.'
-          );
         }
       }
 
@@ -159,6 +161,10 @@ export class JwtAuthGuard implements CanActivate {
             : payload.permissions || [],
         status: user?.status || payload.status,
         isVerifiedAgent: norm.isVerifiedAgent,
+        isTrialActive,
+        trialExpired,
+        activePackageId: user?.activePackageId || payload.activePackageId,
+        kycStatus: user?.kycStatus || payload.kycStatus,
       };
 
       request.user = authenticatedUser;
