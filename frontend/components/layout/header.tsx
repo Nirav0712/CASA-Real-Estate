@@ -156,9 +156,9 @@ export function Header() {
 
   return (
     <>
-      <header className="sticky top-0 z-40 bg-casa-surface/95 backdrop-blur-md border-b border-casa-border-light transition-colors duration-200 py-1.5 sm:py-2">
+      <header className="sticky top-0 z-40 bg-casa-surface/95 backdrop-blur-md border-b border-casa-border-light transition-colors duration-200 py-1">
         <Container>
-          <div className="flex items-center justify-between min-h-[4.75rem] py-2">
+          <div className="flex items-center justify-between min-h-[4rem] sm:min-h-[4.25rem] py-1">
             {/* Logo & Brand Identity */}
             <Logo size="md" height={48} href="/" />
 

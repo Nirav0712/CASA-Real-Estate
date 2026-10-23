@@ -7,11 +7,13 @@ import { Category } from './schemas/category.schema';
 import { UserRole, AccountStatus, PlatformRole, AccountType } from '../auth/enums/auth.enums';
 import { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
 import { EntitlementsService } from '../entitlements/entitlements.service';
+import { User } from '../auth/schemas/user.schema';
 
 describe('PropertiesService (Phase 06 Lifecycle & Security)', () => {
   let service: PropertiesService;
   let mockPropertyModel: any;
   let mockCategoryModel: any;
+  let mockUserModel: any;
 
   const mockAgentUser: AuthenticatedUser = {
     id: 'user-agent-123',
@@ -105,6 +107,19 @@ describe('PropertiesService (Phase 06 Lifecycle & Security)', () => {
       findOneAndDelete: jest.fn(),
     };
 
+    mockUserModel = {
+      find: jest.fn().mockReturnValue({
+        select: jest.fn().mockReturnValue({
+          lean: jest.fn().mockResolvedValue([]),
+        }),
+      }),
+      findOne: jest.fn().mockReturnValue({
+        select: jest.fn().mockReturnValue({
+          lean: jest.fn().mockResolvedValue(null),
+        }),
+      }),
+    };
+
     const mockEntitlementsService = {
       trackAndValidatePropertyView: jest.fn().mockResolvedValue({
         allowed: true,
@@ -114,7 +129,7 @@ describe('PropertiesService (Phase 06 Lifecycle & Security)', () => {
         limit: 10,
         deduplicated: false,
       }),
-      redactContactData: jest.fn().mockImplementation((prop, hasPerm) => ({
+      redactContactData: jest.fn().mockImplementation((prop: any, hasPerm: boolean) => ({
         ...(prop?.toObject ? prop.toObject() : prop),
         contactLocked: !hasPerm,
       })),
@@ -125,6 +140,7 @@ describe('PropertiesService (Phase 06 Lifecycle & Security)', () => {
         PropertiesService,
         { provide: getModelToken(Property.name), useValue: mockPropertyModel },
         { provide: getModelToken(Category.name), useValue: mockCategoryModel },
+        { provide: getModelToken(User.name), useValue: mockUserModel },
         { provide: EntitlementsService, useValue: mockEntitlementsService },
       ],
     }).compile();
@@ -279,6 +295,7 @@ describe('PropertiesService (Phase 06 Lifecycle & Security)', () => {
         expect.objectContaining({
           status: { $in: ['PUBLISHED', 'ACTIVE'] },
           isPublished: true,
+          isSuspendedByAccount: { $ne: true },
         }),
         expect.objectContaining({
           moderation: 0,
@@ -286,6 +303,35 @@ describe('PropertiesService (Phase 06 Lifecycle & Security)', () => {
           rejectionReason: 0,
           adminRemark: 0,
         }),
+      );
+    });
+
+    it('should enforce advertiser suspension: excludes suspended user listings in search', async () => {
+      mockUserModel.find.mockReturnValue({
+        select: jest.fn().mockReturnValue({
+          lean: jest.fn().mockResolvedValue([{ _id: 'suspended-user-id', id: 'user-suspended-1' }]),
+        }),
+      });
+
+      const queryMock = {
+        sort: jest.fn().mockReturnThis(),
+        skip: jest.fn().mockReturnThis(),
+        limit: jest.fn().mockReturnThis(),
+        lean: jest.fn().mockResolvedValue([samplePropertyDoc]),
+      };
+      mockPropertyModel.find.mockReturnValue(queryMock);
+      mockPropertyModel.countDocuments.mockResolvedValue(1);
+
+      await service.search({});
+
+      expect(mockPropertyModel.find).toHaveBeenCalledWith(
+        expect.objectContaining({
+          status: { $in: ['PUBLISHED', 'ACTIVE'] },
+          isPublished: true,
+          isSuspendedByAccount: { $ne: true },
+          ownerId: { $nin: ['suspended-user-id', 'user-suspended-1'] },
+        }),
+        expect.anything(),
       );
     });
 

@@ -74,19 +74,14 @@ export default function HomePage() {
   const [isFeaturedLoading, setIsFeaturedLoading] = React.useState(true);
   const [isFeaturedFallback, setIsFeaturedFallback] = React.useState(false);
 
-  // Initialize Hero Filters with detected location on mount
+  // Initialize Hero Filters on mount without restricting to a single city by default
   React.useEffect(() => {
     if (detectedLocation) {
       setHeroFilters((prev) => {
-        // Only set if not explicitly chosen by user yet
         const country = prev.country || detectedLocation.countrySlug || 'india';
-        const state = prev.state || detectedLocation.stateSlug || 'gujarat';
-        const city = prev.city || detectedLocation.citySlug || 'ahmedabad';
         return {
           ...prev,
           country,
-          state,
-          city,
         };
       });
     }
@@ -99,16 +94,16 @@ export default function HomePage() {
       const targetCity =
         heroFilters.city && heroFilters.city !== 'all'
           ? heroFilters.city
-          : detectedLocation?.citySlug;
+          : undefined;
 
       const targetState =
         heroFilters.state && heroFilters.state !== 'all'
           ? heroFilters.state
-          : detectedLocation?.stateSlug;
+          : undefined;
 
       const res = await getProperties({
         category: heroFilters.category !== 'all' ? heroFilters.category : undefined,
-        listingType: heroFilters.listingMode,
+        listingType: heroFilters.listingMode || undefined,
         country: heroFilters.country !== 'all' ? heroFilters.country : undefined,
         state: targetState,
         city: targetCity,
@@ -118,13 +113,14 @@ export default function HomePage() {
         userState: detectedLocation?.state,
       });
 
-      // If specific city filter returned 0 items, load state/broader properties with fallback banner
-      if (res.properties.length === 0 && targetCity && targetCity !== 'all') {
+      // If specific city/state filter returned 0 items, load broader verified properties with fallback banner
+      if (res.properties.length === 0 && (targetCity || targetState)) {
         const fallbackRes = await getProperties({
           category: heroFilters.category !== 'all' ? heroFilters.category : undefined,
-          listingType: heroFilters.listingMode,
+          listingType: heroFilters.listingMode || undefined,
           country: heroFilters.country !== 'all' ? heroFilters.country : undefined,
-          state: targetState,
+          minPrice: heroFilters.minPrice,
+          maxPrice: heroFilters.maxPrice,
           userCity: detectedLocation?.city,
           userState: detectedLocation?.state,
         });
@@ -150,7 +146,7 @@ export default function HomePage() {
         userState: detectedLocation?.state,
       });
       setFeaturedProperties(res.properties);
-      setIsFeaturedFallback(res.source === 'fallback_dev');
+      setIsFeaturedFallback(false);
     } catch {
       setFeaturedProperties([]);
     } finally {
@@ -351,27 +347,20 @@ export default function HomePage() {
             </div>
           </div>
 
-          {/* Controlled Dev Fallback Alert if Offline */}
-          {isFeaturedFallback && (
-            <div className="mb-6 p-4 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-amber-900 dark:text-amber-200 text-xs flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <span className="font-bold">Controlled Dev State:</span>
-                <span>
-                  Showing isolated sample listings to demonstrate the Gemini-inspired design system.
-                </span>
-              </div>
-              <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 bg-amber-200/60 dark:bg-amber-900 rounded">
-                Development Dataset
-              </span>
-            </div>
-          )}
-
           {/* Grid or Skeleton */}
           {isFeaturedLoading ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
               <PropertyCardSkeleton />
               <PropertyCardSkeleton />
               <PropertyCardSkeleton />
+            </div>
+          ) : featuredProperties.length === 0 ? (
+            <div className="text-center py-10 bg-casa-surface border border-casa-border-light rounded-2xl p-6">
+              <Building2 className="w-8 h-8 text-casa-text-muted mx-auto mb-2" />
+              <h3 className="font-bold text-sm text-casa-text-primary">No Featured Properties Available</h3>
+              <p className="text-xs text-casa-text-secondary mt-1 max-w-sm mx-auto">
+                All approved properties are available in the Real-Time Marketplace section below.
+              </p>
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">

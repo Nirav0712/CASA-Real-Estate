@@ -63,7 +63,7 @@ export function PropertyCard({ property }: { property: Property }) {
   const toggleFavorite = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    await toggleSave(propertyId, property.title?.en || (typeof property.title === 'string' ? property.title : 'Property'));
+    await toggleSave(propertyId, typeof property.title === 'string' ? property.title : (property.title?.en || 'Property'));
   };
 
   const handleShare = (e: React.MouseEvent) => {
@@ -82,7 +82,9 @@ export function PropertyCard({ property }: { property: Property }) {
   );
 
   const localizedTitle =
-    property.title[locale] || property.title.en || 'Real Estate Property';
+    typeof property.title === 'string'
+      ? property.title
+      : property.title?.[locale] || property.title?.en || 'Real Estate Property';
 
   const localizedCategory = getCategoryLabel(property.category, locale);
 
@@ -170,15 +172,26 @@ export function PropertyCard({ property }: { property: Property }) {
           className="block w-full h-full relative"
         >
           {/* Base Poster/Thumbnail Image */}
-          <Image
-            src={property.media.thumbnailUrl || 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=800&q=80'}
-            alt={localizedTitle}
-            fill
-            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-            className={`object-cover transition-transform duration-300 group-hover:scale-105 ${
-              hasVideo && isHovered && !isYouTube ? 'opacity-0' : 'opacity-100'
-            }`}
-          />
+          {property.media?.thumbnailUrl?.startsWith('data:') ? (
+            /* eslint-disable-next-line @next/next/no-img-element */
+            <img
+              src={property.media.thumbnailUrl}
+              alt={localizedTitle}
+              className={`absolute inset-0 w-full h-full object-cover transition-transform duration-300 group-hover:scale-105 ${
+                hasVideo && isHovered && !isYouTube ? 'opacity-0' : 'opacity-100'
+              }`}
+            />
+          ) : (
+            <Image
+              src={property.media?.thumbnailUrl || property.media?.coverImage || property.media?.images?.[0] || 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=800&q=80'}
+              alt={localizedTitle}
+              fill
+              sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+              className={`object-cover transition-transform duration-300 group-hover:scale-105 ${
+                hasVideo && isHovered && !isYouTube ? 'opacity-0' : 'opacity-100'
+              }`}
+            />
+          )}
 
           {/* Local Video Hover Preview */}
           {hasVideo && !isYouTube && videoUrl && isHovered && (

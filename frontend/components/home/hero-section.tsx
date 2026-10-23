@@ -174,7 +174,7 @@ export function HeroSection({
       onMouseMove={handleMouseMove}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
-      className="relative min-h-[85vh] lg:min-h-[calc(100vh-5rem)] flex items-center py-16 sm:py-20 md:py-28 lg:py-32 overflow-hidden border-b border-casa-border-light bg-gradient-to-b from-white via-slate-50/50 to-casa-canvas dark:from-slate-950 dark:via-slate-900/50 dark:to-slate-950 transition-colors duration-200"
+      className="relative flex items-center py-6 sm:py-8 md:py-10 lg:py-12 overflow-hidden border-b border-casa-border-light bg-gradient-to-b from-white via-slate-50/50 to-casa-canvas dark:from-slate-950 dark:via-slate-900/50 dark:to-slate-950 transition-colors duration-200"
     >
       {/* Interactive Architectural Blueprint Grid Background */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden" aria-hidden="true">
@@ -199,11 +199,6 @@ export function HeroSection({
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-12 items-center">
           {/* Left Column: Heading, Supporting Content, Trust Indicators & CTAs */}
           <div className="lg:col-span-6 xl:col-span-7 text-start space-y-6">
-            {/* Live Global Badge */}
-            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-casa-brand-subtle text-casa-brand text-xs font-bold border border-blue-200/60 dark:border-blue-800/60 shadow-2xs">
-              <Sparkles className="w-3.5 h-3.5" />
-              <span>{t('phaseLiveBadge')}</span>
-            </div>
 
             {/* Main Headline */}
             <h1 className="text-3xl sm:text-4xl md:text-5xl xl:text-5xl font-extrabold tracking-tight text-casa-text-primary leading-[1.15]">

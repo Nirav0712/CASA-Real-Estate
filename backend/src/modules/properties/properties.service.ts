@@ -289,15 +289,8 @@ export class PropertiesService implements OnModuleInit {
         this.logger.log('✅ Canonical categories seeded successfully.');
       }
 
-      const propCount = await this.propertyModel.countDocuments();
-      if (
-        propCount === 0 &&
-        (process.env.NODE_ENV === 'test' || process.env.SEED_DEV_PROPERTIES === 'true')
-      ) {
-        this.logger.log('Seeding initial verified properties into MongoDB Atlas for test environment...');
-        await this.propertyModel.insertMany(INITIAL_SEED_PROPERTIES);
-        this.logger.log('✅ Verified properties seeded successfully into MongoDB Atlas.');
-      }
+      // Mock/demo properties seeding disabled to prevent fake listings from entering MongoDB
+      // Canonical categories are preserved
     } catch (err: any) {
       this.logger.warn(`Database seeding note: ${err?.message}`);
     }
@@ -784,6 +777,23 @@ export class PropertiesService implements OnModuleInit {
       // 1. Invariant: Public Discovery ONLY returns strictly published listings
       filter.status = { $in: ['PUBLISHED', 'ACTIVE'] };
       filter.isPublished = true;
+      // Enforce advertiser account status: Immediately hide listings of suspended/inactive advertisers from public search
+      filter.isSuspendedByAccount = { $ne: true };
+
+      try {
+        const inactiveUsers = await this.userModel
+          .find({ status: { $in: [AccountStatus.SUSPENDED, AccountStatus.DEACTIVATED] } })
+          .select('_id id')
+          .lean();
+        if (inactiveUsers && inactiveUsers.length > 0) {
+          const inactiveIds = inactiveUsers.flatMap((u: any) => [u._id?.toString(), u.id].filter(Boolean));
+          filter.ownerId = { $nin: inactiveIds };
+          filter.advertiserId = { $nin: inactiveIds };
+          filter.createdBy = { $nin: inactiveIds };
+        }
+      } catch (uErr: any) {
+        this.logger.warn(`Inactive user filter note in search: ${uErr?.message}`);
+      }
 
       // 2. Keyword Search across multilingual title, description, location, category, referenceId
       if (dto.q && dto.q.trim()) {

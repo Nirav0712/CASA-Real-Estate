@@ -241,7 +241,7 @@ export default function AgentDashboardPage() {
               </p>
             </div>
             <span className="text-xs font-semibold px-3 py-1 bg-casa-50 text-casa-700 rounded-full border border-casa-200 self-start sm:self-auto">
-              Phase 15 Conversion Engine
+              Lead Conversion Engine
             </span>
           </div>
 
