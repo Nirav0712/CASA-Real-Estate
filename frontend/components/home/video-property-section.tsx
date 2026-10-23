@@ -39,16 +39,15 @@ import {
   EyeOff,
 } from 'lucide-react';
 
-// Fake/demo mock reels removed - live verified properties only
+// Live authoritative database-backed video property dataset
 const FALLBACK_VIDEO_PROPERTIES: Property[] = [];
 
 export function VideoPropertySection() {
   const toast = useToast();
   const { user, isAuthenticated } = useAuth();
   const [properties, setProperties] = React.useState<Property[]>([]);
-  const [isLoading, setIsLoading] = React.useState(false);
+  const [isLoading, setIsLoading] = React.useState(true);
   const [visibleCount, setVisibleCount] = React.useState(9);
-
 
   // Filters State
   const [locationFilter, setLocationFilter] = React.useState('ALL');
@@ -59,32 +58,10 @@ export function VideoPropertySection() {
   const [activeVideoIndex, setActiveVideoIndex] = React.useState<number | null>(null);
   const [showDetailsDrawer, setShowDetailsDrawer] = React.useState(false);
 
-  // Fetch real videos from API with fallback & local storage sync
+  // Fetch real authoritative videos strictly from backend API
   const loadVideos = React.useCallback(async () => {
     setIsLoading(true);
     try {
-      // 1. Check deleted IDs
-      let deletedIds = new Set<string>();
-      try {
-        const storedDeleted = localStorage.getItem('casa_deleted_reels');
-        if (storedDeleted) {
-          deletedIds = new Set(JSON.parse(storedDeleted));
-        }
-      } catch (_) {}
-
-      // 2. Check if user explicitly hid demo reels
-      const hideDemoReels = localStorage.getItem('casa_hide_demo_reels') === 'true';
-
-      // 3. Sync with custom reels created via Dashboard or New Property
-      let customReels: Property[] = [];
-      try {
-        const storedCustom = localStorage.getItem('casa_custom_reels');
-        if (storedCustom) {
-          customReels = JSON.parse(storedCustom);
-        }
-      } catch (_) {}
-
-      // 4. Fetch properties from API
       let apiProperties: Property[] = [];
       try {
         const res = await searchProperties({
@@ -93,45 +70,36 @@ export function VideoPropertySection() {
         });
         if (res && Array.isArray(res.data) && res.data.length > 0) {
           apiProperties = res.data.filter(
-            (p) => Boolean((p.media?.videoUrl || (p as any).videoUrl || (p.media?.videos && p.media.videos.length > 0) || '').trim())
+            (p) =>
+              Boolean(
+                (p.media?.videoUrl || (p as any).videoUrl || (p.media?.videos && p.media.videos.length > 0) || '').trim()
+              ) &&
+              p.isPublished &&
+              p.status === 'PUBLISHED' &&
+              !p.isSuspendedByAccount
           );
         }
-      } catch (_) {}
+      } catch (_) { }
 
-      // Fallback check: if searchProperties returned 0, try getProperties
+      // Fallback check: if searchProperties returned 0, query getProperties directly
       if (apiProperties.length === 0) {
         try {
           const allProps = await getProperties({ hasVideo: true });
           apiProperties = (allProps.properties || []).filter(
-            (p) => Boolean((p.media?.videoUrl || (p as any).videoUrl || (p.media?.videos && p.media.videos.length > 0) || '').trim())
+            (p) =>
+              Boolean(
+                (p.media?.videoUrl || (p as any).videoUrl || (p.media?.videos && p.media.videos.length > 0) || '').trim()
+              ) &&
+              p.isPublished &&
+              p.status === 'PUBLISHED' &&
+              !p.isSuspendedByAccount
           );
-        } catch (_) {}
+        } catch (_) { }
       }
 
-      const apiList = apiProperties.filter((p) => !deletedIds.has(p.id));
-      const apiIds = new Set(apiList.map((p) => p.id));
-      const validCustom = customReels.filter((p) => !deletedIds.has(p.id) && !apiIds.has(p.id));
-
-      const realCount = validCustom.length + apiList.length;
-
-      // Only show fallbacks if there are ZERO real properties and demo reels have not been hidden!
-      let fallbacksToShow: Property[] = [];
-      if (!hideDemoReels && realCount === 0) {
-        fallbacksToShow = FALLBACK_VIDEO_PROPERTIES.filter((p) => !deletedIds.has(p.id));
-      }
-
-      const combined = [
-        ...validCustom,
-        ...apiList,
-        ...fallbacksToShow.filter((p) => !apiIds.has(p.id)),
-      ];
-
-      setProperties(combined);
+      setProperties(apiProperties);
     } catch (_) {
-      const hideDemo = localStorage.getItem('casa_hide_demo_reels') === 'true';
-      if (!hideDemo) {
-        setProperties(FALLBACK_VIDEO_PROPERTIES);
-      }
+      setProperties([]);
     } finally {
       setIsLoading(false);
     }
@@ -139,17 +107,6 @@ export function VideoPropertySection() {
 
   React.useEffect(() => {
     loadVideos();
-
-    const handleReelsUpdated = () => {
-      loadVideos();
-    };
-    window.addEventListener('casa_reels_updated', handleReelsUpdated);
-    window.addEventListener('storage', handleReelsUpdated);
-
-    return () => {
-      window.removeEventListener('casa_reels_updated', handleReelsUpdated);
-      window.removeEventListener('storage', handleReelsUpdated);
-    };
   }, [loadVideos]);
 
   // Filter logic

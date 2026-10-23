@@ -390,6 +390,7 @@ export interface Property {
   isPublished?: boolean;
   publishedAt?: string;
   isFeatured?: boolean;
+  isSuspendedByAccount?: boolean;
   moderation?: ModerationMetadata;
   structureType?: PropertyStructureType;
   isParentProject?: boolean;

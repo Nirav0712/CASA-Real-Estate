@@ -62,7 +62,6 @@ export function Header() {
     isTrialActive,
     isTrialExpired,
     trialDaysRemaining,
-    trialRemainingLabel,
     startTrial,
   } = useAuth();
   const toast = useToast();
@@ -136,17 +135,6 @@ export function Header() {
       setStartingTrial(false);
     }
   };
-
-  const showTrialCountdown = Boolean(
-    user &&
-      !isBuyerOrTenant &&
-      !isAdmin &&
-      !user.activePackageId &&
-      (isTrialActive || (user.isTrialActive && !user.trialExpired)) &&
-      (trialRemainingLabel || user.trialRemainingLabel),
-  );
-  const activeRemainingLabel =
-    trialRemainingLabel || user?.trialRemainingLabel || `${trialDaysRemaining} Days Remaining`;
 
   const toggleTheme = () => {
     if (theme === 'light') setTheme('dark');
@@ -233,10 +221,10 @@ export function Header() {
                 <button
                   type="button"
                   onClick={openPlanSelectionModal}
-                  className="hidden md:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30 text-xs font-bold transition-all cursor-pointer"
+                  className="hidden md:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30 text-xs font-bold transition-all cursor-pointer whitespace-nowrap"
                   title="3-Day Free Trial Active. Click to view all plans."
                 >
-                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse flex-shrink-0" />
                   <span>3-Day Trial: {trialDaysRemaining}d Left</span>
                 </button>
               )}
@@ -245,11 +233,11 @@ export function Header() {
                 <button
                   type="button"
                   onClick={openTrialExpiredModal}
-                  className="hidden md:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-700 dark:text-red-400 border border-red-500/30 text-xs font-bold transition-all animate-pulse cursor-pointer"
+                  className="hidden md:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-700 dark:text-red-400 border border-red-500/30 text-xs font-bold transition-all animate-pulse cursor-pointer whitespace-nowrap"
                   title="3-Day Trial Expired. Click to call our sales department to activate."
                 >
-                  <PhoneCall className="w-3.5 h-3.5 text-red-500 animate-bounce" />
-                  <span>Trial Ended • Call Sales</span>
+                  <PhoneCall className="w-3.5 h-3.5 text-red-500 animate-bounce flex-shrink-0" />
+                  <span>Trial Expired</span>
                 </button>
               )}
 
@@ -640,14 +628,6 @@ export function Header() {
                 >
                   Start 3-Day Free Trial
                 </Button>
-              )}
-
-              {/* Active Trial Countdown Header Badge */}
-              {showTrialCountdown && (
-                <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 shadow-sm animate-pulse">
-                  <Clock className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-                  <span>{activeRemainingLabel}</span>
-                </div>
               )}
 
               {/* Post Free Property CTA (Role-based: hidden for Buyer & Tenant) */}

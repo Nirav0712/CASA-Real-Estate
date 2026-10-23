@@ -677,11 +677,14 @@ export class PropertiesService implements OnModuleInit {
       if (query.hasVideo === true || query.hasVideo === 'true') {
         filter.status = { $in: ['PUBLISHED', 'ACTIVE'] };
         filter.isPublished = true;
-        filter.$or = [
-          { 'media.videoUrl': { $exists: true, $nin: ['', null] } },
-          { videoUrl: { $exists: true, $nin: ['', null] } },
-          { 'media.videos.0': { $exists: true, $nin: ['', null] } },
-        ];
+        filter.$and = filter.$and || [];
+        filter.$and.push({
+          $or: [
+            { 'media.videoUrl': { $exists: true, $nin: ['', null] } },
+            { videoUrl: { $exists: true, $nin: ['', null] } },
+            { 'media.videos.0': { $exists: true, $nin: ['', null] } },
+          ],
+        });
       }
 
       if (query.type && query.type !== 'all') {

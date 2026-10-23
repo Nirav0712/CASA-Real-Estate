@@ -151,42 +151,10 @@ export default function BrokerReelsPage() {
 
       // Filter properties that have a video or reel format
       const myVideoProps = (myProps || []).filter(
-        (p) => Boolean(p.media?.videoUrl || (p as any).videoUrl || p.media?.isReelFormat),
+        (p) => Boolean((p.media?.videoUrl || (p as any).videoUrl || p.media?.isReelFormat || '').trim()),
       );
 
-      // Check deleted list
-      let deletedIds = new Set<string>();
-      try {
-        const storedDeleted = localStorage.getItem('casa_deleted_reels');
-        if (storedDeleted) deletedIds = new Set(JSON.parse(storedDeleted));
-      } catch (_) {}
-
-      // Check custom reels created in current session / local storage
-      let customReels: Property[] = [];
-      try {
-        const stored = localStorage.getItem('casa_custom_reels');
-        if (stored) customReels = JSON.parse(stored);
-      } catch (_) {}
-
-      const userCustom = customReels.filter(
-        (p) =>
-          !deletedIds.has(p.id) &&
-          (p.advertiser?.phone === user?.mobile ||
-            p.advertiser?.name === user?.name ||
-            (p as any).createdBy === user?.id ||
-            p.ownerId === user?.id ||
-            user?.role === 'SUPER_ADMIN' ||
-            user?.role === 'ADMIN'),
-      );
-
-      const apiFiltered = myVideoProps.filter((p) => !deletedIds.has(p.id));
-      const apiIds = new Set(apiFiltered.map((p) => p.id));
-      const combined = [
-        ...userCustom.filter((p) => !apiIds.has(p.id)),
-        ...apiFiltered,
-      ];
-
-      setReels(combined);
+      setReels(myVideoProps);
     } catch (err: unknown) {
       toast.error('Sync Notice', 'Failed to load video reels.');
     } finally {

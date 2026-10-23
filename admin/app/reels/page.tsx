@@ -34,213 +34,8 @@ import {
   AlertTriangle,
 } from 'lucide-react';
 
-// Default initial dataset matching the frontend fallbacks so super admin can manage them immediately
-const INITIAL_REELS: any[] = [
-  {
-    id: 'vid-reel-01',
-    slug: '4-bhk-luxury-villa-gomti-nagar-ext',
-    title: {
-      en: '4 BHK Luxury Independent Villa with Private Garden',
-      hi: 'गोमती नगर में 4 बीएचके लक्जरी विला',
-    },
-    category: 'House / Home',
-    listingType: 'SALE',
-    price: { amount: 18500000, currency: 'INR', priceUnit: 'TOTAL' },
-    location: {
-      state: 'Uttar Pradesh',
-      city: 'Lucknow',
-      area: 'Gomti Nagar',
-      subArea: 'Gomti Nagar Extension',
-      society: 'Omaxe Residency',
-      locality: 'Gomti Nagar Extension',
-    },
-    specs: { bedrooms: 4, bathrooms: 4, carpetAreaSqFt: 3200 },
-    media: {
-      thumbnailUrl:
-        'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=800&q=80',
-      videoUrl: 'https://www.youtube.com/shorts/aqz-KE-bpKQ',
-      isReelFormat: true,
-    },
-    advertiser: {
-      name: 'Verma Luxury Estates',
-      phone: '+919925843589',
-      isVerifiedAgent: true,
-      role: 'VERIFIED_AGENT',
-    },
-    status: 'PUBLISHED',
-    isPublished: true,
-  },
-  {
-    id: 'vid-reel-02',
-    slug: '3-bhk-high-rise-penthouse-satellite-ahmedabad',
-    title: {
-      en: '3 BHK High-Rise Penthouse with Sky Deck',
-      hi: 'अहमदाबाद में 3 बीएचके स्काई पेंटहाउस',
-    },
-    category: 'Apartment',
-    listingType: 'SALE',
-    price: { amount: 14500000, currency: 'INR', priceUnit: 'TOTAL' },
-    location: {
-      state: 'Gujarat',
-      city: 'Ahmedabad',
-      area: 'Satellite',
-      subArea: 'Jodhpur Cross Road',
-      society: 'Goyal Riviera',
-      locality: 'Satellite',
-    },
-    specs: { bedrooms: 3, bathrooms: 3, carpetAreaSqFt: 2450 },
-    media: {
-      thumbnailUrl:
-        'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=800&q=80',
-      videoUrl: 'https://www.youtube.com/shorts/aqz-KE-bpKQ',
-      isReelFormat: true,
-    },
-    advertiser: {
-      name: 'Apex Gujarat Realty',
-      phone: '+919876543210',
-      isVerifiedAgent: true,
-      role: 'VERIFIED_AGENT',
-    },
-    status: 'PUBLISHED',
-    isPublished: true,
-  },
-  {
-    id: 'vid-reel-03',
-    slug: 'sea-facing-luxury-condo-bandra-west',
-    title: {
-      en: 'Sea-Facing 2 BHK Designer Condo in Bandra',
-      hi: 'बांद्रा वेस्ट में सी-फेसिंग 2 बीएचके कॉन्डो',
-    },
-    category: 'Apartment',
-    listingType: 'RENT',
-    price: { amount: 125000, currency: 'INR', priceUnit: 'PER_MONTH' },
-    location: {
-      state: 'Maharashtra',
-      city: 'Mumbai',
-      area: 'Bandra West',
-      subArea: 'Carter Road',
-      society: 'Sea Spray Apartments',
-      locality: 'Bandra West',
-    },
-    specs: { bedrooms: 2, bathrooms: 2, carpetAreaSqFt: 1350 },
-    media: {
-      thumbnailUrl:
-        'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=800&q=80',
-      videoUrl: 'https://www.youtube.com/shorts/aqz-KE-bpKQ',
-      isReelFormat: true,
-    },
-    advertiser: {
-      name: 'Mumbai Prime Realty',
-      phone: '+919925843531',
-      isVerifiedAgent: true,
-      role: 'VERIFIED_AGENT',
-    },
-    status: 'PUBLISHED',
-    isPublished: true,
-  },
-  {
-    id: 'vid-reel-04',
-    slug: 'smart-villa-whitefield-bengaluru',
-    title: {
-      en: 'Ultra-Modern Smart Villa in Gated Community',
-      hi: 'व्हाइटफील्ड में अल्ट्रा-मॉडर्न स्मार्ट विला',
-    },
-    category: 'Villa',
-    listingType: 'SALE',
-    price: { amount: 26000000, currency: 'INR', priceUnit: 'TOTAL' },
-    location: {
-      state: 'Karnataka',
-      city: 'Bengaluru',
-      area: 'Whitefield',
-      subArea: 'ITPL Main Road',
-      society: 'Prestige Shantiniketan',
-      locality: 'Whitefield',
-    },
-    specs: { bedrooms: 4, bathrooms: 5, carpetAreaSqFt: 3600 },
-    media: {
-      thumbnailUrl:
-        'https://images.unsplash.com/photo-1613490493576-7fde63acd811?auto=format&fit=crop&w=800&q=80',
-      videoUrl: 'https://www.youtube.com/shorts/aqz-KE-bpKQ',
-      isReelFormat: true,
-    },
-    advertiser: {
-      name: 'Bengaluru Premier Spaces',
-      phone: '+919876543210',
-      isVerifiedAgent: true,
-      role: 'VERIFIED_AGENT',
-    },
-    status: 'PUBLISHED',
-    isPublished: true,
-  },
-  {
-    id: 'vid-reel-05',
-    slug: 'modern-commercial-showroom-hazratganj',
-    title: {
-      en: 'Prime Road-Front Commercial Retail Showroom',
-      hi: 'हज़रतगंज में मुख्य मार्ग पर शोरूम',
-    },
-    category: 'Commercial',
-    listingType: 'RENT',
-    price: { amount: 95000, currency: 'INR', priceUnit: 'PER_MONTH' },
-    location: {
-      state: 'Uttar Pradesh',
-      city: 'Lucknow',
-      area: 'Hazratganj',
-      subArea: 'Main Market Square',
-      society: 'Hazratganj Royale',
-      locality: 'Hazratganj',
-    },
-    specs: { carpetAreaSqFt: 1800 },
-    media: {
-      thumbnailUrl:
-        'https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&w=800&q=80',
-      videoUrl: 'https://www.youtube.com/shorts/aqz-KE-bpKQ',
-      isReelFormat: true,
-    },
-    advertiser: {
-      name: 'Verma Luxury Estates',
-      phone: '+919925843589',
-      isVerifiedAgent: true,
-      role: 'VERIFIED_AGENT',
-    },
-    status: 'PUBLISHED',
-    isPublished: true,
-  },
-  {
-    id: 'vid-reel-06',
-    slug: 'spacious-golf-view-apartment-sushant-golf-city',
-    title: {
-      en: 'Spacious 3 BHK Golf Course Facing Apartment',
-      hi: 'सुशांत गोल्फ सिटी में 3 बीएचके फ्लैट',
-    },
-    category: 'Apartment',
-    listingType: 'SALE',
-    price: { amount: 8800000, currency: 'INR', priceUnit: 'TOTAL' },
-    location: {
-      state: 'Uttar Pradesh',
-      city: 'Lucknow',
-      area: 'Sushant Golf City',
-      subArea: 'Amar Shaheed Path',
-      society: 'Celebrity Gardens',
-      locality: 'Sushant Golf City',
-    },
-    specs: { bedrooms: 3, bathrooms: 3, carpetAreaSqFt: 1950 },
-    media: {
-      thumbnailUrl:
-        'https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?auto=format&fit=crop&w=800&q=80',
-      videoUrl: 'https://www.youtube.com/shorts/aqz-KE-bpKQ',
-      isReelFormat: true,
-    },
-    advertiser: {
-      name: 'Awadh Realtors',
-      phone: '+919925843599',
-      isVerifiedAgent: true,
-      role: 'VERIFIED_AGENT',
-    },
-    status: 'PUBLISHED',
-    isPublished: true,
-  },
-];
+// Live database-backed video property dataset (fake/demo mock reels removed)
+const INITIAL_REELS: any[] = [];
 
 const PUBLIC_FRONTEND_URL =
   process.env.NEXT_PUBLIC_FRONTEND_URL || 'https://casa-real-estate-mocha.vercel.app';
@@ -294,46 +89,24 @@ export default function VideoReelsAdminPage() {
     status: 'PUBLISHED',
   });
 
-  // Load and sync video reels from backend + local storage
+  // Load and sync video reels directly from backend API
   const loadReels = React.useCallback(async () => {
     setIsLoading(true);
     try {
-      // 1. Fetch properties that have a video from API
+      // Fetch properties that have a video from authoritative Admin API
       const res = await fetchAdminApi<any[]>('/admin/properties?limit=100');
-
-      let deletedIds = new Set<string>();
-      try {
-        const storedDeleted = localStorage.getItem('casa_deleted_reels');
-        if (storedDeleted) deletedIds = new Set(JSON.parse(storedDeleted));
-      } catch (_) {}
-
-      let customReels: any[] = [];
-      try {
-        const storedCustom = localStorage.getItem('casa_custom_reels');
-        if (storedCustom) customReels = JSON.parse(storedCustom);
-      } catch (_) {}
 
       let apiVideoProps: any[] = [];
       if (res.isBackendAvailable && Array.isArray(res.data)) {
         apiVideoProps = res.data.filter(
-          (p) =>
-            (p.media?.videoUrl || p.videoUrl || p.media?.isReelFormat) &&
-            !deletedIds.has(p.id),
+          (p) => Boolean((p.media?.videoUrl || p.videoUrl || p.media?.isReelFormat || '').trim()),
         );
       }
 
-      const apiIds = new Set(apiVideoProps.map((p) => p.id));
-      const validCustom = customReels.filter(
-        (p) => !deletedIds.has(p.id) && !apiIds.has(p.id),
-      );
-      const filteredInitial = INITIAL_REELS.filter(
-        (p) => !deletedIds.has(p.id) && !apiIds.has(p.id),
-      );
-
-      const combined = [...validCustom, ...apiVideoProps, ...filteredInitial];
-      setReels(combined);
+      setReels(apiVideoProps);
     } catch (err: unknown) {
-      toast.error('Sync Notice', 'Loaded default video property dataset.');
+      toast.error('Sync Notice', 'Failed to load video properties from server.');
+      setReels([]);
     } finally {
       setIsLoading(false);
     }
