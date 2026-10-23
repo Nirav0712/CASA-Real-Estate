@@ -44,6 +44,7 @@ import {
   CreditCard,
   Receipt,
   Video,
+  ChevronDown,
 } from 'lucide-react';
 
 const ADMIN_PORTAL_URL = process.env.NEXT_PUBLIC_ADMIN_URL || 'http://localhost:3001';
@@ -244,35 +245,55 @@ export function Header() {
               {/* Login / Authenticated User Profile */}
               {isAuthenticated && user ? (
                 <div className="relative hidden sm:block">
-                  <button
-                    type="button"
-                    onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
-                    className="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-casa-border-light hover:border-casa-brand bg-casa-surface hover:bg-casa-subtle/50 transition-colors cursor-pointer"
-                  >
-                    <div className="w-6 h-6 rounded-full bg-casa-brand text-white flex items-center justify-center text-[10px] font-bold">
-                      {user.name ? user.name.charAt(0).toUpperCase() : 'U'}
-                    </div>
-                    <div className="text-start">
-                      <span className="text-xs font-semibold text-casa-text-primary block leading-none max-w-[100px] truncate">
-                        {user.name || user.normalizedMobile}
-                      </span>
-                      <span className="text-[9px] text-casa-brand font-medium uppercase">
-                        {user.isVerifiedAgent ? 'Verified Agent' : user.role.replace('_', ' ')}
-                      </span>
-                    </div>
-                  </button>
+                  <div className="flex items-center rounded-xl border border-casa-border-light hover:border-casa-brand bg-casa-surface transition-colors overflow-hidden">
+                    <Link
+                      href="/dashboard/profile"
+                      className="flex items-center gap-2 px-3 py-1.5 hover:bg-casa-subtle/50 transition-colors cursor-pointer group"
+                      title="Open Dedicated Profile Dashboard"
+                    >
+                      <div className="w-6 h-6 rounded-full bg-casa-brand text-white flex items-center justify-center text-[10px] font-bold group-hover:scale-105 transition-transform shrink-0">
+                        {user.name ? user.name.charAt(0).toUpperCase() : 'U'}
+                      </div>
+                      <div className="text-start">
+                        <span className="text-xs font-semibold text-casa-text-primary block leading-none max-w-[100px] truncate group-hover:text-casa-brand transition-colors">
+                          {user.name || user.normalizedMobile}
+                        </span>
+                        <span className="text-[9px] text-casa-brand font-medium uppercase">
+                          {user.isVerifiedAgent ? 'Verified Agent' : user.role.replace('_', ' ')}
+                        </span>
+                      </div>
+                    </Link>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setIsUserMenuOpen(!isUserMenuOpen);
+                      }}
+                      className="px-2 py-2 text-casa-text-muted hover:text-casa-text-primary hover:bg-casa-subtle border-l border-casa-border-light cursor-pointer transition-colors"
+                      title="Quick Navigation Menu"
+                      aria-label="Toggle Quick Navigation Menu"
+                    >
+                      <ChevronDown className={`w-3.5 h-3.5 transition-transform ${isUserMenuOpen ? 'rotate-180' : ''}`} />
+                    </button>
+                  </div>
 
                   {/* Dropdown Menu */}
                   {isUserMenuOpen && (
                     <div
-                      className="absolute right-0 mt-2 w-60 bg-casa-surface rounded-2xl shadow-elevated border border-casa-border-light py-2 z-50 animate-in fade-in slide-in-from-top-2 text-start"
+                      className="absolute right-0 mt-2 w-64 bg-casa-surface rounded-2xl shadow-elevated border border-casa-border-light py-2 z-50 animate-in fade-in slide-in-from-top-2 text-start"
                       onClick={() => setIsUserMenuOpen(false)}
                     >
-                      {/* User Header Profile */}
-                      <div className="px-3.5 py-2.5 border-b border-casa-border-light">
-                        <span className="text-xs font-bold text-casa-text-primary block truncate">
-                          {user.name || 'myproperty User'}
-                        </span>
+                      {/* User Header Profile Link to Dedicated Dashboard */}
+                      <Link
+                        href="/dashboard/profile"
+                        className="px-3.5 py-2.5 border-b border-casa-border-light block hover:bg-casa-subtle/60 transition-colors group"
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-bold text-casa-text-primary block truncate group-hover:text-casa-brand transition-colors">
+                            {user.name || 'myproperty User'}
+                          </span>
+                          <span className="text-[10px] text-casa-brand font-bold">Dashboard →</span>
+                        </div>
                         <div className="flex items-center gap-1.5 mt-0.5">
                           <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-casa-brand-subtle text-casa-brand uppercase">
                             {user.role?.replace('_', ' ')}
@@ -281,7 +302,7 @@ export function Header() {
                             {user.normalizedMobile}
                           </span>
                         </div>
-                      </div>
+                      </Link>
 
                       {/* Trial & Membership Card in Dropdown (Supply-side accounts only) */}
                       {!isBuyerOrTenant && !isAdmin && (
@@ -821,12 +842,23 @@ export function Header() {
               </Button>
             ) : (
               <div className="p-3 rounded-xl bg-casa-subtle">
-                <span className="text-xs font-bold text-casa-text-primary block">
-                  {user?.name || user?.normalizedMobile}
-                </span>
-                <span className="text-[10px] text-casa-brand font-medium uppercase block mb-2">
-                  {user?.role}
-                </span>
+                <Link
+                  href="/dashboard/profile"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className="flex items-center gap-2.5 mb-2.5 p-1 -m-1 rounded-lg hover:bg-casa-surface transition-colors cursor-pointer group"
+                >
+                  <div className="w-8 h-8 rounded-full bg-casa-brand text-white flex items-center justify-center font-bold text-xs shrink-0 group-hover:scale-105 transition-transform">
+                    {user?.name ? user.name.charAt(0).toUpperCase() : 'U'}
+                  </div>
+                  <div className="overflow-hidden">
+                    <span className="text-xs font-bold text-casa-text-primary block truncate group-hover:text-casa-brand transition-colors">
+                      {user?.name || user?.normalizedMobile}
+                    </span>
+                    <span className="text-[10px] text-casa-brand font-medium uppercase block">
+                      {user?.isVerifiedAgent ? 'Verified Agent' : user?.role?.replace('_', ' ')}
+                    </span>
+                  </div>
+                </Link>
 
                 {/* Mobile Trial Pill (Supply-side accounts only) */}
                 {isTrialActive && !isBuyerOrTenant && !isAdmin && (
