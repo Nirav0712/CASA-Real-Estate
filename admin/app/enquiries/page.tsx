@@ -191,7 +191,7 @@ export default function EnquiriesPage() {
   };
 
   return (
-    <div className="p-6 md:p-8 space-y-6 max-w-7xl mx-auto">
+    <div className="space-y-6 max-w-7xl mx-auto">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -222,7 +222,7 @@ export default function EnquiriesPage() {
 
       {/* KPI Cards */}
       {kpis && (
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
           <Card className="p-4 bg-casa-surface border border-casa-border-light shadow-subtle">
             <span className="text-xs text-casa-text-muted font-medium">Total Leads</span>
             <p className="text-xl font-bold text-casa-text-primary mt-1">{kpis.totalLeads}</p>
@@ -271,7 +271,7 @@ export default function EnquiriesPage() {
           ))}
         </div>
 
-        <div className="relative min-w-[260px]">
+        <div className="relative w-full md:w-auto md:min-w-[260px]">
           <Search className="w-4 h-4 text-casa-text-muted absolute left-3 top-1/2 -translate-y-1/2" />
           <input
             type="text"

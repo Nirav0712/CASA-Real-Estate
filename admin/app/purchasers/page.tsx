@@ -95,7 +95,7 @@ export default function PurchasersPage() {
   };
 
   return (
-    <div className="p-6 md:p-8 space-y-6 max-w-7xl mx-auto">
+    <div className="space-y-6 max-w-7xl mx-auto">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -155,8 +155,8 @@ export default function PurchasersPage() {
 
       {/* Filters Toolbar */}
       <Card className="p-4 bg-casa-surface border border-casa-border-light shadow-subtle flex flex-wrap items-center justify-between gap-4">
-        <div className="flex flex-wrap items-center gap-3 flex-1 min-w-[300px]">
-          <div className="relative flex-1 min-w-[200px] max-w-md">
+        <div className="flex flex-wrap items-center gap-3 flex-1 min-w-0 w-full sm:w-auto">
+          <div className="relative flex-1 min-w-0 w-full sm:min-w-[200px] sm:max-w-md">
             <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-casa-text-muted" />
             <input
               type="text"
@@ -174,7 +174,7 @@ export default function PurchasersPage() {
               setPage(1);
             }}
             aria-label="Filter by Status"
-            className="py-2 px-3 text-xs bg-casa-canvas border border-casa-border-light rounded-xl text-casa-text-primary focus:outline-none focus:ring-2 focus:ring-casa-brand/30 font-medium"
+            className="w-full sm:w-auto py-2 px-3 text-xs bg-casa-canvas border border-casa-border-light rounded-xl text-casa-text-primary focus:outline-none focus:ring-2 focus:ring-casa-brand/30 font-medium"
           >
             <option value="ALL">All Account Statuses</option>
             <option value="ACTIVE">Active Accounts</option>

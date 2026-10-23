@@ -78,9 +78,9 @@ export default function SettingsPage() {
   };
 
   return (
-    <div className="p-6 md:p-8 space-y-6 max-w-4xl mx-auto">
+    <div className="space-y-6 max-w-4xl mx-auto">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-casa-surface p-6 rounded-2xl border border-casa-border-light shadow-subtle">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-casa-surface p-4 sm:p-6 rounded-2xl border border-casa-border-light shadow-subtle">
         <div>
           <div className="flex items-center gap-2">
             <div className="p-2 bg-casa-brand-subtle rounded-xl text-casa-brand">
@@ -109,7 +109,7 @@ export default function SettingsPage() {
 
       <form onSubmit={handleSave} className="space-y-6">
         {/* COMPANY HOTLINE & SALES CONTACTS */}
-        <Card className="p-6 bg-casa-surface border border-casa-border-light shadow-subtle space-y-5">
+        <Card className="p-4 sm:p-6 bg-casa-surface border border-casa-border-light shadow-subtle space-y-5">
           <div className="flex items-center justify-between border-b border-casa-border-light pb-3">
             <h3 className="text-sm font-bold text-casa-text-primary flex items-center gap-2">
               <PhoneCall className="w-4 h-4 text-casa-brand" />
@@ -231,7 +231,7 @@ export default function SettingsPage() {
         </Card>
 
         {/* Backend & DB Architecture */}
-        <Card className="p-6 bg-casa-surface border border-casa-border-light shadow-subtle space-y-4">
+        <Card className="p-4 sm:p-6 bg-casa-surface border border-casa-border-light shadow-subtle space-y-4">
           <h3 className="text-sm font-bold text-casa-text-primary flex items-center gap-2">
             <Database className="w-4 h-4 text-casa-brand" />
             Database & Microservices Gateway
@@ -268,7 +268,7 @@ export default function SettingsPage() {
         </Card>
 
         {/* SMS Provider */}
-        <Card className="p-6 bg-casa-surface border border-casa-border-light shadow-subtle space-y-4">
+        <Card className="p-4 sm:p-6 bg-casa-surface border border-casa-border-light shadow-subtle space-y-4">
           <h3 className="text-sm font-bold text-casa-text-primary flex items-center gap-2">
             <Smartphone className="w-4 h-4 text-casa-brand" />
             Mobile OTP & SMS Gateway Dispatcher

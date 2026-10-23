@@ -363,7 +363,7 @@ export default function VideoReelsAdminPage() {
   };
 
   return (
-    <div className="p-6 md:p-8 space-y-6 max-w-7xl mx-auto">
+    <div className="space-y-6 max-w-7xl mx-auto">
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -395,7 +395,7 @@ export default function VideoReelsAdminPage() {
       </div>
 
       {/* KPI Stats Row */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card className="p-4 bg-casa-surface border border-casa-border-light shadow-subtle space-y-1">
           <div className="text-[11px] font-semibold text-casa-text-muted">Total Video Reels</div>
           <div className="text-2xl font-black text-casa-text-primary">{reels.length}</div>
@@ -429,7 +429,7 @@ export default function VideoReelsAdminPage() {
 
       {/* Search & Filter Toolbar */}
       <Card className="p-3 bg-casa-surface border border-casa-border-light shadow-subtle flex flex-wrap items-center gap-3">
-        <div className="relative flex-1 min-w-[200px]">
+        <div className="relative flex-1 min-w-0 w-full sm:min-w-[200px]">
           <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-casa-text-muted" />
           <input
             type="text"
@@ -440,7 +440,7 @@ export default function VideoReelsAdminPage() {
           />
         </div>
 
-        <div className="flex items-center gap-2 min-w-[130px]">
+        <div className="flex items-center gap-2 min-w-0 w-full sm:w-auto sm:min-w-[130px]">
           <select
             value={filterType}
             onChange={(e) => setFilterType(e.target.value)}
@@ -452,7 +452,7 @@ export default function VideoReelsAdminPage() {
           </select>
         </div>
 
-        <div className="flex items-center gap-2 min-w-[140px]">
+        <div className="flex items-center gap-2 min-w-0 w-full sm:w-auto sm:min-w-[140px]">
           <select
             value={filterCategory}
             onChange={(e) => setFilterCategory(e.target.value)}

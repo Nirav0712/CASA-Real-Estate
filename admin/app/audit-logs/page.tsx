@@ -69,7 +69,7 @@ export default function AuditLogsPage() {
   };
 
   return (
-    <div className="p-6 md:p-8 space-y-6 max-w-7xl mx-auto">
+    <div className="space-y-6 max-w-7xl mx-auto">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -103,7 +103,7 @@ export default function AuditLogsPage() {
 
       {/* Filter Bar */}
       <Card className="p-4 bg-casa-surface border border-casa-border-light shadow-subtle flex flex-wrap items-center justify-between gap-4">
-        <div className="flex flex-wrap items-center gap-3 flex-1 min-w-[300px]">
+        <div className="flex flex-wrap items-center gap-3 flex-1 min-w-0 w-full sm:w-auto">
           <select
             value={actionFilter}
             onChange={(e) => {
@@ -111,7 +111,7 @@ export default function AuditLogsPage() {
               setPage(1);
             }}
             aria-label="Filter by Action"
-            className="py-2 px-3 text-xs bg-casa-canvas border border-casa-border-light rounded-xl text-casa-text-primary focus:outline-none focus:ring-2 focus:ring-casa-brand/30"
+            className="w-full sm:w-auto py-2 px-3 text-xs bg-casa-canvas border border-casa-border-light rounded-xl text-casa-text-primary focus:outline-none focus:ring-2 focus:ring-casa-brand/30"
           >
             <option value="ALL">All Administrative Actions</option>
             <option value="USER_STATUS_CHANGED">USER_STATUS_CHANGED</option>

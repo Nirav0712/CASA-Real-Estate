@@ -99,7 +99,7 @@ export default function PaymentsPage() {
   };
 
   return (
-    <div className="p-6 md:p-8 space-y-6 max-w-7xl mx-auto">
+    <div className="space-y-6 max-w-7xl mx-auto">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -130,7 +130,7 @@ export default function PaymentsPage() {
 
       {/* KPI Cards */}
       {metrics && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <Card className="p-4 bg-casa-surface border border-casa-border-light shadow-subtle flex flex-col justify-between">
             <span className="text-xs text-casa-text-muted font-medium">Total Paid Revenue</span>
             <p className="text-2xl font-bold text-emerald-600 mt-1">
@@ -173,7 +173,7 @@ export default function PaymentsPage() {
           ))}
         </div>
 
-        <div className="relative min-w-[260px]">
+        <div className="relative w-full md:w-auto md:min-w-[260px]">
           <Search className="w-4 h-4 text-casa-text-muted absolute left-3 top-1/2 -translate-y-1/2" />
           <input
             type="text"

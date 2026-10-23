@@ -33,7 +33,10 @@ import {
   Moon,
   LogOut,
   Video,
+  Menu,
+  X,
 } from 'lucide-react';
+import { getPendingModerationQueue } from '@/services/admin-service';
 
 interface NavItem {
   label: string;
@@ -48,11 +51,21 @@ interface NavGroup {
   items: NavItem[];
 }
 
-import { getPendingModerationQueue } from '@/services/admin-service';
+export interface AdminSidebarProps {
+  isMobileOpen?: boolean;
+  onMobileClose?: () => void;
+}
 
-export function AdminSidebar() {
+export function AdminSidebar({ isMobileOpen = false, onMobileClose }: AdminSidebarProps = {}) {
   const pathname = usePathname();
   const [pendingCount, setPendingCount] = React.useState<number>(0);
+
+  // Close mobile drawer on route changes
+  React.useEffect(() => {
+    if (isMobileOpen && onMobileClose) {
+      onMobileClose();
+    }
+  }, [pathname]);
 
   React.useEffect(() => {
     let isMounted = true;
@@ -145,77 +158,136 @@ export function AdminSidebar() {
     },
   ];
 
+  const renderNavContent = () => (
+    <div className="flex-1 overflow-y-auto p-4 space-y-6 text-start">
+      {navGroups.map((group) => (
+        <div key={group.label}>
+          <span className="text-[10px] font-bold text-casa-text-muted tracking-wider uppercase block px-2 mb-2 select-none">
+            {group.label}
+          </span>
+          <ul className="space-y-1">
+            {group.items.map((item) => {
+              const Icon = item.icon;
+              return (
+                <li key={item.label}>
+                  <Link
+                    href={item.href}
+                    onClick={() => onMobileClose?.()}
+                    className={`flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium transition-colors ${
+                      item.active
+                        ? 'bg-casa-brand text-white shadow-subtle font-semibold'
+                        : 'text-casa-text-secondary hover:text-casa-text-primary hover:bg-casa-subtle'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <Icon className="w-4 h-4 shrink-0" />
+                      <span>{item.label}</span>
+                    </div>
+                    {item.badge && (
+                      <span
+                        className={`text-[10px] font-bold px-1.5 py-0.2 rounded-full ${
+                          item.active
+                            ? 'bg-white text-casa-brand'
+                            : 'bg-amber-100 text-amber-700 dark:bg-amber-900/60 dark:text-amber-300'
+                        }`}
+                      >
+                        {item.badge}
+                      </span>
+                    )}
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      ))}
+    </div>
+  );
+
   return (
-    <aside className="w-64 bg-casa-surface border-r border-casa-border-light flex flex-col flex-shrink-0 min-h-screen transition-colors duration-200">
-      {/* Brand Header */}
-      <div className="h-16 border-b border-casa-border-light px-4 flex items-center justify-between">
-        <Logo size="md" height={38} href="/" />
-        <span className="text-[10px] bg-casa-brand-subtle text-casa-brand font-bold px-1.5 py-0.5 rounded-md">
-          v1.0
-        </span>
-      </div>
+    <>
+      {/* 1. Desktop Persistent Sidebar (>= 1024px) */}
+      <aside className="w-64 bg-casa-surface border-r border-casa-border-light flex-col flex-shrink-0 min-h-screen sticky top-0 h-screen transition-colors duration-200 hidden lg:flex">
+        {/* Brand Header */}
+        <div className="h-16 border-b border-casa-border-light px-4 flex items-center justify-between shrink-0">
+          <Logo size="md" height={38} href="/" />
+          <span className="text-[10px] bg-casa-brand-subtle text-casa-brand font-bold px-1.5 py-0.5 rounded-md">
+            v1.0
+          </span>
+        </div>
 
-      {/* Navigation Groups */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-6 text-start">
-        {navGroups.map((group) => (
-          <div key={group.label}>
-            <span className="text-[10px] font-bold text-casa-text-muted tracking-wider uppercase block px-2 mb-2 select-none">
-              {group.label}
-            </span>
-            <ul className="space-y-1">
-              {group.items.map((item) => {
-                const Icon = item.icon;
-                return (
-                  <li key={item.label}>
-                    <Link
-                      href={item.href}
-                      className={`flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium transition-colors ${
-                        item.active
-                          ? 'bg-casa-brand text-white shadow-subtle font-semibold'
-                          : 'text-casa-text-secondary hover:text-casa-text-primary hover:bg-casa-subtle'
-                      }`}
-                    >
-                      <div className="flex items-center gap-2.5">
-                        <Icon className="w-4 h-4" />
-                        <span>{item.label}</span>
-                      </div>
-                      {item.badge && (
-                        <span
-                          className={`text-[10px] font-bold px-1.5 py-0.2 rounded-full ${
-                            item.active
-                              ? 'bg-white text-casa-brand'
-                              : 'bg-amber-100 text-amber-700 dark:bg-amber-900/60 dark:text-amber-300'
-                          }`}
-                        >
-                          {item.badge}
-                        </span>
-                      )}
-                    </Link>
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
-        ))}
-      </div>
+        {/* Navigation Groups */}
+        {renderNavContent()}
 
-      {/* Public Marketplace Quick Link */}
-      <div className="p-4 border-t border-casa-border-light bg-casa-canvas/50">
-        <a
-          href={process.env.NEXT_PUBLIC_FRONTEND_URL || 'http://localhost:3000'}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex items-center justify-between text-xs text-casa-brand hover:underline font-semibold"
-        >
-          <span>View Public Marketplace</span>
-          <span>↗</span>
-        </a>
-      </div>
-    </aside>
+        {/* Public Marketplace Quick Link */}
+        <div className="p-4 border-t border-casa-border-light bg-casa-canvas/50 shrink-0">
+          <a
+            href={process.env.NEXT_PUBLIC_FRONTEND_URL || 'http://localhost:3000'}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center justify-between text-xs text-casa-brand hover:underline font-semibold"
+          >
+            <span>View Public Marketplace</span>
+            <span>↗</span>
+          </a>
+        </div>
+      </aside>
+
+      {/* 2. Mobile / Tablet Overlay Backdrop (< 1024px) */}
+      <div
+        className={`fixed inset-0 bg-casa-overlay/60 backdrop-blur-xs z-40 transition-opacity duration-300 lg:hidden ${
+          isMobileOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
+        }`}
+        onClick={onMobileClose}
+        aria-hidden="true"
+      />
+
+      {/* 3. Mobile / Tablet Slide-Over Drawer (< 1024px) */}
+      <aside
+        className={`fixed inset-y-0 left-0 z-50 w-72 max-w-[85vw] bg-casa-surface border-r border-casa-border-light flex flex-col shadow-elevated transform transition-transform duration-300 ease-in-out lg:hidden ${
+          isMobileOpen ? 'translate-x-0' : '-translate-x-full'
+        }`}
+        aria-label="Mobile Navigation Sidebar"
+      >
+        {/* Mobile Header with Close Button */}
+        <div className="h-16 border-b border-casa-border-light px-4 flex items-center justify-between shrink-0">
+          <Logo size="md" height={36} href="/" />
+          <button
+            type="button"
+            onClick={onMobileClose}
+            className="p-1.5 rounded-xl text-casa-text-muted hover:text-casa-text-primary hover:bg-casa-subtle transition-colors cursor-pointer"
+            aria-label="Close navigation"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Navigation Groups */}
+        {renderNavContent()}
+
+        {/* Public Marketplace Quick Link */}
+        <div className="p-4 border-t border-casa-border-light bg-casa-canvas/50 shrink-0">
+          <a
+            href={process.env.NEXT_PUBLIC_FRONTEND_URL || 'http://localhost:3000'}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={onMobileClose}
+            className="flex items-center justify-between text-xs text-casa-brand hover:underline font-semibold"
+          >
+            <span>View Public Marketplace</span>
+            <span>↗</span>
+          </a>
+        </div>
+      </aside>
+    </>
   );
 }
 
-export function AdminHeader() {
+export interface AdminHeaderProps {
+  onToggleMobileNav?: () => void;
+}
+
+export function AdminHeader({ onToggleMobileNav }: AdminHeaderProps = {}) {
   const { theme, resolvedTheme, setTheme } = useTheme();
   const { adminUser, logout } = useAdminAuth();
 
@@ -230,17 +302,28 @@ export function AdminHeader() {
     : 'AD';
 
   return (
-    <header className="h-16 bg-casa-surface border-b border-casa-border-light px-6 flex items-center justify-between sticky top-0 z-30 transition-colors duration-200">
-      <div className="flex items-center gap-3">
-        <h1 className="text-sm md:text-base font-bold text-casa-text-primary">
+    <header className="h-16 bg-casa-surface border-b border-casa-border-light px-3 sm:px-6 flex items-center justify-between sticky top-0 z-30 transition-colors duration-200">
+      <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+        {/* Mobile Sidebar Hamburger Toggle Button */}
+        <button
+          type="button"
+          onClick={onToggleMobileNav}
+          aria-label="Open navigation menu"
+          className="p-2 -ml-1 sm:ml-0 rounded-xl text-casa-text-secondary hover:text-casa-text-primary hover:bg-casa-subtle border border-casa-border-light lg:hidden cursor-pointer shrink-0"
+        >
+          <Menu className="w-5 h-5" />
+        </button>
+
+        <h1 className="text-xs sm:text-sm md:text-base font-bold text-casa-text-primary truncate max-w-[170px] xs:max-w-[220px] sm:max-w-none">
           Operations & Moderation Dashboard
         </h1>
-        <span className="hidden sm:inline-flex text-[10px] px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 font-semibold">
+
+        <span className="hidden sm:inline-flex text-[10px] px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 font-semibold shrink-0">
           ● Operator Active
         </span>
       </div>
 
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
         {/* Theme Toggle */}
         <button
           type="button"
@@ -256,18 +339,18 @@ export function AdminHeader() {
         </button>
 
         {/* Backend Status Indicator */}
-        <div className="text-xs text-casa-text-muted hidden md:flex items-center gap-1.5 px-2 py-1 rounded-lg bg-casa-canvas border border-casa-border-light">
+        <div className="text-xs text-casa-text-muted hidden xl:flex items-center gap-1.5 px-2 py-1 rounded-lg bg-casa-canvas border border-casa-border-light">
           <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
           <span>API Gateway: :5000</span>
         </div>
 
         {/* User Badge & Logout */}
-        <div className="flex items-center gap-2.5 ps-2 border-s border-casa-border-light">
-          <div className="w-8 h-8 rounded-full bg-casa-brand text-white flex items-center justify-center text-xs font-bold shadow-2xs">
+        <div className="flex items-center gap-2 ps-1.5 sm:ps-2 border-s border-casa-border-light">
+          <div className="w-8 h-8 rounded-full bg-casa-brand text-white flex items-center justify-center text-xs font-bold shadow-2xs shrink-0">
             {userInitials}
           </div>
-          <div className="hidden lg:block text-start">
-            <span className="text-xs font-bold text-casa-text-primary block leading-none">
+          <div className="hidden md:block text-start">
+            <span className="text-xs font-bold text-casa-text-primary block leading-none truncate max-w-[120px]">
               {adminUser?.name || 'Administrator'}
             </span>
             <span className="text-[10px] text-casa-brand font-medium uppercase">

@@ -207,7 +207,7 @@ export default function AdminKycPage() {
   };
 
   return (
-    <div className="space-y-6 p-6">
+    <div className="space-y-6">
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -253,7 +253,7 @@ export default function AdminKycPage() {
       </div>
 
       {/* Metric Stat Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card className="p-4 flex items-center justify-between">
           <div>
             <p className="text-[11px] font-bold uppercase text-casa-text-muted tracking-wider">
@@ -337,7 +337,7 @@ export default function AdminKycPage() {
             ))}
           </div>
 
-          <div className="flex flex-1 max-w-md items-center gap-2">
+          <div className="flex flex-col sm:flex-row flex-1 max-w-md items-stretch sm:items-center gap-2 w-full">
             {/* Search Input */}
             <div className="relative flex-1">
               <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-casa-text-muted" />

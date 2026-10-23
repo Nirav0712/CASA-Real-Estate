@@ -210,7 +210,7 @@ export default function AdminDashboardPage() {
             Real-time advertisement velocity, review queues, and agent verification requests.
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Button
             variant="outline"
             size="sm"
@@ -251,7 +251,7 @@ export default function AdminDashboardPage() {
 
       {/* Pending Approvals Table */}
       <Card className="p-0 shadow-subtle">
-        <div className="p-5 border-b border-casa-border-light bg-casa-surface flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="p-4 sm:p-5 border-b border-casa-border-light bg-casa-surface flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           <div>
             <h3 className="text-sm font-bold text-casa-text-primary">
               Property Moderation Queue
@@ -260,8 +260,8 @@ export default function AdminDashboardPage() {
               Review property advertisement specifications, photos, and legal disclosures before publishing.
             </p>
           </div>
-          <div className="flex items-center gap-3">
-            <div className="w-64">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full lg:w-auto">
+            <div className="w-full sm:w-64">
               <Input
                 placeholder="Filter by title, city, agent..."
                 value={filterQuery}
@@ -271,7 +271,9 @@ export default function AdminDashboardPage() {
                 onClear={() => setFilterQuery('')}
               />
             </div>
-            <Badge variant="pending">{queue.length} Pending Review</Badge>
+            <Badge variant="pending" className="justify-center sm:justify-start shrink-0">
+              {queue.length} Pending Review
+            </Badge>
           </div>
         </div>
 

@@ -194,9 +194,9 @@ export default function NotificationsPage() {
   };
 
   return (
-    <div className="p-6 md:p-8 space-y-6 max-w-7xl mx-auto">
+    <div className="space-y-6 max-w-7xl mx-auto">
       {/* Top Banner Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-casa-surface p-6 rounded-2xl border border-casa-border-light shadow-subtle">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-casa-surface p-4 sm:p-6 rounded-2xl border border-casa-border-light shadow-subtle">
         <div>
           <div className="flex items-center gap-3">
             <div className="p-2.5 rounded-xl bg-casa-brand-subtle text-casa-brand relative">
@@ -329,7 +329,7 @@ export default function NotificationsPage() {
           ))}
         </div>
 
-        <div className="relative min-w-[260px]">
+        <div className="relative w-full md:w-auto md:min-w-[260px]">
           <Search className="w-4 h-4 text-casa-text-muted absolute left-3 top-1/2 -translate-y-1/2" />
           <input
             type="text"

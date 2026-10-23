@@ -450,7 +450,7 @@ export default function UsersPage() {
   };
 
   return (
-    <div className="p-6 md:p-8 space-y-6 max-w-7xl mx-auto">
+    <div className="space-y-6 max-w-7xl mx-auto">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -486,8 +486,8 @@ export default function UsersPage() {
 
       {/* Filters & Search Toolbar */}
       <Card className="p-4 bg-casa-surface border border-casa-border-light shadow-subtle flex flex-wrap items-center justify-between gap-4">
-        <div className="flex flex-wrap items-center gap-3 flex-1 min-w-[300px]">
-          <div className="relative flex-1 min-w-[200px] max-w-md">
+        <div className="flex flex-wrap items-center gap-3 flex-1 min-w-0 w-full">
+          <div className="relative flex-1 min-w-0 w-full sm:min-w-[220px] sm:max-w-md">
             <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-casa-text-muted" />
             <input
               type="text"
