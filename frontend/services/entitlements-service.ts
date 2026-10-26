@@ -14,6 +14,8 @@ export interface PackagePlan {
   isDefault: boolean;
   isPopular?: boolean;
   features: string[];
+  whatsappNumber?: string;
+  callNumber?: string;
   limits: {
     propertyViewsMonthly?: number;
     propertyListingsMax?: number;

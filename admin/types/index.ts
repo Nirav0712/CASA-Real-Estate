@@ -822,6 +822,8 @@ export interface PackageRecord {
   limits: PackageLimits;
   permissions: string[];
   features: string[];
+  whatsappNumber?: string;
+  callNumber?: string;
   isPopular: boolean;
   isDefault: boolean;
   isActive: boolean;

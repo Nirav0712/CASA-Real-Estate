@@ -78,6 +78,12 @@ export class Package {
   @Prop({ type: [String], default: [] })
   features: string[];
 
+  @Prop({ default: '', trim: true })
+  whatsappNumber?: string;
+
+  @Prop({ default: '', trim: true })
+  callNumber?: string;
+
   @Prop({ type: PackageLimits, default: () => ({}) })
   limits: PackageLimits;
 

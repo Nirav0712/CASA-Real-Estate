@@ -42,8 +42,8 @@ export function PlanDetailsModal({
 
   if (!isOpen || !plan) return null;
 
-  const salesPhone = companySettings.companySalesNumber || '+91 98765 43210';
-  const cleanSalesPhone = salesPhone.replace(/[^0-9+]/g, '');
+  const targetSalesPhone = plan.callNumber || companySettings.companySalesNumber || '';
+  const cleanSalesPhone = targetSalesPhone.replace(/[^0-9+]/g, '');
 
   const limits = plan.limits || {};
 
@@ -70,14 +70,21 @@ export function PlanDetailsModal({
       }
 
       if (method === 'CALL') {
+        if (!cleanSalesPhone) {
+          toast.error(
+            'Sales Phone Unavailable',
+            'Sales contact number is not configured for this plan or in system settings.',
+          );
+          return;
+        }
         window.location.href = `tel:${cleanSalesPhone}`;
       } else {
-        const rawWa = companySettings.companySalesWhatsapp || companySettings.companySalesNumber || '';
+        const rawWa = plan.whatsappNumber || companySettings.companySalesWhatsapp || companySettings.companySalesNumber || '';
         const cleanWa = rawWa.replace(/[^0-9]/g, '');
         if (!cleanWa) {
           toast.error(
             'WhatsApp Hotline Unavailable',
-            'Corporate Sales WhatsApp contact is currently not configured in system settings.',
+            'Sales WhatsApp contact is not configured for this plan or in system settings.',
           );
           return;
         }
@@ -263,7 +270,7 @@ export function PlanDetailsModal({
           </div>
 
           <p className="text-center text-[11px] text-casa-text-muted">
-            Sales Desk: {salesPhone} • Instant request reference generated automatically
+            Sales Desk: {targetSalesPhone || 'Direct Sales Hotline'} • Instant request reference generated automatically
           </p>
         </div>
       </div>

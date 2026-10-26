@@ -29,12 +29,21 @@ export default function SubscriptionsPage() {
           </p>
         </div>
 
-        <Link href="/payments?tab=requests">
-          <Button variant="primary" size="sm" className="flex items-center gap-2 self-start sm:self-auto text-xs">
-            <ShieldCheck className="w-4 h-4" />
-            Review Subscription Requests
-          </Button>
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link href="/packages">
+            <Button variant="outline" size="sm" className="flex items-center gap-2 text-xs">
+              <CreditCard className="w-4 h-4" />
+              Manage Plans & Hotlines
+            </Button>
+          </Link>
+
+          <Link href="/payments?tab=requests">
+            <Button variant="primary" size="sm" className="flex items-center gap-2 text-xs">
+              <ShieldCheck className="w-4 h-4" />
+              Review Subscription Requests
+            </Button>
+          </Link>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -67,9 +76,11 @@ export default function SubscriptionsPage() {
               </ul>
             </div>
 
-            <Button variant="outline" size="sm" className="w-full text-xs">
-              Manage Tier Rules
-            </Button>
+            <Link href="/packages" className="w-full">
+              <Button variant="outline" size="sm" className="w-full text-xs">
+                Manage Tier Rules & Hotlines
+              </Button>
+            </Link>
           </Card>
         ))}
       </div>

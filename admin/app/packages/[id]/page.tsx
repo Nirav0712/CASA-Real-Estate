@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
-import { ArrowLeft, Save, CreditCard } from 'lucide-react';
+import { ArrowLeft, Save, CreditCard, MessageCircle, PhoneCall } from 'lucide-react';
 import { getPackage, updatePackage } from '@/services/entitlements-service';
 import { useAdminAuth } from '@/contexts/auth-context';
 import { PackageRecord, BillingPeriod, AccountType } from '@/types';
@@ -33,6 +33,8 @@ export default function EditPackagePage() {
   const [description, setDescription] = useState('');
   const [price, setPrice] = useState<number>(0);
   const [billingPeriod, setBillingPeriod] = useState<BillingPeriod>('MONTHLY');
+  const [whatsappNumber, setWhatsappNumber] = useState('');
+  const [callNumber, setCallNumber] = useState('');
   const [targetAccountTypes, setTargetAccountTypes] = useState<AccountType[]>([]);
   const [isPopular, setIsPopular] = useState(false);
   const [isDefault, setIsDefault] = useState(false);
@@ -64,6 +66,8 @@ export default function EditPackagePage() {
         setIsPopular(data.isPopular);
         setIsDefault(data.isDefault);
         setIsActive(data.isActive);
+        setWhatsappNumber(data.whatsappNumber || '');
+        setCallNumber(data.callNumber || '');
         setFeatures(data.features || []);
 
         if (data.limits) {
@@ -124,6 +128,8 @@ export default function EditPackagePage() {
         description,
         price,
         billingPeriod,
+        whatsappNumber: whatsappNumber.trim() || undefined,
+        callNumber: callNumber.trim() || undefined,
         targetAccountTypes,
         isPopular,
         isDefault,
@@ -272,6 +278,40 @@ export default function EditPackagePage() {
               <option value="MONTHLY">Monthly Standard (30 Days)</option>
               <option value="FREE">Free Trial / Community</option>
             </select>
+          </div>
+
+          <div>
+            <label className="text-xs font-bold text-casa-text-secondary flex items-center gap-1.5 mb-1">
+              <MessageCircle className="w-3.5 h-3.5 text-emerald-600" />
+              Sales WhatsApp Number for this Plan
+            </label>
+            <input
+              type="text"
+              placeholder="e.g. +91 98765 43210 (Leave blank for system default)"
+              value={whatsappNumber}
+              onChange={(e) => setWhatsappNumber(e.target.value)}
+              className="w-full px-3 py-2 text-xs bg-casa-canvas border border-casa-border-light rounded-xl text-casa-text-primary font-mono focus:border-emerald-500 focus:outline-hidden"
+            />
+            <span className="text-[10px] text-casa-text-muted mt-1 block">
+              When a user clicks "WhatsApp to Subscribe" on this plan, message redirects to this number.
+            </span>
+          </div>
+
+          <div>
+            <label className="text-xs font-bold text-casa-text-secondary flex items-center gap-1.5 mb-1">
+              <PhoneCall className="w-3.5 h-3.5 text-blue-600" />
+              Sales Call Number for this Plan
+            </label>
+            <input
+              type="text"
+              placeholder="e.g. +91 98765 43210 (Leave blank for system default)"
+              value={callNumber}
+              onChange={(e) => setCallNumber(e.target.value)}
+              className="w-full px-3 py-2 text-xs bg-casa-canvas border border-casa-border-light rounded-xl text-casa-text-primary font-mono focus:border-blue-500 focus:outline-hidden"
+            />
+            <span className="text-[10px] text-casa-text-muted mt-1 block">
+              When a user clicks "Call to Subscribe" on this plan, phone dialer dials this number.
+            </span>
           </div>
         </div>
 

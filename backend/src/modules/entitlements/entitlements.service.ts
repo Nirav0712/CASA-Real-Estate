@@ -846,6 +846,8 @@ export class EntitlementsService implements OnModuleInit {
     if (dto.isDefault !== undefined) pkg.isDefault = dto.isDefault;
     if (dto.targetAccountTypes) pkg.targetAccountTypes = dto.targetAccountTypes;
     if (dto.features) pkg.features = dto.features;
+    if (dto.whatsappNumber !== undefined) pkg.whatsappNumber = dto.whatsappNumber;
+    if (dto.callNumber !== undefined) pkg.callNumber = dto.callNumber;
     if (dto.limits) pkg.limits = { ...pkg.limits, ...dto.limits };
     if (dto.permissions) pkg.permissions = dto.permissions;
     pkg.updatedBy = actorUser.id;

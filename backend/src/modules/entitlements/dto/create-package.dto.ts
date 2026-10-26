@@ -79,6 +79,14 @@ export class CreatePackageDto {
   features?: string[];
 
   @IsOptional()
+  @IsString()
+  whatsappNumber?: string;
+
+  @IsOptional()
+  @IsString()
+  callNumber?: string;
+
+  @IsOptional()
   @ValidateNested()
   @Type(() => PackageLimitsDto)
   limits?: PackageLimitsDto;

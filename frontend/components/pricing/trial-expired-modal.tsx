@@ -101,12 +101,18 @@ export function TrialExpiredModal() {
       }
 
       if (method === 'CALL') {
-        window.location.href = `tel:${cleanSalesPhone}`;
+        const targetCall = pkg.callNumber || cleanSalesPhone;
+        const cleanCall = targetCall.replace(/[^0-9+]/g, '');
+        if (!cleanCall) {
+          toast.error('Call Hotline Unavailable', 'Sales Call hotline is not configured for this plan or in settings.');
+          return;
+        }
+        window.location.href = `tel:${cleanCall}`;
       } else {
-        const rawWa = settings.companySalesWhatsapp || settings.companySalesNumber || '';
+        const rawWa = pkg.whatsappNumber || settings.companySalesWhatsapp || settings.companySalesNumber || '';
         const cleanWa = rawWa.replace(/[^0-9]/g, '');
         if (!cleanWa) {
-          toast.error('WhatsApp Unavailable', 'Sales Department WhatsApp hotline is currently not configured.');
+          toast.error('WhatsApp Unavailable', 'Sales WhatsApp hotline is not configured for this plan or in settings.');
           return;
         }
 
