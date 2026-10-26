@@ -28,6 +28,7 @@ export class EntitlementsService implements OnModuleInit {
 
   async onModuleInit() {
     await this.seedSystemRolesAndPackages();
+    await this.seedCasaPricingPackages();
   }
 
   // ==========================================
@@ -505,6 +506,285 @@ export class EntitlementsService implements OnModuleInit {
     }
   }
 
+  async seedCasaPricingPackages() {
+    try {
+      this.logger.log('Verifying authoritative CASA Pricing Plans and Duration Rates...');
+
+      const casaPlans = [
+        {
+          name: 'Free Plan',
+          slug: 'casa-free-trial',
+          description: 'Introductory 3 Months Free full marketplace access for first 50 eligible Builders, Brokers, and Agents.',
+          isFree: true,
+          recommended: false,
+          displayOrder: 0,
+          price: 0,
+          currency: 'INR',
+          billingPeriod: BillingPeriod.NINETY_DAYS,
+          durationDays: 90,
+          eligibleUserTypes: ['builder', 'broker', 'agent'],
+          targetAccountTypes: [AccountType.DEVELOPER, AccountType.BROKER, AccountType.AGENT],
+          freeTrialMaxSlots: 50,
+          isActive: true,
+          isDefault: false,
+          limits: {
+            propertyViews: -1,
+            propertyListings: 5,
+            projectListings: 2,
+            savedProperties: 20,
+            savedSearches: 10,
+            monthlyLeads: 25,
+            enquiries: -1,
+            chats: -1,
+            teamMembers: 1,
+          },
+          features: [
+            '3 Months Free Validity',
+            '5 Active Properties',
+            '2 Active Projects',
+            'Team: 1 Member',
+            '25 Verified Buyer Leads',
+            'Standard CRM Pipeline',
+            'Introductory Offer — First 50 Users Only',
+          ],
+          permissions: [
+            Permission.PROPERTY_VIEW,
+            Permission.PROPERTY_CREATE,
+            Permission.PROPERTY_EDIT,
+            Permission.PROPERTY_PUBLISH,
+            Permission.PROPERTY_CONTACT_VIEW,
+            Permission.LEAD_VIEW,
+            Permission.CHAT_START,
+            Permission.CHAT_REPLY,
+            Permission.ENQUIRY_VIEW,
+          ],
+        },
+        {
+          name: 'Basic Plan',
+          slug: 'casa-basic',
+          description: 'Essential toolkit for active individual agents and independent brokers.',
+          isFree: false,
+          recommended: false,
+          displayOrder: 1,
+          price: 999,
+          currency: 'INR',
+          billingPeriod: BillingPeriod.MONTHLY,
+          durationDays: 30,
+          eligibleUserTypes: ['builder', 'broker', 'agent', 'property-owner'],
+          targetAccountTypes: [AccountType.DEVELOPER, AccountType.BROKER, AccountType.AGENT, AccountType.PROPERTY_OWNER],
+          durationPrices: [
+            { durationMonths: 1, amount: 999, currency: 'INR', referenceMonthlyPrice: 999, isActive: true },
+            { durationMonths: 2, amount: 1999, currency: 'INR', referenceMonthlyPrice: 999, isActive: true },
+            { durationMonths: 3, amount: 2999, currency: 'INR', referenceMonthlyPrice: 999, isActive: true },
+            { durationMonths: 6, amount: 4999, currency: 'INR', referenceMonthlyPrice: 999, isActive: true },
+            { durationMonths: 12, amount: 10499, currency: 'INR', referenceMonthlyPrice: 999, isActive: true },
+          ],
+          isActive: true,
+          isDefault: false,
+          limits: {
+            propertyViews: -1,
+            propertyListings: 10,
+            projectListings: 5,
+            savedProperties: -1,
+            savedSearches: -1,
+            monthlyLeads: 100,
+            enquiries: -1,
+            chats: -1,
+            teamMembers: 2,
+          },
+          features: [
+            '10 Active Properties',
+            '5 Active Projects',
+            'Team: 1 Admin + 1 Agent (2 total)',
+            '100 Verified Buyer Leads / mo',
+            'Unlimited Property Views',
+            'Standard CRM Pipeline',
+            'Direct Buyer Dialing & WhatsApp',
+          ],
+          permissions: [
+            Permission.PROPERTY_VIEW,
+            Permission.PROPERTY_CREATE,
+            Permission.PROPERTY_EDIT,
+            Permission.PROPERTY_PUBLISH,
+            Permission.PROPERTY_CONTACT_VIEW,
+            Permission.LEAD_VIEW,
+            Permission.LEAD_EDIT,
+            Permission.CRM_VIEW,
+            Permission.CRM_CREATE,
+            Permission.CHAT_START,
+            Permission.CHAT_REPLY,
+            Permission.ANALYTICS_VIEW,
+          ],
+        },
+        {
+          name: 'Advanced Plan',
+          slug: 'casa-advanced',
+          description: 'High-velocity deal pipeline for top-producing teams and brokerage firms.',
+          isFree: false,
+          recommended: true,
+          displayOrder: 2,
+          price: 1499,
+          currency: 'INR',
+          billingPeriod: BillingPeriod.MONTHLY,
+          durationDays: 30,
+          eligibleUserTypes: ['builder', 'broker', 'agent', 'property-owner'],
+          targetAccountTypes: [AccountType.DEVELOPER, AccountType.BROKER, AccountType.AGENT, AccountType.PROPERTY_OWNER],
+          durationPrices: [
+            { durationMonths: 1, amount: 1499, currency: 'INR', referenceMonthlyPrice: 1499, isActive: true },
+            { durationMonths: 2, amount: 2999, currency: 'INR', referenceMonthlyPrice: 1499, isActive: true },
+            { durationMonths: 3, amount: 4499, currency: 'INR', referenceMonthlyPrice: 1499, isActive: true },
+            { durationMonths: 6, amount: 7999, currency: 'INR', referenceMonthlyPrice: 1499, isActive: true },
+            { durationMonths: 12, amount: 14999, currency: 'INR', referenceMonthlyPrice: 1499, isActive: true },
+          ],
+          isActive: true,
+          isDefault: false,
+          limits: {
+            propertyViews: -1,
+            propertyListings: 25,
+            projectListings: 10,
+            savedProperties: -1,
+            savedSearches: -1,
+            monthlyLeads: 250,
+            enquiries: -1,
+            chats: -1,
+            teamMembers: 4,
+          },
+          features: [
+            '25 Active Properties',
+            '10 Active Projects',
+            'Team: 1 Admin + 3 Agents (4 total)',
+            '250 Verified Buyer Leads / mo',
+            'Priority Search Ranking',
+            'Advanced CRM & Lead Export',
+            'Dedicated Relationship Support',
+          ],
+          permissions: [
+            Permission.PROPERTY_VIEW,
+            Permission.PROPERTY_CREATE,
+            Permission.PROPERTY_EDIT,
+            Permission.PROPERTY_PUBLISH,
+            Permission.PROPERTY_FEATURE,
+            Permission.PROPERTY_CONTACT_VIEW,
+            Permission.LEAD_VIEW,
+            Permission.LEAD_EDIT,
+            Permission.LEAD_EXPORT,
+            Permission.CRM_VIEW,
+            Permission.CRM_CREATE,
+            Permission.CRM_EDIT,
+            Permission.CRM_EXPORT,
+            Permission.CHAT_START,
+            Permission.CHAT_REPLY,
+            Permission.ANALYTICS_ADVANCED,
+          ],
+        },
+        {
+          name: 'Premium Plan',
+          slug: 'casa-premium',
+          description: 'Complete real estate enterprise solution for master brokers and premier builders.',
+          isFree: false,
+          recommended: false,
+          displayOrder: 3,
+          price: 1999,
+          currency: 'INR',
+          billingPeriod: BillingPeriod.MONTHLY,
+          durationDays: 30,
+          eligibleUserTypes: ['builder', 'broker', 'agent', 'property-owner'],
+          targetAccountTypes: [AccountType.DEVELOPER, AccountType.BROKER, AccountType.AGENT, AccountType.PROPERTY_OWNER],
+          durationPrices: [
+            { durationMonths: 1, amount: 1999, currency: 'INR', referenceMonthlyPrice: 1999, isActive: true },
+            { durationMonths: 2, amount: 3999, currency: 'INR', referenceMonthlyPrice: 1999, isActive: true },
+            { durationMonths: 3, amount: 5999, currency: 'INR', referenceMonthlyPrice: 1999, isActive: true },
+            { durationMonths: 6, amount: 10999, currency: 'INR', referenceMonthlyPrice: 1999, isActive: true },
+            { durationMonths: 12, amount: 21999, currency: 'INR', referenceMonthlyPrice: 1999, isActive: true },
+          ],
+          isActive: true,
+          isDefault: false,
+          limits: {
+            propertyViews: -1,
+            propertyListings: 50,
+            projectListings: 15,
+            savedProperties: -1,
+            savedSearches: -1,
+            monthlyLeads: 1000,
+            enquiries: -1,
+            chats: -1,
+            teamMembers: 11,
+          },
+          features: [
+            '50 Active Properties',
+            '15 Active Projects',
+            'Team: 1 Admin + 10 Agents (11 total)',
+            '1,000 Verified Buyer Leads / mo',
+            'VIP Verified Developer/Broker Badge',
+            'Featured Listings Boost',
+            'Priority 24/7 Phone & WhatsApp Concierge',
+          ],
+          permissions: [
+            Permission.PROPERTY_VIEW,
+            Permission.PROPERTY_CREATE,
+            Permission.PROPERTY_EDIT,
+            Permission.PROPERTY_PUBLISH,
+            Permission.PROPERTY_FEATURE,
+            Permission.PROPERTY_CONTACT_VIEW,
+            Permission.LEAD_VIEW,
+            Permission.LEAD_EDIT,
+            Permission.LEAD_EXPORT,
+            Permission.CRM_VIEW,
+            Permission.CRM_CREATE,
+            Permission.CRM_EDIT,
+            Permission.CRM_EXPORT,
+            Permission.CHAT_START,
+            Permission.CHAT_REPLY,
+            Permission.ANALYTICS_ADVANCED,
+            Permission.PROMOTION_CREATE,
+          ],
+        },
+      ];
+
+      for (const p of casaPlans) {
+        const existing = await this.packageModel.findOne({ slug: p.slug });
+        if (!existing) {
+          await this.packageModel.create({ ...p, freeTrialClaimedSlots: 0 });
+          this.logger.log(`✅ Seeded official CASA plan: ${p.name} (${p.slug})`);
+        } else {
+          // If duration prices or eligibleUserTypes are not set, populate them
+          let shouldUpdate = false;
+          if (!existing.durationPrices || existing.durationPrices.length === 0) {
+            existing.durationPrices = (p.durationPrices || []) as any;
+            shouldUpdate = true;
+          }
+          if (!existing.eligibleUserTypes || existing.eligibleUserTypes.length === 0) {
+            existing.eligibleUserTypes = p.eligibleUserTypes;
+            shouldUpdate = true;
+          }
+          if (p.isFree && (existing.freeTrialMaxSlots === undefined || existing.freeTrialMaxSlots === null)) {
+            existing.freeTrialMaxSlots = 50;
+            shouldUpdate = true;
+          }
+          if (existing.recommended === undefined) {
+            existing.recommended = p.recommended;
+            shouldUpdate = true;
+          }
+          if (existing.displayOrder === undefined) {
+            existing.displayOrder = p.displayOrder;
+            shouldUpdate = true;
+          }
+          // Ensure limits contain projectListings
+          if (p.limits?.projectListings && (!existing.limits || existing.limits.projectListings === undefined)) {
+            existing.limits = { ...existing.limits, projectListings: p.limits.projectListings };
+            shouldUpdate = true;
+          }
+          if (shouldUpdate) {
+            await existing.save();
+            this.logger.log(`✅ Updated existing plan config: ${p.name} (${p.slug})`);
+          }
+        }
+      }
+    } catch (err: any) {
+      this.logger.warn(`CASA plans seeding note: ${err?.message}`);
+    }
+  }
+
   // ==========================================
   // 2. ROLE CRUD & MANAGEMENT
   // ==========================================
@@ -845,6 +1125,13 @@ export class EntitlementsService implements OnModuleInit {
     if (dto.isActive !== undefined) pkg.isActive = dto.isActive;
     if (dto.isDefault !== undefined) pkg.isDefault = dto.isDefault;
     if (dto.targetAccountTypes) pkg.targetAccountTypes = dto.targetAccountTypes;
+    if (dto.eligibleUserTypes !== undefined) pkg.eligibleUserTypes = dto.eligibleUserTypes;
+    if (dto.durationPrices !== undefined) pkg.durationPrices = dto.durationPrices as any;
+    if (dto.isFree !== undefined) pkg.isFree = dto.isFree;
+    if (dto.recommended !== undefined) pkg.recommended = dto.recommended;
+    if (dto.displayOrder !== undefined) pkg.displayOrder = dto.displayOrder;
+    if (dto.freeTrialMaxSlots !== undefined) pkg.freeTrialMaxSlots = dto.freeTrialMaxSlots;
+    if (dto.freeTrialClaimedSlots !== undefined) pkg.freeTrialClaimedSlots = dto.freeTrialClaimedSlots;
     if (dto.features) pkg.features = dto.features;
     if (dto.whatsappNumber !== undefined) pkg.whatsappNumber = dto.whatsappNumber;
     if (dto.callNumber !== undefined) pkg.callNumber = dto.callNumber;
@@ -1068,6 +1355,19 @@ export class EntitlementsService implements OnModuleInit {
         endDate: { $gte: new Date() },
       }).sort({ createdAt: -1 }).lean().exec();
 
+      // If user is a broker/builder employee, inherit company/broker subscription
+      if (!subscriptionDoc && (user.brokerId || user.parentUserId || user.agencyId)) {
+        const brokerId = user.brokerId || user.parentUserId || user.agencyId;
+        subscriptionDoc = await this.subscriptionModel.findOne({
+          $or: [
+            { userId: brokerId },
+            { companyId: brokerId },
+          ],
+          status: { $in: ['ACTIVE', 'TRIAL'] },
+          endDate: { $gte: new Date() },
+        }).sort({ createdAt: -1 }).lean().exec();
+      }
+
       if (subscriptionDoc?.packageId && isValidObjectId(subscriptionDoc.packageId)) {
         packageDoc = await this.packageModel.findById(subscriptionDoc.packageId).lean().exec();
       }
@@ -1088,7 +1388,7 @@ export class EntitlementsService implements OnModuleInit {
 
     const packagePermissions: string[] = packageDoc?.permissions || [];
     const packageLimits = packageDoc?.limits || {
-      propertyViews: 10, propertyListings: 0, savedProperties: 5, savedSearches: 2, monthlyLeads: 10, enquiries: 5, chats: 10, teamMembers: 1,
+      propertyViews: 10, propertyListings: 0, projectListings: 0, savedProperties: 5, savedSearches: 2, monthlyLeads: 10, enquiries: 5, chats: 10, teamMembers: 1,
     };
 
     // 4. Combine Permissions: Role + Package + User Granted - User Denied
@@ -1133,6 +1433,7 @@ export class EntitlementsService implements OnModuleInit {
     const effectiveLimits = {
       propertyViews: packageLimits.propertyViews === -1 ? -1 : (packageLimits.propertyViews || 0) + (bonus.propertyViews || 0),
       propertyListings: packageLimits.propertyListings === -1 ? -1 : (packageLimits.propertyListings || 0) + (bonus.propertyListings || 0),
+      projectListings: packageLimits.projectListings === -1 ? -1 : (packageLimits.projectListings || 0) + (bonus.projectListings || 0),
       savedProperties: packageLimits.savedProperties === -1 ? -1 : (packageLimits.savedProperties || 0) + (bonus.savedProperties || 0),
       savedSearches: packageLimits.savedSearches === -1 ? -1 : (packageLimits.savedSearches || 0) + (bonus.savedSearches || 0),
       monthlyLeads: packageLimits.monthlyLeads === -1 ? -1 : (packageLimits.monthlyLeads || 0) + (bonus.monthlyLeads || 0),
@@ -1635,6 +1936,340 @@ export class EntitlementsService implements OnModuleInit {
         limits: pkg.limits,
       },
       entitlements,
+    };
+  }
+
+  // ==========================================
+  // DYNAMIC PRICING & 3-MONTH FREE TRIAL
+  // ==========================================
+
+  async getDynamicPricingPlans(userType?: string, durationMonths = 1) {
+    const rawUserType = (userType || '').toLowerCase().trim();
+    const isConsumer =
+      rawUserType === 'buyer' ||
+      rawUserType === 'tenant' ||
+      rawUserType === 'purchaser' ||
+      rawUserType === 'buyer / tenant';
+
+    if (isConsumer) {
+      return {
+        success: true,
+        userType: rawUserType || 'buyer',
+        isConsumer: true,
+        message: 'Buyers and Tenants enjoy free, unlimited property browsing and direct inquiries on CASA.',
+        plans: [],
+        freeTrialStatus: null,
+      };
+    }
+
+    const freePkg = await this.packageModel
+      .findOne({ $or: [{ slug: 'casa-free-trial' }, { isFree: true }] })
+      .lean()
+      .exec();
+
+    const maxSlots = freePkg?.freeTrialMaxSlots || 50;
+    const claimedSlots = freePkg?.freeTrialClaimedSlots || 0;
+    const remainingSlots = Math.max(0, maxSlots - claimedSlots);
+
+    const freeTrialStatus = {
+      maxSlots,
+      claimedSlots,
+      remainingSlots,
+      isAvailable: claimedSlots < maxSlots,
+      durationDays: 90,
+      validity: '3 Months Free',
+    };
+
+    const allPackages = await this.packageModel
+      .find({ isActive: true })
+      .sort({ displayOrder: 1, price: 1 })
+      .lean()
+      .exec();
+
+    const normalizedReqType = rawUserType.replace(/[^a-z0-9]/g, '');
+
+    const plans = allPackages
+      .filter((pkg) => {
+        if (!normalizedReqType) return true;
+        // Check eligible user types
+        if (Array.isArray(pkg.eligibleUserTypes) && pkg.eligibleUserTypes.length > 0) {
+          const match = pkg.eligibleUserTypes.some((t: string) => {
+            const cleanT = t.toLowerCase().replace(/[^a-z0-9]/g, '');
+            return (
+              cleanT.includes(normalizedReqType) ||
+              normalizedReqType.includes(cleanT) ||
+              (normalizedReqType.includes('builder') && cleanT.includes('developer')) ||
+              (normalizedReqType.includes('developer') && cleanT.includes('builder'))
+            );
+          });
+          if (match) return true;
+        }
+        // Check target account types
+        if (Array.isArray(pkg.targetAccountTypes) && pkg.targetAccountTypes.length > 0) {
+          const match = pkg.targetAccountTypes.some((t: string) => {
+            const cleanT = t.toLowerCase().replace(/[^a-z0-9]/g, '');
+            return (
+              cleanT.includes(normalizedReqType) ||
+              normalizedReqType.includes(cleanT) ||
+              cleanT === 'all' ||
+              (normalizedReqType.includes('builder') && cleanT.includes('developer'))
+            );
+          });
+          if (match) return true;
+        }
+        return true;
+      })
+      .map((pkg) => {
+        const isFree = Boolean(pkg.isFree || pkg.price === 0);
+
+        if (isFree) {
+          return {
+            id: pkg._id.toString(),
+            slug: pkg.slug,
+            name: pkg.name,
+            description: pkg.description,
+            isFree: true,
+            recommended: Boolean(pkg.recommended),
+            displayOrder: pkg.displayOrder ?? 0,
+            validityText: '3 Months Free',
+            durationMonths: 3,
+            durationDays: 90,
+            price: 0,
+            currency: pkg.currency || 'INR',
+            monthlyEquivalent: 0,
+            originalPrice: 0,
+            savings: 0,
+            discountPercentage: 0,
+            limits: pkg.limits || {},
+            features: pkg.features || [],
+            whatsappNumber: pkg.whatsappNumber,
+            callNumber: pkg.callNumber,
+            freeTrial: {
+              maxSlots: pkg.freeTrialMaxSlots || 50,
+              claimedSlots: pkg.freeTrialClaimedSlots || 0,
+              remainingSlots: Math.max(0, (pkg.freeTrialMaxSlots || 50) - (pkg.freeTrialClaimedSlots || 0)),
+              isAvailable: (pkg.freeTrialClaimedSlots || 0) < (pkg.freeTrialMaxSlots || 50),
+            },
+          };
+        }
+
+        const dur = Number(durationMonths) || 1;
+        let actualPrice = pkg.price * dur;
+        let referenceMonthlyPrice = pkg.price;
+
+        if (Array.isArray(pkg.durationPrices) && pkg.durationPrices.length > 0) {
+          const match = pkg.durationPrices.find(
+            (dp: any) => Number(dp.durationMonths) === dur && dp.isActive !== false,
+          );
+          if (match) {
+            actualPrice = match.amount;
+            referenceMonthlyPrice = match.referenceMonthlyPrice || pkg.price;
+          }
+        }
+
+        const referenceTotal = referenceMonthlyPrice * dur;
+        const savings = Math.max(0, referenceTotal - actualPrice);
+        const discountPercentage = referenceTotal > 0 ? Math.round((savings / referenceTotal) * 100) : 0;
+        const monthlyEquivalent = Math.round(actualPrice / dur);
+
+        return {
+          id: pkg._id.toString(),
+          slug: pkg.slug,
+          name: pkg.name,
+          description: pkg.description,
+          isFree: false,
+          recommended: Boolean(pkg.recommended),
+          displayOrder: pkg.displayOrder ?? 1,
+          selectedDurationMonths: dur,
+          price: actualPrice,
+          currency: pkg.currency || 'INR',
+          monthlyEquivalent,
+          referenceMonthlyPrice,
+          originalPrice: referenceTotal,
+          savings,
+          discountPercentage,
+          limits: pkg.limits || {},
+          features: pkg.features || [],
+          durationPrices: pkg.durationPrices || [],
+          whatsappNumber: pkg.whatsappNumber,
+          callNumber: pkg.callNumber,
+        };
+      });
+
+    return {
+      success: true,
+      userType: rawUserType || 'all',
+      durationMonths: Number(durationMonths) || 1,
+      freeTrialStatus,
+      plans,
+    };
+  }
+
+  async claimFreeTrialSubscription(userId: string) {
+    if (!userId) {
+      throw new BadRequestException('User ID is required');
+    }
+
+    const user = await this.userModel.findById(userId);
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    if (user.isTrialActive) {
+      throw new BadRequestException('You already have an active trial.');
+    }
+
+    if (user.trialUsed) {
+      throw new BadRequestException('You have already used your introductory free trial.');
+    }
+
+    const existingSub = await this.subscriptionModel.findOne({
+      userId,
+      status: { $in: ['ACTIVE', 'TRIAL'] },
+      endDate: { $gte: new Date() },
+    });
+    if (existingSub) {
+      throw new BadRequestException('You already have an active subscription on your account.');
+    }
+
+    const freePkg = await this.packageModel.findOne({
+      $or: [{ slug: 'casa-free-trial' }, { isFree: true }],
+    });
+    if (!freePkg) {
+      throw new NotFoundException('Introductory Free Plan is currently not available.');
+    }
+
+    const maxSlots = freePkg.freeTrialMaxSlots || 50;
+    const claimedSlots = freePkg.freeTrialClaimedSlots || 0;
+    if (claimedSlots >= maxSlots) {
+      throw new BadRequestException('All 50 introductory free trial slots have been claimed.');
+    }
+
+    // Atomic slot claim
+    const updatedPkg = await this.packageModel.findOneAndUpdate(
+      {
+        _id: freePkg._id,
+        freeTrialClaimedSlots: { $lt: maxSlots },
+      },
+      { $inc: { freeTrialClaimedSlots: 1 } },
+      { new: true },
+    );
+
+    if (!updatedPkg) {
+      throw new BadRequestException('All 50 introductory free trial slots have been claimed.');
+    }
+
+    const startDate = new Date();
+    const durationDays = freePkg.durationDays || 90;
+    const endDate = new Date(startDate.getTime() + durationDays * 24 * 60 * 60 * 1000);
+
+    const sub = await this.subscriptionModel.create({
+      userId,
+      packageId: freePkg._id.toString(),
+      accountType: user.accountType,
+      plan: 'FREE_TRIAL',
+      status: 'TRIAL',
+      durationMonths: 3,
+      amountPaid: 0,
+      currency: 'INR',
+      startDate,
+      endDate,
+      metadata: {
+        packageName: freePkg.name,
+        packageSlug: freePkg.slug,
+        isIntroductoryTrial: true,
+      },
+    });
+
+    user.activePackageId = freePkg._id.toString();
+    user.activeSubscriptionId = sub._id.toString();
+    user.isTrialActive = true;
+    user.trialUsed = true;
+    user.trialStartedAt = startDate;
+    user.trialExpiresAt = endDate;
+    user.trialPackageId = freePkg._id.toString();
+    await user.save();
+
+    await this.auditLogModel.create({
+      action: 'FREE_TRIAL_CLAIMED',
+      actorUserId: userId,
+      actorName: user.name || 'User',
+      actorRole: user.role,
+      targetEntity: 'SUBSCRIPTION',
+      targetEntityId: sub._id.toString(),
+      metadata: {
+        claimedSlots: updatedPkg.freeTrialClaimedSlots,
+        remainingSlots: Math.max(0, maxSlots - updatedPkg.freeTrialClaimedSlots),
+      },
+      timestamp: new Date(),
+    });
+
+    return {
+      success: true,
+      message: 'Congratulations! Your 3-Month Free Plan is now active.',
+      subscription: sub,
+      remainingSlots: Math.max(0, maxSlots - updatedPkg.freeTrialClaimedSlots),
+    };
+  }
+
+  async getFreeTrialStatus() {
+    const freePkg = await this.packageModel
+      .findOne({ $or: [{ slug: 'casa-free-trial' }, { isFree: true }] })
+      .lean()
+      .exec();
+
+    const maxSlots = freePkg?.freeTrialMaxSlots || 50;
+    const claimedSlots = freePkg?.freeTrialClaimedSlots || 0;
+    const remainingSlots = Math.max(0, maxSlots - claimedSlots);
+
+    return {
+      success: true,
+      maxSlots,
+      claimedSlots,
+      remainingSlots,
+      isAvailable: claimedSlots < maxSlots,
+      durationDays: freePkg?.durationDays || 90,
+      validity: '3 Months Free',
+    };
+  }
+
+  async configureFreeTrial(
+    dto: { maxSlots?: number; resetClaimed?: boolean },
+    actorUser: any,
+  ) {
+    if (
+      actorUser?.platformRole !== PlatformRole.SUPER_ADMIN &&
+      actorUser?.role !== UserRole.SUPER_ADMIN
+    ) {
+      throw new ForbiddenException('Only Super Admins can configure free trial slots.');
+    }
+
+    const freePkg = await this.packageModel.findOne({
+      $or: [{ slug: 'casa-free-trial' }, { isFree: true }],
+    });
+    if (!freePkg) {
+      throw new NotFoundException('Introductory Free Plan not found.');
+    }
+
+    if (dto.maxSlots !== undefined) {
+      freePkg.freeTrialMaxSlots = Number(dto.maxSlots);
+    }
+    if (dto.resetClaimed) {
+      freePkg.freeTrialClaimedSlots = 0;
+    }
+    await freePkg.save();
+
+    return {
+      success: true,
+      message: 'Free trial configuration updated successfully.',
+      freeTrialStatus: {
+        maxSlots: freePkg.freeTrialMaxSlots,
+        claimedSlots: freePkg.freeTrialClaimedSlots,
+        remainingSlots: Math.max(
+          0,
+          (freePkg.freeTrialMaxSlots || 50) - (freePkg.freeTrialClaimedSlots || 0),
+        ),
+      },
     };
   }
 }

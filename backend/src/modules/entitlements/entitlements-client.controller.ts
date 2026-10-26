@@ -4,6 +4,7 @@ import {
   Post,
   Param,
   Body,
+  Query,
   Req,
   Ip,
   UseGuards,
@@ -22,6 +23,29 @@ export class EntitlementsClientController {
   async getPublicPackages(): Promise<any[]> {
     const all = await this.entitlementsService.getAllPackages();
     return all.filter((p) => p.isActive);
+  }
+
+  @Get('pricing-plans')
+  @ApiOperation({ summary: 'Get dynamic pricing plans with duration pricing and user type filtering' })
+  getDynamicPricingPlans(
+    @Query('userType') userType?: string,
+    @Query('durationMonths') durationMonths?: string,
+  ): Promise<any> {
+    const dur = durationMonths ? parseInt(durationMonths, 10) : 1;
+    return this.entitlementsService.getDynamicPricingPlans(userType, dur);
+  }
+
+  @Get('free-trial-status')
+  @ApiOperation({ summary: 'Get 3-month introductory free trial slot status' })
+  getFreeTrialStatus(): Promise<any> {
+    return this.entitlementsService.getFreeTrialStatus();
+  }
+
+  @Post('claim-free-trial')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Claim 3-month free trial slot for logged in user' })
+  claimFreeTrial(@Req() req: any): Promise<any> {
+    return this.entitlementsService.claimFreeTrialSubscription(req.user.id);
   }
 
   @Get('roles')

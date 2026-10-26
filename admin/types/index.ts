@@ -853,8 +853,19 @@ export type BillingPeriod =
   | 'LIFETIME'
   | 'CUSTOM';
 
+export interface PackageDurationPrice {
+  durationMonths: number;
+  amount: number;
+  currency?: string;
+  referenceMonthlyPrice?: number;
+  isActive?: boolean;
+}
+
 export interface PackageLimits {
   propertyListingsMax: number;
+  projectListings?: number;
+  projectListingsMax?: number;
+  propertyListings?: number;
   featuredListingsMax: number;
   propertyViewsMonthly: number;
   savedItemsMax: number;
@@ -862,6 +873,7 @@ export interface PackageLimits {
   enquiriesMonthly: number;
   chatThreadsMax: number;
   teamMembersMax: number;
+  teamMembers?: number;
 }
 
 export interface PackageRecord {
@@ -874,6 +886,13 @@ export interface PackageRecord {
   currency: string;
   billingPeriod: BillingPeriod;
   targetAccountTypes: AccountType[];
+  eligibleUserTypes?: string[];
+  durationPrices?: PackageDurationPrice[];
+  isFree?: boolean;
+  recommended?: boolean;
+  displayOrder?: number;
+  freeTrialMaxSlots?: number;
+  freeTrialClaimedSlots?: number;
   limits: PackageLimits;
   permissions: string[];
   features: string[];

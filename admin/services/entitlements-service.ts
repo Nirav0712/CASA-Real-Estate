@@ -179,6 +179,35 @@ export async function deletePackage(id: string): Promise<{ success: boolean; mes
   return json;
 }
 
+export async function getAdminFreeTrialStatus(): Promise<{
+  maxSlots: number;
+  claimedSlots: number;
+  remainingSlots: number;
+  isAvailable: boolean;
+  validity: string;
+}> {
+  const res = await fetch(`${API_BASE_URL}/admin/entitlements/free-trial`, {
+    headers: getAuthHeaders(),
+    credentials: 'include',
+    cache: 'no-store',
+  });
+  const json = await res.json().catch(() => null);
+  if (!res.ok) throw new Error(json?.message || json?.error || 'Failed to fetch free trial status');
+  return json?.data !== undefined ? json.data : json;
+}
+
+export async function configureFreeTrial(payload: { maxSlots?: number; resetClaimed?: boolean }): Promise<any> {
+  const res = await fetch(`${API_BASE_URL}/admin/entitlements/free-trial/configure`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    credentials: 'include',
+    body: JSON.stringify(payload),
+  });
+  const json = await res.json().catch(() => null);
+  if (!res.ok) throw new Error(json?.message || json?.error || 'Failed to configure free trial');
+  return json?.data !== undefined ? json.data : json;
+}
+
 // ----------------- USAGE & OVERRIDES -----------------
 
 export async function getUsageMetrics(params?: { search?: string; page?: number; limit?: number }): Promise<{

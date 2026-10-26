@@ -89,7 +89,7 @@ export class PaymentsService {
     let product: PricingProduct | null = null;
 
     if (dto.purpose === PaymentPurpose.SUBSCRIPTION) {
-      const lookupCode = dto.productCode || dto.referenceId;
+      const lookupCode = dto.packageId || dto.productCode || dto.referenceId;
       let pkgDoc: PackageDocument | null = null;
 
       if (lookupCode) {
@@ -130,14 +130,31 @@ export class PaymentsService {
           }
         }
 
+        let purchaseAmount = pkgDoc.price;
+        const durationMonths = Number(dto.durationMonths) || 1;
+        const durationDays = durationMonths * 30;
+
+        if (Array.isArray(pkgDoc.durationPrices) && pkgDoc.durationPrices.length > 0) {
+          const matchPrice = pkgDoc.durationPrices.find(
+            (dp) => Number(dp.durationMonths) === durationMonths && dp.isActive !== false,
+          );
+          if (matchPrice) {
+            purchaseAmount = matchPrice.amount;
+          } else {
+            purchaseAmount = pkgDoc.price * durationMonths;
+          }
+        } else if (durationMonths > 1) {
+          purchaseAmount = pkgDoc.price * durationMonths;
+        }
+
         product = {
           code: pkgDoc.slug,
           purpose: PaymentPurpose.SUBSCRIPTION,
-          name: pkgDoc.name,
+          name: `${pkgDoc.name} (${durationMonths} Mo)`,
           description: pkgDoc.description || `${pkgDoc.name} Subscription`,
-          amount: pkgDoc.price,
+          amount: purchaseAmount,
           currency: pkgDoc.currency || 'INR',
-          durationDays: pkgDoc.durationDays || 30,
+          durationDays,
           active: pkgDoc.isActive,
         };
       } else {
@@ -446,28 +463,44 @@ export class PaymentsService {
         ? SubscriptionPlan.BUSINESS
         : SubscriptionPlan.PRO;
 
-      await this.subscriptionModel.findOneAndUpdate(
+      const durationMonths = payment.metadata?.durationMonths || Math.max(1, Math.round(durationDays / 30));
+      const userDoc = await this.userModel.findById(payment.userId).lean();
+      const companyId = userDoc?.brokerId || userDoc?.parentUserId || userDoc?.agencyId || null;
+
+      const sub = await this.subscriptionModel.findOneAndUpdate(
         { userId: payment.userId },
         {
           userId: payment.userId,
+          companyId,
+          packageId: pkgDoc ? pkgDoc._id.toString() : payment.metadata?.packageId,
+          accountType: userDoc?.accountType,
           plan,
           status: SubscriptionStatus.ACTIVE,
+          durationMonths,
+          amountPaid: payment.amount,
+          currency: payment.currency,
           startDate: now,
           endDate: expiryDate,
           paymentId: payment._id.toString(),
           orderId: payment.orderId,
-          packageId: pkgDoc ? pkgDoc._id.toString() : undefined,
           metadata: {
             productName: payment.productName,
             amount: payment.amount,
             packageName: pkgDoc?.name,
             packageSlug: pkgDoc?.slug,
+            durationMonths,
           },
         },
         { upsert: true, new: true },
       );
 
-      this.logger.log(`⭐ Subscription ${pkgDoc?.name || plan} activated for user ${payment.userId} until ${expiryDate.toISOString()}`);
+      if (sub) {
+        await this.userModel.findByIdAndUpdate(payment.userId, {
+          activeSubscriptionId: sub._id.toString(),
+        });
+      }
+
+      this.logger.log(`⭐ Subscription ${pkgDoc?.name || plan} (${durationMonths} mo) activated for user ${payment.userId} until ${expiryDate.toISOString()}`);
     }
   }
 

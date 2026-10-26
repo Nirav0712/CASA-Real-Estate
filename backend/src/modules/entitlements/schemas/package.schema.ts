@@ -24,6 +24,9 @@ export class PackageLimits {
   @Prop({ default: 0 })
   propertyListings: number; // -1 for unlimited
 
+  @Prop({ default: 0 })
+  projectListings: number; // -1 for unlimited
+
   @Prop({ default: 10 })
   savedProperties: number; // -1 for unlimited
 
@@ -43,6 +46,24 @@ export class PackageLimits {
   teamMembers: number;
 }
 
+@Schema({ _id: false })
+export class PackageDurationPrice {
+  @Prop({ required: true })
+  durationMonths: number; // 1, 2, 3, 6, 12
+
+  @Prop({ required: true })
+  amount: number;
+
+  @Prop({ default: 'INR' })
+  currency: string;
+
+  @Prop()
+  referenceMonthlyPrice?: number;
+
+  @Prop({ default: true })
+  isActive: boolean;
+}
+
 @Schema({ timestamps: true, collection: 'packages' })
 export class Package {
   @Prop({ required: true, trim: true })
@@ -57,6 +78,9 @@ export class Package {
   @Prop({ type: [String], default: [] })
   targetAccountTypes: string[];
 
+  @Prop({ type: [String], default: [] })
+  eligibleUserTypes: string[]; // BUILDER, DEVELOPER, BROKER, AGENT, PROPERTY_OWNER, BUYER, TENANT
+
   @Prop({ required: true, default: 0 })
   price: number;
 
@@ -68,6 +92,24 @@ export class Package {
 
   @Prop({ default: 30 })
   durationDays: number;
+
+  @Prop({ type: [PackageDurationPrice], default: [] })
+  durationPrices: PackageDurationPrice[];
+
+  @Prop({ default: false, index: true })
+  isFree: boolean;
+
+  @Prop({ default: false, index: true })
+  recommended: boolean;
+
+  @Prop({ default: 0 })
+  displayOrder: number;
+
+  @Prop({ default: 50 })
+  freeTrialMaxSlots: number;
+
+  @Prop({ default: 0 })
+  freeTrialClaimedSlots: number;
 
   @Prop({ default: true, index: true })
   isActive: boolean;

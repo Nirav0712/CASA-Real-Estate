@@ -122,6 +122,12 @@ describe('PropertiesService (Phase 06 Lifecycle & Security)', () => {
     };
 
     const mockEntitlementsService = {
+      resolveUserEntitlements: jest.fn().mockResolvedValue({
+        limits: {
+          propertyListings: 100,
+          projectListings: 50,
+        },
+      }),
       trackAndValidatePropertyView: jest.fn().mockResolvedValue({
         allowed: true,
         contactVisible: true,

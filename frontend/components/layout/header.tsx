@@ -169,6 +169,10 @@ export function Header() {
               <Link href="/#categories" className="hover:text-casa-brand transition-colors">
                 {t('categories')}
               </Link>
+              <Link href="/pricing" className="hover:text-casa-brand transition-colors flex items-center gap-1 font-semibold text-blue-600 dark:text-blue-400">
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>Pricing</span>
+              </Link>
             </nav>
 
             {/* Controls: Theme, Language, Auth, Post Ad */}
@@ -1250,6 +1254,14 @@ export function Footer() {
                   className="text-casa-text-muted hover:text-casa-brand transition-colors block"
                 >
                   {t('verifiedAgents')}
+                </Link>
+              </li>
+              <li>
+                <Link
+                  href="/pricing"
+                  className="text-casa-text-muted hover:text-casa-brand transition-colors block font-semibold text-blue-600 dark:text-blue-400"
+                >
+                  Pricing & Plans
                 </Link>
               </li>
             </ul>

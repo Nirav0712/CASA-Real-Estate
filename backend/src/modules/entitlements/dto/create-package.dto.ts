@@ -13,6 +13,10 @@ export class PackageLimitsDto {
 
   @IsOptional()
   @IsNumber()
+  projectListings?: number;
+
+  @IsOptional()
+  @IsNumber()
   savedProperties?: number;
 
   @IsOptional()
@@ -36,6 +40,26 @@ export class PackageLimitsDto {
   teamMembers?: number;
 }
 
+export class PackageDurationPriceDto {
+  @IsNumber()
+  durationMonths: number;
+
+  @IsNumber()
+  amount: number;
+
+  @IsOptional()
+  @IsString()
+  currency?: string;
+
+  @IsOptional()
+  @IsNumber()
+  referenceMonthlyPrice?: number;
+
+  @IsOptional()
+  @IsBoolean()
+  isActive?: boolean;
+}
+
 export class CreatePackageDto {
   @IsString()
   @IsNotEmpty()
@@ -54,6 +78,11 @@ export class CreatePackageDto {
   @IsString({ each: true })
   targetAccountTypes?: string[];
 
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  eligibleUserTypes?: string[];
+
   @IsNumber()
   price: number;
 
@@ -64,6 +93,36 @@ export class CreatePackageDto {
   @IsEnum(BillingPeriod)
   @IsNotEmpty()
   billingPeriod: BillingPeriod;
+
+  @IsOptional()
+  @IsNumber()
+  durationDays?: number;
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => PackageDurationPriceDto)
+  durationPrices?: PackageDurationPriceDto[];
+
+  @IsOptional()
+  @IsBoolean()
+  isFree?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  recommended?: boolean;
+
+  @IsOptional()
+  @IsNumber()
+  displayOrder?: number;
+
+  @IsOptional()
+  @IsNumber()
+  freeTrialMaxSlots?: number;
+
+  @IsOptional()
+  @IsNumber()
+  freeTrialClaimedSlots?: number;
 
   @IsOptional()
   @IsBoolean()

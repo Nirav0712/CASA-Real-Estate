@@ -152,4 +152,23 @@ export class EntitlementsAdminController {
   addBonusCredits(@Param('id') id: string, @Body() dto: AddBonusCreditsDto, @Req() req: any): Promise<any> {
     return this.entitlementsService.addBonusCredits(id, dto, req.user);
   }
+
+  // ------------------------------------------
+  // FREE TRIAL MONITOR & CONFIGURATION
+  // ------------------------------------------
+  @Get('free-trial')
+  @ApiOperation({ summary: 'Get free trial slots configuration and live status' })
+  getAdminFreeTrialStatus(): Promise<any> {
+    return this.entitlementsService.getFreeTrialStatus();
+  }
+
+  @Post('free-trial/configure')
+  @Roles(UserRole.SUPER_ADMIN)
+  @ApiOperation({ summary: 'Configure free trial max slots or reset claimed slots' })
+  configureFreeTrial(
+    @Body() dto: { maxSlots?: number; resetClaimed?: boolean },
+    @Req() req: any,
+  ): Promise<any> {
+    return this.entitlementsService.configureFreeTrial(dto, req.user);
+  }
 }

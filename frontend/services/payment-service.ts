@@ -28,6 +28,8 @@ export async function createPaymentOrder(payload: {
   purpose: PaymentPurpose;
   referenceId?: string;
   productCode?: string;
+  packageId?: string;
+  durationMonths?: number;
   metadata?: Record<string, any>;
 }): Promise<PaymentOrderResponse> {
   const result = await fetchApi<PaymentOrderResponse>('/payments/orders', {

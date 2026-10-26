@@ -344,6 +344,127 @@ export class PropertiesService implements OnModuleInit {
   }
 
   // ==========================================
+  // LISTING LIMITS & COMPANY SUBSCRIPTION
+  // ==========================================
+
+  async getCompanyUserIds(user: any): Promise<string[]> {
+    const userId = user?.id || user?._id?.toString();
+    if (!userId) return [];
+
+    let userDoc: any = null;
+    if (isValidObjectId(userId)) {
+      userDoc = await this.userModel.findById(userId).lean();
+    }
+
+    const effectiveBrokerId =
+      userDoc?.brokerId ||
+      userDoc?.parentUserId ||
+      userDoc?.agencyId ||
+      user?.brokerId ||
+      user?.parentUserId ||
+      user?.agencyId;
+
+    if (effectiveBrokerId) {
+      const colleagues = await this.userModel
+        .find({
+          $or: [
+            { brokerId: effectiveBrokerId },
+            { parentUserId: effectiveBrokerId },
+            { agencyId: effectiveBrokerId },
+            ...(isValidObjectId(effectiveBrokerId) ? [{ _id: new Types.ObjectId(effectiveBrokerId) }] : []),
+          ],
+        })
+        .select('_id id')
+        .lean();
+
+      const ids = new Set<string>([effectiveBrokerId, userId]);
+      for (const c of colleagues) {
+        if (c._id) ids.add(c._id.toString());
+        if (c.id) ids.add(c.id);
+      }
+      return Array.from(ids);
+    }
+
+    const employees = await this.userModel
+      .find({
+        $or: [
+          { brokerId: userId },
+          { parentUserId: userId },
+          { agencyId: userId },
+        ],
+      })
+      .select('_id id')
+      .lean();
+
+    const ids = new Set<string>([userId]);
+    for (const e of employees) {
+      if (e._id) ids.add(e._id.toString());
+      if (e.id) ids.add(e.id);
+    }
+    return Array.from(ids);
+  }
+
+  async checkListingLimits(user: any, isProject = false): Promise<void> {
+    const isDirectAdmin =
+      user?.role === UserRole.SUPER_ADMIN ||
+      user?.role === UserRole.ADMIN ||
+      user?.platformRole === PlatformRole.SUPER_ADMIN ||
+      user?.platformRole === PlatformRole.ADMIN;
+
+    if (isDirectAdmin) return;
+
+    let userDoc: any = null;
+    if (user?.id && isValidObjectId(user.id)) {
+      userDoc = await this.userModel.findById(user.id).lean();
+    }
+
+    const entitlements = await this.entitlementsService.resolveUserEntitlements(userDoc || user);
+    const limits: any = entitlements?.limits || {};
+    const companyUserIds = await this.getCompanyUserIds(user);
+
+    if (isProject) {
+      const maxProjects = limits.projectListings;
+      if (maxProjects !== undefined && maxProjects !== -1) {
+        const count = await this.propertyModel.countDocuments({
+          isParentProject: true,
+          status: { $in: ['PUBLISHED', 'ACTIVE', 'PENDING_REVIEW', 'PENDING_APPROVAL'] },
+          $or: [
+            { ownerId: { $in: companyUserIds } },
+            { advertiserId: { $in: companyUserIds } },
+            { createdBy: { $in: companyUserIds } },
+            { brokerId: { $in: companyUserIds } },
+          ],
+        });
+        if (count >= maxProjects) {
+          throw new BadRequestException(
+            `You have reached your active project listings limit (${count}/${maxProjects}). Upgrade your CASA subscription plan to publish more projects.`,
+          );
+        }
+      }
+    } else {
+      const maxProperties = limits.propertyListings;
+      if (maxProperties !== undefined && maxProperties !== -1) {
+        const count = await this.propertyModel.countDocuments({
+          isParentProject: { $ne: true },
+          isChildUnit: { $ne: true },
+          status: { $in: ['PUBLISHED', 'ACTIVE', 'PENDING_REVIEW', 'PENDING_APPROVAL'] },
+          $or: [
+            { ownerId: { $in: companyUserIds } },
+            { advertiserId: { $in: companyUserIds } },
+            { createdBy: { $in: companyUserIds } },
+            { brokerId: { $in: companyUserIds } },
+          ],
+        });
+        if (count >= maxProperties) {
+          throw new BadRequestException(
+            `You have reached your active property listings limit (${count}/${maxProperties}). Upgrade your CASA subscription plan to post additional properties.`,
+          );
+        }
+      }
+    }
+  }
+
+  // ==========================================
   // MULTI-UNIT & PLOTTED DEVELOPMENT HELPERS
   // ==========================================
 
@@ -1409,6 +1530,8 @@ export class PropertiesService implements OnModuleInit {
           }
         }
       }
+
+      await this.checkListingLimits(user, Boolean(dto.isParentProject));
     }
 
     const titleEn = typeof dto.title === 'string' ? dto.title : dto.title?.en || 'New Property Listing';
@@ -2059,6 +2182,8 @@ export class PropertiesService implements OnModuleInit {
         }
       }
     }
+
+    await this.checkListingLimits(user, Boolean(property.isParentProject));
 
     // Status state validation
     if (

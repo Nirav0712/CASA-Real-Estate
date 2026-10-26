@@ -29,6 +29,21 @@ export class CreatePaymentOrderDto {
   productCode?: string;
 
   @ApiPropertyOptional({
+    description: 'Target package ID for subscription purchase',
+    example: 'casa-basic',
+  })
+  @IsString()
+  @IsOptional()
+  packageId?: string;
+
+  @ApiPropertyOptional({
+    description: 'Subscription duration in months (1, 2, 3, 6, 12)',
+    example: 3,
+  })
+  @IsOptional()
+  durationMonths?: number;
+
+  @ApiPropertyOptional({
     description: 'Additional contextual metadata (customer notes, redirect urls)',
     example: { propertyTitle: '3BHK Villa in Gomti Nagar' },
   })

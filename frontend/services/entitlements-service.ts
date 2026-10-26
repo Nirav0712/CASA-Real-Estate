@@ -170,3 +170,93 @@ export function checkPermission(permissions: string[] | undefined, required: str
   if (parts.length > 1 && permissions.includes(`${parts[0]}:*`)) return true;
   return false;
 }
+
+export interface DynamicPricingResponse {
+  success: boolean;
+  userType: string;
+  durationMonths: number;
+  isConsumer?: boolean;
+  message?: string;
+  freeTrialStatus: {
+    maxSlots: number;
+    claimedSlots: number;
+    remainingSlots: number;
+    isAvailable: boolean;
+    durationDays: number;
+    validity: string;
+  } | null;
+  plans: Array<{
+    id: string;
+    slug: string;
+    name: string;
+    description: string;
+    isFree: boolean;
+    recommended: boolean;
+    displayOrder: number;
+    validityText?: string;
+    selectedDurationMonths?: number;
+    price: number;
+    currency: string;
+    monthlyEquivalent: number;
+    referenceMonthlyPrice?: number;
+    originalPrice: number;
+    savings: number;
+    discountPercentage: number;
+    limits: Record<string, number>;
+    features: string[];
+    whatsappNumber?: string;
+    callNumber?: string;
+    freeTrial?: {
+      maxSlots: number;
+      claimedSlots: number;
+      remainingSlots: number;
+      isAvailable: boolean;
+    };
+  }>;
+}
+
+export async function getDynamicPricingPlans(
+  userType?: string,
+  durationMonths = 1,
+): Promise<DynamicPricingResponse> {
+  const params = new URLSearchParams();
+  if (userType) params.set('userType', userType);
+  if (durationMonths) params.set('durationMonths', durationMonths.toString());
+
+  const qs = params.toString() ? `?${params.toString()}` : '';
+  const result = await fetchApi<DynamicPricingResponse>(`/entitlements/pricing-plans${qs}`);
+  if (!result.isBackendAvailable || result.error || !result.data) {
+    throw new Error(result.error || 'Failed to load pricing plans.');
+  }
+  return result.data;
+}
+
+export async function getFreeTrialStatus(): Promise<{
+  maxSlots: number;
+  claimedSlots: number;
+  remainingSlots: number;
+  isAvailable: boolean;
+  durationDays: number;
+  validity: string;
+}> {
+  const result = await fetchApi<any>('/entitlements/free-trial-status');
+  if (!result.isBackendAvailable || result.error || !result.data) {
+    throw new Error(result.error || 'Failed to load free trial status.');
+  }
+  return result.data;
+}
+
+export async function claimFreeTrial(): Promise<{
+  success: boolean;
+  message: string;
+  subscription: any;
+  remainingSlots: number;
+}> {
+  const result = await fetchApi<any>('/entitlements/claim-free-trial', {
+    method: 'POST',
+  });
+  if (!result.isBackendAvailable || result.error || !result.data) {
+    throw new Error(result.error || 'Failed to claim introductory free trial.');
+  }
+  return result.data;
+}

@@ -21,6 +21,24 @@ export class Subscription {
   @Prop({ required: true })
   endDate: Date;
 
+  @Prop({ required: false, index: true })
+  companyId?: string;
+
+  @Prop({ required: false, index: true })
+  packageId?: string;
+
+  @Prop({ required: false })
+  accountType?: string;
+
+  @Prop({ required: false, default: 1 })
+  durationMonths?: number;
+
+  @Prop({ required: false, default: 0 })
+  amountPaid?: number;
+
+  @Prop({ required: false, default: 'INR' })
+  currency?: string;
+
   @Prop({ required: false })
   paymentId?: string;
 
