@@ -1,5 +1,11 @@
 import { fetchApi, getApiBaseUrl } from '@/lib/api-client';
-import { Property, SearchPropertiesParams, PaginatedResponse } from '@/types';
+import {
+  Property,
+  SearchPropertiesParams,
+  PaginatedResponse,
+  FeaturedPropertyRequest,
+  CreateFeaturedRequestPayload,
+} from '@/types';
 
 // Fake/demo mock dataset removed - live MongoDB Atlas database is the sole source of truth
 export const DEV_FALLBACK_PROPERTIES: Property[] = [];
@@ -333,3 +339,28 @@ export async function uploadPropertyVideo(
     xhr.send(formData);
   });
 }
+
+export async function createFeaturedRequest(
+  payload: CreateFeaturedRequestPayload,
+): Promise<{ success: boolean; message: string; request: FeaturedPropertyRequest }> {
+  const result = await fetchApi<{ success: boolean; message: string; request: FeaturedPropertyRequest }>(
+    '/properties/featured-requests',
+    {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    },
+  );
+  if (!result.isBackendAvailable || result.error || !result.data) {
+    throw new Error(result.error || 'Failed to submit featured property request.');
+  }
+  return result.data;
+}
+
+export async function getMyFeaturedRequests(): Promise<FeaturedPropertyRequest[]> {
+  const result = await fetchApi<FeaturedPropertyRequest[]>('/properties/featured-requests/my');
+  if (result.isBackendAvailable && Array.isArray(result.data)) {
+    return result.data;
+  }
+  return [];
+}
+

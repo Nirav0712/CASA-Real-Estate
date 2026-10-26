@@ -112,7 +112,29 @@ export default function BrokerDashboardPage() {
         </div>
 
         {/* Broker Modules Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <Card className="p-6 bg-casa-surface border border-casa-border-light shadow-subtle space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-base font-bold text-casa-text-primary flex items-center gap-2">
+                <Users className="w-4 h-4 text-amber-600" />
+                <span>Employee Team</span>
+              </h3>
+              <Link href="/dashboard/broker/employees" className="text-xs font-semibold text-amber-600 hover:underline">
+                Manage
+              </Link>
+            </div>
+            <p className="text-xs text-casa-text-secondary">
+              Create and manage employee accounts, assign permissions across listings, reels, and CRM with strict tenant isolation.
+            </p>
+            <div className="pt-2">
+              <Link href="/dashboard/broker/employees">
+                <Button variant="primary" size="sm" fullWidth className="bg-amber-600 hover:bg-amber-700 text-white">
+                  <span>Manage Employees</span>
+                </Button>
+              </Link>
+            </div>
+          </Card>
+
           <Card className="p-6 bg-casa-surface border border-casa-border-light shadow-subtle space-y-4">
             <div className="flex items-center justify-between">
               <h3 className="text-base font-bold text-casa-text-primary flex items-center gap-2">

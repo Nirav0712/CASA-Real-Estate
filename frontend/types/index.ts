@@ -1025,5 +1025,86 @@ export interface SubscriptionRequest {
   updatedAt?: string;
 }
 
+export interface BrokerEmployee {
+  id: string;
+  _id?: string;
+  name: string;
+  email?: string;
+  mobile: string;
+  normalizedMobile?: string;
+  designation?: string;
+  role: string;
+  status: string;
+  permissions: string[];
+  assignedProperties?: string[];
+  createdAt: string;
+}
+
+export interface BrokerEmployeesResponse {
+  employees: BrokerEmployee[];
+  summary: {
+    total: number;
+    active: number;
+    inactive: number;
+    quotaLimit: number;
+  };
+}
+
+export interface CreateBrokerEmployeePayload {
+  name: string;
+  email: string;
+  mobile: string;
+  password?: string;
+  designation?: string;
+  permissions?: string[];
+}
+
+export interface UpdateBrokerEmployeePayload {
+  name?: string;
+  email?: string;
+  mobile?: string;
+  designation?: string;
+  password?: string;
+  permissions?: string[];
+  status?: 'ACTIVE' | 'INACTIVE';
+}
+
+export interface FeaturedPropertyRequest {
+  id: string;
+  _id?: string;
+  requestReference: string;
+  brokerId: string;
+  brokerName?: string;
+  propertyId: string;
+  propertyTitle?: string;
+  propertySlug?: string;
+  propertyPrice?: number;
+  propertyLocation?: string;
+  propertyImage?: string;
+  durationDays: number;
+  requestedStartDate?: string;
+  requestedEndDate?: string;
+  price?: number;
+  planName?: string;
+  notes?: string;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'EXPIRED';
+  rejectionReason?: string;
+  approvedStartDate?: string;
+  approvedEndDate?: string;
+  approvedDurationDays?: number;
+  reviewedBy?: string;
+  reviewedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateFeaturedRequestPayload {
+  propertyId: string;
+  durationDays: number;
+  requestedStartDate?: string;
+  notes?: string;
+}
+
+
 
 

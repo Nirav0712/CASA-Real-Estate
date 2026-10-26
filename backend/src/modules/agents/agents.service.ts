@@ -19,9 +19,12 @@ import { AuditLog, AuditLogDocument } from '../admin/schemas/audit-log.schema';
 import { UpdateAgentProfileDto } from './dto/update-agent-profile.dto';
 import { SubmitVerificationDto } from './dto/submit-verification.dto';
 import { UploadDocumentDto } from './dto/upload-document.dto';
+import { CreateBrokerEmployeeDto, UpdateBrokerEmployeeDto } from './dto/create-employee.dto';
 import { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
 import { WhatsAppService } from '../leads/whatsapp.service';
-import { UserRole, AccountType } from '../auth/enums/auth.enums';
+import { UserRole, AccountType, PlatformRole, AccountStatus } from '../auth/enums/auth.enums';
+import { EntitlementsService } from '../entitlements/entitlements.service';
+import { hashPassword } from '../auth/utils/password.util';
 
 @Injectable()
 export class AgentsService {
@@ -41,6 +44,7 @@ export class AgentsService {
     @InjectModel(AuditLog.name)
     private readonly auditLogModel: Model<AuditLogDocument>,
     private readonly whatsappService: WhatsAppService,
+    private readonly entitlementsService: EntitlementsService,
   ) {}
 
   /**
@@ -867,6 +871,304 @@ export class AgentsService {
     return {
       success: true,
       message: `Team member ${agent.name} unlinked from your agency.`,
+    };
+  }
+
+  // ==========================================
+  // BROKER EMPLOYEE MANAGEMENT (Requirement 1 & 2)
+  // ==========================================
+
+  /**
+   * Helper: Assert that the authenticated user is a verified Broker.
+   * Throws ForbiddenException if user is not a Broker or is not verified.
+   */
+  async assertVerifiedBroker(user: AuthenticatedUser): Promise<UserDocument> {
+    const isBroker =
+      user.role === UserRole.BROKER ||
+      user.accountType === AccountType.BROKER ||
+      user.role === UserRole.BROKER_AGENCY ||
+      user.accountType === AccountType.BROKER_AGENCY ||
+      user.role === UserRole.ADMIN ||
+      user.role === UserRole.SUPER_ADMIN ||
+      user.platformRole === PlatformRole.ADMIN ||
+      user.platformRole === PlatformRole.SUPER_ADMIN;
+
+    if (!isBroker) {
+      throw new ForbiddenException('Only Brokers can manage employee accounts.');
+    }
+
+    const userDoc = await this.userModel.findById(user.id);
+    if (!userDoc) {
+      throw new NotFoundException('Broker account not found.');
+    }
+
+    const isDirectAdmin =
+      user.role === UserRole.ADMIN ||
+      user.role === UserRole.SUPER_ADMIN ||
+      user.platformRole === PlatformRole.ADMIN ||
+      user.platformRole === PlatformRole.SUPER_ADMIN;
+
+    if (isDirectAdmin) {
+      return userDoc;
+    }
+
+    const isVerified = Boolean(userDoc.isVerifiedAgent) || userDoc.kycStatus === 'APPROVED';
+    if (!isVerified) {
+      throw new ForbiddenException(
+        'Only a verified Broker can create and manage employee accounts. Please complete RERA/KYC verification first.',
+      );
+    }
+
+    return userDoc;
+  }
+
+  /**
+   * Get employee list and KPI counts for the current verified Broker
+   */
+  async getBrokerEmployees(user: AuthenticatedUser) {
+    await this.assertVerifiedBroker(user);
+
+    const brokerId = user.id;
+    const query = {
+      $or: [{ brokerId }, { parentUserId: brokerId }, { agencyId: brokerId }],
+    };
+
+    const [total, active, inactive, employees] = await Promise.all([
+      this.userModel.countDocuments(query),
+      this.userModel.countDocuments({ ...query, status: AccountStatus.ACTIVE }),
+      this.userModel.countDocuments({ ...query, status: { $ne: AccountStatus.ACTIVE } }),
+      this.userModel
+        .find(query)
+        .select('-passwordHash')
+        .sort({ createdAt: -1 })
+        .lean(),
+    ]);
+
+    let packageLimit = 1;
+    try {
+      const entitlements = await this.entitlementsService.resolveUserEntitlements(user);
+      packageLimit = entitlements.limits?.teamMembers !== undefined ? entitlements.limits.teamMembers : 1;
+    } catch {
+      packageLimit = 5;
+    }
+
+    return {
+      summary: {
+        total,
+        active,
+        inactive,
+        packageLimit,
+      },
+      employees: employees.map((m: any) => ({
+        id: m._id.toString(),
+        name: m.name,
+        email: m.email || '',
+        mobile: m.mobile,
+        normalizedMobile: m.normalizedMobile,
+        designation: m.designation || 'Broker Associate',
+        role: m.role,
+        accountType: m.accountType,
+        status: m.status || AccountStatus.ACTIVE,
+        permissions: m.grantedPermissions || m.permissions || [],
+        assignedProperties: m.assignedProperties || [],
+        createdAt: m.createdAt,
+      })),
+    };
+  }
+
+  /**
+   * Create a new employee under the verified Broker with strict entitlement and permission validation
+   */
+  async createBrokerEmployee(user: AuthenticatedUser, dto: CreateBrokerEmployeeDto) {
+    await this.assertVerifiedBroker(user);
+
+    // 1. Check Broker's subscription entitlements for employee count
+    const entitlements = await this.entitlementsService.resolveUserEntitlements(user);
+    const limit = entitlements.limits?.teamMembers !== undefined ? entitlements.limits.teamMembers : 1;
+    const currentCount = await this.userModel.countDocuments({
+      $or: [{ brokerId: user.id }, { parentUserId: user.id }, { agencyId: user.id }],
+    });
+
+    if (limit !== -1 && currentCount >= limit) {
+      throw new BadRequestException(
+        `Your subscription package limit allows up to ${limit} employee(s). You currently have ${currentCount}. Please upgrade your subscription plan to add more employees.`,
+      );
+    }
+
+    // 2. Validate permissions: The Broker cannot grant an employee permissions that the Broker does not possess
+    const requestedPermissions = Array.isArray(dto.permissions) ? dto.permissions : [];
+    const brokerPerms = new Set(entitlements.permissions || []);
+    if (!brokerPerms.has('*')) {
+      for (const p of requestedPermissions) {
+        const prefix = p.includes(':') ? `${p.split(':')[0]}:*` : p;
+        if (!brokerPerms.has(p) && !brokerPerms.has(prefix)) {
+          throw new BadRequestException(
+            `Cannot assign permission "${p}". Your brokerage subscription or role does not possess this entitlement.`,
+          );
+        }
+      }
+    }
+
+    // 3. Clean and check mobile and email
+    const cleanMobile = dto.mobile.trim().replace(/\s+/g, '');
+    const cleanEmail = dto.email.trim().toLowerCase();
+    const normalizedMobile = cleanMobile.startsWith('+') ? cleanMobile : `+91${cleanMobile.slice(-10)}`;
+
+    const existingUser = await this.userModel.findOne({
+      $or: [
+        { email: cleanEmail },
+        { mobile: cleanMobile },
+        { normalizedMobile },
+      ],
+    });
+
+    if (existingUser) {
+      const existingBrokerId = existingUser.brokerId || existingUser.parentUserId || existingUser.agencyId;
+      if (existingBrokerId && existingBrokerId !== user.id) {
+        throw new BadRequestException(
+          'An account with this email or mobile number is already registered under another brokerage.',
+        );
+      }
+      if (!existingBrokerId && existingUser.role !== UserRole.BROKER_AGENT) {
+        throw new BadRequestException(
+          'A user account with this email or mobile number already exists on CASA Real Estate.',
+        );
+      }
+    }
+
+    // 4. Secure password setup
+    const rawPassword = dto.password?.trim() || Math.random().toString(36).slice(-8) + 'Casa#1';
+    const passwordHash = await hashPassword(rawPassword);
+
+    const created = await this.userModel.create({
+      name: dto.name.trim(),
+      email: cleanEmail,
+      mobile: cleanMobile,
+      normalizedMobile,
+      passwordHash,
+      designation: dto.designation?.trim() || 'Broker Associate',
+      role: UserRole.BROKER_AGENT,
+      accountType: AccountType.BROKER_AGENT,
+      brokerId: user.id,
+      parentUserId: user.id,
+      agencyId: user.id,
+      grantedPermissions: requestedPermissions,
+      permissions: requestedPermissions,
+      assignedProperties: dto.assignedProperties || [],
+      status: AccountStatus.ACTIVE,
+      isVerifiedAgent: true,
+      kycStatus: 'APPROVED',
+    });
+
+    return {
+      success: true,
+      message: `Employee "${created.name}" created successfully under your brokerage.`,
+      employee: {
+        id: created._id.toString(),
+        name: created.name,
+        email: created.email,
+        mobile: created.mobile,
+        normalizedMobile: created.normalizedMobile,
+        designation: created.designation,
+        role: created.role,
+        accountType: created.accountType,
+        permissions: created.grantedPermissions,
+        assignedProperties: created.assignedProperties,
+        status: created.status,
+        createdAt: created.createdAt,
+      },
+      temporaryPassword: dto.password ? undefined : rawPassword,
+    };
+  }
+
+  /**
+   * Update employee details and permissions
+   */
+  async updateBrokerEmployee(user: AuthenticatedUser, employeeId: string, dto: UpdateBrokerEmployeeDto) {
+    await this.assertVerifiedBroker(user);
+
+    const employee = await this.userModel.findOne({
+      _id: employeeId,
+      $or: [{ brokerId: user.id }, { parentUserId: user.id }, { agencyId: user.id }],
+    });
+
+    if (!employee) {
+      throw new NotFoundException('Employee not found under your brokerage.');
+    }
+
+    // Validate updated permissions against broker's entitlements
+    if (dto.permissions !== undefined) {
+      const entitlements = await this.entitlementsService.resolveUserEntitlements(user);
+      const brokerPerms = new Set(entitlements.permissions || []);
+      if (!brokerPerms.has('*')) {
+        for (const p of dto.permissions) {
+          const prefix = p.includes(':') ? `${p.split(':')[0]}:*` : p;
+          if (!brokerPerms.has(p) && !brokerPerms.has(prefix)) {
+            throw new BadRequestException(
+              `Cannot assign permission "${p}". Your brokerage subscription does not possess this entitlement.`,
+            );
+          }
+        }
+      }
+      employee.grantedPermissions = dto.permissions;
+      employee.permissions = dto.permissions;
+    }
+
+    if (dto.name) employee.name = dto.name.trim();
+    if (dto.designation !== undefined) employee.designation = dto.designation.trim();
+    if (dto.email) employee.email = dto.email.trim().toLowerCase();
+    if (dto.mobile) {
+      const cleanMobile = dto.mobile.trim().replace(/\s+/g, '');
+      employee.mobile = cleanMobile;
+      employee.normalizedMobile = cleanMobile.startsWith('+') ? cleanMobile : `+91${cleanMobile.slice(-10)}`;
+    }
+    if (dto.status) employee.status = dto.status as any;
+    if (dto.assignedProperties !== undefined) employee.assignedProperties = dto.assignedProperties;
+    if (dto.password && dto.password.length >= 8) {
+      employee.passwordHash = await hashPassword(dto.password);
+    }
+
+    await employee.save();
+
+    return {
+      success: true,
+      message: `Employee "${employee.name}" updated successfully.`,
+      employee: {
+        id: employee._id.toString(),
+        name: employee.name,
+        email: employee.email,
+        mobile: employee.mobile,
+        designation: employee.designation,
+        permissions: employee.grantedPermissions,
+        assignedProperties: employee.assignedProperties,
+        status: employee.status,
+      },
+    };
+  }
+
+  /**
+   * Quick toggle employee status between ACTIVE and DEACTIVATED
+   */
+  async toggleBrokerEmployeeStatus(user: AuthenticatedUser, employeeId: string) {
+    await this.assertVerifiedBroker(user);
+
+    const employee = await this.userModel.findOne({
+      _id: employeeId,
+      $or: [{ brokerId: user.id }, { parentUserId: user.id }, { agencyId: user.id }],
+    });
+
+    if (!employee) {
+      throw new NotFoundException('Employee not found under your brokerage.');
+    }
+
+    const nextStatus = employee.status === AccountStatus.ACTIVE ? AccountStatus.DEACTIVATED : AccountStatus.ACTIVE;
+    employee.status = nextStatus as any;
+    await employee.save();
+
+    return {
+      success: true,
+      status: nextStatus,
+      message: `Employee "${employee.name}" access is now ${nextStatus === AccountStatus.ACTIVE ? 'activated' : 'deactivated'}.`,
     };
   }
 }

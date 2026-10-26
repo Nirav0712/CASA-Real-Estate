@@ -15,6 +15,10 @@ import { Payment, PaymentSchema } from '../payments/schemas/payment.schema';
 import { SystemSetting, SystemSettingSchema } from './schemas/system-setting.schema';
 import { Package, PackageSchema } from '../entitlements/schemas/package.schema';
 import { Subscription, SubscriptionSchema } from '../payments/schemas/subscription.schema';
+import {
+  FeaturedPropertyRequest,
+  FeaturedPropertyRequestSchema,
+} from '../properties/schemas/featured-property-request.schema';
 import { AuthModule } from '../auth/auth.module';
 
 import { LeadsModule } from '../leads/leads.module';
@@ -36,6 +40,7 @@ import { SettingsPublicController } from './settings-public.controller';
       { name: SystemSetting.name, schema: SystemSettingSchema },
       { name: Package.name, schema: PackageSchema },
       { name: Subscription.name, schema: SubscriptionSchema },
+      { name: FeaturedPropertyRequest.name, schema: FeaturedPropertyRequestSchema },
     ]),
     AuthModule,
     LeadsModule,

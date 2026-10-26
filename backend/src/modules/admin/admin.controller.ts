@@ -181,6 +181,42 @@ export class AdminController {
     return this.adminService.toggleFeature(id, false);
   }
 
+  // ==========================================
+  // FEATURED PROPERTY REQUEST APPROVAL (Requirements 7 & 8)
+  // ==========================================
+
+  @Get('featured-requests')
+  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN, UserRole.MODERATOR)
+  @ApiOperation({ summary: 'List all Featured Property Requests submitted by Brokers' })
+  @ApiResponse({ status: 200, description: 'Featured requests list returned' })
+  getFeaturedRequests(@Query() query: any) {
+    return this.adminService.getAdminFeaturedRequests(query);
+  }
+
+  @Post('featured-requests/:id/approve')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN)
+  @ApiOperation({ summary: 'Super Admin approve a Featured Property Request' })
+  @ApiResponse({ status: 200, description: 'Featured placement approved and activated' })
+  approveFeaturedRequest(
+    @Param('id') id: string,
+    @Body() body: { approvedDurationDays?: number; approvedStartDate?: string },
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.adminService.approveFeaturedRequest(user, id, body);
+  }
+
+  @Post('featured-requests/:id/reject')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN)
+  @ApiOperation({ summary: 'Super Admin reject a Featured Property Request' })
+  @ApiResponse({ status: 200, description: 'Featured request rejected' })
+  rejectFeaturedRequest(
+    @Param('id') id: string,
+    @Body() body: { reason?: string },
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.adminService.rejectFeaturedRequest(user, id, body);
+  }
+
   @Post('properties/:id/rera-verify')
   @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN, UserRole.MODERATOR)
   @ApiOperation({ summary: 'Admin verify RERA registration for a property' })
@@ -407,6 +443,14 @@ export class AdminController {
     @CurrentUser() user?: AuthenticatedUser,
   ) {
     return this.adminService.revokeAgentVerification(id, body?.reason, user);
+  }
+
+  @Get('agents/:id/employees')
+  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN, UserRole.MODERATOR)
+  @ApiOperation({ summary: 'Super Admin inspect employees belonging to a Broker' })
+  @ApiResponse({ status: 200, description: 'Broker employee list returned' })
+  getAgentEmployees(@Param('id') id: string) {
+    return this.adminService.getAgentEmployees(id);
   }
 
   // ==========================================

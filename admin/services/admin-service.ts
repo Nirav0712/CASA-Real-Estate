@@ -267,8 +267,10 @@ import {
   UserRecord,
   UserDetailRecord,
   AgentRecord,
+  BrokerEmployeeRecord,
   PurchaserRecord,
   AuditLogRecord,
+  FeaturedPropertyRequestRecord,
 } from '@/types';
 
 export async function getAdminUsers(params?: {
@@ -774,4 +776,92 @@ export async function assignAdminUserPackage(
 
   return result.data || { success: true, message: 'Package assigned successfully' };
 }
+
+export async function getAdminAgentEmployees(agentId: string): Promise<BrokerEmployeeRecord[]> {
+  const result = await fetchAdminApi<BrokerEmployeeRecord[]>(
+    `/admin/agents/${encodeURIComponent(agentId)}/employees`,
+  );
+  if (result.isBackendAvailable && Array.isArray(result.data)) {
+    return result.data;
+  }
+  return [];
+}
+
+export async function getAdminFeaturedRequests(params?: {
+  status?: string;
+  search?: string;
+  page?: number;
+  limit?: number;
+}): Promise<{
+  requests: FeaturedPropertyRequestRecord[];
+  summary: {
+    total: number;
+    pending: number;
+    approved: number;
+    rejected: number;
+  };
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+}> {
+  const searchParams = new URLSearchParams();
+  if (params?.status && params.status !== 'ALL') searchParams.set('status', params.status);
+  if (params?.search && params.search.trim()) searchParams.set('search', params.search.trim());
+  if (params?.page) searchParams.set('page', String(params.page));
+  if (params?.limit) searchParams.set('limit', String(params.limit));
+
+  const queryStr = searchParams.toString() ? `?${searchParams.toString()}` : '';
+  const result = await fetchAdminApi<any>(`/admin/featured-requests${queryStr}`);
+
+  if (result.isBackendAvailable && result.data) {
+    return result.data;
+  }
+  return {
+    requests: [],
+    summary: { total: 0, pending: 0, approved: 0, rejected: 0 },
+    pagination: { page: 1, limit: 20, total: 0, totalPages: 0 },
+  };
+}
+
+export async function approveAdminFeaturedRequest(
+  id: string,
+  payload?: { approvedDurationDays?: number; approvedStartDate?: string },
+): Promise<{ success: boolean; message: string; request: FeaturedPropertyRequestRecord }> {
+  const result = await fetchAdminApi<{ success: boolean; message: string; request: FeaturedPropertyRequestRecord }>(
+    `/admin/featured-requests/${encodeURIComponent(id)}/approve`,
+    {
+      method: 'POST',
+      body: JSON.stringify(payload || {}),
+    },
+  );
+
+  if (!result.isBackendAvailable || result.error || !result.data) {
+    throw new Error(result.error || 'Failed to approve featured property request');
+  }
+
+  return result.data;
+}
+
+export async function rejectAdminFeaturedRequest(
+  id: string,
+  rejectionReason?: string,
+): Promise<{ success: boolean; message: string; request: FeaturedPropertyRequestRecord }> {
+  const result = await fetchAdminApi<{ success: boolean; message: string; request: FeaturedPropertyRequestRecord }>(
+    `/admin/featured-requests/${encodeURIComponent(id)}/reject`,
+    {
+      method: 'POST',
+      body: JSON.stringify({ rejectionReason: rejectionReason || '' }),
+    },
+  );
+
+  if (!result.isBackendAvailable || result.error || !result.data) {
+    throw new Error(result.error || 'Failed to reject featured property request');
+  }
+
+  return result.data;
+}
+
 

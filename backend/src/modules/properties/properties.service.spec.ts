@@ -4,6 +4,7 @@ import { NotFoundException, ForbiddenException, BadRequestException } from '@nes
 import { PropertiesService } from './properties.service';
 import { Property } from './schemas/property.schema';
 import { Category } from './schemas/category.schema';
+import { FeaturedPropertyRequest } from './schemas/featured-property-request.schema';
 import { UserRole, AccountStatus, PlatformRole, AccountType } from '../auth/enums/auth.enums';
 import { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
 import { EntitlementsService } from '../entitlements/entitlements.service';
@@ -141,6 +142,15 @@ describe('PropertiesService (Phase 06 Lifecycle & Security)', () => {
         { provide: getModelToken(Property.name), useValue: mockPropertyModel },
         { provide: getModelToken(Category.name), useValue: mockCategoryModel },
         { provide: getModelToken(User.name), useValue: mockUserModel },
+        {
+          provide: getModelToken(FeaturedPropertyRequest.name),
+          useValue: {
+            find: jest.fn().mockReturnValue({ sort: jest.fn().mockReturnValue({ lean: jest.fn().mockResolvedValue([]) }) }),
+            findOne: jest.fn().mockReturnValue({ lean: jest.fn().mockResolvedValue(null) }),
+            create: jest.fn().mockResolvedValue({}),
+            updateMany: jest.fn().mockResolvedValue({ modifiedCount: 0 }),
+          },
+        },
         { provide: EntitlementsService, useValue: mockEntitlementsService },
       ],
     }).compile();
@@ -272,6 +282,7 @@ describe('PropertiesService (Phase 06 Lifecycle & Security)', () => {
           { ownerId: mockAgentUser.id },
           { advertiserId: mockAgentUser.id },
           { createdBy: mockAgentUser.id },
+          { brokerId: mockAgentUser.id },
         ],
       });
     });

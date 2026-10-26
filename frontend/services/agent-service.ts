@@ -5,6 +5,10 @@ import {
   AgentDocument,
   AgentVerificationStatus,
   Property,
+  BrokerEmployee,
+  BrokerEmployeesResponse,
+  CreateBrokerEmployeePayload,
+  UpdateBrokerEmployeePayload,
 } from '@/types';
 
 export interface PublicAgentDetailResponse {
@@ -129,3 +133,60 @@ export async function getPublicAgentProfile(slug: string): Promise<PublicAgentDe
   }
   return result.data;
 }
+
+export async function getBrokerEmployees(): Promise<BrokerEmployeesResponse> {
+  const result = await fetchApi<BrokerEmployeesResponse>('/agents/employees');
+  if (!result.isBackendAvailable || result.error || !result.data) {
+    throw new Error(result.error || 'Failed to fetch broker employees.');
+  }
+  return result.data;
+}
+
+export async function createBrokerEmployee(
+  payload: CreateBrokerEmployeePayload,
+): Promise<{ success: boolean; message: string; employee: BrokerEmployee }> {
+  const result = await fetchApi<{ success: boolean; message: string; employee: BrokerEmployee }>(
+    '/agents/employees',
+    {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    },
+  );
+  if (!result.isBackendAvailable || result.error || !result.data) {
+    throw new Error(result.error || 'Failed to create employee account.');
+  }
+  return result.data;
+}
+
+export async function updateBrokerEmployee(
+  id: string,
+  payload: UpdateBrokerEmployeePayload,
+): Promise<{ success: boolean; message: string; employee: BrokerEmployee }> {
+  const result = await fetchApi<{ success: boolean; message: string; employee: BrokerEmployee }>(
+    `/agents/employees/${encodeURIComponent(id)}`,
+    {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    },
+  );
+  if (!result.isBackendAvailable || result.error || !result.data) {
+    throw new Error(result.error || 'Failed to update employee account.');
+  }
+  return result.data;
+}
+
+export async function toggleBrokerEmployeeStatus(
+  id: string,
+): Promise<{ success: boolean; message: string; employee: BrokerEmployee }> {
+  const result = await fetchApi<{ success: boolean; message: string; employee: BrokerEmployee }>(
+    `/agents/employees/${encodeURIComponent(id)}/status`,
+    {
+      method: 'PATCH',
+    },
+  );
+  if (!result.isBackendAvailable || result.error || !result.data) {
+    throw new Error(result.error || 'Failed to toggle employee status.');
+  }
+  return result.data;
+}
+

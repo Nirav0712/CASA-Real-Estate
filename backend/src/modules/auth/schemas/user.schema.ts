@@ -169,6 +169,12 @@ export class User {
   @Prop({ type: String, default: null, index: true })
   parentUserId?: string | null;
 
+  @Prop({ type: String, default: null, index: true })
+  brokerId?: string | null;
+
+  @Prop({ type: String, default: '', trim: true })
+  designation?: string;
+
   @Prop({ type: [String], default: [] })
   assignedProperties?: string[];
 

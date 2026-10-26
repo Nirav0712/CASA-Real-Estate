@@ -26,6 +26,11 @@ import { PaymentStatus } from '../payments/enums/payment.enums';
 import { SystemSetting, SystemSettingDocument } from './schemas/system-setting.schema';
 import { Package, PackageDocument } from '../entitlements/schemas/package.schema';
 import { Subscription, SubscriptionDocument } from '../payments/schemas/subscription.schema';
+import {
+  FeaturedPropertyRequest,
+  FeaturedPropertyRequestDocument,
+  FeaturedRequestStatus,
+} from '../properties/schemas/featured-property-request.schema';
 import { AdminUserQueryDto } from './dto/admin-user-query.dto';
 import { UpdateUserStatusDto } from './dto/update-user-status.dto';
 import { UpdateUserRoleDto } from './dto/update-user-role.dto';
@@ -270,6 +275,8 @@ export class AdminService implements OnModuleInit {
     @InjectModel(SystemSetting.name) private readonly systemSettingModel: Model<SystemSettingDocument>,
     @InjectModel(Package.name) private readonly packageModel: Model<PackageDocument>,
     @InjectModel(Subscription.name) private readonly subscriptionModel: Model<SubscriptionDocument>,
+    @InjectModel(FeaturedPropertyRequest.name)
+    private readonly featuredRequestModel: Model<FeaturedPropertyRequestDocument>,
     private readonly authService: AuthService,
     private readonly whatsappService: WhatsAppService,
     @Optional() private readonly mailService?: MailService,
@@ -2224,9 +2231,31 @@ export class AdminService implements OnModuleInit {
       profileMap.set(p.userId, p);
     });
 
-    const docCounts = await this.agentDocumentModel.aggregate([
-      { $match: { userId: { $in: userIds } } },
-      { $group: { _id: '$userId', count: { $sum: 1 } } },
+    const [docCounts, employeeAgg] = await Promise.all([
+      this.agentDocumentModel.aggregate([
+        { $match: { userId: { $in: userIds } } },
+        { $group: { _id: '$userId', count: { $sum: 1 } } },
+      ]),
+      this.userModel.aggregate([
+        {
+          $match: {
+            $or: [
+              { brokerId: { $in: userIds } },
+              { parentUserId: { $in: userIds } },
+              { agencyId: { $in: userIds } },
+            ],
+          },
+        },
+        {
+          $group: {
+            _id: {
+              broker: { $ifNull: ['$brokerId', { $ifNull: ['$parentUserId', '$agencyId'] }] },
+              status: '$status',
+            },
+            count: { $sum: 1 },
+          },
+        },
+      ]),
     ]);
 
     const docMap = new Map();
@@ -2234,9 +2263,26 @@ export class AdminService implements OnModuleInit {
       docMap.set(d._id.toString(), d.count);
     });
 
+    const employeeMap = new Map<string, { total: number; active: number; inactive: number }>();
+    employeeAgg.forEach((item: any) => {
+      const bId = item._id.broker?.toString();
+      if (!bId) return;
+      if (!employeeMap.has(bId)) {
+        employeeMap.set(bId, { total: 0, active: 0, inactive: 0 });
+      }
+      const entry = employeeMap.get(bId)!;
+      entry.total += item.count;
+      if (item._id.status === 'ACTIVE') {
+        entry.active += item.count;
+      } else {
+        entry.inactive += item.count;
+      }
+    });
+
     const data = agents.map((a: any) => {
       const counts = countMap.get(a._id.toString()) || countMap.get(a.normalizedMobile) || { total: 0, published: 0 };
       const prof = profileMap.get(a._id.toString());
+      const empStats = employeeMap.get(a._id.toString()) || { total: 0, active: 0, inactive: 0 };
       return {
         id: a._id.toString(),
         _id: a._id.toString(),
@@ -2252,6 +2298,9 @@ export class AdminService implements OnModuleInit {
         status: a.status || 'ACTIVE',
         activeListings: counts.published,
         totalListings: counts.total,
+        totalEmployees: empStats.total,
+        activeEmployees: empStats.active,
+        inactiveEmployees: empStats.inactive,
         documentsCount: docMap.get(a._id.toString()) || 0,
         createdAt: a.createdAt,
       };
@@ -2293,6 +2342,18 @@ export class AdminService implements OnModuleInit {
       .limit(10)
       .lean();
 
+    // Query employees belonging to this Broker from real DB records
+    const employees = await this.userModel
+      .find({
+        $or: [{ brokerId: userId }, { parentUserId: userId }, { agencyId: userId }],
+      })
+      .select('-passwordHash')
+      .sort({ createdAt: -1 })
+      .lean();
+
+    const activeEmployeesCount = employees.filter((e) => e.status === 'ACTIVE').length;
+    const inactiveEmployeesCount = employees.length - activeEmployeesCount;
+
     return {
       agent: {
         id: userId,
@@ -2312,6 +2373,9 @@ export class AdminService implements OnModuleInit {
         rejectionReasons: profile?.rejectionReasons || [],
         experienceYears: profile?.experienceYears || 1,
         city: profile?.city || 'Lucknow',
+        totalEmployees: employees.length,
+        activeEmployees: activeEmployeesCount,
+        inactiveEmployees: inactiveEmployeesCount,
         createdAt: user.createdAt,
       },
       documents: documents.map((d: any) => ({
@@ -2326,6 +2390,24 @@ export class AdminService implements OnModuleInit {
         uploadedAt: d.uploadedAt,
         rejectionReason: d.rejectionReason,
       })),
+      employees: employees.map((m: any) => ({
+        id: m._id.toString(),
+        name: m.name,
+        email: m.email || '',
+        mobile: m.mobile,
+        normalizedMobile: m.normalizedMobile,
+        designation: m.designation || 'Broker Associate',
+        role: m.role,
+        status: m.status || 'ACTIVE',
+        permissions: m.grantedPermissions || m.permissions || [],
+        assignedProperties: m.assignedProperties || [],
+        createdAt: m.createdAt,
+      })),
+      employeeCounts: {
+        total: employees.length,
+        active: activeEmployeesCount,
+        inactive: inactiveEmployeesCount,
+      },
       auditHistory: auditHistory.map((a: any) => ({
         id: a._id.toString(),
         action: a.action,
@@ -2334,6 +2416,239 @@ export class AdminService implements OnModuleInit {
         reason: a.reason,
         timestamp: a.timestamp,
       })),
+    };
+  }
+
+  async getAgentEmployees(id: string) {
+    const query: any = isValidObjectId(id) ? { _id: id } : { normalizedMobile: id };
+    const user = await this.userModel.findOne(query).lean();
+    if (!user) {
+      throw new NotFoundException(`Agent/Broker with ID "${id}" was not found.`);
+    }
+
+    const brokerId = user._id.toString();
+    const employees = await this.userModel
+      .find({
+        $or: [{ brokerId }, { parentUserId: brokerId }, { agencyId: brokerId }],
+      })
+      .select('-passwordHash')
+      .sort({ createdAt: -1 })
+      .lean();
+
+    const active = employees.filter((e) => e.status === 'ACTIVE').length;
+    const inactive = employees.length - active;
+
+    return {
+      broker: {
+        id: brokerId,
+        name: user.name,
+        email: user.email,
+        mobile: user.mobile,
+        agencyName: user.agencyName,
+      },
+      counts: {
+        total: employees.length,
+        active,
+        inactive,
+      },
+      employees: employees.map((m: any) => ({
+        id: m._id.toString(),
+        name: m.name,
+        email: m.email || '',
+        mobile: m.mobile,
+        normalizedMobile: m.normalizedMobile,
+        designation: m.designation || 'Broker Associate',
+        role: m.role,
+        status: m.status || 'ACTIVE',
+        permissions: m.grantedPermissions || m.permissions || [],
+        assignedProperties: m.assignedProperties || [],
+        createdAt: m.createdAt,
+      })),
+    };
+  }
+
+  // ==========================================
+  // FEATURED PROPERTY REQUEST APPROVAL (Requirements 7 & 8)
+  // ==========================================
+
+  async getAdminFeaturedRequests(queryDto: any) {
+    const filter: any = {};
+    if (queryDto.status && queryDto.status !== 'ALL') {
+      filter.status = queryDto.status;
+    }
+    if (queryDto.search) {
+      const regex = new RegExp(queryDto.search.trim(), 'i');
+      filter.$or = [
+        { requestReference: regex },
+        { brokerName: regex },
+        { brokerEmail: regex },
+        { brokerMobile: regex },
+        { propertyTitle: regex },
+      ];
+    }
+
+    const page = Math.max(1, Number(queryDto.page) || 1);
+    const limit = Math.min(100, Math.max(1, Number(queryDto.limit) || 20));
+    const skip = (page - 1) * limit;
+
+    const [total, requests] = await Promise.all([
+      this.featuredRequestModel.countDocuments(filter),
+      this.featuredRequestModel.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
+    ]);
+
+    const totalPages = Math.ceil(total / limit) || 1;
+
+    return {
+      data: requests,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages,
+        hasNextPage: page < totalPages,
+        hasPreviousPage: page > 1,
+      },
+    };
+  }
+
+  async approveFeaturedRequest(
+    adminUser: AuthenticatedUser,
+    requestId: string,
+    dto?: { approvedDurationDays?: number; approvedStartDate?: string },
+  ) {
+    const query: any = {
+      $or: [
+        { _id: isValidObjectId(requestId) ? requestId : null },
+        { requestReference: requestId },
+      ].filter(Boolean),
+    };
+    const request = await this.featuredRequestModel.findOne(query);
+    if (!request) {
+      throw new NotFoundException(`Featured Property Request "${requestId}" was not found.`);
+    }
+
+    if (request.status !== FeaturedRequestStatus.PENDING) {
+      throw new BadRequestException(
+        `Cannot approve request with status "${request.status}". Only PENDING requests can be approved.`,
+      );
+    }
+
+    const propQuery: any = { $or: [{ id: request.propertyId }, { slug: request.propertySlug }] };
+    if (isValidObjectId(request.propertyId)) {
+      propQuery.$or.push({ _id: request.propertyId });
+    }
+    const property = await this.propertyModel.findOne(propQuery);
+    if (!property) {
+      throw new NotFoundException(`Property with ID "${request.propertyId}" was not found.`);
+    }
+
+    const approvedDurationDays =
+      Number(dto?.approvedDurationDays) > 0
+        ? Number(dto.approvedDurationDays)
+        : request.durationDays;
+
+    const approvedStartDate = dto?.approvedStartDate
+      ? new Date(dto.approvedStartDate)
+      : new Date();
+    const approvedEndDate = new Date(
+      approvedStartDate.getTime() + approvedDurationDays * 24 * 60 * 60 * 1000,
+    );
+
+    request.status = FeaturedRequestStatus.APPROVED;
+    request.approvedDurationDays = approvedDurationDays;
+    request.approvedStartDate = approvedStartDate;
+    request.approvedEndDate = approvedEndDate;
+    request.reviewedBy = adminUser.id;
+    request.reviewedByName = adminUser.name || 'Super Admin';
+    request.reviewedAt = new Date();
+    await request.save();
+
+    const now = new Date();
+    if (approvedStartDate <= now) {
+      property.isFeatured = true;
+      property.featuredAt = approvedStartDate;
+      property.featuredUntil = approvedEndDate;
+    } else {
+      property.featuredAt = approvedStartDate;
+      property.featuredUntil = approvedEndDate;
+    }
+    await property.save();
+
+    await this.auditLogModel.create({
+      action: 'FEATURED_PROPERTY_APPROVED',
+      actorUserId: adminUser.id,
+      actorName: adminUser.name || 'Super Admin',
+      actorRole: adminUser.role || 'SUPER_ADMIN',
+      targetEntity: 'FEATURED_REQUEST',
+      targetEntityId: request._id.toString(),
+      metadata: {
+        requestReference: request.requestReference,
+        propertyId: property.id,
+        durationDays: approvedDurationDays,
+        approvedEndDate,
+      },
+      timestamp: new Date(),
+    });
+
+    return {
+      success: true,
+      message: `Featured placement approved for "${request.propertyTitle}" for ${approvedDurationDays} days (active until ${approvedEndDate.toLocaleDateString('en-IN')}).`,
+      request,
+    };
+  }
+
+  async rejectFeaturedRequest(
+    adminUser: AuthenticatedUser,
+    requestId: string,
+    dto?: { reason?: string },
+  ) {
+    const query: any = {
+      $or: [
+        { _id: isValidObjectId(requestId) ? requestId : null },
+        { requestReference: requestId },
+      ].filter(Boolean),
+    };
+    const request = await this.featuredRequestModel.findOne(query);
+    if (!request) {
+      throw new NotFoundException(`Featured Property Request "${requestId}" was not found.`);
+    }
+
+    if (request.status !== FeaturedRequestStatus.PENDING) {
+      throw new BadRequestException(
+        `Cannot reject request with status "${request.status}". Only PENDING requests can be rejected.`,
+      );
+    }
+
+    request.status = FeaturedRequestStatus.REJECTED;
+    request.rejectionReason =
+      dto?.reason?.trim() || 'Request does not meet marketplace promotion standards.';
+    request.reviewedBy = adminUser.id;
+    request.reviewedByName = adminUser.name || 'Super Admin';
+    request.reviewedAt = new Date();
+    await request.save();
+
+    const propQuery: any = { $or: [{ id: request.propertyId }, { slug: request.propertySlug }] };
+    if (isValidObjectId(request.propertyId)) {
+      propQuery.$or.push({ _id: request.propertyId });
+    }
+    await this.propertyModel.updateOne(propQuery, { $set: { isFeatured: false } });
+
+    await this.auditLogModel.create({
+      action: 'FEATURED_PROPERTY_REJECTED',
+      actorUserId: adminUser.id,
+      actorName: adminUser.name || 'Super Admin',
+      actorRole: adminUser.role || 'SUPER_ADMIN',
+      targetEntity: 'FEATURED_REQUEST',
+      targetEntityId: request._id.toString(),
+      reason: request.rejectionReason,
+      metadata: { requestReference: request.requestReference, propertyId: request.propertyId },
+      timestamp: new Date(),
+    });
+
+    return {
+      success: true,
+      message: `Featured property request rejected. Reason: ${request.rejectionReason}`,
+      request,
     };
   }
 

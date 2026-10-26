@@ -27,7 +27,7 @@ import {
   AgentVerificationDetailResponse,
   AgentDocumentRecord,
 } from '@/types';
-import { FileText, CheckCircle2, XCircle, ExternalLink, Eye, X } from 'lucide-react';
+import { FileText, CheckCircle2, XCircle, ExternalLink, Eye, X, Users } from 'lucide-react';
 
 export default function AgentsPage() {
   const toast = useToast();
@@ -311,6 +311,16 @@ export default function AgentsPage() {
                       {ag.activeListings} / {ag.totalListings}
                     </strong>
                   </div>
+                  <div className="flex items-center justify-between">
+                    <span>Broker Employees:</span>
+                    <strong className="text-casa-text-primary text-[11px] font-bold">
+                      <span className="text-emerald-600">{ag.activeEmployees ?? 0} active</span>
+                      {(ag.inactiveEmployees ?? 0) > 0 && (
+                        <span className="text-casa-text-muted font-normal">, {ag.inactiveEmployees} inactive</span>
+                      )}
+                      <span className="text-casa-text-muted font-normal"> / {ag.totalEmployees ?? 0} total</span>
+                    </strong>
+                  </div>
                 </div>
               </div>
 
@@ -489,6 +499,65 @@ export default function AgentsPage() {
                               <ExternalLink className="w-3.5 h-3.5" />
                               <span className="text-[11px] font-semibold">Inspect</span>
                             </a>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Employees Section */}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-casa-text-primary flex items-center gap-1.5">
+                      <Users className="w-4 h-4 text-casa-brand" />
+                      Broker Employees ({verificationDetail?.employeeCounts?.total ?? (verificationDetail?.employees?.length || 0)})
+                    </h4>
+                    <span className="text-[11px] text-casa-text-muted">
+                      {verificationDetail?.employeeCounts?.active ?? 0} Active • {verificationDetail?.employeeCounts?.inactive ?? 0} Inactive
+                    </span>
+                  </div>
+
+                  {(!verificationDetail?.employees || verificationDetail.employees.length === 0) ? (
+                    <div className="p-5 border border-dashed border-casa-border-light rounded-2xl text-center text-xs text-casa-text-muted">
+                      No employee accounts registered under this Broker.
+                    </div>
+                  ) : (
+                    <div className="border border-casa-border-light rounded-2xl overflow-hidden divide-y divide-casa-border-light text-xs bg-casa-canvas">
+                      {verificationDetail.employees.map((emp) => (
+                        <div key={emp.id || emp._id} className="p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="font-bold text-casa-text-primary">{emp.name}</span>
+                              {emp.designation && (
+                                <span className="text-[10px] font-medium px-2 py-0.5 rounded bg-casa-brand-subtle text-casa-brand">
+                                  {emp.designation}
+                                </span>
+                              )}
+                              <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${emp.status === 'ACTIVE' ? 'bg-emerald-50 text-emerald-700' : 'bg-zinc-100 text-zinc-600'}`}>
+                                {emp.status}
+                              </span>
+                            </div>
+                            <div className="text-[11px] text-casa-text-muted mt-0.5 flex flex-wrap gap-x-3">
+                              <span>Email: {emp.email || 'N/A'}</span>
+                              <span>Mobile: {emp.normalizedMobile || emp.mobile}</span>
+                            </div>
+                          </div>
+                          <div className="flex flex-wrap items-center gap-1">
+                            {emp.permissions && emp.permissions.length > 0 ? (
+                              emp.permissions.slice(0, 4).map((perm: string) => (
+                                <span key={perm} className="text-[9px] px-1.5 py-0.5 rounded bg-casa-surface border border-casa-border-light text-casa-text-secondary font-mono">
+                                  {perm}
+                                </span>
+                              ))
+                            ) : (
+                              <span className="text-[10px] text-casa-text-muted">No custom permissions</span>
+                            )}
+                            {emp.permissions && emp.permissions.length > 4 && (
+                              <span className="text-[9px] px-1 py-0.5 text-casa-text-muted font-bold">
+                                +{emp.permissions.length - 4} more
+                              </span>
+                            )}
                           </div>
                         </div>
                       ))}

@@ -10,6 +10,7 @@ import { AuditLog } from '../admin/schemas/audit-log.schema';
 import { UserRole, AccountStatus, PlatformRole, AccountType } from '../auth/enums/auth.enums';
 import { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
 import { WhatsAppService } from '../leads/whatsapp.service';
+import { EntitlementsService } from '../entitlements/entitlements.service';
 
 describe('AgentsService', () => {
   let service: AgentsService;
@@ -118,8 +119,17 @@ describe('AgentsService', () => {
         { provide: getModelToken(User.name), useValue: mockUserModel },
         { provide: getModelToken(Property.name), useValue: mockPropertyModel },
         { provide: getModelToken(Lead.name), useValue: mockLeadModel },
-        { provide: getModelToken(AuditLog.name), useValue: mockAuditLogModel },
+        { provide: AuditLog.name ? getModelToken(AuditLog.name) : 'AuditLogModel', useValue: mockAuditLogModel },
         { provide: WhatsAppService, useValue: mockWhatsAppService },
+        {
+          provide: EntitlementsService,
+          useValue: {
+            resolveUserEntitlements: jest.fn().mockResolvedValue({
+              package: { limits: { teamMembers: 10 } },
+              permissions: new Set(['property:view', 'property:create', 'lead:view']),
+            }),
+          },
+        },
       ],
     }).compile();
 

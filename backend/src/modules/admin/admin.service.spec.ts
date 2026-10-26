@@ -22,6 +22,7 @@ import { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
 
 import { AuthService } from '../auth/auth.service';
 import { WhatsAppService } from '../leads/whatsapp.service';
+import { FeaturedPropertyRequest } from '../properties/schemas/featured-property-request.schema';
 
 describe('AdminService Moderation & User Governance (Phase 08)', () => {
   let service: AdminService;
@@ -259,6 +260,14 @@ describe('AdminService Moderation & User Governance (Phase 08)', () => {
         {
           provide: getModelToken('Subscription'),
           useValue: { find: jest.fn().mockReturnValue({ lean: jest.fn().mockResolvedValue([]) }) },
+        },
+        {
+          provide: getModelToken(FeaturedPropertyRequest.name),
+          useValue: {
+            find: jest.fn().mockReturnValue({ sort: jest.fn().mockReturnValue({ skip: jest.fn().mockReturnValue({ limit: jest.fn().mockReturnValue({ lean: jest.fn().mockResolvedValue([]) }) }) }) }),
+            findOne: jest.fn().mockReturnValue({ lean: jest.fn().mockResolvedValue(null) }),
+            countDocuments: jest.fn().mockResolvedValue(0),
+          },
         },
         {
           provide: AuthService,

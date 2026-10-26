@@ -264,6 +264,17 @@ const INITIAL_SEED_PROPERTIES = [
   },
 ];
 
+import {
+  FeaturedPropertyRequest,
+  FeaturedPropertyRequestDocument,
+  FeaturedRequestStatus,
+} from './schemas/featured-property-request.schema';
+import {
+  CreateFeaturedRequestDto,
+  ApproveFeaturedRequestDto,
+  RejectFeaturedRequestDto,
+} from './dto/featured-request.dto';
+import { Permission } from '../entitlements/enums/permissions.enum';
 import { EntitlementsService } from '../entitlements/entitlements.service';
 
 @Injectable()
@@ -274,11 +285,33 @@ export class PropertiesService implements OnModuleInit {
     @InjectModel(Property.name) private readonly propertyModel: Model<PropertyDocument>,
     @InjectModel(Category.name) private readonly categoryModel: Model<CategoryDocument>,
     @InjectModel(User.name) private readonly userModel: Model<UserDocument>,
+    @InjectModel(FeaturedPropertyRequest.name)
+    private readonly featuredRequestModel: Model<FeaturedPropertyRequestDocument>,
     private readonly entitlementsService: EntitlementsService,
   ) {}
 
+  /**
+   * Helper: Automatically unfeature properties whose featuredUntil duration has passed
+   */
+  async enforceFeaturedExpiry(): Promise<void> {
+    try {
+      const now = new Date();
+      await this.propertyModel.updateMany(
+        { isFeatured: true, featuredUntil: { $exists: true, $ne: null, $lt: now } },
+        { $set: { isFeatured: false } },
+      );
+      await this.featuredRequestModel.updateMany(
+        { status: FeaturedRequestStatus.APPROVED, approvedEndDate: { $exists: true, $ne: null, $lt: now } },
+        { $set: { status: FeaturedRequestStatus.EXPIRED } },
+      );
+    } catch (err: any) {
+      this.logger.warn(`Featured expiry cleanup note: ${err?.message}`);
+    }
+  }
+
   async onModuleInit() {
     await this.seedDatabaseIfEmpty();
+    await this.enforceFeaturedExpiry();
   }
 
   private async seedDatabaseIfEmpty() {
@@ -1029,9 +1062,17 @@ export class PropertiesService implements OnModuleInit {
         }
       }
 
-      // 11. Featured Filter
+      // 11. Featured Filter (enforcing active valid duration)
       if (dto.featured === true) {
         filter.isFeatured = true;
+        filter.$and = filter.$and || [];
+        filter.$and.push({
+          $or: [
+            { featuredUntil: { $exists: false } },
+            { featuredUntil: null },
+            { featuredUntil: { $gte: new Date() } },
+          ],
+        });
       }
 
       // 11b. RERA Compliance Filters
@@ -1662,12 +1703,61 @@ export class PropertiesService implements OnModuleInit {
     if (!userId) {
       throw new BadRequestException('User ID is required to fetch owned properties');
     }
-    const query: any = {
-      $or: [{ ownerId: userId }, { advertiserId: userId }, { createdBy: userId }],
-    };
+    await this.enforceFeaturedExpiry();
 
-    if (user?.role === UserRole.BROKER_AGENT || user?.accountType === 'BROKER_AGENT') {
-      query.$or.push({ assignedAgentId: userId });
+    const isEmployee = user?.role === UserRole.BROKER_AGENT || user?.accountType === AccountType.BROKER_AGENT;
+
+    let query: any;
+    if (isEmployee) {
+      const employeeUser = await this.userModel.findById(userId).lean();
+      const effectiveBrokerId = employeeUser?.brokerId || employeeUser?.parentUserId || employeeUser?.agencyId || user?.brokerId || user?.parentUserId || user?.agencyId;
+      const assignedProps = employeeUser?.assignedProperties || user?.assignedProperties || [];
+
+      if (!effectiveBrokerId) {
+        throw new ForbiddenException('Employee account is not linked to any authorized Broker.');
+      }
+
+      if (Array.isArray(assignedProps) && assignedProps.length > 0) {
+        query = {
+          $and: [
+            {
+              $or: [
+                { brokerId: effectiveBrokerId },
+                { ownerId: effectiveBrokerId },
+                { advertiserId: effectiveBrokerId },
+                { createdBy: effectiveBrokerId },
+              ],
+            },
+            {
+              $or: [
+                { id: { $in: assignedProps } },
+                { slug: { $in: assignedProps } },
+                ...(assignedProps.filter(isValidObjectId).map((_id) => ({ _id }))),
+              ],
+            },
+          ],
+        };
+      } else {
+        query = {
+          $or: [
+            { brokerId: effectiveBrokerId },
+            { ownerId: effectiveBrokerId },
+            { advertiserId: effectiveBrokerId },
+            { createdBy: effectiveBrokerId },
+            { createdBy: userId },
+            { assignedAgentId: userId },
+          ],
+        };
+      }
+    } else {
+      query = {
+        $or: [
+          { ownerId: userId },
+          { advertiserId: userId },
+          { createdBy: userId },
+          { brokerId: userId },
+        ],
+      };
     }
 
     const properties = await this.propertyModel
@@ -1678,21 +1768,70 @@ export class PropertiesService implements OnModuleInit {
     return properties;
   }
 
-  async findMyPropertyById(id: string, userId: string) {
-    const query: any = {
-      $and: [
-        { $or: [{ id }, { slug: id }] },
-        { $or: [{ ownerId: userId }, { advertiserId: userId }, { createdBy: userId }] },
-      ],
-    };
+  async findMyPropertyById(id: string, userId: string, user?: AuthenticatedUser) {
+    await this.enforceFeaturedExpiry();
+
+    const idQuery: any = { $or: [{ id }, { slug: id }] };
     if (isValidObjectId(id)) {
-      query.$and[0].$or.push({ _id: id });
+      idQuery.$or.push({ _id: id });
     }
 
-    const property = await this.propertyModel.findOne(query).lean();
+    const property = await this.propertyModel.findOne(idQuery).lean();
     if (!property) {
-      throw new NotFoundException(`Property "${id}" not found or unauthorized.`);
+      throw new NotFoundException(`Property "${id}" not found.`);
     }
+
+    const isDirectAdmin =
+      user?.role === UserRole.ADMIN ||
+      user?.role === UserRole.SUPER_ADMIN ||
+      user?.platformRole === PlatformRole.ADMIN ||
+      user?.platformRole === PlatformRole.SUPER_ADMIN;
+
+    if (isDirectAdmin) {
+      return property;
+    }
+
+    const isEmployee = user?.role === UserRole.BROKER_AGENT || user?.accountType === AccountType.BROKER_AGENT;
+    if (isEmployee) {
+      const employeeUser = await this.userModel.findById(userId).lean();
+      const effectiveBrokerId = employeeUser?.brokerId || employeeUser?.parentUserId || employeeUser?.agencyId;
+      const assignedProps = employeeUser?.assignedProperties || [];
+
+      const belongsToBroker =
+        property.brokerId === effectiveBrokerId ||
+        property.ownerId === effectiveBrokerId ||
+        property.advertiserId === effectiveBrokerId ||
+        property.createdBy === effectiveBrokerId ||
+        property.createdBy === userId ||
+        property.assignedAgentId === userId;
+
+      if (!belongsToBroker) {
+        throw new ForbiddenException('Access denied. You do not have authorization to view this property.');
+      }
+
+      if (Array.isArray(assignedProps) && assignedProps.length > 0) {
+        const isAssigned =
+          assignedProps.includes(property.id) ||
+          assignedProps.includes(property.slug) ||
+          assignedProps.includes(property._id.toString());
+        if (!isAssigned) {
+          throw new ForbiddenException('Access denied. This property is outside your assigned scope.');
+        }
+      }
+
+      return property;
+    }
+
+    const isOwnerOrBroker =
+      property.ownerId === userId ||
+      property.advertiserId === userId ||
+      property.createdBy === userId ||
+      property.brokerId === userId;
+
+    if (!isOwnerOrBroker) {
+      throw new ForbiddenException('Access denied. You do not have authorization to view this property.');
+    }
+
     return property;
   }
 
@@ -1712,15 +1851,52 @@ export class PropertiesService implements OnModuleInit {
       user?.role === UserRole.SUPER_ADMIN ||
       user?.role === UserRole.MODERATOR;
 
-    // Security Check: Non-privileged users can only edit their own listings
+    // Security Check: Non-privileged users can only edit their own or authorized brokerage listings
     if (user && !isPrivileged) {
-      const isOwner =
-        existing.ownerId === user.id ||
-        existing.advertiserId === user.id ||
-        existing.createdBy === user.id;
+      const isEmployee = user.role === UserRole.BROKER_AGENT || user.accountType === AccountType.BROKER_AGENT;
 
-      if (!isOwner) {
-        throw new ForbiddenException('You do not have permission to modify this property.');
+      if (isEmployee) {
+        const employeeUser = await this.userModel.findById(user.id).lean();
+        const effectiveBrokerId = employeeUser?.brokerId || employeeUser?.parentUserId || employeeUser?.agencyId;
+        const assignedProps = employeeUser?.assignedProperties || [];
+
+        const belongsToBroker =
+          existing.brokerId === effectiveBrokerId ||
+          existing.ownerId === effectiveBrokerId ||
+          existing.advertiserId === effectiveBrokerId ||
+          existing.createdBy === effectiveBrokerId ||
+          existing.createdBy === user.id;
+
+        if (!belongsToBroker) {
+          throw new ForbiddenException('You do not have permission to modify properties outside your brokerage.');
+        }
+
+        if (Array.isArray(assignedProps) && assignedProps.length > 0) {
+          const isAssigned =
+            assignedProps.includes(existing.id) ||
+            assignedProps.includes(existing.slug) ||
+            assignedProps.includes(existing._id.toString());
+          if (!isAssigned) {
+            throw new ForbiddenException('You do not have permission to modify properties outside your assigned scope.');
+          }
+        }
+
+        // Permission check for projects
+        const isProject = existing.isParentProject || existing.structureType === PropertyStructureType.PLOTTED_DEVELOPMENT;
+        const permissions = employeeUser?.grantedPermissions || employeeUser?.permissions || [];
+        if (isProject && !permissions.includes(Permission.PROJECT_EDIT) && !permissions.includes('*') && !permissions.includes('project:*')) {
+          throw new ForbiddenException('Insufficient permissions. Required: project:edit.');
+        }
+      } else {
+        const isOwner =
+          existing.ownerId === user.id ||
+          existing.advertiserId === user.id ||
+          existing.brokerId === user.id ||
+          existing.createdBy === user.id;
+
+        if (!isOwner) {
+          throw new ForbiddenException('You do not have permission to modify this property.');
+        }
       }
 
       // Security Check: Non-admins cannot alter status to APPROVED or PUBLISHED directly
@@ -1838,13 +2014,50 @@ export class PropertiesService implements OnModuleInit {
       user.role === UserRole.SUPER_ADMIN ||
       user.role === UserRole.MODERATOR;
 
-    const isOwner =
-      property.ownerId === user.id ||
-      property.advertiserId === user.id ||
-      property.createdBy === user.id;
+    if (!isPrivileged) {
+      const isEmployee = user.role === UserRole.BROKER_AGENT || user.accountType === AccountType.BROKER_AGENT;
 
-    if (!isPrivileged && !isOwner) {
-      throw new ForbiddenException('You cannot submit another user’s property.');
+      if (isEmployee) {
+        const empUser = await this.userModel.findById(user.id).lean();
+        const effectiveBrokerId = empUser?.brokerId || empUser?.parentUserId || empUser?.agencyId;
+        const assignedProps = empUser?.assignedProperties || [];
+
+        const belongsToBroker =
+          property.brokerId === effectiveBrokerId ||
+          property.ownerId === effectiveBrokerId ||
+          property.advertiserId === effectiveBrokerId ||
+          property.createdBy === effectiveBrokerId ||
+          property.createdBy === user.id;
+
+        if (!belongsToBroker) {
+          throw new ForbiddenException('You cannot submit another broker’s property.');
+        }
+
+        if (Array.isArray(assignedProps) && assignedProps.length > 0) {
+          const isAssigned =
+            assignedProps.includes(property.id) ||
+            assignedProps.includes(property.slug) ||
+            assignedProps.includes(property._id.toString());
+          if (!isAssigned) {
+            throw new ForbiddenException('You cannot submit properties outside your assigned scope.');
+          }
+        }
+
+        const permissions = empUser?.grantedPermissions || empUser?.permissions || [];
+        if (!permissions.includes(Permission.PROPERTY_PUBLISH) && !permissions.includes('*') && !permissions.includes('property:*')) {
+          throw new ForbiddenException('Insufficient permissions. Required: property:publish.');
+        }
+      } else {
+        const isOwner =
+          property.ownerId === user.id ||
+          property.advertiserId === user.id ||
+          property.brokerId === user.id ||
+          property.createdBy === user.id;
+
+        if (!isOwner) {
+          throw new ForbiddenException('You cannot submit another user’s property.');
+        }
+      }
     }
 
     // Status state validation
@@ -2179,5 +2392,330 @@ export class PropertiesService implements OnModuleInit {
     throw new ServiceUnavailableException(
       'Direct video upload requires persistent cloud media storage configuration. Missing required environment variables: IMAGEKIT_PRIVATE_KEY, IMAGEKIT_PUBLIC_KEY, and IMAGEKIT_URL_ENDPOINT (or AWS_S3_BUCKET / CLOUDINARY_URL). Please configure these in backend/.env to enable direct video file storage, or use a YouTube Short or Instagram Reel URL.',
     );
+  }
+
+  // ==========================================
+  // FEATURED PROPERTY REQUEST WORKFLOW (Requirements 6, 7 & 8)
+  // ==========================================
+
+  /**
+   * Broker submits a Featured Property Request
+   */
+  async createFeaturedRequest(user: AuthenticatedUser, dto: CreateFeaturedRequestDto) {
+    await this.enforceFeaturedExpiry();
+
+    // 1. Locate property
+    const propQuery: any = { $or: [{ id: dto.propertyId }, { slug: dto.propertyId }] };
+    if (isValidObjectId(dto.propertyId)) {
+      propQuery.$or.push({ _id: dto.propertyId });
+    }
+    const property = await this.propertyModel.findOne(propQuery);
+    if (!property) {
+      throw new NotFoundException(`Property with ID "${dto.propertyId}" was not found.`);
+    }
+
+    // 2. Ownership verification
+    const isDirectAdmin =
+      user.role === UserRole.ADMIN ||
+      user.role === UserRole.SUPER_ADMIN ||
+      user.platformRole === PlatformRole.ADMIN ||
+      user.platformRole === PlatformRole.SUPER_ADMIN;
+
+    const isEmployee = user.role === UserRole.BROKER_AGENT || user.accountType === AccountType.BROKER_AGENT;
+    let effectiveBrokerId = user.id;
+
+    if (isEmployee) {
+      const empUser = await this.userModel.findById(user.id).lean();
+      effectiveBrokerId = empUser?.brokerId || empUser?.parentUserId || empUser?.agencyId || user.id;
+    }
+
+    if (!isDirectAdmin) {
+      const belongsToBroker =
+        property.ownerId === effectiveBrokerId ||
+        property.advertiserId === effectiveBrokerId ||
+        property.brokerId === effectiveBrokerId ||
+        property.createdBy === effectiveBrokerId ||
+        property.createdBy === user.id;
+
+      if (!belongsToBroker) {
+        throw new ForbiddenException('You can only submit featured placement requests for your own brokerage listings.');
+      }
+    }
+
+    // 3. Property must be active/published
+    if (!property.isPublished || property.status !== 'PUBLISHED') {
+      throw new BadRequestException(
+        'Only active published listings can be submitted for Featured Property promotion. Please ensure the listing is published first.',
+      );
+    }
+
+    // 4. Prevent duplicate pending or active requests
+    const cleanPropId = property.id || property._id.toString();
+    const existingActiveOrPending = await this.featuredRequestModel.findOne({
+      propertyId: { $in: [cleanPropId, property._id.toString(), property.slug].filter(Boolean) },
+      status: { $in: [FeaturedRequestStatus.PENDING, FeaturedRequestStatus.APPROVED] },
+      $or: [
+        { status: FeaturedRequestStatus.PENDING },
+        { approvedEndDate: { $gte: new Date() } },
+      ],
+    });
+
+    if (existingActiveOrPending) {
+      if (existingActiveOrPending.status === FeaturedRequestStatus.PENDING) {
+        throw new BadRequestException(
+          'A featured promotion request for this property is already pending Super Admin approval.',
+        );
+      } else {
+        const untilStr = existingActiveOrPending.approvedEndDate
+          ? new Date(existingActiveOrPending.approvedEndDate).toLocaleDateString('en-IN')
+          : 'future date';
+        throw new BadRequestException(
+          `This property is currently active as a Featured Listing until ${untilStr}. Renewals can be submitted after expiry.`,
+        );
+      }
+    }
+
+    // 5. Calculate proposed duration and dates
+    const durationDays = [7, 15, 30, 60, 90].includes(Number(dto.durationDays))
+      ? Number(dto.durationDays)
+      : 30;
+
+    const requestedStartDate = dto.requestedStartDate ? new Date(dto.requestedStartDate) : new Date();
+    const requestedEndDate = new Date(requestedStartDate.getTime() + durationDays * 24 * 60 * 60 * 1000);
+
+    // Determine plan pricing (₹499 for 7d, ₹999 for 15d, ₹1,999 for 30d, or 0 if plan bonus covers it)
+    const price = durationDays === 7 ? 499 : durationDays === 15 ? 999 : 1999;
+    const planName = `${durationDays}-Day Premier Featured Placement`;
+
+    // Broker user context
+    const brokerUser = await this.userModel.findById(effectiveBrokerId).lean();
+    const brokerName = brokerUser?.name || user.name || 'Broker Partner';
+    const brokerEmail = brokerUser?.email || user.email || '';
+    const brokerMobile = brokerUser?.normalizedMobile || brokerUser?.mobile || user.mobile || '';
+
+    // Property title and image
+    const propTitle = typeof property.title === 'string' ? property.title : property.title?.en || 'Featured Listing';
+    const propPrice = typeof property.price === 'number' ? property.price : property.price?.amount || 0;
+    const propLocation = typeof property.location === 'string'
+      ? property.location
+      : [property.location?.locality, property.location?.city].filter(Boolean).join(', ');
+    const propImage = property.media?.thumbnailUrl || property.media?.coverImage || (property.media?.images?.[0] || '');
+
+    const requestReference = `FEAT-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).slice(-4).toUpperCase()}`;
+
+    const request = await this.featuredRequestModel.create({
+      requestReference,
+      brokerId: effectiveBrokerId,
+      brokerName,
+      brokerEmail,
+      brokerMobile,
+      propertyId: cleanPropId,
+      propertyTitle: propTitle,
+      propertySlug: property.slug,
+      propertyPrice: propPrice,
+      propertyLocation: propLocation,
+      propertyImage: propImage,
+      durationDays,
+      requestedStartDate,
+      requestedEndDate,
+      price,
+      planName,
+      notes: dto.notes?.trim() || '',
+      status: FeaturedRequestStatus.PENDING,
+    });
+
+    // IMPORTANT: Property is NOT marked featured while request is pending!
+    // Countdown does NOT start until approved!
+
+    return {
+      success: true,
+      message: `Featured property request submitted for "${propTitle}". Status: PENDING Super Admin approval.`,
+      request,
+    };
+  }
+
+  /**
+   * Get featured requests submitted by the authenticated Broker
+   */
+  async getMyFeaturedRequests(user: AuthenticatedUser) {
+    await this.enforceFeaturedExpiry();
+
+    const isEmployee = user.role === UserRole.BROKER_AGENT || user.accountType === AccountType.BROKER_AGENT;
+    let brokerId = user.id;
+    if (isEmployee) {
+      const empUser = await this.userModel.findById(user.id).lean();
+      brokerId = empUser?.brokerId || empUser?.parentUserId || empUser?.agencyId || user.id;
+    }
+
+    const requests = await this.featuredRequestModel
+      .find({ brokerId })
+      .sort({ createdAt: -1 })
+      .lean();
+
+    return requests;
+  }
+
+  /**
+   * Super Admin lists all Featured Property Requests
+   */
+  async getAdminFeaturedRequests(queryDto: any) {
+    await this.enforceFeaturedExpiry();
+
+    const filter: any = {};
+    if (queryDto.status && queryDto.status !== 'ALL') {
+      filter.status = queryDto.status;
+    }
+    if (queryDto.search) {
+      const regex = new RegExp(queryDto.search.trim(), 'i');
+      filter.$or = [
+        { requestReference: regex },
+        { brokerName: regex },
+        { brokerEmail: regex },
+        { brokerMobile: regex },
+        { propertyTitle: regex },
+      ];
+    }
+
+    const page = Math.max(1, Number(queryDto.page) || 1);
+    const limit = Math.min(100, Math.max(1, Number(queryDto.limit) || 20));
+    const skip = (page - 1) * limit;
+
+    const [total, requests] = await Promise.all([
+      this.featuredRequestModel.countDocuments(filter),
+      this.featuredRequestModel.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
+    ]);
+
+    const totalPages = Math.ceil(total / limit) || 1;
+
+    return {
+      data: requests,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages,
+        hasNextPage: page < totalPages,
+        hasPreviousPage: page > 1,
+      },
+    };
+  }
+
+  /**
+   * Super Admin approves a Featured Property Request
+   */
+  async approveFeaturedRequest(adminUser: AuthenticatedUser, requestId: string, dto?: ApproveFeaturedRequestDto) {
+    const isDirectAdmin =
+      adminUser.role === UserRole.ADMIN ||
+      adminUser.role === UserRole.SUPER_ADMIN ||
+      adminUser.platformRole === PlatformRole.ADMIN ||
+      adminUser.platformRole === PlatformRole.SUPER_ADMIN;
+
+    if (!isDirectAdmin) {
+      throw new ForbiddenException('Only Super Admin is authorized to approve Featured Property requests.');
+    }
+
+    const query: any = { $or: [{ _id: isValidObjectId(requestId) ? requestId : null }, { requestReference: requestId }].filter(Boolean) };
+    const request = await this.featuredRequestModel.findOne(query);
+    if (!request) {
+      throw new NotFoundException(`Featured Property Request "${requestId}" was not found.`);
+    }
+
+    if (request.status !== FeaturedRequestStatus.PENDING) {
+      throw new BadRequestException(`Cannot approve request with current status "${request.status}". Only PENDING requests can be approved.`);
+    }
+
+    // Find the associated property
+    const propQuery: any = { $or: [{ id: request.propertyId }, { slug: request.propertySlug }] };
+    if (isValidObjectId(request.propertyId)) {
+      propQuery.$or.push({ _id: request.propertyId });
+    }
+    const property = await this.propertyModel.findOne(propQuery);
+    if (!property) {
+      throw new NotFoundException(`Property with ID "${request.propertyId}" was not found.`);
+    }
+
+    const approvedDurationDays = Number(dto?.approvedDurationDays) > 0
+      ? Number(dto.approvedDurationDays)
+      : request.durationDays;
+
+    const approvedStartDate = dto?.approvedStartDate ? new Date(dto.approvedStartDate) : new Date();
+    const approvedEndDate = new Date(approvedStartDate.getTime() + approvedDurationDays * 24 * 60 * 60 * 1000);
+
+    request.status = FeaturedRequestStatus.APPROVED;
+    request.approvedDurationDays = approvedDurationDays;
+    request.approvedStartDate = approvedStartDate;
+    request.approvedEndDate = approvedEndDate;
+    request.reviewedBy = adminUser.id;
+    request.reviewedByName = adminUser.name || 'Super Admin';
+    request.reviewedAt = new Date();
+    await request.save();
+
+    // Activate featured status on property
+    const now = new Date();
+    if (approvedStartDate <= now) {
+      property.isFeatured = true;
+      property.featuredAt = approvedStartDate;
+      property.featuredUntil = approvedEndDate;
+    } else {
+      // Future scheduled start date
+      property.featuredAt = approvedStartDate;
+      property.featuredUntil = approvedEndDate;
+    }
+    await property.save();
+
+    this.logger.log(
+      `Featured request ${request.requestReference} APPROVED by admin ${adminUser.name} for property ${property.id} until ${approvedEndDate.toISOString()}`,
+    );
+
+    return {
+      success: true,
+      message: `Featured placement approved for "${request.propertyTitle}" for ${approvedDurationDays} days (active until ${approvedEndDate.toLocaleDateString('en-IN')}).`,
+      request,
+    };
+  }
+
+  /**
+   * Super Admin rejects a Featured Property Request
+   */
+  async rejectFeaturedRequest(adminUser: AuthenticatedUser, requestId: string, dto?: RejectFeaturedRequestDto) {
+    const isDirectAdmin =
+      adminUser.role === UserRole.ADMIN ||
+      adminUser.role === UserRole.SUPER_ADMIN ||
+      adminUser.platformRole === PlatformRole.ADMIN ||
+      adminUser.platformRole === PlatformRole.SUPER_ADMIN;
+
+    if (!isDirectAdmin) {
+      throw new ForbiddenException('Only Super Admin is authorized to reject Featured Property requests.');
+    }
+
+    const query: any = { $or: [{ _id: isValidObjectId(requestId) ? requestId : null }, { requestReference: requestId }].filter(Boolean) };
+    const request = await this.featuredRequestModel.findOne(query);
+    if (!request) {
+      throw new NotFoundException(`Featured Property Request "${requestId}" was not found.`);
+    }
+
+    if (request.status !== FeaturedRequestStatus.PENDING) {
+      throw new BadRequestException(`Cannot reject request with current status "${request.status}". Only PENDING requests can be rejected.`);
+    }
+
+    request.status = FeaturedRequestStatus.REJECTED;
+    request.rejectionReason = dto?.reason?.trim() || 'Request does not meet marketplace featured placement criteria.';
+    request.reviewedBy = adminUser.id;
+    request.reviewedByName = adminUser.name || 'Super Admin';
+    request.reviewedAt = new Date();
+    await request.save();
+
+    // Property remains a normal listing
+    const propQuery: any = { $or: [{ id: request.propertyId }, { slug: request.propertySlug }] };
+    if (isValidObjectId(request.propertyId)) {
+      propQuery.$or.push({ _id: request.propertyId });
+    }
+    await this.propertyModel.updateOne(propQuery, { $set: { isFeatured: false } });
+
+    return {
+      success: true,
+      message: `Featured property request rejected. Reason: ${request.rejectionReason}`,
+      request,
+    };
   }
 }

@@ -61,6 +61,11 @@ export interface AuthenticatedUser {
   kycApprovedAt?: Date | string | null;
   kycApprovedBy?: string | null;
   kycDocumentType?: string | null;
+  brokerId?: string | null;
+  parentUserId?: string | null;
+  agencyId?: string | null;
+  assignedProperties?: string[];
+  designation?: string;
 }
 
 export interface AuthTokens {

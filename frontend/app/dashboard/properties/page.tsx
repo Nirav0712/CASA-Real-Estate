@@ -8,12 +8,14 @@ import { formatPrice } from '@/lib/utils';
 import {
   getMyProperties,
   submitPropertyForApproval,
+  createFeaturedRequest,
+  getMyFeaturedRequests,
 } from '@/services/property-service';
 import {
   createPaymentOrder,
   verifyPayment,
 } from '@/services/payment-service';
-import { Property } from '@/types';
+import { Property, FeaturedPropertyRequest } from '@/types';
 import {
   Home,
   Plus,
@@ -47,9 +49,32 @@ export default function MyPropertiesPage() {
   const [hasPermission, setHasPermission] = React.useState<boolean | null>(null);
   const [submittingId, setSubmittingId] = React.useState<string | null>(null);
 
+  // Tab & Featured State
+  const [activeTab, setActiveTab] = React.useState<'properties' | 'featured_requests'>('properties');
+  const [featuredRequests, setFeaturedRequests] = React.useState<FeaturedPropertyRequest[]>([]);
+  const [loadingFeatured, setLoadingFeatured] = React.useState(false);
+
   // Monetization / Feature Modal State
   const [featureModalProperty, setFeatureModalProperty] = React.useState<Property | null>(null);
-  const [isProcessingPayment, setIsProcessingPayment] = React.useState(false);
+  const [requestedDuration, setRequestedDuration] = React.useState<number>(30);
+  const [requestedStartDate, setRequestedStartDate] = React.useState<string>(
+    new Date().toISOString().split('T')[0],
+  );
+  const [featureNotes, setFeatureNotes] = React.useState<string>('');
+  const [isSubmittingFeatured, setIsSubmittingFeatured] = React.useState(false);
+
+  const loadFeaturedRequests = React.useCallback(async () => {
+    if (!isAuthenticated) return;
+    setLoadingFeatured(true);
+    try {
+      const data = await getMyFeaturedRequests();
+      setFeaturedRequests(data);
+    } catch {
+      // silently fallback
+    } finally {
+      setLoadingFeatured(false);
+    }
+  }, [isAuthenticated]);
 
   const loadProperties = React.useCallback(async () => {
     if (!isAuthenticated) return;
@@ -58,6 +83,7 @@ export default function MyPropertiesPage() {
       const data = await getMyProperties();
       setProperties(data);
       setHasPermission(true);
+      await loadFeaturedRequests();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : '';
       if (msg.includes('403') || msg.toLowerCase().includes('permission') || msg.toLowerCase().includes('forbidden')) {
@@ -201,8 +227,36 @@ export default function MyPropertiesPage() {
       {/* KYC Verification & Account Activation Status Banner */}
       <KycStatusBanner onRefresh={loadProperties} />
 
+      {/* Navigation Tabs */}
+      <div className="flex items-center gap-2 border-b border-casa-border-light pb-2">
+        <button
+          type="button"
+          onClick={() => setActiveTab('properties')}
+          className={`px-4 py-2 rounded-xl text-xs font-bold transition-colors ${
+            activeTab === 'properties'
+              ? 'bg-casa-brand text-white shadow-xs'
+              : 'text-casa-text-secondary hover:text-casa-text-primary hover:bg-casa-subtle'
+          }`}
+        >
+          My Properties ({properties.length})
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab('featured_requests')}
+          className={`px-4 py-2 rounded-xl text-xs font-bold transition-colors flex items-center gap-1.5 ${
+            activeTab === 'featured_requests'
+              ? 'bg-amber-600 text-white shadow-xs'
+              : 'text-casa-text-secondary hover:text-casa-text-primary hover:bg-casa-subtle'
+          }`}
+        >
+          <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+          <span>Featured Promotion Requests ({featuredRequests.length})</span>
+        </button>
+      </div>
+
       {/* Properties List */}
-      {isLoading ? (
+      {activeTab === 'properties' && (
+        isLoading ? (
         <div className="py-20 text-center text-casa-text-muted text-sm space-y-2">
           <RefreshCw className="w-6 h-6 animate-spin mx-auto text-casa-brand" />
           <p>Loading your property listings from MongoDB...</p>
@@ -407,114 +461,301 @@ export default function MyPropertiesPage() {
             );
           })}
         </div>
+      ))}
+
+      {/* Featured Promotion Requests List */}
+      {activeTab === 'featured_requests' && (
+        loadingFeatured ? (
+          <div className="py-20 text-center text-casa-text-muted text-sm space-y-2">
+            <RefreshCw className="w-6 h-6 animate-spin mx-auto text-amber-600" />
+            <p>Loading your featured property promotion requests...</p>
+          </div>
+        ) : featuredRequests.length === 0 ? (
+          <div className="py-16 text-center bg-casa-surface border border-casa-border-light rounded-2xl shadow-subtle space-y-4">
+            <div className="w-14 h-14 rounded-full bg-amber-500/10 flex items-center justify-center text-amber-600 mx-auto">
+              <Sparkles className="w-7 h-7" />
+            </div>
+            <div className="space-y-1">
+              <h3 className="text-base font-bold text-casa-text-primary">No Featured Promotion Requests</h3>
+              <p className="text-xs text-casa-text-secondary max-w-sm mx-auto">
+                Select any of your published listings under &ldquo;My Properties&rdquo; and click &ldquo;Feature Property&rdquo; to submit an approval request to Super Admin.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setActiveTab('properties')}
+              className="px-4 py-2 bg-casa-brand hover:bg-casa-brand-hover text-white rounded-xl text-xs font-semibold"
+            >
+              Go to My Properties
+            </button>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {featuredRequests.map((req) => {
+              const isPending = req.status === 'PENDING';
+              const isApproved = req.status === 'APPROVED';
+              const isRejected = req.status === 'REJECTED';
+              const isExpired = req.status === 'EXPIRED';
+
+              return (
+                <div
+                  key={req.id || req._id}
+                  className="p-5 bg-casa-surface border border-casa-border-light rounded-2xl shadow-subtle flex flex-col md:flex-row md:items-center justify-between gap-4"
+                >
+                  <div className="flex items-start gap-3.5 min-w-0">
+                    {req.propertyImage ? (
+                      <img
+                        src={req.propertyImage}
+                        alt={req.propertyTitle || 'Property'}
+                        className="w-16 h-16 rounded-xl object-cover shrink-0 border border-casa-border-light"
+                      />
+                    ) : (
+                      <div className="w-16 h-16 rounded-xl bg-casa-subtle border border-casa-border-light flex items-center justify-center shrink-0 text-casa-text-muted">
+                        <Building className="w-6 h-6" />
+                      </div>
+                    )}
+
+                    <div className="space-y-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span
+                          className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase ${
+                            isPending
+                              ? 'bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-300'
+                              : isApproved
+                              ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300'
+                              : isRejected
+                              ? 'bg-rose-50 text-rose-700 dark:bg-rose-950 dark:text-rose-300'
+                              : 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400'
+                          }`}
+                        >
+                          {req.status}
+                        </span>
+                        <span className="text-[10px] font-mono text-casa-text-muted">
+                          Ref: {req.requestReference}
+                        </span>
+                      </div>
+
+                      <h4 className="text-sm font-bold text-casa-text-primary truncate">
+                        {req.propertyTitle || 'Property'}
+                      </h4>
+
+                      <div className="text-xs text-casa-text-muted flex items-center gap-3 flex-wrap">
+                        <span>Requested: <strong>{req.durationDays} Days</strong></span>
+                        <span>• Submitted: {new Date(req.createdAt).toLocaleDateString()}</span>
+                        {req.price && <span>• ₹{req.price}</span>}
+                      </div>
+
+                      {isApproved && (
+                        <p className="text-[11px] text-emerald-700 dark:text-emerald-400 font-semibold">
+                          Approved Duration: {req.approvedDurationDays || req.durationDays} Days (Active until{' '}
+                          {req.approvedEndDate ? new Date(req.approvedEndDate).toLocaleDateString() : 'N/A'})
+                        </p>
+                      )}
+
+                      {isRejected && req.rejectionReason && (
+                        <p className="text-[11px] text-rose-600">
+                          Rejection Reason: {req.rejectionReason}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 shrink-0">
+                    {req.propertySlug && (
+                      <Link
+                        href={`/properties/${req.propertySlug}`}
+                        target="_blank"
+                        className="px-3 py-1.5 text-xs border border-casa-border-light rounded-xl hover:bg-casa-subtle text-casa-text-secondary flex items-center gap-1"
+                      >
+                        <Eye className="w-3.5 h-3.5" />
+                        <span>View Listing</span>
+                      </Link>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )
       )}
 
-      {/* Feature Property Checkout Modal */}
+      {/* Feature Property Request Form Modal */}
       {featureModalProperty && (
         <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-5 border border-slate-100">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+          <div className="bg-casa-surface rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-5 border border-casa-border-light text-start">
+            <div className="flex items-center justify-between border-b border-casa-border-light pb-3">
               <div className="flex items-center space-x-2">
-                <div className="p-2 bg-amber-50 text-amber-600 rounded-xl">
-                  <Sparkles className="w-5 h-5" />
+                <div className="p-2 bg-amber-500/10 text-amber-600 rounded-xl">
+                  <Sparkles className="w-5 h-5 text-amber-500" />
                 </div>
-                <h3 className="font-bold text-slate-900 text-base">Upgrade to Featured Listing</h3>
+                <div>
+                  <h3 className="font-bold text-casa-text-primary text-base">Request Featured Property Placement</h3>
+                  <p className="text-[11px] text-casa-text-muted">Subject to Super Admin approval before activation</p>
+                </div>
               </div>
               <button
                 onClick={() => setFeatureModalProperty(null)}
-                className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100"
+                className="p-1.5 text-casa-text-muted hover:text-casa-text-primary rounded-lg hover:bg-casa-subtle"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <div className="space-y-3">
-              <div className="p-3.5 bg-slate-50 rounded-xl space-y-1">
-                <span className="text-[10px] font-bold text-slate-400 uppercase">Selected Property</span>
-                <p className="text-xs font-bold text-slate-900 truncate">
+            {/* Selected Property Preview */}
+            <div className="p-3.5 bg-casa-canvas rounded-xl border border-casa-border-light flex items-center gap-3">
+              {featureModalProperty.media?.thumbnailUrl || featureModalProperty.media?.coverImage ? (
+                <img
+                  src={featureModalProperty.media.thumbnailUrl || featureModalProperty.media.coverImage}
+                  alt="Property"
+                  className="w-14 h-14 rounded-lg object-cover shrink-0"
+                />
+              ) : (
+                <div className="w-14 h-14 rounded-lg bg-casa-subtle flex items-center justify-center shrink-0">
+                  <Building className="w-6 h-6 text-casa-text-muted" />
+                </div>
+              )}
+              <div className="min-w-0">
+                <span className="text-[10px] font-bold text-casa-brand uppercase tracking-wider">Target Listing</span>
+                <p className="text-xs font-bold text-casa-text-primary truncate">
                   {typeof featureModalProperty.title === 'string'
                     ? featureModalProperty.title
                     : featureModalProperty.title?.en || 'Property'}
                 </p>
-                <p className="text-[11px] text-slate-500">
+                <p className="text-[11px] text-casa-text-muted">
                   Ref ID: <span className="font-mono">{featureModalProperty.referenceId || featureModalProperty.id}</span>
                 </p>
               </div>
+            </div>
 
-              <div className="p-4 bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-200 rounded-xl space-y-2.5">
-                <div className="flex justify-between items-center">
-                  <span className="text-xs font-bold text-amber-900">Featured Showcase (30 Days)</span>
-                  <span className="text-lg font-bold text-amber-900">₹1,999</span>
+            {/* Form Inputs */}
+            <div className="space-y-3 text-xs">
+              <div>
+                <label className="font-semibold text-casa-text-primary block mb-1">
+                  Featured Placement Duration
+                </label>
+                <select
+                  value={requestedDuration}
+                  onChange={(e) => setRequestedDuration(Number(e.target.value))}
+                  className="w-full px-3 py-2 bg-casa-canvas border border-casa-border-light rounded-xl text-casa-text-primary focus:outline-hidden focus:border-casa-brand font-medium"
+                >
+                  <option value={7}>7 Days — Weekly Spotlight (₹599)</option>
+                  <option value={15}>15 Days — Fortnight Showcase (₹1,199)</option>
+                  <option value={30}>30 Days — Premium Monthly Premiere (₹1,999)</option>
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="font-semibold text-casa-text-primary block mb-1">
+                    Requested Start Date
+                  </label>
+                  <input
+                    type="date"
+                    value={requestedStartDate}
+                    onChange={(e) => setRequestedStartDate(e.target.value)}
+                    className="w-full px-3 py-2 bg-casa-canvas border border-casa-border-light rounded-xl text-casa-text-primary focus:outline-hidden focus:border-casa-brand"
+                  />
                 </div>
-                <ul className="text-xs text-amber-800 space-y-1.5">
-                  <li className="flex items-center gap-1.5">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                    Top rank placement on Lucknow search & category pages
-                  </li>
-                  <li className="flex items-center gap-1.5">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                    Golden &ldquo;CASA Featured&rdquo; badge visible to all buyers
-                  </li>
-                  <li className="flex items-center gap-1.5">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                    Up to 3x more direct buyer phone calls and WhatsApp leads
-                  </li>
-                </ul>
+                <div>
+                  <label className="font-semibold text-casa-text-primary block mb-1">
+                    Calculated Expiry Date
+                  </label>
+                  <input
+                    type="text"
+                    disabled
+                    value={
+                      new Date(
+                        new Date(requestedStartDate || Date.now()).getTime() +
+                          requestedDuration * 86400000,
+                      ).toLocaleDateString()
+                    }
+                    className="w-full px-3 py-2 bg-casa-subtle border border-casa-border-light rounded-xl text-casa-text-muted"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="font-semibold text-casa-text-primary block mb-1">
+                  Notes or Placement Reason (Optional)
+                </label>
+                <textarea
+                  rows={2}
+                  placeholder="e.g. Exclusive penthouse mandate, high buyer demand area..."
+                  value={featureNotes}
+                  onChange={(e) => setFeatureNotes(e.target.value)}
+                  className="w-full px-3 py-2 bg-casa-canvas border border-casa-border-light rounded-xl text-casa-text-primary focus:outline-hidden focus:border-casa-brand"
+                />
+              </div>
+
+              {/* Pre-submission Summary */}
+              <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl space-y-1.5 text-xs text-amber-900 dark:text-amber-200">
+                <span className="font-bold text-[10px] uppercase tracking-wider block">Request Summary</span>
+                <div className="flex justify-between">
+                  <span>Duration:</span>
+                  <strong className="font-bold">{requestedDuration} Days</strong>
+                </div>
+                <div className="flex justify-between">
+                  <span>Applicable Price:</span>
+                  <strong className="font-bold">
+                    ₹{requestedDuration === 7 ? '599' : requestedDuration === 15 ? '1,199' : '1,999'}
+                  </strong>
+                </div>
+                <div className="flex justify-between text-[11px]">
+                  <span>Status on Submit:</span>
+                  <strong className="font-bold text-amber-700 dark:text-amber-400">PENDING SUPER ADMIN APPROVAL</strong>
+                </div>
+                <p className="text-[10px] text-casa-text-muted pt-1 border-t border-amber-500/20">
+                  Notice: The property will NOT appear as featured until Super Admin reviews and approves the request. The featured duration countdown will not begin while awaiting approval.
+                </p>
               </div>
             </div>
 
-            <div className="flex items-center justify-between pt-2">
-              <div className="flex items-center gap-1.5 text-[11px] text-slate-400">
-                <Lock className="w-3 h-3 text-slate-400" />
-                <span>256-bit Secure Razorpay Checkout</span>
-              </div>
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-casa-border-light">
               <button
                 type="button"
-                disabled={isProcessingPayment}
+                onClick={() => setFeatureModalProperty(null)}
+                className="px-4 py-2 border border-casa-border-light hover:bg-casa-subtle rounded-xl text-xs font-semibold text-casa-text-secondary"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={isSubmittingFeatured}
                 onClick={async () => {
-                  setIsProcessingPayment(true);
+                  setIsSubmittingFeatured(true);
                   try {
-                    // 1. Create server order
-                    const order = await createPaymentOrder({
-                      purpose: 'FEATURED_PROPERTY',
-                      referenceId: featureModalProperty.id,
+                    await createFeaturedRequest({
+                      propertyId: featureModalProperty.id,
+                      durationDays: requestedDuration,
+                      requestedStartDate: requestedStartDate ? new Date(requestedStartDate).toISOString() : undefined,
+                      notes: featureNotes.trim() || undefined,
                     });
-
-                    // 2. Open Razorpay simulation / live test
-                    // In browser test mode, we generate / verify with payment signature
-                    const testPaymentId = `pay_${Date.now()}`;
-                    // Send to verification endpoint
-                    const verifyRes = await verifyPayment({
-                      orderId: order.orderId,
-                      razorpayPaymentId: testPaymentId,
-                      razorpaySignature: 'simulated_test_sig', // Provider validates
-                    }).catch(async () => {
-                      // If signature simulation fails in dev, call with live config
-                      toast.info('Payment Gateway', `Order ${order.orderId} created for ₹${order.amount}`);
-                      return { success: true, message: 'Payment completed' };
-                    });
-
-                    toast.success('Property Upgraded!', 'Your property is now actively featured on the marketplace.');
+                    toast.success(
+                      'Featured Request Submitted',
+                      `Request for "${typeof featureModalProperty.title === 'string' ? featureModalProperty.title : featureModalProperty.title?.en}" is now PENDING Super Admin approval.`,
+                    );
                     setFeatureModalProperty(null);
+                    setActiveTab('featured_requests');
                     await loadProperties();
+                    await loadFeaturedRequests();
                   } catch (err: unknown) {
-                    const msg = err instanceof Error ? err.message : 'Payment initiation failed';
-                    toast.error('Payment Error', msg);
+                    const msg = err instanceof Error ? err.message : 'Submission failed';
+                    toast.error('Request Error', msg);
                   } finally {
-                    setIsProcessingPayment(false);
+                    setIsSubmittingFeatured(false);
                   }
                 }}
                 className="px-5 py-2.5 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold rounded-xl shadow-xs transition flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
               >
-                {isProcessingPayment ? (
+                {isSubmittingFeatured ? (
                   <>
                     <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                    <span>Processing...</span>
+                    <span>Submitting Request...</span>
                   </>
                 ) : (
                   <>
-                    <CreditCard className="w-3.5 h-3.5" />
-                    <span>Pay ₹1,999</span>
+                    <Sparkles className="w-3.5 h-3.5" />
+                    <span>Submit for Admin Approval</span>
                   </>
                 )}
               </button>

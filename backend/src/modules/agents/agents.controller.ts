@@ -3,6 +3,7 @@ import {
   Get,
   Patch,
   Post,
+  Put,
   Delete,
   Body,
   Param,
@@ -13,6 +14,7 @@ import { AgentsService } from './agents.service';
 import { UpdateAgentProfileDto } from './dto/update-agent-profile.dto';
 import { SubmitVerificationDto } from './dto/submit-verification.dto';
 import { UploadDocumentDto } from './dto/upload-document.dto';
+import { CreateBrokerEmployeeDto, UpdateBrokerEmployeeDto } from './dto/create-employee.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -157,6 +159,69 @@ export class AgentsController {
     @Param('id') id: string,
   ) {
     return this.agentsService.removeAgencyTeamMember(user, id);
+  }
+
+  // ==========================================
+  // BROKER EMPLOYEE MANAGEMENT (Requirement 1 & 2)
+  // ==========================================
+
+  @Get('employees')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get employee list and counts for current verified Broker' })
+  @ApiResponse({ status: 200, description: 'Employees and counts returned' })
+  getBrokerEmployees(@CurrentUser() user: AuthenticatedUser) {
+    return this.agentsService.getBrokerEmployees(user);
+  }
+
+  @Post('employees')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Add a new employee under the verified Broker' })
+  @ApiResponse({ status: 201, description: 'Employee created' })
+  createBrokerEmployee(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: CreateBrokerEmployeeDto,
+  ) {
+    return this.agentsService.createBrokerEmployee(user, dto);
+  }
+
+  @Put('employees/:id')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Update employee details and permissions' })
+  @ApiResponse({ status: 200, description: 'Employee updated' })
+  updateBrokerEmployee(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+    @Body() dto: UpdateBrokerEmployeeDto,
+  ) {
+    return this.agentsService.updateBrokerEmployee(user, id, dto);
+  }
+
+  @Patch('employees/:id')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Patch employee details and permissions' })
+  @ApiResponse({ status: 200, description: 'Employee updated' })
+  patchBrokerEmployee(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+    @Body() dto: UpdateBrokerEmployeeDto,
+  ) {
+    return this.agentsService.updateBrokerEmployee(user, id, dto);
+  }
+
+  @Patch('employees/:id/status')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Toggle employee active/deactivated status' })
+  @ApiResponse({ status: 200, description: 'Status toggled' })
+  toggleBrokerEmployeeStatus(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+  ) {
+    return this.agentsService.toggleBrokerEmployeeStatus(user, id);
   }
 
   @Get(':slug')

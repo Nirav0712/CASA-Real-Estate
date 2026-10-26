@@ -1026,6 +1026,17 @@ export default function AdminPropertiesPage() {
             <span>Refresh</span>
           </Button>
 
+          <Link href="/properties/featured-requests">
+            <Button
+              variant="outline"
+              size="sm"
+              className="text-xs flex items-center gap-1.5 border-amber-300 bg-amber-50/50 text-amber-800 hover:bg-amber-100"
+            >
+              <Star className="w-3.5 h-3.5 fill-amber-500 text-amber-500" />
+              <span>Featured Requests</span>
+            </Button>
+          </Link>
+
           <Button
             variant="primary"
             size="sm"

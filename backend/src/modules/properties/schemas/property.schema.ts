@@ -705,6 +705,12 @@ export class Property {
   @Prop({ index: true })
   advertiserId?: string;
 
+  @Prop({ index: true })
+  brokerId?: string;
+
+  @Prop({ index: true })
+  assignedAgentId?: string;
+
   @Prop()
   createdBy?: string;
 

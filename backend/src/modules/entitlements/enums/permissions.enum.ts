@@ -19,6 +19,18 @@ export enum Permission {
   PROPERTY_PROMOTE = 'property:promote',
   PROPERTY_CONTACT_VIEW = 'property_contact:view',
 
+  // PROJECTS
+  PROJECT_VIEW = 'project:view',
+  PROJECT_CREATE = 'project:create',
+  PROJECT_EDIT = 'project:edit',
+  PROJECT_MANAGE = 'project:manage',
+
+  // VIDEO REELS
+  REEL_VIEW = 'reel:view',
+  REEL_CREATE = 'reel:create',
+  REEL_EDIT = 'reel:edit',
+  REEL_DELETE = 'reel:delete',
+
   // LEADS
   LEAD_VIEW = 'lead:view',
   LEAD_CREATE = 'lead:create',
@@ -46,6 +58,7 @@ export enum Permission {
   CRM_EDIT = 'crm:edit',
   CRM_DELETE = 'crm:delete',
   CRM_EXPORT = 'crm:export',
+  CRM_FOLLOWUP = 'crm:followup',
 
   // CUSTOMERS
   CUSTOMER_VIEW = 'customer:view',
@@ -313,3 +326,68 @@ export const PERMISSION_GROUPS: PermissionGroup[] = [
     ],
   },
 ];
+
+export interface EmployeePermissionItem {
+  key: Permission;
+  label: string;
+  description: string;
+}
+
+export interface EmployeePermissionCategory {
+  key: string;
+  title: string;
+  description: string;
+  permissions: EmployeePermissionItem[];
+}
+
+export const EMPLOYEE_PERMISSION_GROUPS: EmployeePermissionCategory[] = [
+  {
+    key: 'PROPERTY',
+    title: 'Property Management',
+    description: 'Permissions for listings, drafts, and submissions',
+    permissions: [
+      { key: Permission.PROPERTY_VIEW, label: 'View Properties', description: 'Browse brokerage properties and listings' },
+      { key: Permission.PROPERTY_CREATE, label: 'Add Properties', description: 'Draft and create new property listings' },
+      { key: Permission.PROPERTY_EDIT, label: 'Edit Properties', description: 'Modify pricing, details, and media of properties' },
+      { key: Permission.PROPERTY_PUBLISH, label: 'Submit Properties for Approval', description: 'Submit listings for moderation and direct publishing' },
+      { key: Permission.PROPERTY_DELETE, label: 'Delete / Archive Properties', description: 'Archive or remove property listings (if authorized)' },
+    ],
+  },
+  {
+    key: 'PROJECT',
+    title: 'Project Management',
+    description: 'Commercial developments and multi-unit projects',
+    permissions: [
+      { key: Permission.PROJECT_VIEW, label: 'View Projects', description: 'Browse and inspect parent project developments' },
+      { key: Permission.PROJECT_CREATE, label: 'Add Projects', description: 'Create and list new multi-unit developments' },
+      { key: Permission.PROJECT_EDIT, label: 'Edit Projects', description: 'Update project configurations and timelines' },
+      { key: Permission.PROJECT_MANAGE, label: 'Manage Project Details & Listings', description: 'Manage units, inventory tiers, and availability' },
+    ],
+  },
+  {
+    key: 'REEL',
+    title: 'Video Reels',
+    description: '9:16 mobile property video walkthroughs',
+    permissions: [
+      { key: Permission.REEL_VIEW, label: 'View Reels', description: 'Browse published and pending video reels' },
+      { key: Permission.REEL_CREATE, label: 'Upload Reels', description: 'Upload vertical video tours and walkthroughs' },
+      { key: Permission.REEL_EDIT, label: 'Edit Reels', description: 'Modify video metadata, tags, and thumbnails' },
+      { key: Permission.REEL_DELETE, label: 'Delete Reels', description: 'Remove video tours (if authorized)' },
+    ],
+  },
+  {
+    key: 'CRM',
+    title: 'Clients, Leads & CRM',
+    description: 'Buyer inquiry pipelines and customer relationships',
+    permissions: [
+      { key: Permission.LEAD_VIEW, label: 'View Clients & Leads', description: 'Inspect prospective client inquiries and pipelines' },
+      { key: Permission.LEAD_CREATE, label: 'Add Clients & Leads', description: 'Manually register prospective client inquiries' },
+      { key: Permission.LEAD_EDIT, label: 'Edit Client & Lead Details', description: 'Update client requirements, stages, and notes' },
+      { key: Permission.ENQUIRY_MANAGE, label: 'Manage Enquiries', description: 'Respond to incoming property queries' },
+      { key: Permission.CRM_FOLLOWUP, label: 'Manage Follow-ups & Reminders', description: 'Schedule and manage call/site visit reminders' },
+      { key: Permission.CRM_VIEW, label: 'Access CRM', description: 'Access full customer deal pipelines and history' },
+      { key: Permission.LEAD_ASSIGN, label: 'Assign Leads', description: 'Delegate leads to internal colleagues (if authorized)' },
+    ],
+  },
+];
+

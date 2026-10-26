@@ -35,6 +35,7 @@ import {
   Video,
   Menu,
   X,
+  Star,
 } from 'lucide-react';
 import { getPendingModerationQueue } from '@/services/admin-service';
 
@@ -101,6 +102,7 @@ export function AdminSidebar({ isMobileOpen = false, onMobileClose }: AdminSideb
       label: 'PROPERTY MANAGEMENT',
       items: [
         { label: 'All Properties', href: '/properties', icon: Home, active: pathname === '/properties' },
+        { label: 'Featured Requests', href: '/properties/featured-requests', icon: Star, active: pathname?.startsWith('/properties/featured-requests') },
         { label: '9:16 Video Reels', href: '/reels', icon: Video, active: pathname?.startsWith('/reels') },
         {
           label: 'Pending Approvals',

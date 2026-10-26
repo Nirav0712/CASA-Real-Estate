@@ -19,6 +19,7 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { PropertiesService } from './properties.service';
 import { SearchPropertiesDto } from './dto/search-properties.dto';
+import { CreateFeaturedRequestDto } from './dto/featured-request.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -141,7 +142,28 @@ export class PropertiesController {
   @ApiOperation({ summary: 'Get single property owned by currently authenticated user' })
   @ApiResponse({ status: 200, description: 'Property details returned' })
   findMyPropertyById(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
-    return this.propertiesService.findMyPropertyById(id, user.id);
+    return this.propertiesService.findMyPropertyById(id, user.id, user);
+  }
+
+  @Post('featured-requests')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Submit a request to feature a property' })
+  @ApiResponse({ status: 201, description: 'Featured request submitted as PENDING' })
+  createFeaturedRequest(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: CreateFeaturedRequestDto,
+  ) {
+    return this.propertiesService.createFeaturedRequest(user, dto);
+  }
+
+  @Get('featured-requests/my')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'List all featured requests submitted by current Broker' })
+  @ApiResponse({ status: 200, description: 'List of featured requests' })
+  getMyFeaturedRequests(@CurrentUser() user: AuthenticatedUser) {
+    return this.propertiesService.getMyFeaturedRequests(user);
   }
 
   @Post(':id/submit')

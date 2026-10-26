@@ -382,6 +382,9 @@ export interface AgentRecord {
   status: AccountStatus;
   activeListings: number;
   totalListings: number;
+  totalEmployees?: number;
+  activeEmployees?: number;
+  inactiveEmployees?: number;
   createdAt: string;
 }
 
@@ -458,10 +461,62 @@ export interface AgentProfileRecord {
   isVerifiedAgent?: boolean;
 }
 
+export interface BrokerEmployeeRecord {
+  id: string;
+  _id?: string;
+  name: string;
+  email?: string;
+  mobile: string;
+  normalizedMobile?: string;
+  designation?: string;
+  role: string;
+  status: string;
+  permissions?: string[];
+  assignedProperties?: string[];
+  createdAt: string;
+}
+
 export interface AgentVerificationDetailResponse {
   agent: AgentRecord;
   profile: AgentProfileRecord | null;
   documents: AgentDocumentRecord[];
+  employees?: BrokerEmployeeRecord[];
+  employeeCounts?: {
+    total: number;
+    active: number;
+    inactive: number;
+  };
+}
+
+export interface FeaturedPropertyRequestRecord {
+  id: string;
+  _id?: string;
+  requestReference: string;
+  brokerId: string;
+  brokerName?: string;
+  brokerEmail?: string;
+  brokerMobile?: string;
+  propertyId: string;
+  propertyTitle?: string;
+  propertySlug?: string;
+  propertyPrice?: number;
+  propertyLocation?: string;
+  propertyImage?: string;
+  durationDays: number;
+  requestedStartDate?: string;
+  requestedEndDate?: string;
+  price?: number;
+  planName?: string;
+  notes?: string;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'EXPIRED';
+  rejectionReason?: string;
+  approvedStartDate?: string;
+  approvedEndDate?: string;
+  approvedDurationDays?: number;
+  reviewedBy?: string;
+  reviewedAt?: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export type LocationType =

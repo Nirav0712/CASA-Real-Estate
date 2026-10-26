@@ -272,11 +272,31 @@ export class LeadsService {
 
     // RBAC Isolation: Agents and Owners can only see their own assigned/owned leads
     if (!this.isAdmin(user)) {
-      filter.$or = [
-        { agentId: { $in: userIdentifiers } },
-        { assignedAgentId: { $in: userIdentifiers } },
-        { ownerId: { $in: userIdentifiers } },
-      ];
+      const isEmployee = user.role === UserRole.BROKER_AGENT || user.accountType === 'BROKER_AGENT';
+      if (isEmployee) {
+        const employeeUser = await this.userModel.findById(user.id).lean();
+        const effectiveBrokerId = employeeUser?.brokerId || employeeUser?.parentUserId || employeeUser?.agencyId;
+        const assignedProps = employeeUser?.assignedProperties || [];
+
+        if (Array.isArray(assignedProps) && assignedProps.length > 0) {
+          filter.$or = [
+            { assignedAgentId: { $in: userIdentifiers } },
+            { propertyId: { $in: assignedProps } },
+          ];
+        } else {
+          filter.$or = [
+            { assignedAgentId: { $in: userIdentifiers } },
+            { agentId: { $in: userIdentifiers } },
+            ...(effectiveBrokerId ? [{ ownerId: effectiveBrokerId }, { agentId: effectiveBrokerId }] : []),
+          ];
+        }
+      } else {
+        filter.$or = [
+          { agentId: { $in: userIdentifiers } },
+          { assignedAgentId: { $in: userIdentifiers } },
+          { ownerId: { $in: userIdentifiers } },
+        ];
+      }
     } else {
       // Admin filters
       if (queryDto.agentId) {
@@ -487,12 +507,38 @@ export class LeadsService {
       (lead.purchaserId && userIdentifiers.includes(lead.purchaserId)) ||
       (lead.mobile && userIdentifiers.includes(lead.mobile));
 
-    const isAgentOrOwner =
-      (lead.agentId && userIdentifiers.includes(lead.agentId)) ||
-      (lead.assignedAgentId && userIdentifiers.includes(lead.assignedAgentId)) ||
-      (lead.ownerId && userIdentifiers.includes(lead.ownerId));
+    let isAuthorized = false;
+    let isAgentOrOwner = false;
+    if (this.isAdmin(user) || isPurchaserOwner) {
+      isAuthorized = true;
+    } else {
+      const isEmployee = user.role === UserRole.BROKER_AGENT || user.accountType === 'BROKER_AGENT';
+      if (isEmployee) {
+        const employeeUser = await this.userModel.findById(user.id).lean();
+        const effectiveBrokerId = employeeUser?.brokerId || employeeUser?.parentUserId || employeeUser?.agencyId;
+        const assignedProps = employeeUser?.assignedProperties || [];
 
-    const isAuthorized = isAgentOrOwner || this.isAdmin(user) || isPurchaserOwner;
+        const isDirectAssigned = Boolean(lead.assignedAgentId && userIdentifiers.includes(lead.assignedAgentId));
+        const belongsToBroker = Boolean(
+          (lead.agentId && (lead.agentId === effectiveBrokerId || userIdentifiers.includes(lead.agentId))) ||
+          (lead.ownerId && lead.ownerId === effectiveBrokerId),
+        );
+
+        if (Array.isArray(assignedProps) && assignedProps.length > 0) {
+          isAuthorized = Boolean(isDirectAssigned || (belongsToBroker && assignedProps.includes(lead.propertyId)));
+        } else {
+          isAuthorized = Boolean(isDirectAssigned || belongsToBroker);
+        }
+        isAgentOrOwner = isAuthorized;
+      } else {
+        isAgentOrOwner = Boolean(
+          (lead.agentId && userIdentifiers.includes(lead.agentId)) ||
+          (lead.assignedAgentId && userIdentifiers.includes(lead.assignedAgentId)) ||
+          (lead.ownerId && userIdentifiers.includes(lead.ownerId)),
+        );
+        isAuthorized = isAgentOrOwner;
+      }
+    }
 
     if (!isAuthorized) {
       throw new ForbiddenException('You do not have permission to view this lead.');
