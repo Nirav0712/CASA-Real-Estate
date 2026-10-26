@@ -351,6 +351,18 @@ export class AdminService implements OnModuleInit {
       advertiserRole,
       advertiserPhone: (typeof raw.advertiser === 'object' && raw.advertiser?.phone) || '',
       advertiser: raw.advertiser,
+      contactNumbers:
+        raw.contactNumbers ||
+        raw.advertiser?.contactNumbers ||
+        (raw.advertiser?.phone
+          ? [
+              {
+                countryCode: raw.advertiser.phone.startsWith('+') ? raw.advertiser.phone.slice(0, 3) : '+91',
+                number: raw.advertiser.phone.replace(/^\+\d{1,3}/, '').trim(),
+                isPrimary: true,
+              },
+            ]
+          : []),
       status: raw.status,
       isPublished: !!raw.isPublished,
       isSuspendedByAccount: Boolean(raw.isSuspendedByAccount),
@@ -590,6 +602,22 @@ export class AdminService implements OnModuleInit {
 
     if (user?.id) {
       updateDto.updatedBy = user.id;
+    }
+
+    if (updateDto.contactNumbers || updateDto.advertiser?.contactNumbers) {
+      const contacts = updateDto.contactNumbers || updateDto.advertiser?.contactNumbers;
+      updateDto.contactNumbers = contacts;
+      const primaryContact = Array.isArray(contacts) ? contacts.find((c: any) => c.isPrimary) || contacts[0] : undefined;
+      const primaryPhone = primaryContact && primaryContact.number
+        ? (primaryContact.number.startsWith('+') ? primaryContact.number : `${primaryContact.countryCode || '+91'}${primaryContact.number}`)
+        : updateDto.advertiser?.phone;
+
+      if (updateDto.advertiser) {
+        updateDto.advertiser.contactNumbers = contacts;
+        if (primaryPhone) {
+          updateDto.advertiser.phone = primaryPhone;
+        }
+      }
     }
 
     const updated = await this.propertyModel

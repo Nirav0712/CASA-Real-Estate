@@ -265,6 +265,23 @@ export class PropertySpecs {
 
   @Prop({ type: [String], default: [] })
   includedAppliances?: string[];
+
+  // Warehouse / Storage Specific
+  @Prop()
+  ceilingHeightFt?: number;
+
+  @Prop()
+  loadingAccess?: string;
+
+  // PG / Paying Guest Specific
+  @Prop()
+  accommodationType?: string; // PG Accommodation, Student Housing, Co-living
+
+  @Prop()
+  sharingType?: string; // Single, Double, Triple, Multiple Sharing
+
+  @Prop()
+  availableBeds?: number;
 }
 
 @Schema({ _id: false })
@@ -316,12 +333,27 @@ export class PropertyMedia {
 }
 
 @Schema({ _id: false })
+export class ContactNumber {
+  @Prop({ default: '+91' })
+  countryCode: string;
+
+  @Prop({ required: true })
+  number: string;
+
+  @Prop({ default: false })
+  isPrimary: boolean;
+}
+
+@Schema({ _id: false })
 export class PropertyAdvertiser {
   @Prop({ required: true })
   name: string;
 
   @Prop({ required: true })
   phone: string;
+
+  @Prop({ type: [ContactNumber], default: [] })
+  contactNumbers?: ContactNumber[];
 
   @Prop()
   email?: string;
@@ -716,6 +748,9 @@ export class Property {
 
   @Prop({ type: PropertyAdvertiser, required: true })
   advertiser: PropertyAdvertiser;
+
+  @Prop({ type: [ContactNumber], default: [] })
+  contactNumbers?: ContactNumber[];
 
   @Prop({ type: PropertyRera, default: () => ({ reraRegistered: 'NOT_APPLICABLE', verificationStatus: 'NOT_APPLICABLE' }) })
   rera?: PropertyRera;

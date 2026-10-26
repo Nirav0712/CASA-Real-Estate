@@ -226,6 +226,26 @@ export const CASA_CATEGORIES: CategoryDefinition[] = [
     count: '65+ Ads',
     group: 'Special',
   },
+  {
+    id: 'pg',
+    name: 'PG',
+    slug: 'pg',
+    localizedNames: {
+      en: 'PG (Paying Guest)',
+      hi: 'पीजी / पेइंग गेस्ट',
+      ar: 'سكن ضيوف / كوليفينج',
+      ur: 'پی جی / ہاسٹل',
+    },
+    description: {
+      en: 'Paying guest accommodation, student housing, and co-living rooms.',
+      hi: 'पेइंग गेस्ट आवास, छात्र आवास और को-लिविंग स्पेस।',
+      ar: 'أماكن إقامة للضيوف وسكن طلاب ومساحات معيشة مشتركة.',
+      ur: 'طلباء اور پروفیشنلز کے لیے پی جی اور ہاسٹل کی سہولیات۔',
+    },
+    icon: Home,
+    count: '320+ Ads',
+    group: 'Residential',
+  },
 ];
 
 export function getAllCategories(): CategoryDefinition[] {

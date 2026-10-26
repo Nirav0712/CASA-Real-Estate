@@ -32,6 +32,12 @@ export type AccountStatus =
   | 'SUSPENDED'
   | 'DEACTIVATED';
 
+export interface ContactNumber {
+  countryCode: string;
+  number: string;
+  isPrimary: boolean;
+}
+
 export interface AdminUser {
   id: string;
   name: string;
@@ -234,6 +240,7 @@ export interface AdminPropertyItem {
   advertiserRole: string;
   advertiserPhone?: string;
   advertiser?: any;
+  contactNumbers?: ContactNumber[];
   approvalStatus: ApprovalStatus;
   status: PropertyStatus;
   isPublished?: boolean;

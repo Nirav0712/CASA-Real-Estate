@@ -1524,12 +1524,14 @@ export class EntitlementsService implements OnModuleInit {
       phone: null,
       whatsapp: null,
       email: null,
-      hasPhone: Boolean(raw.advertiser.phone),
+      contactNumbers: [],
+      hasPhone: Boolean(raw.advertiser.phone || (raw.advertiser.contactNumbers && raw.advertiser.contactNumbers.length > 0)),
     } : null;
 
     return {
       ...raw,
       advertiser: sanitizedAdvertiser,
+      contactNumbers: [],
       owner: null,
       contactLocked: true,
       whatsappUrl: null,

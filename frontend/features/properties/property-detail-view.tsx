@@ -1763,6 +1763,39 @@ export function PropertyDetailView({
                       </span>
                     </Button>
                   ) : null}
+
+                  {/* Alternate Contact Numbers */}
+                  {isAuthenticated && (
+                    (() => {
+                      const list = (currentProperty.contactNumbers && currentProperty.contactNumbers.length > 0)
+                        ? currentProperty.contactNumbers
+                        : (currentProperty.advertiser?.contactNumbers || []);
+                      const alternates = list.filter((c) => !c.isPrimary && c.number);
+                      if (alternates.length === 0) return null;
+                      return (
+                        <div className="mt-2.5 pt-2.5 border-t border-dashed border-casa-border-light text-start">
+                          <p className="text-[10px] font-semibold text-casa-text-secondary uppercase tracking-wider mb-1.5">
+                            Alternate Contact Numbers
+                          </p>
+                          <div className="flex flex-col gap-1.5">
+                            {alternates.map((c, idx) => (
+                              <a
+                                key={idx}
+                                href={`tel:${c.countryCode}${c.number}`}
+                                className="inline-flex items-center justify-between px-3 py-1.5 text-xs font-medium rounded-lg bg-casa-surface-secondary text-casa-text-primary hover:bg-casa-brand/10 hover:text-casa-brand border border-casa-border transition-colors"
+                              >
+                                <span className="flex items-center gap-1.5">
+                                  <Phone className="w-3.5 h-3.5 text-casa-brand" />
+                                  <span>{c.countryCode} {c.number}</span>
+                                </span>
+                                <span className="text-[10px] text-casa-text-secondary">Call</span>
+                              </a>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })()
+                  )}
                 </div>
 
                 {/* Direct CASA Lead Enquiry Form */}

@@ -401,6 +401,33 @@ export class PropertySpecsDto {
   @IsOptional()
   @IsArray()
   includedAppliances?: string[];
+
+  // Warehouse Specific
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber()
+  ceilingHeightFt?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  loadingAccess?: string;
+
+  // PG Specific
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  accommodationType?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  sharingType?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber()
+  availableBeds?: number;
 }
 
 export class PropertyMediaDto {
@@ -445,6 +472,23 @@ export class PropertyMediaDto {
   primaryMediaType?: string;
 }
 
+export class ContactNumberDto {
+  @ApiPropertyOptional({ default: '+91' })
+  @IsOptional()
+  @IsString()
+  countryCode?: string;
+
+  @ApiProperty({ description: 'Contact phone number' })
+  @IsString()
+  @IsNotEmpty()
+  number: string;
+
+  @ApiPropertyOptional({ default: false })
+  @IsOptional()
+  @IsBoolean()
+  isPrimary?: boolean;
+}
+
 export class PropertyAdvertiserDto {
   @ApiProperty({ description: 'Contact Name' })
   @IsString()
@@ -455,6 +499,13 @@ export class PropertyAdvertiserDto {
   @IsString()
   @IsNotEmpty()
   phone: string;
+
+  @ApiPropertyOptional({ type: [ContactNumberDto] })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => ContactNumberDto)
+  contactNumbers?: ContactNumberDto[];
 
   @ApiPropertyOptional()
   @IsOptional()
@@ -847,6 +898,13 @@ export class CreatePropertyDto {
   @ValidateNested()
   @Type(() => PropertyAdvertiserDto)
   advertiser?: PropertyAdvertiserDto;
+
+  @ApiPropertyOptional({ type: [ContactNumberDto] })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => ContactNumberDto)
+  contactNumbers?: ContactNumberDto[];
 
   @ApiPropertyOptional({ default: false })
   @IsOptional()

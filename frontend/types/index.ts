@@ -31,6 +31,12 @@ export type AccountStatus =
   | 'SUSPENDED'
   | 'DEACTIVATED';
 
+export interface ContactNumber {
+  countryCode: string;
+  number: string;
+  isPrimary: boolean;
+}
+
 export interface User {
   id: string;
   name: string;
@@ -222,6 +228,13 @@ export interface PropertySpecs {
   powerBackupKva?: number;
   suitableFor?: string[];
   includedAppliances?: string[];
+  // Warehouse specifics
+  ceilingHeightFt?: number;
+  loadingAccess?: string;
+  // PG specifics
+  accommodationType?: string;
+  sharingType?: string;
+  availableBeds?: number;
 }
 
 export interface PropertyRera {
@@ -378,12 +391,14 @@ export interface Property {
   advertiser: {
     name: string;
     phone: string;
+    contactNumbers?: ContactNumber[];
     email?: string;
     isVerifiedAgent: boolean;
     role?: string;
     agencyName?: string;
     reraNumber?: string;
   };
+  contactNumbers?: ContactNumber[];
   rera?: PropertyRera;
   reraNumber?: string;
   status: PropertyStatus;

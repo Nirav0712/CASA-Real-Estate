@@ -49,8 +49,10 @@ import {
   rejectPropertyRera,
 } from '@/services/admin-service';
 import { fetchAdminApi } from '@/lib/api-client';
-import { AdminPropertyItem } from '@/types';
+import { AdminPropertyItem, ContactNumber } from '@/types';
 import { parseYouTubeUrl, validateVideoFile } from '@/lib/video';
+import { getCategoryFieldVisibility } from '@/lib/property-categories';
+import { ContactNumbersManager, normalizeContactNumbers } from '@/components/property/contact-numbers-manager';
 
 const API_BASE =
   process.env.NEXT_PUBLIC_API_BASE_URL ||
@@ -149,8 +151,21 @@ export default function AdminPropertiesPage() {
     carpetAreaSqFt: '1800',
     furnishing: 'SEMI_FURNISHED',
     constructionStatus: 'READY_TO_MOVE',
+    ceilingHeightFt: '',
+    loadingAccess: 'DOCK_HIGH',
+    accommodationType: 'PG_HOSTEL',
+    sharingType: 'DOUBLE',
+    availableBeds: '2',
+    washrooms: '',
+    cabins: '',
+    workstations: '',
+    powerBackupKva: '',
+    plotLength: '',
+    plotBreadth: '',
+    roadWidthFt: '',
     advertiserName: 'CASA Premier Realty',
     advertiserPhone: '+917359237870',
+    contactNumbers: [{ countryCode: '+91', number: '7359237870', isPrimary: true }] as ContactNumber[],
     advertiserRole: 'SUPER_ADMIN',
     reraNumber: '',
     description: '',
@@ -168,13 +183,30 @@ export default function AdminPropertiesPage() {
     bedrooms: '3',
     bathrooms: '3',
     carpetAreaSqFt: '1800',
+    furnishing: 'SEMI_FURNISHED',
+    ceilingHeightFt: '',
+    loadingAccess: 'DOCK_HIGH',
+    accommodationType: 'PG_HOSTEL',
+    sharingType: 'DOUBLE',
+    availableBeds: '2',
+    washrooms: '',
+    cabins: '',
+    workstations: '',
+    powerBackupKva: '',
+    plotLength: '',
+    plotBreadth: '',
+    roadWidthFt: '',
     advertiserName: 'CASA Premier Realty',
     advertiserPhone: '+917359237870',
+    contactNumbers: [{ countryCode: '+91', number: '7359237870', isPrimary: true }] as ContactNumber[],
     reraNumber: '',
     description: '',
     isFeatured: false,
     status: 'PUBLISHED',
   });
+
+  const addVisibility = React.useMemo(() => getCategoryFieldVisibility(newProp.category), [newProp.category]);
+  const editModalVisibility = React.useMemo(() => getCategoryFieldVisibility(editProp.category), [editProp.category]);
 
   const loadData = React.useCallback(async () => {
     setIsLoading(true);
@@ -529,10 +561,26 @@ export default function AdminPropertiesPage() {
         : '1800',
       furnishing: prop.specs?.furnishing || 'SEMI_FURNISHED',
       constructionStatus: prop.specs?.constructionStatus || 'READY_TO_MOVE',
+      ceilingHeightFt: (prop.specs as any)?.ceilingHeightFt ? String((prop.specs as any).ceilingHeightFt) : '',
+      loadingAccess: (prop.specs as any)?.loadingAccess || 'DOCK_HIGH',
+      accommodationType: (prop.specs as any)?.accommodationType || 'PG_HOSTEL',
+      sharingType: (prop.specs as any)?.sharingType || 'DOUBLE',
+      availableBeds: (prop.specs as any)?.availableBeds ? String((prop.specs as any).availableBeds) : '2',
+      washrooms: prop.specs?.washrooms ? String(prop.specs.washrooms) : '',
+      cabins: prop.specs?.cabins ? String(prop.specs.cabins) : '',
+      workstations: prop.specs?.workstations ? String(prop.specs.workstations) : '',
+      powerBackupKva: prop.specs?.powerBackupKva ? String(prop.specs.powerBackupKva) : '',
+      plotLength: (prop.specs as any)?.plotLength ? String((prop.specs as any).plotLength) : '',
+      plotBreadth: (prop.specs as any)?.plotBreadth ? String((prop.specs as any).plotBreadth) : '',
+      roadWidthFt: (prop.specs as any)?.roadWidthFt ? String((prop.specs as any).roadWidthFt) : '',
       advertiserName:
         prop.advertiserName || prop.advertiser?.name || 'CASA Premier Realty',
       advertiserPhone:
         prop.advertiserPhone || prop.advertiser?.phone || '+917359237870',
+      contactNumbers: normalizeContactNumbers(
+        prop.contactNumbers || prop.advertiser?.contactNumbers,
+        prop.advertiserPhone || prop.advertiser?.phone,
+      ),
       advertiserRole:
         prop.advertiserRole || prop.advertiser?.role || 'SUPER_ADMIN',
       description:
@@ -684,6 +732,13 @@ export default function AdminPropertiesPage() {
         ? editUploadedImages[0]
         : videoThumbnail || 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1200&q=80';
 
+    const editVisibility = getCategoryFieldVisibility(editProp.category);
+    const validEditContacts = editProp.contactNumbers.filter((n) => n.number.trim().length > 0);
+    const primaryEditContact = validEditContacts.find((n) => n.isPrimary) || validEditContacts[0];
+    const primaryEditPhone = primaryEditContact
+      ? `${primaryEditContact.countryCode}${primaryEditContact.number}`
+      : editProp.advertiserPhone;
+
     setIsEditSubmitting(true);
     try {
       const payload = {
@@ -705,11 +760,24 @@ export default function AdminPropertiesPage() {
           coordinates: [80.9462, 26.8467],
         },
         specs: {
-          bedrooms: editProp.bedrooms ? Number(editProp.bedrooms) : undefined,
-          bathrooms: editProp.bathrooms ? Number(editProp.bathrooms) : undefined,
-          carpetAreaSqFt: editProp.carpetAreaSqFt ? Number(editProp.carpetAreaSqFt) : undefined,
-          constructionStatus: editProp.constructionStatus,
-          furnishing: editProp.furnishing,
+          bedrooms: editVisibility.showBedrooms && editProp.bedrooms ? Number(editProp.bedrooms) : undefined,
+          bathrooms: (editVisibility.showBathrooms || (editVisibility.showWashrooms && !editVisibility.showCommercialSpecs)) && editProp.bathrooms ? Number(editProp.bathrooms) : undefined,
+          carpetAreaSqFt: editVisibility.showCarpetArea && editProp.carpetAreaSqFt ? Number(editProp.carpetAreaSqFt) : undefined,
+          area: Number(editProp.carpetAreaSqFt) || undefined,
+          constructionStatus: editVisibility.showConstructionStatus ? editProp.constructionStatus : undefined,
+          furnishing: editVisibility.showFurnishing ? editProp.furnishing : undefined,
+          ceilingHeightFt: editVisibility.showCeilingHeight && editProp.ceilingHeightFt ? Number(editProp.ceilingHeightFt) : undefined,
+          loadingAccess: editVisibility.showLoadingAccess ? editProp.loadingAccess : undefined,
+          accommodationType: editVisibility.showAccommodationType ? editProp.accommodationType : undefined,
+          sharingType: editVisibility.showSharingType ? editProp.sharingType : undefined,
+          availableBeds: editVisibility.showAvailableBeds && editProp.availableBeds ? Number(editProp.availableBeds) : undefined,
+          washrooms: editVisibility.showWashrooms && editProp.washrooms ? Number(editProp.washrooms) : undefined,
+          cabins: editVisibility.showCabins && editProp.cabins ? Number(editProp.cabins) : undefined,
+          workstations: editVisibility.showWorkstations && editProp.workstations ? Number(editProp.workstations) : undefined,
+          powerBackupKva: editVisibility.showPowerBackup && editProp.powerBackupKva ? Number(editProp.powerBackupKva) : undefined,
+          plotLength: editVisibility.showPlotDimensions && editProp.plotLength ? Number(editProp.plotLength) : undefined,
+          plotBreadth: editVisibility.showPlotDimensions && editProp.plotBreadth ? Number(editProp.plotBreadth) : undefined,
+          roadWidthFt: editVisibility.showRoadWidth && editProp.roadWidthFt ? Number(editProp.roadWidthFt) : undefined,
         },
         media: {
           thumbnailUrl: isVideoPrimary && videoThumbnail ? videoThumbnail : primaryImage,
@@ -721,9 +789,11 @@ export default function AdminPropertiesPage() {
           videoThumbnail: videoThumbnail,
           primaryMediaType: isVideoPrimary ? 'VIDEO' : 'IMAGE',
         },
+        contactNumbers: validEditContacts,
         advertiser: {
           name: editProp.advertiserName,
-          phone: editProp.advertiserPhone,
+          phone: primaryEditPhone,
+          contactNumbers: validEditContacts,
           isVerifiedAgent: true,
           role: editProp.advertiserRole,
           reraNumber: editProp.reraNumber.trim() || undefined,
@@ -790,6 +860,13 @@ export default function AdminPropertiesPage() {
         ? uploadedImages[0]
         : videoThumbnail || 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1200&q=80';
 
+    const createVisibility = getCategoryFieldVisibility(newProp.category);
+    const validCreateContacts = newProp.contactNumbers.filter((n) => n.number.trim().length > 0);
+    const primaryCreateContact = validCreateContacts.find((n) => n.isPrimary) || validCreateContacts[0];
+    const primaryCreatePhone = primaryCreateContact
+      ? `${primaryCreateContact.countryCode}${primaryCreateContact.number}`
+      : newProp.advertiserPhone;
+
     setIsSubmitting(true);
     try {
       const payload = {
@@ -809,11 +886,24 @@ export default function AdminPropertiesPage() {
           coordinates: [80.9462, 26.8467],
         },
         specs: {
-          bedrooms: Number(newProp.bedrooms) || undefined,
-          bathrooms: Number(newProp.bathrooms) || undefined,
-          carpetAreaSqFt: Number(newProp.carpetAreaSqFt) || undefined,
+          bedrooms: createVisibility.showBedrooms && newProp.bedrooms ? Number(newProp.bedrooms) : undefined,
+          bathrooms: (createVisibility.showBathrooms || (createVisibility.showWashrooms && !createVisibility.showCommercialSpecs)) && newProp.bathrooms ? Number(newProp.bathrooms) : undefined,
+          carpetAreaSqFt: createVisibility.showCarpetArea && newProp.carpetAreaSqFt ? Number(newProp.carpetAreaSqFt) : undefined,
+          area: Number(newProp.carpetAreaSqFt) || undefined,
           constructionStatus: 'READY_TO_MOVE',
-          furnishing: 'SEMI_FURNISHED',
+          furnishing: createVisibility.showFurnishing ? newProp.furnishing : undefined,
+          ceilingHeightFt: createVisibility.showCeilingHeight && newProp.ceilingHeightFt ? Number(newProp.ceilingHeightFt) : undefined,
+          loadingAccess: createVisibility.showLoadingAccess ? newProp.loadingAccess : undefined,
+          accommodationType: createVisibility.showAccommodationType ? newProp.accommodationType : undefined,
+          sharingType: createVisibility.showSharingType ? newProp.sharingType : undefined,
+          availableBeds: createVisibility.showAvailableBeds && newProp.availableBeds ? Number(newProp.availableBeds) : undefined,
+          washrooms: createVisibility.showWashrooms && newProp.washrooms ? Number(newProp.washrooms) : undefined,
+          cabins: createVisibility.showCabins && newProp.cabins ? Number(newProp.cabins) : undefined,
+          workstations: createVisibility.showWorkstations && newProp.workstations ? Number(newProp.workstations) : undefined,
+          powerBackupKva: createVisibility.showPowerBackup && newProp.powerBackupKva ? Number(newProp.powerBackupKva) : undefined,
+          plotLength: createVisibility.showPlotDimensions && newProp.plotLength ? Number(newProp.plotLength) : undefined,
+          plotBreadth: createVisibility.showPlotDimensions && newProp.plotBreadth ? Number(newProp.plotBreadth) : undefined,
+          roadWidthFt: createVisibility.showRoadWidth && newProp.roadWidthFt ? Number(newProp.roadWidthFt) : undefined,
         },
         media: {
           thumbnailUrl: isVideoPrimary && videoThumbnail ? videoThumbnail : primaryImage,
@@ -825,9 +915,11 @@ export default function AdminPropertiesPage() {
           videoThumbnail: videoThumbnail,
           primaryMediaType: isVideoPrimary ? 'VIDEO' : 'IMAGE',
         },
+        contactNumbers: validCreateContacts,
         advertiser: {
           name: newProp.advertiserName,
-          phone: newProp.advertiserPhone,
+          phone: primaryCreatePhone,
+          contactNumbers: validCreateContacts,
           isVerifiedAgent: true,
           role: 'SUPER_ADMIN',
           reraNumber: newProp.reraNumber.trim() || undefined,
@@ -873,8 +965,22 @@ export default function AdminPropertiesPage() {
           bedrooms: '3',
           bathrooms: '3',
           carpetAreaSqFt: '1800',
+          furnishing: 'SEMI_FURNISHED',
+          ceilingHeightFt: '',
+          loadingAccess: 'DOCK_HIGH',
+          accommodationType: 'PG_HOSTEL',
+          sharingType: 'DOUBLE',
+          availableBeds: '2',
+          washrooms: '',
+          cabins: '',
+          workstations: '',
+          powerBackupKva: '',
+          plotLength: '',
+          plotBreadth: '',
+          roadWidthFt: '',
           advertiserName: 'CASA Premier Realty',
           advertiserPhone: '+917359237870',
+          contactNumbers: [{ countryCode: '+91', number: '7359237870', isPrimary: true }] as ContactNumber[],
           reraNumber: '',
           description: '',
           isFeatured: false,
@@ -993,6 +1099,7 @@ export default function AdminPropertiesPage() {
             <option value="SALE">For Sale</option>
             <option value="RENT">For Rent</option>
             <option value="LEASE">For Lease</option>
+            <option value="PG_COLIVING">PG / Co-living</option>
           </select>
 
           {/* Status Filter */}
@@ -1771,16 +1878,23 @@ export default function AdminPropertiesPage() {
                 className="w-full px-3 py-2 text-xs bg-casa-canvas border border-casa-border-light rounded-xl text-casa-text-primary"
               >
                 {categories.length > 0 ? (
-                  categories.map((c) => (
-                    <option key={c} value={c}>
-                      {c}
-                    </option>
-                  ))
+                  <>
+                    {categories.map((c) => (
+                      <option key={c} value={c}>
+                        {c}
+                      </option>
+                    ))}
+                    {!categories.includes('PG') && !categories.includes('PG (Paying Guest)') && (
+                      <option value="PG (Paying Guest)">PG (Paying Guest)</option>
+                    )}
+                  </>
                 ) : (
                   <>
                     <option value="House / Home">House / Home</option>
                     <option value="Apartment">Apartment</option>
                     <option value="Flats">Flats</option>
+                    <option value="PG (Paying Guest)">PG (Paying Guest)</option>
+                    <option value="Commercial Office Space">Commercial Office Space</option>
                     <option value="Plotting Land">Plotting Land</option>
                     <option value="Small Land">Small Land</option>
                     <option value="Big Land">Big Land</option>
@@ -1800,13 +1914,14 @@ export default function AdminPropertiesPage() {
               <select
                 value={newProp.listingType}
                 onChange={(e) =>
-                  setNewProp({ ...newProp, listingType: e.target.value as 'SALE' | 'RENT' | 'LEASE' })
+                  setNewProp({ ...newProp, listingType: e.target.value as any })
                 }
                 className="w-full px-3 py-2 text-xs bg-casa-canvas border border-casa-border-light rounded-xl text-casa-text-primary"
               >
                 <option value="SALE">For Sale</option>
                 <option value="RENT">For Rent</option>
                 <option value="LEASE">For Lease</option>
+                <option value="PG_COLIVING">PG / Co-living</option>
               </select>
             </div>
           </div>
@@ -1867,41 +1982,230 @@ export default function AdminPropertiesPage() {
             />
           </div>
 
-          <div className="grid grid-cols-3 gap-2">
-            <div>
-              <label className="text-[11px] font-semibold text-casa-text-primary block mb-1">
-                Bedrooms
-              </label>
-              <input
-                type="number"
-                value={newProp.bedrooms}
-                onChange={(e) => setNewProp({ ...newProp, bedrooms: e.target.value })}
-                className="w-full px-2 py-1.5 text-xs bg-casa-canvas border border-casa-border-light rounded-lg text-casa-text-primary"
-              />
+          {/* Category-Specific Dynamic Specifications */}
+          <div className="space-y-2.5 p-3 rounded-xl bg-casa-canvas/50 border border-casa-border-light">
+            <span className="text-[11px] font-bold text-casa-text-primary uppercase tracking-wider block">
+              Specifications &amp; Dimensions ({addVisibility.canonicalType})
+            </span>
+
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              {addVisibility.showBedrooms && (
+                <div>
+                  <label className="text-[11px] font-semibold text-casa-text-primary block mb-1">
+                    Bedrooms
+                  </label>
+                  <input
+                    type="number"
+                    value={newProp.bedrooms}
+                    onChange={(e) => setNewProp({ ...newProp, bedrooms: e.target.value })}
+                    className="w-full px-2 py-1.5 text-xs bg-casa-surface border border-casa-border-light rounded-lg text-casa-text-primary"
+                  />
+                </div>
+              )}
+
+              {addVisibility.showBathrooms && (
+                <div>
+                  <label className="text-[11px] font-semibold text-casa-text-primary block mb-1">
+                    Bathrooms
+                  </label>
+                  <input
+                    type="number"
+                    value={newProp.bathrooms}
+                    onChange={(e) => setNewProp({ ...newProp, bathrooms: e.target.value })}
+                    className="w-full px-2 py-1.5 text-xs bg-casa-surface border border-casa-border-light rounded-lg text-casa-text-primary"
+                  />
+                </div>
+              )}
+
+              <div>
+                <label className="text-[11px] font-semibold text-casa-text-primary block mb-1">
+                  {addVisibility.areaLabel || 'Area (Sq.Ft)'}
+                </label>
+                <input
+                  type="number"
+                  value={newProp.carpetAreaSqFt}
+                  onChange={(e) => setNewProp({ ...newProp, carpetAreaSqFt: e.target.value })}
+                  className="w-full px-2 py-1.5 text-xs bg-casa-surface border border-casa-border-light rounded-lg text-casa-text-primary font-bold"
+                />
+              </div>
+
+              {addVisibility.showFurnishing && (
+                <div>
+                  <label className="text-[11px] font-semibold text-casa-text-primary block mb-1">
+                    Furnishing
+                  </label>
+                  <select
+                    value={newProp.furnishing}
+                    onChange={(e) => setNewProp({ ...newProp, furnishing: e.target.value })}
+                    className="w-full px-2 py-1.5 text-xs bg-casa-surface border border-casa-border-light rounded-lg text-casa-text-primary"
+                  >
+                    <option value="FULLY_FURNISHED">Fully Furnished</option>
+                    <option value="SEMI_FURNISHED">Semi Furnished</option>
+                    <option value="UNFURNISHED">Unfurnished</option>
+                  </select>
+                </div>
+              )}
             </div>
-            <div>
-              <label className="text-[11px] font-semibold text-casa-text-primary block mb-1">
-                Bathrooms
-              </label>
-              <input
-                type="number"
-                value={newProp.bathrooms}
-                onChange={(e) => setNewProp({ ...newProp, bathrooms: e.target.value })}
-                className="w-full px-2 py-1.5 text-xs bg-casa-canvas border border-casa-border-light rounded-lg text-casa-text-primary"
-              />
-            </div>
-            <div>
-              <label className="text-[11px] font-semibold text-casa-text-primary block mb-1">
-                Area (Sq.Ft)
-              </label>
-              <input
-                type="number"
-                value={newProp.carpetAreaSqFt}
-                onChange={(e) => setNewProp({ ...newProp, carpetAreaSqFt: e.target.value })}
-                className="w-full px-2 py-1.5 text-xs bg-casa-canvas border border-casa-border-light rounded-lg text-casa-text-primary"
-              />
-            </div>
+
+            {/* Commercial Specs */}
+            {addVisibility.showCommercialSpecs && (
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1 border-t border-casa-border-light/60">
+                <div>
+                  <label className="text-[10px] font-semibold text-casa-text-primary block mb-0.5">Cabins</label>
+                  <input
+                    type="number"
+                    placeholder="4"
+                    value={newProp.cabins}
+                    onChange={(e) => setNewProp({ ...newProp, cabins: e.target.value })}
+                    className="w-full px-2 py-1 text-xs bg-casa-surface border border-casa-border-light rounded-lg text-casa-text-primary"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-semibold text-casa-text-primary block mb-0.5">Workstations</label>
+                  <input
+                    type="number"
+                    placeholder="20"
+                    value={newProp.workstations}
+                    onChange={(e) => setNewProp({ ...newProp, workstations: e.target.value })}
+                    className="w-full px-2 py-1 text-xs bg-casa-surface border border-casa-border-light rounded-lg text-casa-text-primary"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-semibold text-casa-text-primary block mb-0.5">Washrooms</label>
+                  <input
+                    type="number"
+                    placeholder="2"
+                    value={newProp.washrooms}
+                    onChange={(e) => setNewProp({ ...newProp, washrooms: e.target.value })}
+                    className="w-full px-2 py-1 text-xs bg-casa-surface border border-casa-border-light rounded-lg text-casa-text-primary"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-semibold text-casa-text-primary block mb-0.5">Power Backup (kVA)</label>
+                  <input
+                    type="number"
+                    placeholder="50"
+                    value={newProp.powerBackupKva}
+                    onChange={(e) => setNewProp({ ...newProp, powerBackupKva: e.target.value })}
+                    className="w-full px-2 py-1 text-xs bg-casa-surface border border-casa-border-light rounded-lg text-casa-text-primary"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Warehouse Specs */}
+            {addVisibility.showWarehouseSpecs && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1 border-t border-casa-border-light/60">
+                <div>
+                  <label className="text-[10px] font-semibold text-casa-text-primary block mb-0.5">Clear Height (ft)</label>
+                  <input
+                    type="number"
+                    placeholder="28"
+                    value={newProp.ceilingHeightFt}
+                    onChange={(e) => setNewProp({ ...newProp, ceilingHeightFt: e.target.value })}
+                    className="w-full px-2 py-1 text-xs bg-casa-surface border border-casa-border-light rounded-lg text-casa-text-primary font-medium"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-semibold text-casa-text-primary block mb-0.5">Loading Access</label>
+                  <select
+                    value={newProp.loadingAccess}
+                    onChange={(e) => setNewProp({ ...newProp, loadingAccess: e.target.value })}
+                    className="w-full px-2 py-1 text-xs bg-casa-surface border border-casa-border-light rounded-lg text-casa-text-primary"
+                  >
+                    <option value="DOCK_HIGH">Dock High</option>
+                    <option value="GROUND_LEVEL">Ground Level</option>
+                    <option value="RAMP_ACCESS">Ramp Access</option>
+                    <option value="CONTAINER_TRUCK_DIRECT">Container Direct</option>
+                  </select>
+                </div>
+              </div>
+            )}
+
+            {/* PG Specs */}
+            {addVisibility.showPgSpecs && (
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1 border-t border-casa-border-light/60">
+                <div>
+                  <label className="text-[10px] font-semibold text-casa-text-primary block mb-0.5">Accommodation</label>
+                  <select
+                    value={newProp.accommodationType}
+                    onChange={(e) => setNewProp({ ...newProp, accommodationType: e.target.value })}
+                    className="w-full px-2 py-1 text-xs bg-casa-surface border border-casa-border-light rounded-lg text-casa-text-primary"
+                  >
+                    <option value="PG_HOSTEL">PG / Hostel</option>
+                    <option value="COLIVING_SUITE">Co-living Suite</option>
+                    <option value="MANAGED_APARTMENT">Managed PG</option>
+                    <option value="PRIVATE_ROOM">Private Room</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-[10px] font-semibold text-casa-text-primary block mb-0.5">Sharing</label>
+                  <select
+                    value={newProp.sharingType}
+                    onChange={(e) => setNewProp({ ...newProp, sharingType: e.target.value })}
+                    className="w-full px-2 py-1 text-xs bg-casa-surface border border-casa-border-light rounded-lg text-casa-text-primary"
+                  >
+                    <option value="SINGLE">Single Occupancy</option>
+                    <option value="DOUBLE">Double Sharing</option>
+                    <option value="TRIPLE">Triple Sharing</option>
+                    <option value="FOUR_PLUS">4+ Sharing</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-[10px] font-semibold text-casa-text-primary block mb-0.5">Available Beds</label>
+                  <input
+                    type="number"
+                    placeholder="2"
+                    value={newProp.availableBeds}
+                    onChange={(e) => setNewProp({ ...newProp, availableBeds: e.target.value })}
+                    className="w-full px-2 py-1 text-xs bg-casa-surface border border-casa-border-light rounded-lg text-casa-text-primary"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Plot Dimensions */}
+            {addVisibility.showPlotDimensions && (
+              <div className="grid grid-cols-3 gap-2 pt-1 border-t border-casa-border-light/60">
+                <div>
+                  <label className="text-[10px] font-semibold text-casa-text-primary block mb-0.5">Length (ft)</label>
+                  <input
+                    type="number"
+                    placeholder="60"
+                    value={newProp.plotLength}
+                    onChange={(e) => setNewProp({ ...newProp, plotLength: e.target.value })}
+                    className="w-full px-2 py-1 text-xs bg-casa-surface border border-casa-border-light rounded-lg text-casa-text-primary"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-semibold text-casa-text-primary block mb-0.5">Breadth (ft)</label>
+                  <input
+                    type="number"
+                    placeholder="40"
+                    value={newProp.plotBreadth}
+                    onChange={(e) => setNewProp({ ...newProp, plotBreadth: e.target.value })}
+                    className="w-full px-2 py-1 text-xs bg-casa-surface border border-casa-border-light rounded-lg text-casa-text-primary"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-semibold text-casa-text-primary block mb-0.5">Road Width (ft)</label>
+                  <input
+                    type="number"
+                    placeholder="40"
+                    value={newProp.roadWidthFt}
+                    onChange={(e) => setNewProp({ ...newProp, roadWidthFt: e.target.value })}
+                    className="w-full px-2 py-1 text-xs bg-casa-surface border border-casa-border-light rounded-lg text-casa-text-primary"
+                  />
+                </div>
+              </div>
+            )}
           </div>
+
+          {/* Multiple Contact Numbers Manager */}
+          <ContactNumbersManager
+            contactNumbers={newProp.contactNumbers}
+            onChange={(next) => setNewProp({ ...newProp, contactNumbers: next })}
+          />
 
           {/* Media Selector: Photos & Video */}
           <div className="border border-casa-border-light rounded-xl overflow-hidden bg-casa-canvas/40">
@@ -2218,16 +2522,23 @@ export default function AdminPropertiesPage() {
                   className="w-full px-3 py-2 text-xs bg-casa-canvas border border-casa-border-light rounded-xl text-casa-text-primary"
                 >
                   {categories.length > 0 ? (
-                    categories.map((c) => (
-                      <option key={c} value={c}>
-                        {c}
-                      </option>
-                    ))
+                    <>
+                      {categories.map((c) => (
+                        <option key={c} value={c}>
+                          {c}
+                        </option>
+                      ))}
+                      {!categories.includes('PG') && !categories.includes('PG (Paying Guest)') && (
+                        <option value="PG (Paying Guest)">PG (Paying Guest)</option>
+                      )}
+                    </>
                   ) : (
                     <>
                       <option value="House / Home">House / Home</option>
                       <option value="Apartment">Apartment</option>
                       <option value="Flats">Flats</option>
+                      <option value="PG (Paying Guest)">PG (Paying Guest)</option>
+                      <option value="Commercial Office Space">Commercial Office Space</option>
                       <option value="Plotting Land">Plotting Land</option>
                       <option value="Small Land">Small Land</option>
                       <option value="Big Land">Big Land</option>
@@ -2247,13 +2558,14 @@ export default function AdminPropertiesPage() {
                 <select
                   value={editProp.listingType}
                   onChange={(e) =>
-                    setEditProp({ ...editProp, listingType: e.target.value as 'SALE' | 'RENT' | 'LEASE' })
+                    setEditProp({ ...editProp, listingType: e.target.value as any })
                   }
                   className="w-full px-3 py-2 text-xs bg-casa-canvas border border-casa-border-light rounded-xl text-casa-text-primary"
                 >
                   <option value="SALE">For Sale</option>
                   <option value="RENT">For Rent</option>
                   <option value="LEASE">For Lease</option>
+                  <option value="PG_COLIVING">PG / Co-living</option>
                 </select>
               </div>
             </div>
@@ -2338,46 +2650,209 @@ export default function AdminPropertiesPage() {
               />
             </div>
 
-            {/* Specifications */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <div>
-                <label className="text-xs font-semibold text-casa-text-primary block mb-1">
-                  Bedrooms (BHK)
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  value={editProp.bedrooms}
-                  onChange={(e) => setEditProp({ ...editProp, bedrooms: e.target.value })}
-                  className="w-full px-3 py-2 text-xs bg-casa-canvas border border-casa-border-light rounded-xl text-casa-text-primary"
-                />
+            {/* Dynamic Specifications based on Category */}
+            <div className="space-y-2.5 p-3 rounded-xl bg-casa-canvas/50 border border-casa-border-light">
+              <span className="text-[11px] font-bold text-casa-text-primary uppercase tracking-wider block">
+                Specifications &amp; Dimensions ({editModalVisibility.canonicalType})
+              </span>
+
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                {editModalVisibility.showBedrooms && (
+                  <div>
+                    <label className="text-xs font-semibold text-casa-text-primary block mb-1">
+                      Bedrooms (BHK)
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={editProp.bedrooms}
+                      onChange={(e) => setEditProp({ ...editProp, bedrooms: e.target.value })}
+                      className="w-full px-2 py-1.5 text-xs bg-casa-surface border border-casa-border-light rounded-lg text-casa-text-primary"
+                    />
+                  </div>
+                )}
+
+                {editModalVisibility.showBathrooms && (
+                  <div>
+                    <label className="text-xs font-semibold text-casa-text-primary block mb-1">
+                      Bathrooms
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={editProp.bathrooms}
+                      onChange={(e) => setEditProp({ ...editProp, bathrooms: e.target.value })}
+                      className="w-full px-2 py-1.5 text-xs bg-casa-surface border border-casa-border-light rounded-lg text-casa-text-primary"
+                    />
+                  </div>
+                )}
+
+                <div>
+                  <label className="text-xs font-semibold text-casa-text-primary block mb-1">
+                    {editModalVisibility.areaLabel || 'Area (Sq.Ft)'}
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={editProp.carpetAreaSqFt}
+                    onChange={(e) => setEditProp({ ...editProp, carpetAreaSqFt: e.target.value })}
+                    className="w-full px-2 py-1.5 text-xs bg-casa-surface border border-casa-border-light rounded-lg text-casa-text-primary font-bold"
+                  />
+                </div>
               </div>
 
-              <div>
-                <label className="text-xs font-semibold text-casa-text-primary block mb-1">
-                  Bathrooms
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  value={editProp.bathrooms}
-                  onChange={(e) => setEditProp({ ...editProp, bathrooms: e.target.value })}
-                  className="w-full px-3 py-2 text-xs bg-casa-canvas border border-casa-border-light rounded-xl text-casa-text-primary"
-                />
-              </div>
+              {/* Commercial Specs */}
+              {editModalVisibility.showCommercialSpecs && (
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1 border-t border-casa-border-light/60">
+                  <div>
+                    <label className="text-[10px] font-semibold text-casa-text-primary block mb-0.5">Cabins</label>
+                    <input
+                      type="number"
+                      placeholder="4"
+                      value={editProp.cabins}
+                      onChange={(e) => setEditProp({ ...editProp, cabins: e.target.value })}
+                      className="w-full px-2 py-1 text-xs bg-casa-surface border border-casa-border-light rounded-lg text-casa-text-primary"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-semibold text-casa-text-primary block mb-0.5">Workstations</label>
+                    <input
+                      type="number"
+                      placeholder="20"
+                      value={editProp.workstations}
+                      onChange={(e) => setEditProp({ ...editProp, workstations: e.target.value })}
+                      className="w-full px-2 py-1 text-xs bg-casa-surface border border-casa-border-light rounded-lg text-casa-text-primary"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-semibold text-casa-text-primary block mb-0.5">Washrooms</label>
+                    <input
+                      type="number"
+                      placeholder="2"
+                      value={editProp.washrooms}
+                      onChange={(e) => setEditProp({ ...editProp, washrooms: e.target.value })}
+                      className="w-full px-2 py-1 text-xs bg-casa-surface border border-casa-border-light rounded-lg text-casa-text-primary"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-semibold text-casa-text-primary block mb-0.5">Power Backup (kVA)</label>
+                    <input
+                      type="number"
+                      placeholder="50"
+                      value={editProp.powerBackupKva}
+                      onChange={(e) => setEditProp({ ...editProp, powerBackupKva: e.target.value })}
+                      className="w-full px-2 py-1 text-xs bg-casa-surface border border-casa-border-light rounded-lg text-casa-text-primary"
+                    />
+                  </div>
+                </div>
+              )}
 
-              <div>
-                <label className="text-xs font-semibold text-casa-text-primary block mb-1">
-                  Carpet Area (Sq.Ft)
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  value={editProp.carpetAreaSqFt}
-                  onChange={(e) => setEditProp({ ...editProp, carpetAreaSqFt: e.target.value })}
-                  className="w-full px-3 py-2 text-xs bg-casa-canvas border border-casa-border-light rounded-xl text-casa-text-primary"
-                />
-              </div>
+              {/* Warehouse Specs */}
+              {editModalVisibility.showWarehouseSpecs && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1 border-t border-casa-border-light/60">
+                  <div>
+                    <label className="text-[10px] font-semibold text-casa-text-primary block mb-0.5">Clear Height (ft)</label>
+                    <input
+                      type="number"
+                      placeholder="28"
+                      value={editProp.ceilingHeightFt}
+                      onChange={(e) => setEditProp({ ...editProp, ceilingHeightFt: e.target.value })}
+                      className="w-full px-2 py-1 text-xs bg-casa-surface border border-casa-border-light rounded-lg text-casa-text-primary font-medium"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-semibold text-casa-text-primary block mb-0.5">Loading Access</label>
+                    <select
+                      value={editProp.loadingAccess}
+                      onChange={(e) => setEditProp({ ...editProp, loadingAccess: e.target.value })}
+                      className="w-full px-2 py-1 text-xs bg-casa-surface border border-casa-border-light rounded-lg text-casa-text-primary"
+                    >
+                      <option value="DOCK_HIGH">Dock High</option>
+                      <option value="GROUND_LEVEL">Ground Level</option>
+                      <option value="RAMP_ACCESS">Ramp Access</option>
+                      <option value="CONTAINER_TRUCK_DIRECT">Container Direct</option>
+                    </select>
+                  </div>
+                </div>
+              )}
+
+              {/* PG Specs */}
+              {editModalVisibility.showPgSpecs && (
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1 border-t border-casa-border-light/60">
+                  <div>
+                    <label className="text-[10px] font-semibold text-casa-text-primary block mb-0.5">Accommodation</label>
+                    <select
+                      value={editProp.accommodationType}
+                      onChange={(e) => setEditProp({ ...editProp, accommodationType: e.target.value })}
+                      className="w-full px-2 py-1 text-xs bg-casa-surface border border-casa-border-light rounded-lg text-casa-text-primary"
+                    >
+                      <option value="PG_HOSTEL">PG / Hostel</option>
+                      <option value="COLIVING_SUITE">Co-living Suite</option>
+                      <option value="MANAGED_APARTMENT">Managed PG</option>
+                      <option value="PRIVATE_ROOM">Private Room</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-semibold text-casa-text-primary block mb-0.5">Sharing</label>
+                    <select
+                      value={editProp.sharingType}
+                      onChange={(e) => setEditProp({ ...editProp, sharingType: e.target.value })}
+                      className="w-full px-2 py-1 text-xs bg-casa-surface border border-casa-border-light rounded-lg text-casa-text-primary"
+                    >
+                      <option value="SINGLE">Single Occupancy</option>
+                      <option value="DOUBLE">Double Sharing</option>
+                      <option value="TRIPLE">Triple Sharing</option>
+                      <option value="FOUR_PLUS">4+ Sharing</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-semibold text-casa-text-primary block mb-0.5">Available Beds</label>
+                    <input
+                      type="number"
+                      placeholder="2"
+                      value={editProp.availableBeds}
+                      onChange={(e) => setEditProp({ ...editProp, availableBeds: e.target.value })}
+                      className="w-full px-2 py-1 text-xs bg-casa-surface border border-casa-border-light rounded-lg text-casa-text-primary"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Plot Dimensions */}
+              {editModalVisibility.showPlotDimensions && (
+                <div className="grid grid-cols-3 gap-2 pt-1 border-t border-casa-border-light/60">
+                  <div>
+                    <label className="text-[10px] font-semibold text-casa-text-primary block mb-0.5">Length (ft)</label>
+                    <input
+                      type="number"
+                      placeholder="60"
+                      value={editProp.plotLength}
+                      onChange={(e) => setEditProp({ ...editProp, plotLength: e.target.value })}
+                      className="w-full px-2 py-1 text-xs bg-casa-surface border border-casa-border-light rounded-lg text-casa-text-primary"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-semibold text-casa-text-primary block mb-0.5">Breadth (ft)</label>
+                    <input
+                      type="number"
+                      placeholder="40"
+                      value={editProp.plotBreadth}
+                      onChange={(e) => setEditProp({ ...editProp, plotBreadth: e.target.value })}
+                      className="w-full px-2 py-1 text-xs bg-casa-surface border border-casa-border-light rounded-lg text-casa-text-primary"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-semibold text-casa-text-primary block mb-0.5">Road Width (ft)</label>
+                    <input
+                      type="number"
+                      placeholder="40"
+                      value={editProp.roadWidthFt}
+                      onChange={(e) => setEditProp({ ...editProp, roadWidthFt: e.target.value })}
+                      className="w-full px-2 py-1 text-xs bg-casa-surface border border-casa-border-light rounded-lg text-casa-text-primary"
+                    />
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Furnishing & Construction Status */}
@@ -2415,31 +2890,23 @@ export default function AdminPropertiesPage() {
             </div>
 
             {/* Advertiser Details */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label className="text-xs font-semibold text-casa-text-primary block mb-1">
-                  Advertiser Name
-                </label>
-                <input
-                  type="text"
-                  value={editProp.advertiserName}
-                  onChange={(e) => setEditProp({ ...editProp, advertiserName: e.target.value })}
-                  className="w-full px-3 py-2 text-xs bg-casa-canvas border border-casa-border-light rounded-xl text-casa-text-primary"
-                />
-              </div>
-
-              <div>
-                <label className="text-xs font-semibold text-casa-text-primary block mb-1">
-                  Advertiser Phone
-                </label>
-                <input
-                  type="text"
-                  value={editProp.advertiserPhone}
-                  onChange={(e) => setEditProp({ ...editProp, advertiserPhone: e.target.value })}
-                  className="w-full px-3 py-2 text-xs bg-casa-canvas border border-casa-border-light rounded-xl text-casa-text-primary font-mono"
-                />
-              </div>
+            <div>
+              <label className="text-xs font-semibold text-casa-text-primary block mb-1">
+                Advertiser Name
+              </label>
+              <input
+                type="text"
+                value={editProp.advertiserName}
+                onChange={(e) => setEditProp({ ...editProp, advertiserName: e.target.value })}
+                className="w-full px-3 py-2 text-xs bg-casa-canvas border border-casa-border-light rounded-xl text-casa-text-primary"
+              />
             </div>
+
+            {/* Multiple Contact Numbers Manager */}
+            <ContactNumbersManager
+              contactNumbers={editProp.contactNumbers}
+              onChange={(next) => setEditProp({ ...editProp, contactNumbers: next })}
+            />
 
             {/* Description */}
             <div>

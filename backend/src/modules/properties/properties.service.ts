@@ -32,6 +32,7 @@ const INITIAL_SEED_CATEGORIES = [
   { code: 'WAREHOUSE', name: 'Warehouse', description: 'Logistics hubs, cold storage, industrial godowns', sortOrder: 8 },
   { code: 'LEASE', name: 'Lease', description: 'Commercial office floors, turnkey corporate spaces', sortOrder: 9 },
   { code: 'LITIGATED', name: 'Litigated', description: 'Court-disclosed assets, SARFAESI bank auctions', sortOrder: 10 },
+  { code: 'PG', name: 'PG', description: 'Paying Guest accommodation, student housing, co-living spaces', sortOrder: 11 },
 ];
 
 const INITIAL_SEED_PROPERTIES = [
@@ -287,6 +288,19 @@ export class PropertiesService implements OnModuleInit {
         this.logger.log('Seeding canonical categories into MongoDB Atlas...');
         await this.categoryModel.insertMany(INITIAL_SEED_CATEGORIES);
         this.logger.log('✅ Canonical categories seeded successfully.');
+      } else {
+        const pgExists = await this.categoryModel.findOne({ code: 'PG' });
+        if (!pgExists) {
+          await this.categoryModel.create({
+            code: 'PG',
+            name: 'PG',
+            description: 'Paying Guest accommodation, student housing, co-living spaces',
+            sortOrder: 11,
+            isActive: true,
+            totalListings: 0,
+          });
+          this.logger.log('✅ Canonical category "PG" seeded successfully.');
+        }
       }
 
       // Mock/demo properties seeding disabled to prevent fake listings from entering MongoDB
@@ -607,14 +621,18 @@ export class PropertiesService implements OnModuleInit {
   private sanitizeAdvertiserForVisitor(prop: any): any {
     const p = prop && typeof prop.toObject === 'function' ? prop.toObject() : { ...prop };
     if (p && p.advertiser) {
-      const hasPhone = Boolean(p.advertiser.phone);
+      const hasPhone = Boolean(p.advertiser.phone || (p.advertiser.contactNumbers && p.advertiser.contactNumbers.length > 0));
       p.advertiser = {
         ...p.advertiser,
         phone: null,
         email: null,
         whatsapp: null,
+        contactNumbers: [],
         hasPhone,
       };
+    }
+    if (p && p.contactNumbers) {
+      p.contactNumbers = [];
     }
     return p;
   }
@@ -1460,9 +1478,34 @@ export class PropertiesService implements OnModuleInit {
       primaryMediaType: dto.media?.primaryMediaType || (dto.media?.videoUrl || dto.videoUrl ? 'VIDEO' : 'IMAGE'),
     };
 
-    const advertiserObj = dto.advertiser || {
+    const rawContactNumbers =
+      dto.contactNumbers ||
+      dto.advertiser?.contactNumbers ||
+      (dto.advertiserPhone || user?.mobile
+        ? [
+            {
+              countryCode: '+91',
+              number: (dto.advertiserPhone || user?.mobile || '').replace(/^\+\d{1,3}/, '').trim(),
+              isPrimary: true,
+            },
+          ]
+        : []);
+
+    const primaryContact = Array.isArray(rawContactNumbers)
+      ? rawContactNumbers.find((c: any) => c.isPrimary) || rawContactNumbers[0]
+      : undefined;
+    const primaryPhone = primaryContact && primaryContact.number
+      ? (primaryContact.number.startsWith('+') ? primaryContact.number : `${primaryContact.countryCode || '+91'}${primaryContact.number}`)
+      : user?.mobile || dto.advertiserPhone || '+917359237870';
+
+    const advertiserObj = dto.advertiser ? {
+      ...dto.advertiser,
+      phone: primaryPhone,
+      contactNumbers: rawContactNumbers,
+    } : {
       name: user?.name || dto.advertiserName || 'myproperty Property Owner',
-      phone: user?.mobile || dto.advertiserPhone || '+917359237870',
+      phone: primaryPhone,
+      contactNumbers: rawContactNumbers,
       email: user?.email,
       isVerifiedAgent: user?.isVerifiedAgent || false,
       role: user?.role || 'PROPERTY_OWNER',
@@ -1564,6 +1607,7 @@ export class PropertiesService implements OnModuleInit {
       amenities: dto.amenities || ['24/7 Security', 'Water Supply'],
       media: mediaObj,
       advertiser: advertiserObj,
+      contactNumbers: rawContactNumbers,
       rera: reraObj,
       reraNumber: rawReraNumber || undefined,
       status: initialStatus,
@@ -1740,6 +1784,23 @@ export class PropertiesService implements OnModuleInit {
       }
     }
 
+    // Contact numbers syncing
+    if (updateDto.contactNumbers || updateDto.advertiser?.contactNumbers) {
+      const contacts = updateDto.contactNumbers || updateDto.advertiser?.contactNumbers;
+      updateDto.contactNumbers = contacts;
+      const primaryContact = Array.isArray(contacts) ? contacts.find((c: any) => c.isPrimary) || contacts[0] : undefined;
+      const primaryPhone = primaryContact && primaryContact.number
+        ? (primaryContact.number.startsWith('+') ? primaryContact.number : `${primaryContact.countryCode || '+91'}${primaryContact.number}`)
+        : updateDto.advertiser?.phone || existing.advertiser?.phone;
+
+      updateDto.advertiser = {
+        ...(existing.advertiser || {}),
+        ...(updateDto.advertiser || {}),
+        contactNumbers: contacts,
+        phone: primaryPhone,
+      };
+    }
+
     // Set updatedBy
     if (user) {
       updateDto.updatedBy = user.id;
@@ -1882,6 +1943,19 @@ export class PropertiesService implements OnModuleInit {
     const categories = await this.categoryModel.find().sort({ sortOrder: 1 }).lean();
     if (!categories || categories.length === 0) {
       return INITIAL_SEED_CATEGORIES.map((c, i) => ({ ...c, id: `cat-${i + 1}`, isActive: true, totalListings: 0 }));
+    }
+    const hasPg = categories.some((c: any) => c.code === 'PG' || c.name === 'PG');
+    if (!hasPg) {
+      categories.push({
+        _id: 'cat-pg',
+        id: 'cat-pg',
+        code: 'PG',
+        name: 'PG',
+        description: 'Paying Guest accommodation, student housing, co-living spaces',
+        sortOrder: 11,
+        isActive: true,
+        totalListings: 0,
+      } as any);
     }
     return categories;
   }

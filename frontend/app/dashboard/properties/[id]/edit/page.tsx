@@ -19,12 +19,14 @@ import {
   getCategoryFieldVisibility,
   validateReraNumber,
 } from '@/lib/property-categories';
+import { ContactNumbersManager, normalizeContactNumbers } from '@/components/property/contact-numbers-manager';
 import { PropertyUnitsManager } from '@/components/property/property-units-manager';
 import { PropertyVideoManager } from '@/components/property/property-video-manager';
 import {
   PropertyStructureType,
   PropertyUnitDetails,
   ProjectBuildingDetails,
+  ContactNumber,
 } from '@/types';
 import {
   ArrowLeft,
@@ -125,6 +127,18 @@ export default function EditPropertyPage() {
     pantry: 'DRY',
     powerBackupKva: '',
     suitableFor: '',
+
+    // Warehouse Specs
+    ceilingHeightFt: '',
+    loadingAccess: 'DOCK_HIGH',
+
+    // PG Specific Specs
+    accommodationType: 'PG_HOSTEL',
+    sharingType: 'DOUBLE',
+    availableBeds: '2',
+
+    // Contact Numbers
+    contactNumbers: [{ countryCode: '+91', number: '', isPrimary: true }] as ContactNumber[],
 
     // Plot/Land Specs
     plotLength: '',
@@ -263,6 +277,21 @@ export default function EditPropertyPage() {
         pantry: (specsObj as any).pantry || 'DRY',
         powerBackupKva: String((specsObj as any).powerBackupKva ?? ''),
         suitableFor: Array.isArray((specsObj as any).suitableFor) ? (specsObj as any).suitableFor.join(', ') : '',
+
+        // Warehouse
+        ceilingHeightFt: String((specsObj as any).ceilingHeightFt ?? ''),
+        loadingAccess: (specsObj as any).loadingAccess || 'DOCK_HIGH',
+
+        // PG Specs
+        accommodationType: (specsObj as any).accommodationType || 'PG_HOSTEL',
+        sharingType: (specsObj as any).sharingType || 'DOUBLE',
+        availableBeds: String((specsObj as any).availableBeds ?? '2'),
+
+        // Contact Numbers
+        contactNumbers: normalizeContactNumbers(
+          (data as any).contactNumbers || (data as any).advertiser?.contactNumbers,
+          (data as any).advertiser?.phone,
+        ),
 
         // Plot
         plotLength: String((specsObj as any).plotLength ?? ''),
@@ -453,44 +482,52 @@ export default function EditPropertyPage() {
         pincode: formData.pincode || undefined,
       },
       specs: {
-        bedrooms: visibility.hasBedrooms && formData.bedrooms ? Number(formData.bedrooms) : undefined,
-        bathrooms: visibility.hasBedrooms && formData.bathrooms ? Number(formData.bathrooms) : undefined,
-        balconies: visibility.hasBedrooms && formData.balconies ? Number(formData.balconies) : undefined,
+        bedrooms: visibility.showBedrooms && formData.bedrooms ? Number(formData.bedrooms) : undefined,
+        bathrooms: (visibility.showBathrooms || (visibility.showWashrooms && !visibility.showCommercialSpecs)) && formData.bathrooms ? Number(formData.bathrooms) : undefined,
+        balconies: visibility.showBalconies && formData.balconies ? Number(formData.balconies) : undefined,
         area: Number(formData.area) || undefined,
         areaUnit: formData.areaUnit,
-        carpetArea: formData.carpetArea ? Number(formData.carpetArea) : undefined,
+        carpetArea: visibility.showCarpetArea && formData.carpetArea ? Number(formData.carpetArea) : undefined,
         carpetAreaSqFt: Number(formData.area) || undefined,
-        builtUpArea: formData.builtUpArea ? Number(formData.builtUpArea) : undefined,
-        superBuiltUpArea: formData.superBuiltUpArea ? Number(formData.superBuiltUpArea) : undefined,
-        furnishing: visibility.hasFurnishing ? formData.furnishing : undefined,
-        facing: formData.facing,
-        parking: formData.parking,
-        floorLevel: formData.floorLevel,
-        floorNumber: formData.floorLevel,
-        totalFloors: formData.totalFloors ? Number(formData.totalFloors) : undefined,
-        constructionStatus: formData.constructionStatus,
-        propertyAge: formData.propertyAge,
+        builtUpArea: visibility.showBuiltUpArea && formData.builtUpArea ? Number(formData.builtUpArea) : undefined,
+        superBuiltUpArea: visibility.showSuperBuiltUpArea && formData.superBuiltUpArea ? Number(formData.superBuiltUpArea) : undefined,
+        furnishing: visibility.showFurnishing ? formData.furnishing : undefined,
+        facing: visibility.showFacing ? formData.facing : undefined,
+        parking: visibility.showParking ? formData.parking : undefined,
+        floorLevel: visibility.showFloorNumber ? formData.floorLevel : undefined,
+        floorNumber: visibility.showFloorNumber ? formData.floorLevel : undefined,
+        totalFloors: visibility.showTotalFloors && formData.totalFloors ? Number(formData.totalFloors) : undefined,
+        constructionStatus: visibility.showConstructionStatus ? formData.constructionStatus : undefined,
+        propertyAge: visibility.showPropertyAge ? formData.propertyAge : undefined,
         possessionStatus: formData.possessionStatus,
         possessionDate: formData.possessionDate || undefined,
         availableFrom: formData.availableFrom || undefined,
         ownershipType: formData.ownershipType,
         // Commercial
-        washrooms: visibility.hasCommercialSpaces && formData.washrooms ? Number(formData.washrooms) : undefined,
-        cabins: visibility.hasCommercialSpaces && formData.cabins ? Number(formData.cabins) : undefined,
-        workstations: visibility.hasCommercialSpaces && formData.workstations ? Number(formData.workstations) : undefined,
-        pantry: visibility.hasCommercialSpaces ? formData.pantry : undefined,
-        powerBackupKva: visibility.hasCommercialSpaces && formData.powerBackupKva ? Number(formData.powerBackupKva) : undefined,
-        suitableFor: visibility.hasCommercialSpaces && formData.suitableFor ? formData.suitableFor.split(',').map((s) => s.trim()) : undefined,
+        washrooms: visibility.showWashrooms && formData.washrooms ? Number(formData.washrooms) : undefined,
+        cabins: visibility.showCabins && formData.cabins ? Number(formData.cabins) : undefined,
+        workstations: visibility.showWorkstations && formData.workstations ? Number(formData.workstations) : undefined,
+        pantry: visibility.showPantry ? formData.pantry : undefined,
+        powerBackupKva: visibility.showPowerBackup && formData.powerBackupKva ? Number(formData.powerBackupKva) : undefined,
+        suitableFor: visibility.showSuitableFor && formData.suitableFor ? formData.suitableFor.split(',').map((s) => s.trim()) : undefined,
+        // Warehouse
+        ceilingHeightFt: visibility.showCeilingHeight && formData.ceilingHeightFt ? Number(formData.ceilingHeightFt) : undefined,
+        loadingAccess: visibility.showLoadingAccess ? formData.loadingAccess : undefined,
         // Plot / Land
-        plotLength: visibility.hasPlotDimensions && formData.plotLength ? Number(formData.plotLength) : undefined,
-        plotBreadth: visibility.hasPlotDimensions && formData.plotBreadth ? Number(formData.plotBreadth) : undefined,
-        openSides: visibility.hasPlotDimensions && formData.openSides ? Number(formData.openSides) : undefined,
-        boundaryWall: visibility.hasPlotDimensions ? formData.boundaryWall : undefined,
-        cornerPlot: visibility.hasPlotDimensions ? formData.cornerPlot : undefined,
-        roadWidthFt: visibility.hasPlotDimensions && formData.roadWidthFt ? Number(formData.roadWidthFt) : undefined,
-        soilType: visibility.hasPlotDimensions ? formData.soilType : undefined,
-        landZone: visibility.hasPlotDimensions ? formData.landZone : undefined,
+        plotLength: visibility.showPlotDimensions && formData.plotLength ? Number(formData.plotLength) : undefined,
+        plotBreadth: visibility.showPlotDimensions && formData.plotBreadth ? Number(formData.plotBreadth) : undefined,
+        openSides: visibility.showOpenSides && formData.openSides ? Number(formData.openSides) : undefined,
+        boundaryWall: visibility.showBoundaryWall ? formData.boundaryWall : undefined,
+        cornerPlot: visibility.showCornerPlot ? formData.cornerPlot : undefined,
+        roadWidthFt: visibility.showRoadWidth && formData.roadWidthFt ? Number(formData.roadWidthFt) : undefined,
+        soilType: visibility.showSoilType ? formData.soilType : undefined,
+        landZone: visibility.showLandZone ? formData.landZone : undefined,
+        // PG Specs
+        accommodationType: visibility.showAccommodationType ? formData.accommodationType : undefined,
+        sharingType: visibility.showSharingType ? formData.sharingType : undefined,
+        availableBeds: visibility.showAvailableBeds && formData.availableBeds ? Number(formData.availableBeds) : undefined,
       },
+      contactNumbers: formData.contactNumbers.filter((n) => n.number.trim().length > 0),
       rera: {
         isReraRegistered: formData.reraRegistered,
         reraNumber: formData.reraRegistered === 'YES' ? formData.reraNumber.trim() : undefined,
@@ -760,6 +797,12 @@ export default function EditPropertyPage() {
           onUnitsChange={setUnits}
         />
 
+        {/* Contact Numbers Management */}
+        <ContactNumbersManager
+          contactNumbers={formData.contactNumbers}
+          onChange={(next) => setFormData((prev) => ({ ...prev, contactNumbers: next }))}
+        />
+
         {/* Dynamic Specifications */}
         <div className="space-y-4">
           <h3 className="text-sm font-bold text-casa-text-primary border-b border-casa-border-light pb-2">
@@ -810,6 +853,167 @@ export default function EditPropertyPage() {
                     type="number"
                     value={formData.bathrooms}
                     onChange={(e) => setFormData({ ...formData, bathrooms: e.target.value })}
+                    className="w-full px-3 py-2 text-xs bg-casa-canvas border border-casa-border-light rounded-xl text-casa-text-primary"
+                  />
+                </div>
+              </>
+            )}
+
+            {/* Commercial Specs */}
+            {visibility.showCommercialSpecs && (
+              <>
+                <div>
+                  <label className="text-xs font-semibold text-casa-text-primary block mb-1">Cabins</label>
+                  <input
+                    type="number"
+                    placeholder="e.g., 4"
+                    value={formData.cabins}
+                    onChange={(e) => setFormData({ ...formData, cabins: e.target.value })}
+                    className="w-full px-3 py-2 text-xs bg-casa-canvas border border-casa-border-light rounded-xl text-casa-text-primary"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-semibold text-casa-text-primary block mb-1">Workstations</label>
+                  <input
+                    type="number"
+                    placeholder="e.g., 20"
+                    value={formData.workstations}
+                    onChange={(e) => setFormData({ ...formData, workstations: e.target.value })}
+                    className="w-full px-3 py-2 text-xs bg-casa-canvas border border-casa-border-light rounded-xl text-casa-text-primary"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-semibold text-casa-text-primary block mb-1">Washrooms</label>
+                  <input
+                    type="number"
+                    placeholder="e.g., 2"
+                    value={formData.washrooms}
+                    onChange={(e) => setFormData({ ...formData, washrooms: e.target.value })}
+                    className="w-full px-3 py-2 text-xs bg-casa-canvas border border-casa-border-light rounded-xl text-casa-text-primary"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-semibold text-casa-text-primary block mb-1">Power Backup (kVA)</label>
+                  <input
+                    type="number"
+                    placeholder="e.g., 50"
+                    value={formData.powerBackupKva}
+                    onChange={(e) => setFormData({ ...formData, powerBackupKva: e.target.value })}
+                    className="w-full px-3 py-2 text-xs bg-casa-canvas border border-casa-border-light rounded-xl text-casa-text-primary"
+                  />
+                </div>
+              </>
+            )}
+
+            {/* Warehouse Specs */}
+            {visibility.showWarehouseSpecs && (
+              <>
+                <div>
+                  <label className="text-xs font-semibold text-casa-text-primary block mb-1">Clear Height (ft)</label>
+                  <input
+                    type="number"
+                    placeholder="e.g., 28"
+                    value={formData.ceilingHeightFt}
+                    onChange={(e) => setFormData({ ...formData, ceilingHeightFt: e.target.value })}
+                    className="w-full px-3 py-2 text-xs bg-casa-canvas border border-casa-border-light rounded-xl text-casa-text-primary font-medium"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-semibold text-casa-text-primary block mb-1">Loading Access</label>
+                  <select
+                    value={formData.loadingAccess}
+                    onChange={(e) => setFormData({ ...formData, loadingAccess: e.target.value })}
+                    className="w-full px-3 py-2 text-xs bg-casa-canvas border border-casa-border-light rounded-xl text-casa-text-primary"
+                  >
+                    <option value="DOCK_HIGH">Dock High</option>
+                    <option value="GROUND_LEVEL">Ground Level</option>
+                    <option value="RAMP_ACCESS">Ramp Access</option>
+                    <option value="CONTAINER_TRUCK_DIRECT">Container Direct</option>
+                  </select>
+                </div>
+              </>
+            )}
+
+            {/* PG Specs */}
+            {visibility.showPgSpecs && (
+              <>
+                <div>
+                  <label className="text-xs font-semibold text-casa-text-primary block mb-1">Accommodation</label>
+                  <select
+                    value={formData.accommodationType}
+                    onChange={(e) => setFormData({ ...formData, accommodationType: e.target.value })}
+                    className="w-full px-3 py-2 text-xs bg-casa-canvas border border-casa-border-light rounded-xl text-casa-text-primary"
+                  >
+                    <option value="PG_HOSTEL">PG / Hostel</option>
+                    <option value="COLIVING_SUITE">Co-living Suite</option>
+                    <option value="MANAGED_APARTMENT">Managed PG</option>
+                    <option value="PRIVATE_ROOM">Private Room</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-xs font-semibold text-casa-text-primary block mb-1">Sharing Type</label>
+                  <select
+                    value={formData.sharingType}
+                    onChange={(e) => setFormData({ ...formData, sharingType: e.target.value })}
+                    className="w-full px-3 py-2 text-xs bg-casa-canvas border border-casa-border-light rounded-xl text-casa-text-primary"
+                  >
+                    <option value="SINGLE">Single Occupancy</option>
+                    <option value="DOUBLE">Double Sharing</option>
+                    <option value="TRIPLE">Triple Sharing</option>
+                    <option value="FOUR_PLUS">4+ Sharing</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-xs font-semibold text-casa-text-primary block mb-1">Available Beds</label>
+                  <input
+                    type="number"
+                    placeholder="e.g., 2"
+                    value={formData.availableBeds}
+                    onChange={(e) => setFormData({ ...formData, availableBeds: e.target.value })}
+                    className="w-full px-3 py-2 text-xs bg-casa-canvas border border-casa-border-light rounded-xl text-casa-text-primary"
+                  />
+                </div>
+              </>
+            )}
+
+            {/* Plot Dimensions */}
+            {visibility.showPlotDimensions && (
+              <>
+                <div>
+                  <label className="text-xs font-semibold text-casa-text-primary block mb-1">Length (ft)</label>
+                  <input
+                    type="number"
+                    placeholder="e.g., 60"
+                    value={formData.plotLength}
+                    onChange={(e) => setFormData({ ...formData, plotLength: e.target.value })}
+                    className="w-full px-3 py-2 text-xs bg-casa-canvas border border-casa-border-light rounded-xl text-casa-text-primary"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-semibold text-casa-text-primary block mb-1">Breadth (ft)</label>
+                  <input
+                    type="number"
+                    placeholder="e.g., 40"
+                    value={formData.plotBreadth}
+                    onChange={(e) => setFormData({ ...formData, plotBreadth: e.target.value })}
+                    className="w-full px-3 py-2 text-xs bg-casa-canvas border border-casa-border-light rounded-xl text-casa-text-primary"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-semibold text-casa-text-primary block mb-1">Road Width (ft)</label>
+                  <input
+                    type="number"
+                    placeholder="e.g., 40"
+                    value={formData.roadWidthFt}
+                    onChange={(e) => setFormData({ ...formData, roadWidthFt: e.target.value })}
                     className="w-full px-3 py-2 text-xs bg-casa-canvas border border-casa-border-light rounded-xl text-casa-text-primary"
                   />
                 </div>
