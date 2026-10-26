@@ -10,6 +10,7 @@ import {
   createPaymentOrder,
   verifyPayment,
   getPublicGatewayConfig,
+  getMySubscriptionRequests,
 } from '@/services/payment-service';
 import {
   getActivePackages,
@@ -17,7 +18,8 @@ import {
   PackagePlan,
   CompanySettings,
 } from '@/services/entitlements-service';
-import { PaymentItem, PaymentStatus, PaymentPurpose } from '@/types';
+import { PlanDetailsModal } from '@/components/pricing/plan-details-modal';
+import { PaymentItem, PaymentStatus, PaymentPurpose, SubscriptionRequest } from '@/types';
 import { formatPrice } from '@/lib/utils';
 import { isKycExempt } from '@/components/dashboard/kyc-status-banner';
 import {
@@ -69,6 +71,9 @@ export default function BillingDashboardPage() {
   const [recentPayments, setRecentPayments] = React.useState<PaymentItem[]>([]);
   const [packages, setPackages] = React.useState<PackagePlan[]>([]);
   const [isPackagesLoading, setIsPackagesLoading] = React.useState(true);
+  const [subscriptionRequests, setSubscriptionRequests] = React.useState<SubscriptionRequest[]>([]);
+  const [selectedDetailsPlan, setSelectedDetailsPlan] = React.useState<PackagePlan | null>(null);
+  const [isDetailsModalOpen, setIsDetailsModalOpen] = React.useState(false);
   const [companySettings, setCompanySettings] = React.useState<CompanySettings>({
     appName: 'myproperty Marketplace',
     companySalesNumber: '+91 98765 43210',
@@ -96,10 +101,11 @@ export default function BillingDashboardPage() {
     setLoading(true);
     setIsPackagesLoading(true);
     try {
-      const [paymentsRes, settingsRes, packagesRes] = await Promise.allSettled([
+      const [paymentsRes, settingsRes, packagesRes, reqsRes] = await Promise.allSettled([
         getMyPayments({ page: 1, limit: 5 }),
         getPublicCompanySettings(),
         getActivePackages(),
+        getMySubscriptionRequests(),
       ]);
 
       if (paymentsRes.status === 'fulfilled' && paymentsRes.value?.data) {
@@ -110,6 +116,9 @@ export default function BillingDashboardPage() {
       }
       if (packagesRes.status === 'fulfilled' && Array.isArray(packagesRes.value)) {
         setPackages(packagesRes.value);
+      }
+      if (reqsRes.status === 'fulfilled' && Array.isArray(reqsRes.value)) {
+        setSubscriptionRequests(reqsRes.value);
       }
     } catch {
       // Non-blocking fallback
@@ -324,15 +333,58 @@ export default function BillingDashboardPage() {
               </div>
             )}
 
-            <button
-              onClick={openPlanSelectionModal}
-              className="px-4 py-2.5 rounded-2xl bg-casa-brand hover:bg-casa-brand-hover text-white text-xs font-bold shadow-subtle transition-colors flex items-center gap-1.5"
-            >
-              <Sparkles className="w-4 h-4" />
-              <span>Select Free Trial Plan</span>
-            </button>
+            {/* Remove free-trial activation option for expired users or users who already used trial */}
+            {!isTrialExpired && !user?.trialUsed && Boolean(user?.isTrialEligible !== false) && (
+              <button
+                onClick={openPlanSelectionModal}
+                className="px-4 py-2.5 rounded-2xl bg-casa-brand hover:bg-casa-brand-hover text-white text-xs font-bold shadow-subtle transition-colors flex items-center gap-1.5 cursor-pointer"
+              >
+                <Sparkles className="w-4 h-4" />
+                <span>Select Free Trial Plan</span>
+              </button>
+            )}
           </div>
         </div>
+
+        {/* Pending Subscription Request Banner */}
+        {subscriptionRequests[0] && subscriptionRequests[0].status === 'PENDING' && (
+          <div className="mt-6 p-5 rounded-3xl bg-amber-500/10 border-2 border-amber-500/30 text-casa-text-primary space-y-2 shadow-sm animate-in fade-in">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <Clock className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+                <span className="font-extrabold text-sm text-amber-900 dark:text-amber-200">
+                  Subscription Request Pending Approval (Ref: {subscriptionRequests[0].requestReference})
+                </span>
+              </div>
+              <span className="text-[10px] font-extrabold px-2.5 py-0.5 rounded-full bg-amber-500 text-white uppercase tracking-wider">
+                Pending Approval
+              </span>
+            </div>
+            <p className="text-xs text-casa-text-secondary leading-relaxed">
+              Your activation request for <strong>{subscriptionRequests[0].planName}</strong> (₹{subscriptionRequests[0].planPrice?.toLocaleString('en-IN')}) is under review by our Corporate Sales Governance Team. Once verified, your plan and entitlements will be activated immediately without requiring re-login.
+            </p>
+          </div>
+        )}
+
+        {/* Denied Subscription Request Banner */}
+        {subscriptionRequests[0] && subscriptionRequests[0].status === 'DENIED' && (
+          <div className="mt-6 p-5 rounded-3xl bg-red-500/10 border-2 border-red-500/30 text-casa-text-primary space-y-2 shadow-sm animate-in fade-in">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <XCircle className="w-5 h-5 text-red-600 dark:text-red-400" />
+                <span className="font-extrabold text-sm text-red-900 dark:text-red-200">
+                  Subscription Request Declined (Ref: {subscriptionRequests[0].requestReference})
+                </span>
+              </div>
+              <span className="text-[10px] font-extrabold px-2.5 py-0.5 rounded-full bg-red-600 text-white uppercase tracking-wider">
+                Request Declined
+              </span>
+            </div>
+            <p className="text-xs text-casa-text-secondary leading-relaxed">
+              {subscriptionRequests[0].denialReason || 'Your previous subscription request was not approved.'} You may review plan features and submit a new request below.
+            </p>
+          </div>
+        )}
 
         {/* KYC Verification Call Advisory Notice (Only for KYC-required accounts) */}
         {!isExempt && (
@@ -406,14 +458,17 @@ export default function BillingDashboardPage() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {eligiblePackages.map((plan) => {
               const planKey = plan.id || plan._id || plan.slug;
-              const isProcessing = processingPlanId === planKey;
               return (
                 <div
                   key={planKey}
-                  className={`rounded-3xl p-6 sm:p-7 flex flex-col justify-between transition-all relative ${
+                  onClick={() => {
+                    setSelectedDetailsPlan(plan);
+                    setIsDetailsModalOpen(true);
+                  }}
+                  className={`rounded-3xl p-6 sm:p-7 flex flex-col justify-between transition-all relative cursor-pointer ${
                     plan.isPopular
                       ? 'bg-casa-surface border-2 border-casa-brand shadow-elevated scale-[1.02]'
-                      : 'bg-casa-surface border border-casa-border-light shadow-subtle hover:border-casa-border-medium'
+                      : 'bg-casa-surface border border-casa-border-light shadow-subtle hover:border-casa-brand/40'
                   }`}
                 >
                   {plan.isPopular && (
@@ -456,25 +511,19 @@ export default function BillingDashboardPage() {
                   <div className="pt-6 mt-6 border-t border-casa-border-light">
                     <button
                       type="button"
-                      onClick={() => handleSubscribe(plan)}
-                      disabled={isProcessing}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedDetailsPlan(plan);
+                        setIsDetailsModalOpen(true);
+                      }}
                       className={`w-full py-2.5 px-4 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
                         plan.isPopular
                           ? 'bg-casa-brand hover:bg-casa-brand-hover text-white shadow-subtle'
                           : 'bg-casa-subtle hover:bg-casa-border-light text-casa-text-primary'
                       }`}
                     >
-                      {isProcessing ? (
-                        <>
-                          <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                          <span>Processing Order...</span>
-                        </>
-                      ) : (
-                        <>
-                          <span>Upgrade to {plan.name}</span>
-                          <ArrowRight className="w-3.5 h-3.5" />
-                        </>
-                      )}
+                      <span>Upgrade to {plan.name}</span>
+                      <ArrowRight className="w-3.5 h-3.5" />
                     </button>
                   </div>
                 </div>
@@ -598,6 +647,15 @@ export default function BillingDashboardPage() {
           </a>
         </div>
       </div>
+
+      {/* Plan Details & Subscription Action Modal */}
+      <PlanDetailsModal
+        isOpen={isDetailsModalOpen}
+        plan={selectedDetailsPlan}
+        companySettings={companySettings}
+        onClose={() => setIsDetailsModalOpen(false)}
+        onRequestSubmitted={() => loadBillingData()}
+      />
     </div>
   );
 }

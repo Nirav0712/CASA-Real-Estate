@@ -411,17 +411,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return { isTrialActive: false, isTrialExpired: false, daysRemaining: 0, remainingLabel: '' };
     }
 
-    if (!user.trialExpiresAt) {
-      return { isTrialActive: false, isTrialExpired: false, daysRemaining: 0, remainingLabel: '' };
-    }
-    const expires = new Date(user.trialExpiresAt).getTime();
+    const hasStoredExpired = Boolean(user.trialExpired || user.isTrialExpired);
+    const expires = user.trialExpiresAt ? new Date(user.trialExpiresAt).getTime() : 0;
     const now = Date.now();
-    const msRemaining = expires - now;
-    const isExpired = msRemaining <= 0;
+    const msRemaining = expires ? expires - now : 0;
+    const isExpired = hasStoredExpired || (expires > 0 && msRemaining <= 0);
     let daysRemaining = 0;
     let remainingLabel = '';
 
-    if (!isExpired && Boolean(user.isTrialActive)) {
+    if (!isExpired && Boolean(user.isTrialActive) && msRemaining > 0) {
       if (msRemaining > 2 * 24 * 60 * 60 * 1000) {
         daysRemaining = 3;
         remainingLabel = '3 Days Remaining';
@@ -436,7 +434,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     return {
       isTrialActive: !isExpired && Boolean(user.isTrialActive),
-      isTrialExpired: isExpired || Boolean(user.trialExpired),
+      isTrialExpired: isExpired,
       daysRemaining,
       remainingLabel,
     };

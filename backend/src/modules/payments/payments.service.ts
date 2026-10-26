@@ -6,13 +6,24 @@ import {
   Logger,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model, isValidObjectId } from 'mongoose';
+import { Model, isValidObjectId, Types } from 'mongoose';
 import * as crypto from 'crypto';
 import { Payment, PaymentDocument } from './schemas/payment.schema';
 import { Subscription, SubscriptionDocument } from './schemas/subscription.schema';
+import {
+  SubscriptionRequest,
+  SubscriptionRequestDocument,
+  SubscriptionRequestStatus,
+  SubscriptionContactMethod,
+} from './schemas/subscription-request.schema';
 import { Property, PropertyDocument } from '../properties/schemas/property.schema';
 import { User, UserDocument } from '../auth/schemas/user.schema';
 import { AuditLog, AuditLogDocument } from '../admin/schemas/audit-log.schema';
+import {
+  Notification,
+  NotificationDocument,
+  NotificationType,
+} from '../engagement/schemas/notification.schema';
 import { RazorpayPaymentProvider } from './providers/razorpay.provider';
 import {
   PaymentStatus,
@@ -26,6 +37,11 @@ import { CreatePaymentOrderDto } from './dto/create-order.dto';
 import { VerifyPaymentDto } from './dto/verify-payment.dto';
 import { RefundPaymentDto } from './dto/refund-payment.dto';
 import { PaymentQueryDto } from './dto/payment-query.dto';
+import {
+  CreateSubscriptionRequestDto,
+  DenySubscriptionRequestDto,
+  SubscriptionRequestQueryDto,
+} from './dto/subscription-request.dto';
 import { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
 import { UserRole } from '../auth/enums/auth.enums';
 import { Package, PackageDocument } from '../entitlements/schemas/package.schema';
@@ -37,10 +53,12 @@ export class PaymentsService {
   constructor(
     @InjectModel(Payment.name) private readonly paymentModel: Model<PaymentDocument>,
     @InjectModel(Subscription.name) private readonly subscriptionModel: Model<SubscriptionDocument>,
+    @InjectModel(SubscriptionRequest.name) private readonly subscriptionRequestModel: Model<SubscriptionRequestDocument>,
     @InjectModel(Property.name) private readonly propertyModel: Model<PropertyDocument>,
     @InjectModel(User.name) private readonly userModel: Model<UserDocument>,
     @InjectModel(AuditLog.name) private readonly auditLogModel: Model<AuditLogDocument>,
     @InjectModel(Package.name) private readonly packageModel: Model<PackageDocument>,
+    @InjectModel(Notification.name) private readonly notificationModel: Model<NotificationDocument>,
     private readonly razorpayProvider: RazorpayPaymentProvider,
   ) {}
 
@@ -822,5 +840,439 @@ export class PaymentsService {
       return false;
     }
     return property.isFeatured;
+  }
+
+  // ==========================================
+  // SUBSCRIPTION APPROVAL REQUESTS WORKFLOW
+  // ==========================================
+
+  /**
+   * Submit or retrieve an existing pending subscription request
+   */
+  async createSubscriptionRequest(user: AuthenticatedUser, dto: CreateSubscriptionRequestDto) {
+    if (!user || !user.id) {
+      throw new ForbiddenException('User authentication required to submit subscription request.');
+    }
+
+    if (!dto.packageId || !isValidObjectId(dto.packageId)) {
+      throw new BadRequestException('Valid pricing package ID is required.');
+    }
+
+    const pkg = await this.packageModel.findById(dto.packageId);
+    if (!pkg) {
+      throw new NotFoundException('Selected subscription plan not found.');
+    }
+
+    const contactMethod = dto.contactMethod || SubscriptionContactMethod.WHATSAPP;
+
+    // Check if user already has an active PENDING request for this package to avoid duplicate records
+    const existing = await this.subscriptionRequestModel.findOne({
+      userId: new Types.ObjectId(user.id),
+      packageId: pkg._id,
+      status: SubscriptionRequestStatus.PENDING,
+    });
+
+    if (existing) {
+      existing.contactMethod = contactMethod;
+      existing.updatedAt = new Date();
+      await existing.save();
+
+      return {
+        success: true,
+        message: 'Existing pending subscription request retrieved and refreshed.',
+        request: {
+          id: existing._id.toString(),
+          requestReference: existing.requestReference,
+          packageId: existing.packageId.toString(),
+          planName: existing.planName,
+          planPrice: existing.planPrice,
+          billingPeriod: existing.billingPeriod,
+          planFeatures: existing.planFeatures,
+          contactMethod: existing.contactMethod,
+          status: existing.status,
+          createdAt: existing.createdAt,
+        },
+      };
+    }
+
+    // Generate unique human-readable request reference: SUB-REQ-YYYYMMDD-XXXX
+    const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+    const randSuffix = Math.random().toString(36).substring(2, 6).toUpperCase();
+    const requestReference = `SUB-REQ-${dateStr}-${randSuffix}`;
+
+    const newRequest = await this.subscriptionRequestModel.create({
+      requestReference,
+      userId: new Types.ObjectId(user.id),
+      userName: user.name || 'Marketplace User',
+      userMobile: user.mobile || user.normalizedMobile || '',
+      userEmail: user.email,
+      packageId: pkg._id,
+      planName: pkg.name,
+      planPrice: pkg.price,
+      billingPeriod: pkg.billingPeriod || 'MONTHLY',
+      planFeatures: pkg.features || [],
+      contactMethod,
+      status: SubscriptionRequestStatus.PENDING,
+      metadata: {
+        packageSlug: pkg.slug,
+        targetAccountTypes: pkg.targetAccountTypes,
+        userRole: user.role,
+        userAccountType: user.accountType,
+      },
+    });
+
+    this.logger.log(`📥 Subscription request created: ${requestReference} by user ${user.name} for plan ${pkg.name}`);
+
+    return {
+      success: true,
+      message: 'Subscription request recorded successfully.',
+      request: {
+        id: newRequest._id.toString(),
+        requestReference: newRequest.requestReference,
+        packageId: newRequest.packageId.toString(),
+        planName: newRequest.planName,
+        planPrice: newRequest.planPrice,
+        billingPeriod: newRequest.billingPeriod,
+        planFeatures: newRequest.planFeatures,
+        contactMethod: newRequest.contactMethod,
+        status: newRequest.status,
+        createdAt: newRequest.createdAt,
+      },
+    };
+  }
+
+  /**
+   * Get user's own subscription requests
+   */
+  async getMySubscriptionRequests(user: AuthenticatedUser) {
+    if (!user || !user.id) {
+      throw new ForbiddenException('User authentication required.');
+    }
+
+    const requests = await this.subscriptionRequestModel
+      .find({ userId: new Types.ObjectId(user.id) })
+      .sort({ createdAt: -1 })
+      .limit(10)
+      .lean()
+      .exec();
+
+    return {
+      success: true,
+      data: requests.map((r) => ({
+        id: r._id.toString(),
+        requestReference: r.requestReference,
+        packageId: r.packageId?.toString(),
+        planName: r.planName,
+        planPrice: r.planPrice,
+        billingPeriod: r.billingPeriod,
+        planFeatures: r.planFeatures,
+        contactMethod: r.contactMethod,
+        status: r.status,
+        denialReason: r.denialReason,
+        reviewedAt: r.reviewedAt,
+        createdAt: r.createdAt,
+      })),
+    };
+  }
+
+  /**
+   * List global subscription requests for Super Admin / Admin
+   */
+  async getAdminSubscriptionRequests(user: AuthenticatedUser, query: SubscriptionRequestQueryDto) {
+    if (!this.isAdmin(user)) {
+      throw new ForbiddenException('Super Admin or Admin privileges required.');
+    }
+
+    const page = Math.max(1, Number(query.page) || 1);
+    const limit = Math.max(1, Math.min(100, Number(query.limit) || 20));
+    const skip = (page - 1) * limit;
+
+    const filter: any = {};
+    if (query.status && query.status !== 'ALL') {
+      filter.status = query.status.toUpperCase();
+    }
+
+    if (query.q && query.q.trim()) {
+      const qRegex = new RegExp(query.q.trim(), 'i');
+      filter.$or = [
+        { requestReference: qRegex },
+        { userName: qRegex },
+        { userMobile: qRegex },
+        { userEmail: qRegex },
+        { planName: qRegex },
+      ];
+    }
+
+    const [requests, total, totalPending, totalApproved, totalDenied] = await Promise.all([
+      this.subscriptionRequestModel.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit).lean().exec(),
+      this.subscriptionRequestModel.countDocuments(filter),
+      this.subscriptionRequestModel.countDocuments({ status: SubscriptionRequestStatus.PENDING }),
+      this.subscriptionRequestModel.countDocuments({ status: SubscriptionRequestStatus.APPROVED }),
+      this.subscriptionRequestModel.countDocuments({ status: SubscriptionRequestStatus.DENIED }),
+    ]);
+
+    return {
+      success: true,
+      data: requests.map((r) => ({
+        id: r._id.toString(),
+        requestReference: r.requestReference,
+        userId: r.userId?.toString(),
+        userName: r.userName,
+        userMobile: r.userMobile,
+        userEmail: r.userEmail,
+        packageId: r.packageId?.toString(),
+        planName: r.planName,
+        planPrice: r.planPrice,
+        billingPeriod: r.billingPeriod,
+        planFeatures: r.planFeatures,
+        contactMethod: r.contactMethod,
+        status: r.status,
+        denialReason: r.denialReason,
+        reviewedByName: r.reviewedByName,
+        reviewedAt: r.reviewedAt,
+        createdAt: r.createdAt,
+        updatedAt: r.updatedAt,
+      })),
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit) || 1,
+      },
+      metrics: {
+        totalRequests: totalPending + totalApproved + totalDenied,
+        pending: totalPending,
+        approved: totalApproved,
+        denied: totalDenied,
+      },
+    };
+  }
+
+  /**
+   * Super Admin approves subscription request and activates user entitlements immediately
+   */
+  async approveSubscriptionRequest(id: string, adminUser: AuthenticatedUser) {
+    if (!this.isAdmin(adminUser)) {
+      throw new ForbiddenException('Super Admin or Admin privileges required.');
+    }
+
+    if (!isValidObjectId(id)) {
+      throw new BadRequestException('Invalid request ID format.');
+    }
+
+    const request = await this.subscriptionRequestModel.findById(id);
+    if (!request) {
+      throw new NotFoundException('Subscription request not found.');
+    }
+
+    if (request.status !== SubscriptionRequestStatus.PENDING) {
+      throw new BadRequestException(`Subscription request has already been processed (Current status: ${request.status}).`);
+    }
+
+    const pkg = await this.packageModel.findById(request.packageId);
+    if (!pkg) {
+      throw new NotFoundException('Target subscription plan package not found.');
+    }
+
+    const targetUser = await this.userModel.findById(request.userId);
+    if (!targetUser) {
+      throw new NotFoundException('User associated with this request was not found.');
+    }
+
+    const now = new Date();
+    let durationDays = 30; // standard monthly
+    const billingPeriodUpper = String(pkg.billingPeriod || '').toUpperCase();
+    if (billingPeriodUpper.includes('ANNUAL') || billingPeriodUpper.includes('YEAR')) {
+      durationDays = 365;
+    } else if (billingPeriodUpper.includes('QUARTER')) {
+      durationDays = 90;
+    } else if (billingPeriodUpper.includes('HALF')) {
+      durationDays = 180;
+    }
+    const expiryDate = new Date(now.getTime() + durationDays * 24 * 60 * 60 * 1000);
+
+    // 1. Activate Subscription on User Model
+    targetUser.activePackageId = pkg._id.toString();
+    targetUser.isTrialActive = false;
+    targetUser.trialExpired = false;
+    await targetUser.save();
+
+    // 2. Upsert Subscription collection record (reusing existing schema)
+    await this.subscriptionModel.findOneAndUpdate(
+      { userId: targetUser._id.toString() },
+      {
+        userId: targetUser._id.toString(),
+        plan: pkg.name || SubscriptionPlan.PRO,
+        status: SubscriptionStatus.ACTIVE,
+        startDate: now,
+        endDate: expiryDate,
+        packageId: pkg._id.toString(),
+        metadata: {
+          requestReference: request.requestReference,
+          approvedByAdminId: adminUser.id,
+          approvedByAdminName: adminUser.name,
+          manualSalesApproval: true,
+          packageName: pkg.name,
+          packageSlug: pkg.slug,
+          amount: pkg.price,
+        },
+      },
+      { upsert: true, new: true },
+    );
+
+    // 3. Mark request as APPROVED
+    request.status = SubscriptionRequestStatus.APPROVED;
+    request.reviewedBy = new Types.ObjectId(adminUser.id);
+    request.reviewedByName = adminUser.name || 'Super Admin';
+    request.reviewedAt = now;
+    await request.save();
+
+    // 4. Log in Audit Log
+    try {
+      await this.auditLogModel.create({
+        userId: new Types.ObjectId(adminUser.id),
+        userName: adminUser.name || 'Super Admin',
+        action: 'SUBSCRIPTION_REQUEST_APPROVED',
+        entity: 'SubscriptionRequest',
+        entityId: request._id.toString(),
+        details: {
+          requestReference: request.requestReference,
+          targetUserId: targetUser._id.toString(),
+          targetUserName: targetUser.name,
+          targetUserMobile: targetUser.mobile,
+          planName: pkg.name,
+          planPrice: pkg.price,
+          durationDays,
+          expiryDate,
+        },
+        timestamp: now,
+      });
+    } catch (auditErr: any) {
+      this.logger.warn(`Failed to create audit log: ${auditErr.message}`);
+    }
+
+    // 5. In-App Notification to User
+    try {
+      await this.notificationModel.create({
+        recipientId: targetUser._id,
+        type: NotificationType.PAYMENT_SUCCESS,
+        title: 'Subscription Activated',
+        message: `Your ${pkg.name} subscription has been activated successfully!`,
+        data: {
+          packageId: pkg._id.toString(),
+          planName: pkg.name,
+          requestReference: request.requestReference,
+          expiryDate,
+        },
+        isRead: false,
+      });
+    } catch (notifErr: any) {
+      this.logger.warn(`Failed to dispatch in-app notification: ${notifErr.message}`);
+    }
+
+    this.logger.log(`✅ Subscription request ${request.requestReference} APPROVED by ${adminUser.name} for user ${targetUser.name}`);
+
+    return {
+      success: true,
+      message: `Subscription request approved and ${pkg.name} activated successfully for ${targetUser.name}.`,
+      request: {
+        id: request._id.toString(),
+        requestReference: request.requestReference,
+        status: request.status,
+        reviewedByName: request.reviewedByName,
+        reviewedAt: request.reviewedAt,
+      },
+      subscription: {
+        planName: pkg.name,
+        activePackageId: pkg._id.toString(),
+        startDate: now,
+        endDate: expiryDate,
+      },
+    };
+  }
+
+  /**
+   * Super Admin denies subscription request with reason
+   */
+  async denySubscriptionRequest(id: string, adminUser: AuthenticatedUser, dto: DenySubscriptionRequestDto) {
+    if (!this.isAdmin(adminUser)) {
+      throw new ForbiddenException('Super Admin or Admin privileges required.');
+    }
+
+    if (!isValidObjectId(id)) {
+      throw new BadRequestException('Invalid request ID format.');
+    }
+
+    const request = await this.subscriptionRequestModel.findById(id);
+    if (!request) {
+      throw new NotFoundException('Subscription request not found.');
+    }
+
+    if (request.status !== SubscriptionRequestStatus.PENDING) {
+      throw new BadRequestException(`Subscription request has already been processed (Current status: ${request.status}).`);
+    }
+
+    const now = new Date();
+    const reason = dto?.reason?.trim() || 'Declined by administrator.';
+
+    request.status = SubscriptionRequestStatus.DENIED;
+    request.denialReason = reason;
+    request.reviewedBy = new Types.ObjectId(adminUser.id);
+    request.reviewedByName = adminUser.name || 'Super Admin';
+    request.reviewedAt = now;
+    await request.save();
+
+    // Log in Audit Log
+    try {
+      await this.auditLogModel.create({
+        userId: new Types.ObjectId(adminUser.id),
+        userName: adminUser.name || 'Super Admin',
+        action: 'SUBSCRIPTION_REQUEST_DENIED',
+        entity: 'SubscriptionRequest',
+        entityId: request._id.toString(),
+        details: {
+          requestReference: request.requestReference,
+          targetUserId: request.userId.toString(),
+          planName: request.planName,
+          reason,
+        },
+        timestamp: now,
+      });
+    } catch (auditErr: any) {
+      this.logger.warn(`Failed to create audit log: ${auditErr.message}`);
+    }
+
+    // In-App Notification to User
+    try {
+      await this.notificationModel.create({
+        recipientId: request.userId,
+        type: NotificationType.SUBSCRIPTION_EXPIRING,
+        title: 'Subscription Request Declined',
+        message: `Your subscription request for ${request.planName} was not approved: ${reason}`,
+        data: {
+          requestReference: request.requestReference,
+          planName: request.planName,
+          denialReason: reason,
+        },
+        isRead: false,
+      });
+    } catch (notifErr: any) {
+      this.logger.warn(`Failed to dispatch in-app notification: ${notifErr.message}`);
+    }
+
+    this.logger.log(`❌ Subscription request ${request.requestReference} DENIED by ${adminUser.name}`);
+
+    return {
+      success: true,
+      message: `Subscription request ${request.requestReference} denied successfully.`,
+      request: {
+        id: request._id.toString(),
+        requestReference: request.requestReference,
+        status: request.status,
+        denialReason: request.denialReason,
+        reviewedByName: request.reviewedByName,
+        reviewedAt: request.reviewedAt,
+      },
+    };
   }
 }

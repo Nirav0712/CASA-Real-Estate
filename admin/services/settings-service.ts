@@ -6,6 +6,7 @@ const API_BASE_URL =
 export interface SystemSettingsRecord {
   appName: string;
   companySalesNumber: string;
+  companySalesWhatsapp?: string;
   companyServiceNumber: string;
   companySalesEmail: string;
   companySupportEmail: string;
@@ -32,6 +33,7 @@ export async function getSystemSettings(): Promise<SystemSettingsRecord> {
   return {
     appName: payload?.appName || 'myproperty Marketplace',
     companySalesNumber: payload?.companySalesNumber || '+91 98765 43210',
+    companySalesWhatsapp: payload?.companySalesWhatsapp || payload?.companySalesNumber || '+91 98765 43210',
     companyServiceNumber: payload?.companyServiceNumber || '+91 98765 43211',
     companySalesEmail: payload?.companySalesEmail || 'sales@myproperty.com',
     companySupportEmail: payload?.companySupportEmail || 'support@myproperty.com',

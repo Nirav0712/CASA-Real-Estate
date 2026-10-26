@@ -57,6 +57,7 @@ export interface User {
   isTrialActive?: boolean;
   trialUsed?: boolean;
   trialExpired?: boolean;
+  isTrialExpired?: boolean;
   isTrialEligible?: boolean;
   trialDaysRemaining?: number;
   trialRemainingLabel?: string;
@@ -999,5 +1000,30 @@ export interface PaymentVerifyResponse {
     paidAt?: string;
   };
 }
+
+export type SubscriptionRequestStatus = 'PENDING' | 'APPROVED' | 'DENIED';
+export type SubscriptionContactMethod = 'WHATSAPP' | 'CALL';
+
+export interface SubscriptionRequest {
+  id: string;
+  requestReference: string;
+  userId?: string;
+  userName?: string;
+  userMobile?: string;
+  userEmail?: string;
+  packageId: string;
+  planName: string;
+  planPrice: number;
+  billingPeriod: string;
+  planFeatures: string[];
+  contactMethod: SubscriptionContactMethod;
+  status: SubscriptionRequestStatus;
+  denialReason?: string;
+  reviewedByName?: string;
+  reviewedAt?: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+
 
 

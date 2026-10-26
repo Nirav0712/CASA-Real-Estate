@@ -47,3 +47,53 @@ export async function refundAdminPayment(
   }
   return result.data;
 }
+
+export async function getAdminSubscriptionRequests(params?: {
+  page?: number;
+  limit?: number;
+  status?: string;
+  q?: string;
+}): Promise<any> {
+  const queryParams = new URLSearchParams();
+  if (params?.page) queryParams.set('page', params.page.toString());
+  if (params?.limit) queryParams.set('limit', params.limit.toString());
+  if (params?.status && params.status !== 'ALL') queryParams.set('status', params.status);
+  if (params?.q) queryParams.set('q', params.q);
+
+  const qs = queryParams.toString() ? `?${queryParams.toString()}` : '';
+  const result = await fetchAdminApi<any>(`/admin/payments/subscription-requests${qs}`);
+  if (!result.isBackendAvailable || result.error || !result.data) {
+    throw new Error(result.error || 'Failed to fetch subscription requests.');
+  }
+  return result.data;
+}
+
+export async function approveSubscriptionRequest(id: string): Promise<any> {
+  const result = await fetchAdminApi<any>(
+    `/admin/payments/subscription-requests/${encodeURIComponent(id)}/approve`,
+    {
+      method: 'POST',
+    },
+  );
+  if (!result.isBackendAvailable || result.error || !result.data) {
+    throw new Error(result.error || 'Failed to approve subscription request.');
+  }
+  return result.data;
+}
+
+export async function denySubscriptionRequest(
+  id: string,
+  payload?: { reason?: string },
+): Promise<any> {
+  const result = await fetchAdminApi<any>(
+    `/admin/payments/subscription-requests/${encodeURIComponent(id)}/deny`,
+    {
+      method: 'POST',
+      body: JSON.stringify(payload || {}),
+    },
+  );
+  if (!result.isBackendAvailable || result.error || !result.data) {
+    throw new Error(result.error || 'Failed to deny subscription request.');
+  }
+  return result.data;
+}

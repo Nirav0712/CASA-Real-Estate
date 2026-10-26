@@ -1565,6 +1565,22 @@ export class EntitlementsService implements OnModuleInit {
       );
     }
 
+    // Do not restart trial by logging out, signing in again, refreshing, or creating duplicate requests
+    if (
+      user.trialStartedAt ||
+      user.trialUsed ||
+      user.trialExpired ||
+      (user.trialExpiresAt && new Date(user.trialExpiresAt).getTime() <= Date.now())
+    ) {
+      throw new BadRequestException(
+        'Free trial has already been used or expired for this account. Free trial cannot be restarted.',
+      );
+    }
+
+    if (user.isTrialActive && user.trialExpiresAt && new Date(user.trialExpiresAt).getTime() > Date.now()) {
+      throw new BadRequestException('Your 3-day free trial is already active.');
+    }
+
     const pkg = await this.packageModel.findById(packageId);
     if (!pkg) throw new NotFoundException('Selected pricing plan was not found.');
     if (!pkg.isActive) throw new BadRequestException('This plan is currently not active.');

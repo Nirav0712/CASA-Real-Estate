@@ -11,6 +11,9 @@ export class SystemSetting {
   @Prop({ default: '+91 98765 43210' })
   companySalesNumber: string;
 
+  @Prop({ default: '+91 98765 43210' })
+  companySalesWhatsapp: string;
+
   @Prop({ default: '+91 98765 43211' })
   companyServiceNumber: string;
 

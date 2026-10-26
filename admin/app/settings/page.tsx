@@ -8,6 +8,7 @@ import {
   Database,
   Smartphone,
   PhoneCall,
+  MessageCircle,
   Headphones,
   Mail,
   MapPin,
@@ -31,6 +32,7 @@ export default function SettingsPage() {
   const [form, setForm] = React.useState<SystemSettingsRecord>({
     appName: 'myproperty Marketplace',
     companySalesNumber: '+91 98765 43210',
+    companySalesWhatsapp: '+91 98765 43210',
     companyServiceNumber: '+91 98765 43211',
     companySalesEmail: 'sales@myproperty.com',
     companySupportEmail: 'support@myproperty.com',
@@ -124,12 +126,12 @@ export default function SettingsPage() {
             These numbers are prominently displayed to users when their 3-day free trial expires, with a direct 1-click &ldquo;Call Sales Department&rdquo; Call-To-Action (CTA) button to process subscription payments.
           </p>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
             {/* Sales Dept Number */}
             <div className="p-4 rounded-xl bg-casa-canvas border border-casa-border-light space-y-2">
               <label className="font-bold text-casa-text-primary flex items-center gap-1.5">
                 <PhoneCall className="w-3.5 h-3.5 text-casa-brand" />
-                Company Sales Department Contact Number
+                Sales Call Contact Number
               </label>
               <input
                 type="text"
@@ -140,7 +142,26 @@ export default function SettingsPage() {
                 className="w-full px-3 py-2 bg-casa-surface border border-casa-border-light rounded-xl font-mono text-casa-text-primary text-xs font-semibold focus:outline-none focus:border-casa-brand"
               />
               <span className="text-[11px] text-casa-text-muted block">
-                Shown as primary dial button when user trial expires to renew plan.
+                Target phone number for "Call to Subscribe" buttons across marketplace.
+              </span>
+            </div>
+
+            {/* Sales WhatsApp Number */}
+            <div className="p-4 rounded-xl bg-casa-canvas border border-emerald-500/20 space-y-2">
+              <label className="font-bold text-casa-text-primary flex items-center gap-1.5">
+                <MessageCircle className="w-3.5 h-3.5 text-emerald-600" />
+                Sales WhatsApp Number
+              </label>
+              <input
+                type="text"
+                required
+                placeholder="e.g. +91 98765 43210"
+                value={form.companySalesWhatsapp || ''}
+                onChange={(e) => handleChange('companySalesWhatsapp', e.target.value)}
+                className="w-full px-3 py-2 bg-casa-surface border border-casa-border-light rounded-xl font-mono text-casa-text-primary text-xs font-semibold focus:outline-none focus:border-emerald-500"
+              />
+              <span className="text-[11px] text-casa-text-muted block">
+                Target number for "WhatsApp to Subscribe" prefilled chat requests.
               </span>
             </div>
 
@@ -148,7 +169,7 @@ export default function SettingsPage() {
             <div className="p-4 rounded-xl bg-casa-canvas border border-casa-border-light space-y-2">
               <label className="font-bold text-casa-text-primary flex items-center gap-1.5">
                 <Headphones className="w-3.5 h-3.5 text-casa-brand" />
-                Company Customer Service / Support Number
+                Support / Service Number
               </label>
               <input
                 type="text"

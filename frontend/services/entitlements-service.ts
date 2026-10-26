@@ -30,6 +30,7 @@ export interface PackagePlan {
 export interface CompanySettings {
   appName: string;
   companySalesNumber: string;
+  companySalesWhatsapp?: string;
   companyServiceNumber: string;
   companySalesEmail: string;
   companySupportEmail: string;

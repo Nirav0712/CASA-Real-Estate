@@ -1976,6 +1976,18 @@ export class AuthService implements OnModuleInit {
       user.trialExpired || (user.trialExpiresAt && msRemaining <= 0)
     );
 
+    // Persist trial expired status in database so it cannot restart on relogin or page refresh
+    if (isTrialExpired && (!user.trialExpired || user.isTrialActive)) {
+      user.trialExpired = true;
+      user.isTrialActive = false;
+      if (this.isDbConnected() && (user._id || user.id)) {
+        this.userModel.updateOne(
+          { _id: user._id || user.id },
+          { $set: { trialExpired: true, isTrialActive: false } }
+        ).exec().catch(() => {});
+      }
+    }
+
     if (isTrialActive) {
       if (msRemaining > 2 * 24 * 60 * 60 * 1000) {
         trialDaysRemaining = 3;

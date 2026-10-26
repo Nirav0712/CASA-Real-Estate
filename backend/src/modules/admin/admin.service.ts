@@ -3307,6 +3307,7 @@ export class AdminService implements OnModuleInit {
     return {
       appName: settings.appName || 'myproperty',
       companySalesNumber: settings.companySalesNumber || '+91 98765 43210',
+      companySalesWhatsapp: settings.companySalesWhatsapp || settings.companySalesNumber || '+91 98765 43210',
       companyServiceNumber: settings.companyServiceNumber || '+91 98765 43211',
       companySalesEmail: settings.companySalesEmail || 'sales@myproperty.com',
       companySupportEmail: settings.companySupportEmail || 'support@myproperty.com',

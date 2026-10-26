@@ -2,7 +2,8 @@
 
 import * as React from 'react';
 import { Card, Button } from '@/components/ui/button';
-import { CreditCard, Check } from 'lucide-react';
+import Link from 'next/link';
+import { CreditCard, Check, ShieldCheck } from 'lucide-react';
 
 export default function SubscriptionsPage() {
   const plans = [
@@ -27,6 +28,13 @@ export default function SubscriptionsPage() {
             Configure monetization tiers, active agent subscriptions, and promotional pricing.
           </p>
         </div>
+
+        <Link href="/payments?tab=requests">
+          <Button variant="primary" size="sm" className="flex items-center gap-2 self-start sm:self-auto text-xs">
+            <ShieldCheck className="w-4 h-4" />
+            Review Subscription Requests
+          </Button>
+        </Link>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

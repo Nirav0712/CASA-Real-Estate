@@ -18,6 +18,7 @@ import { CreatePaymentOrderDto } from './dto/create-order.dto';
 import { VerifyPaymentDto } from './dto/verify-payment.dto';
 import { RefundPaymentDto } from './dto/refund-payment.dto';
 import { PaymentQueryDto } from './dto/payment-query.dto';
+import { CreateSubscriptionRequestDto } from './dto/subscription-request.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -120,6 +121,27 @@ export class PaymentsController {
     @Body() dto: RefundPaymentDto,
   ) {
     return this.paymentsService.refundPayment(id, user, dto);
+  }
+
+  @Post('subscription-requests')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Submit or retrieve pending subscription request for plan upgrade' })
+  @ApiResponse({ status: 201, description: 'Subscription request recorded with reference' })
+  createSubscriptionRequest(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: CreateSubscriptionRequestDto,
+  ) {
+    return this.paymentsService.createSubscriptionRequest(user, dto);
+  }
+
+  @Get('subscription-requests/my')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get current user active and historical subscription requests' })
+  @ApiResponse({ status: 200, description: 'List of subscription requests returned' })
+  getMySubscriptionRequests(@CurrentUser() user: AuthenticatedUser) {
+    return this.paymentsService.getMySubscriptionRequests(user);
   }
 
   @Get(':id')

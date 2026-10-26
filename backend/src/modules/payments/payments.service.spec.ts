@@ -10,6 +10,8 @@ import { Property } from '../properties/schemas/property.schema';
 import { User } from '../auth/schemas/user.schema';
 import { AuditLog } from '../admin/schemas/audit-log.schema';
 import { Package } from '../entitlements/schemas/package.schema';
+import { SubscriptionRequest } from './schemas/subscription-request.schema';
+import { Notification } from '../engagement/schemas/notification.schema';
 import { PaymentStatus, PaymentPurpose, SubscriptionPlan, SubscriptionStatus } from './enums/payment.enums';
 import { UserRole } from '../auth/enums/auth.enums';
 
@@ -78,6 +80,18 @@ describe('PaymentsService (Phase 13 Payments & Monetization)', () => {
     findById: jest.fn().mockResolvedValue(null),
   };
 
+  const mockSubscriptionRequestModel: any = {
+    create: jest.fn(),
+    findOne: jest.fn(),
+    find: jest.fn(),
+    countDocuments: jest.fn(),
+    findById: jest.fn(),
+  };
+
+  const mockNotificationModel: any = {
+    create: jest.fn().mockResolvedValue(true),
+  };
+
   const mockConfigService = {
     get: jest.fn((key: string) => {
       if (key === 'payments.razorpayKeyId') return 'rzp_test_sample_key_123';
@@ -97,10 +111,12 @@ describe('PaymentsService (Phase 13 Payments & Monetization)', () => {
         { provide: ConfigService, useValue: mockConfigService },
         { provide: getModelToken(Payment.name), useValue: mockPaymentModel },
         { provide: getModelToken(Subscription.name), useValue: mockSubscriptionModel },
+        { provide: getModelToken(SubscriptionRequest.name), useValue: mockSubscriptionRequestModel },
         { provide: getModelToken(Property.name), useValue: mockPropertyModel },
         { provide: getModelToken(User.name), useValue: mockUserModel },
         { provide: getModelToken(AuditLog.name), useValue: mockAuditLogModel },
         { provide: getModelToken(Package.name), useValue: mockPackageModel },
+        { provide: getModelToken(Notification.name), useValue: mockNotificationModel },
       ],
     }).compile();
 

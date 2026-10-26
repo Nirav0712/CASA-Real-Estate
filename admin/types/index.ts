@@ -714,6 +714,46 @@ export interface PaymentAdminResponse {
   metrics: PaymentKPIs;
 }
 
+export type SubscriptionRequestStatus = 'PENDING' | 'APPROVED' | 'DENIED';
+export type SubscriptionContactMethod = 'WHATSAPP' | 'CALL';
+
+export interface SubscriptionRequest {
+  id: string;
+  requestReference: string;
+  userId?: string;
+  userName?: string;
+  userMobile?: string;
+  userEmail?: string;
+  packageId: string;
+  planName: string;
+  planPrice: number;
+  billingPeriod: string;
+  planFeatures: string[];
+  contactMethod: SubscriptionContactMethod;
+  status: SubscriptionRequestStatus;
+  denialReason?: string;
+  reviewedByName?: string;
+  reviewedAt?: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface SubscriptionRequestAdminResponse {
+  data: SubscriptionRequest[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+  metrics: {
+    totalRequests: number;
+    pending: number;
+    approved: number;
+    denied: number;
+  };
+}
+
 export type DataScope = 'OWN' | 'TEAM' | 'ORGANIZATION' | 'ALL';
 
 export interface DashboardConfig {

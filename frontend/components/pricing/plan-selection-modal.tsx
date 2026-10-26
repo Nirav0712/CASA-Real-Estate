@@ -70,10 +70,15 @@ export function PlanSelectionModal() {
 
   if (!isPlanSelectionModalOpen || isExempt) return null;
 
-  // Calculate remaining trial days
-  const isTrialActive = Boolean(user?.isTrialActive);
+  // Calculate trial state
+  const isTrialExpired = Boolean(
+    user?.trialExpired ||
+    user?.isTrialExpired ||
+    (user?.trialExpiresAt && new Date(user.trialExpiresAt).getTime() <= Date.now())
+  );
+  const isTrialActive = Boolean(user?.isTrialActive && !isTrialExpired);
   let remainingDays = 0;
-  if (user?.trialExpiresAt) {
+  if (user?.trialExpiresAt && isTrialActive) {
     const diff = new Date(user.trialExpiresAt).getTime() - Date.now();
     remainingDays = Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
   }
@@ -168,6 +173,35 @@ export function PlanSelectionModal() {
               <span className="inline-block px-3 py-1 rounded-full bg-emerald-600 text-white text-xs font-bold">
                 {remainingDays} Day{remainingDays !== 1 ? 's' : ''} Remaining
               </span>
+            </div>
+          </div>
+        ) : isTrialExpired ? (
+          /* Expired Trial Notice - No free trial activation option */
+          <div className="p-6 md:p-8 bg-red-50/60 dark:bg-red-950/30 border border-red-200 dark:border-red-800 rounded-3xl space-y-4 text-center">
+            <div className="w-14 h-14 rounded-2xl bg-red-600/10 text-red-600 dark:text-red-400 border border-red-500/20 flex items-center justify-center mx-auto shadow-sm">
+              <ShieldCheck className="w-7 h-7" />
+            </div>
+
+            <div>
+              <h3 className="text-xl font-extrabold text-casa-text-primary">
+                Your 3-Day Free Trial Has Ended
+              </h3>
+              <p className="text-xs sm:text-sm text-casa-text-secondary mt-1.5 max-w-md mx-auto leading-relaxed">
+                Your complimentary 3-day access has concluded. You can upgrade to any of our paid subscription tiers to reactivate full marketplace benefits and verified direct contacts.
+              </p>
+            </div>
+
+            <div className="pt-2 max-w-sm mx-auto">
+              <button
+                onClick={() => {
+                  closePlanSelectionModal();
+                  router.push('/dashboard/billing');
+                }}
+                className="w-full py-3.5 px-6 rounded-2xl bg-casa-brand hover:bg-casa-brand-hover text-white text-xs md:text-sm font-bold shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <span>View Paid Plans & Upgrade</span>
+                <ArrowRight className="w-4 h-4" />
+              </button>
             </div>
           </div>
         ) : (

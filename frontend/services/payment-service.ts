@@ -86,3 +86,42 @@ export async function getPaymentById(id: string): Promise<PaymentItem> {
   }
   return result.data;
 }
+
+export async function createSubscriptionRequest(data: {
+  packageId: string;
+  contactMethod?: 'WHATSAPP' | 'CALL';
+}): Promise<{
+  success: boolean;
+  message: string;
+  request: {
+    id: string;
+    requestReference: string;
+    packageId: string;
+    planName: string;
+    planPrice: number;
+    billingPeriod: string;
+    planFeatures: string[];
+    contactMethod: 'WHATSAPP' | 'CALL';
+    status: 'PENDING' | 'APPROVED' | 'DENIED';
+    createdAt: string;
+  };
+}> {
+  const result = await fetchApi<any>('/payments/subscription-requests', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+
+  if (!result.isBackendAvailable || result.error || !result.data) {
+    throw new Error(result.error || 'Failed to submit subscription request.');
+  }
+
+  return result.data;
+}
+
+export async function getMySubscriptionRequests(): Promise<any[]> {
+  const result = await fetchApi<{ success: boolean; data: any[] }>('/payments/subscription-requests/my');
+  if (!result.isBackendAvailable || result.error || !result.data) {
+    return [];
+  }
+  return result.data.data || [];
+}

@@ -11,8 +11,11 @@ import {
   X,
   CreditCard,
   Building,
+  MessageSquare,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/auth-context';
+import { useToast } from '@/contexts/toast-context';
+import { createSubscriptionRequest } from '@/services/payment-service';
 import {
   getActivePackages,
   getPublicCompanySettings,
@@ -22,6 +25,8 @@ import {
 
 export function TrialExpiredModal() {
   const { isTrialExpiredModalOpen, closeTrialExpiredModal, user } = useAuth();
+  const toast = useToast();
+  const [requestingPlanId, setRequestingPlanId] = React.useState<string | null>(null);
 
   const [packages, setPackages] = React.useState<PackagePlan[]>([]);
   const [settings, setSettings] = React.useState<CompanySettings>({
@@ -76,6 +81,52 @@ export function TrialExpiredModal() {
   const servicePhone = settings.companyServiceNumber || '+91 98765 43211';
   const cleanSalesPhone = salesPhone.replace(/[^0-9+]/g, '');
   const cleanServicePhone = servicePhone.replace(/[^0-9+]/g, '');
+
+  const handleAction = async (pkg: PackagePlan, method: 'WHATSAPP' | 'CALL') => {
+    const pkgId = pkg.id || pkg._id || '';
+    if (!pkgId) return;
+    setRequestingPlanId(`${pkgId}-${method}`);
+    try {
+      let ref = 'PENDING';
+      try {
+        const res = await createSubscriptionRequest({
+          packageId: pkgId,
+          contactMethod: method,
+        });
+        if (res?.request?.requestReference) {
+          ref = res.request.requestReference;
+        }
+      } catch (err: any) {
+        console.warn('Subscription request note:', err?.message);
+      }
+
+      if (method === 'CALL') {
+        window.location.href = `tel:${cleanSalesPhone}`;
+      } else {
+        const rawWa = settings.companySalesWhatsapp || settings.companySalesNumber || '';
+        const cleanWa = rawWa.replace(/[^0-9]/g, '');
+        if (!cleanWa) {
+          toast.error('WhatsApp Unavailable', 'Sales Department WhatsApp hotline is currently not configured.');
+          return;
+        }
+
+        const featureSummary = (pkg.features && pkg.features.length > 0)
+          ? pkg.features.slice(0, 4).join(', ')
+          : (pkg.description || 'Full platform features');
+
+        const message = `Hello CASA Sales Team, I would like to subscribe to ${pkg.name}. User: ${user?.name || 'Customer'}. Registered Mobile: ${user?.mobile || user?.normalizedMobile || ''}. Plan Price: ₹${pkg.price.toLocaleString('en-IN')}. Billing Period: ${pkg.billingPeriod || 'Monthly'}. Plan Features: ${featureSummary}. Request Reference: ${ref}. Please review my subscription activation request.`;
+
+        window.open(`https://wa.me/${cleanWa}?text=${encodeURIComponent(message)}`, '_blank', 'noopener,noreferrer');
+      }
+
+      toast.success(
+        'Subscription Request Recorded',
+        `Reference: ${ref}. Our Sales Team is ready to activate your plan.`
+      );
+    } finally {
+      setRequestingPlanId(null);
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto animate-in fade-in duration-200">
@@ -165,7 +216,7 @@ export function TrialExpiredModal() {
               <CreditCard className="w-4 h-4 text-casa-brand" />
               Select Your Plan to Activate via Sales Desk:
             </h4>
-            <span className="text-xs text-casa-text-muted font-medium">Mention plan name when calling</span>
+            <span className="text-xs text-casa-text-muted font-medium">Mention plan name when calling or chatting</span>
           </div>
 
           {loading ? (
@@ -194,13 +245,27 @@ export function TrialExpiredModal() {
                     </p>
                   </div>
 
-                  <a
-                    href={`tel:${cleanSalesPhone}`}
-                    className="w-full mt-2 py-2 px-3 rounded-xl bg-casa-brand/10 hover:bg-casa-brand text-casa-brand hover:text-white text-xs font-bold text-center transition-colors flex items-center justify-center gap-1"
-                  >
-                    <PhoneCall className="w-3 h-3" />
-                    <span>Call to Subscribe</span>
-                  </a>
+                  <div className="flex flex-col gap-2 mt-3 pt-3 border-t border-casa-border-light">
+                    <button
+                      type="button"
+                      disabled={requestingPlanId === `${pkg.id || pkg._id}-CALL`}
+                      onClick={() => handleAction(pkg, 'CALL')}
+                      className="w-full py-2 px-3 rounded-xl bg-casa-brand/10 hover:bg-casa-brand text-casa-brand hover:text-white text-xs font-bold text-center transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+                    >
+                      <PhoneCall className="w-3.5 h-3.5" />
+                      <span>Call to Subscribe</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      disabled={requestingPlanId === `${pkg.id || pkg._id}-WHATSAPP`}
+                      onClick={() => handleAction(pkg, 'WHATSAPP')}
+                      className="w-full py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold text-center shadow-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+                    >
+                      <MessageSquare className="w-3.5 h-3.5" />
+                      <span>WhatsApp to Subscribe</span>
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
