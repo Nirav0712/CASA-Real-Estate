@@ -112,6 +112,11 @@ export class RazorpayPaymentProvider implements IPaymentProvider {
       return false;
     }
 
+    if (!this.isConfigured && process.env.NODE_ENV === 'production') {
+      this.logger.error('CRITICAL: Payment verification invoked in production without configured Razorpay credentials.');
+      return false;
+    }
+
     const secret = this.keySecret || 'rzp_test_placeholder_key_secret';
     const text = `${params.providerOrderId}|${params.providerPaymentId}`;
     const expectedSignature = crypto
@@ -138,6 +143,12 @@ export class RazorpayPaymentProvider implements IPaymentProvider {
     if (!signature || !rawBody) {
       return false;
     }
+
+    if (!this.isConfigured && process.env.NODE_ENV === 'production') {
+      this.logger.error('CRITICAL: Webhook signature verification invoked in production without configured Razorpay credentials.');
+      return false;
+    }
+
     const webhookSecret = this.webhookSecret || 'casa_dev_webhook_secret_2026';
     const expectedSignature = crypto
       .createHmac('sha256', webhookSecret)

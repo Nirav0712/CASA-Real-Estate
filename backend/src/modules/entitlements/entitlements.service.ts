@@ -1373,7 +1373,8 @@ export class EntitlementsService implements OnModuleInit {
       }
     }
 
-    if (!packageDoc && user.activePackageId && isValidObjectId(user.activePackageId)) {
+    const isTrialValid = Boolean(user.trialExpiresAt && new Date() <= new Date(user.trialExpiresAt) && user.isTrialActive);
+    if (!packageDoc && user.activePackageId && isValidObjectId(user.activePackageId) && isTrialValid) {
       packageDoc = await this.packageModel.findById(user.activePackageId).lean().exec();
     }
 
@@ -1991,8 +1992,10 @@ export class EntitlementsService implements OnModuleInit {
     const plans = allPackages
       .filter((pkg) => {
         if (!normalizedReqType) return true;
+        let hasFilterCriteria = false;
         // Check eligible user types
         if (Array.isArray(pkg.eligibleUserTypes) && pkg.eligibleUserTypes.length > 0) {
+          hasFilterCriteria = true;
           const match = pkg.eligibleUserTypes.some((t: string) => {
             const cleanT = t.toLowerCase().replace(/[^a-z0-9]/g, '');
             return (
@@ -2006,6 +2009,7 @@ export class EntitlementsService implements OnModuleInit {
         }
         // Check target account types
         if (Array.isArray(pkg.targetAccountTypes) && pkg.targetAccountTypes.length > 0) {
+          hasFilterCriteria = true;
           const match = pkg.targetAccountTypes.some((t: string) => {
             const cleanT = t.toLowerCase().replace(/[^a-z0-9]/g, '');
             return (
@@ -2017,7 +2021,7 @@ export class EntitlementsService implements OnModuleInit {
           });
           if (match) return true;
         }
-        return true;
+        return !hasFilterCriteria;
       })
       .map((pkg) => {
         const isFree = Boolean(pkg.isFree || pkg.price === 0);
@@ -2115,12 +2119,50 @@ export class EntitlementsService implements OnModuleInit {
       throw new NotFoundException('User not found');
     }
 
+    // 1. Verify user type eligibility: Only Builder/Developer, Broker, Agent can claim
+    const userRole = String(user.role || '').toUpperCase();
+    const userAccountType = String(user.accountType || '').toUpperCase();
+    const isEligibleUserType =
+      ['DEVELOPER', 'BUILDER'].includes(userRole) ||
+      ['DEVELOPER', 'BUILDER'].includes(userAccountType) ||
+      ['BROKER', 'BROKER_AGENCY'].includes(userRole) ||
+      ['BROKER', 'BROKER_AGENCY'].includes(userAccountType) ||
+      ['AGENT', 'BROKER_AGENT'].includes(userRole) ||
+      ['AGENT', 'BROKER_AGENT'].includes(userAccountType);
+
+    if (!isEligibleUserType) {
+      throw new ForbiddenException(
+        'The introductory 3-month free trial is exclusively available to Builders / Developers, Brokers, and Agents.',
+      );
+    }
+
     if (user.isTrialActive) {
       throw new BadRequestException('You already have an active trial.');
     }
 
     if (user.trialUsed) {
       throw new BadRequestException('You have already used your introductory free trial.');
+    }
+
+    // 2. Company-level eligibility: Check if parent company or agency already used trial or has active subscription
+    const companyId = user.brokerId || user.parentUserId || user.agencyId;
+    if (companyId) {
+      const companyParent = await this.userModel.findById(companyId);
+      if (companyParent?.trialUsed || companyParent?.isTrialActive) {
+        throw new BadRequestException(
+          'Your company / parent agency has already utilized or claimed the introductory free trial.',
+        );
+      }
+      const companySub = await this.subscriptionModel.findOne({
+        $or: [{ userId: companyId }, { companyId }],
+        status: { $in: ['ACTIVE', 'TRIAL'] },
+        endDate: { $gte: new Date() },
+      });
+      if (companySub) {
+        throw new BadRequestException(
+          'Your company / parent agency already has an active subscription or trial in place.',
+        );
+      }
     }
 
     const existingSub = await this.subscriptionModel.findOne({
@@ -2145,7 +2187,27 @@ export class EntitlementsService implements OnModuleInit {
       throw new BadRequestException('All 50 introductory free trial slots have been claimed.');
     }
 
-    // Atomic slot claim
+    // 3. Atomic user lock to prevent concurrent duplicate claims by the same account
+    const lockedUser = await this.userModel.findOneAndUpdate(
+      {
+        _id: user._id,
+        trialUsed: { $ne: true },
+        isTrialActive: { $ne: true },
+      },
+      {
+        $set: {
+          isTrialActive: true,
+          trialUsed: true,
+        },
+      },
+      { new: true },
+    );
+
+    if (!lockedUser) {
+      throw new BadRequestException('You have already used or are currently claiming your introductory free trial.');
+    }
+
+    // 4. Atomic slot reservation
     const updatedPkg = await this.packageModel.findOneAndUpdate(
       {
         _id: freePkg._id,
@@ -2156,60 +2218,74 @@ export class EntitlementsService implements OnModuleInit {
     );
 
     if (!updatedPkg) {
+      // Rollback user lock if slots became full
+      await this.userModel.findByIdAndUpdate(userId, {
+        $set: { isTrialActive: false, trialUsed: false },
+      });
       throw new BadRequestException('All 50 introductory free trial slots have been claimed.');
     }
 
-    const startDate = new Date();
-    const durationDays = freePkg.durationDays || 90;
-    const endDate = new Date(startDate.getTime() + durationDays * 24 * 60 * 60 * 1000);
+    try {
+      const startDate = new Date();
+      const durationDays = freePkg.durationDays || 90;
+      const endDate = new Date(startDate.getTime() + durationDays * 24 * 60 * 60 * 1000);
 
-    const sub = await this.subscriptionModel.create({
-      userId,
-      packageId: freePkg._id.toString(),
-      accountType: user.accountType,
-      plan: 'FREE_TRIAL',
-      status: 'TRIAL',
-      durationMonths: 3,
-      amountPaid: 0,
-      currency: 'INR',
-      startDate,
-      endDate,
-      metadata: {
-        packageName: freePkg.name,
-        packageSlug: freePkg.slug,
-        isIntroductoryTrial: true,
-      },
-    });
+      const sub = await this.subscriptionModel.create({
+        userId,
+        packageId: freePkg._id.toString(),
+        companyId: companyId || undefined,
+        accountType: user.accountType,
+        plan: 'FREE_TRIAL',
+        status: 'TRIAL',
+        durationMonths: 3,
+        amountPaid: 0,
+        currency: 'INR',
+        startDate,
+        endDate,
+        metadata: {
+          packageName: freePkg.name,
+          packageSlug: freePkg.slug,
+          isIntroductoryTrial: true,
+        },
+      });
 
-    user.activePackageId = freePkg._id.toString();
-    user.activeSubscriptionId = sub._id.toString();
-    user.isTrialActive = true;
-    user.trialUsed = true;
-    user.trialStartedAt = startDate;
-    user.trialExpiresAt = endDate;
-    user.trialPackageId = freePkg._id.toString();
-    await user.save();
+      lockedUser.activePackageId = freePkg._id.toString();
+      lockedUser.activeSubscriptionId = sub._id.toString();
+      lockedUser.trialStartedAt = startDate;
+      lockedUser.trialExpiresAt = endDate;
+      lockedUser.trialPackageId = freePkg._id.toString();
+      await lockedUser.save();
 
-    await this.auditLogModel.create({
-      action: 'FREE_TRIAL_CLAIMED',
-      actorUserId: userId,
-      actorName: user.name || 'User',
-      actorRole: user.role,
-      targetEntity: 'SUBSCRIPTION',
-      targetEntityId: sub._id.toString(),
-      metadata: {
-        claimedSlots: updatedPkg.freeTrialClaimedSlots,
+      await this.auditLogModel.create({
+        action: 'FREE_TRIAL_CLAIMED',
+        actorUserId: userId,
+        actorName: user.name || 'User',
+        actorRole: user.role,
+        targetEntity: 'SUBSCRIPTION',
+        targetEntityId: sub._id.toString(),
+        metadata: {
+          claimedSlots: updatedPkg.freeTrialClaimedSlots,
+          remainingSlots: Math.max(0, maxSlots - updatedPkg.freeTrialClaimedSlots),
+        },
+        timestamp: new Date(),
+      });
+
+      return {
+        success: true,
+        message: 'Congratulations! Your 3-Month Free Plan is now active.',
+        subscription: sub,
         remainingSlots: Math.max(0, maxSlots - updatedPkg.freeTrialClaimedSlots),
-      },
-      timestamp: new Date(),
-    });
-
-    return {
-      success: true,
-      message: 'Congratulations! Your 3-Month Free Plan is now active.',
-      subscription: sub,
-      remainingSlots: Math.max(0, maxSlots - updatedPkg.freeTrialClaimedSlots),
-    };
+      };
+    } catch (err: any) {
+      // Rollback slot and user state if subscription creation fails
+      await this.packageModel.findByIdAndUpdate(freePkg._id, {
+        $inc: { freeTrialClaimedSlots: -1 },
+      });
+      await this.userModel.findByIdAndUpdate(userId, {
+        $set: { isTrialActive: false, trialUsed: false },
+      });
+      throw err;
+    }
   }
 
   async getFreeTrialStatus() {
