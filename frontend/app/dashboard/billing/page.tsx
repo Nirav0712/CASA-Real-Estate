@@ -41,6 +41,7 @@ import {
   Check,
   Lock,
   Phone,
+  Crown,
 } from 'lucide-react';
 
 export default function BillingDashboardPage() {
@@ -54,6 +55,9 @@ export default function BillingDashboardPage() {
     isTrialActive,
     isTrialExpired,
     trialDaysRemaining,
+    hasActiveSubscription,
+    activePlanName,
+    subscriptionExpiresAt,
   } = useAuth();
   const toast = useToast();
   const router = useRouter();
@@ -299,7 +303,19 @@ export default function BillingDashboardPage() {
 
           {/* Quick Status Pill */}
           <div className="flex flex-wrap items-center gap-3">
-            {isTrialActive ? (
+            {hasActiveSubscription ? (
+              <div className="px-4 py-2.5 rounded-2xl bg-amber-50 dark:bg-amber-950/50 border border-amber-200 dark:border-amber-800 text-amber-900 dark:text-amber-200 flex items-center gap-2.5">
+                <Crown className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+                <div>
+                  <div className="text-xs font-bold leading-none">Active Plan: {activePlanName || 'Paid Subscription'}</div>
+                  <div className="text-[10px] text-amber-700 dark:text-amber-300 mt-0.5">
+                    {subscriptionExpiresAt || user?.subscriptionExpiresAt
+                      ? `Valid until ${new Date(subscriptionExpiresAt || user?.subscriptionExpiresAt || '').toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}`
+                      : 'Active Paid Access'}
+                  </div>
+                </div>
+              </div>
+            ) : isTrialActive ? (
               <div className="px-4 py-2.5 rounded-2xl bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-200 flex items-center gap-2.5">
                 <CheckCircle2 className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
                 <div>
@@ -333,8 +349,8 @@ export default function BillingDashboardPage() {
               </div>
             )}
 
-            {/* Remove free-trial activation option for expired users or users who already used trial */}
-            {!isTrialExpired && !user?.trialUsed && Boolean(user?.isTrialEligible !== false) && (
+            {/* Remove free-trial activation option for active paid users, expired users or users who already used trial */}
+            {!hasActiveSubscription && !isTrialExpired && !user?.trialUsed && Boolean(user?.isTrialEligible !== false) && (
               <button
                 onClick={openPlanSelectionModal}
                 className="px-4 py-2.5 rounded-2xl bg-casa-brand hover:bg-casa-brand-hover text-white text-xs font-bold shadow-subtle transition-colors flex items-center gap-1.5 cursor-pointer"
@@ -509,22 +525,35 @@ export default function BillingDashboardPage() {
                   </div>
 
                   <div className="pt-6 mt-6 border-t border-casa-border-light">
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setSelectedDetailsPlan(plan);
-                        setIsDetailsModalOpen(true);
-                      }}
-                      className={`w-full py-2.5 px-4 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
-                        plan.isPopular
-                          ? 'bg-casa-brand hover:bg-casa-brand-hover text-white shadow-subtle'
-                          : 'bg-casa-subtle hover:bg-casa-border-light text-casa-text-primary'
-                      }`}
-                    >
-                      <span>Upgrade to {plan.name}</span>
-                      <ArrowRight className="w-3.5 h-3.5" />
-                    </button>
+                    {(() => {
+                      const isCurrentPlan =
+                        (user?.activePackageId && (user.activePackageId === plan.id || user.activePackageId === plan._id)) ||
+                        (hasActiveSubscription && user?.activePlanName?.toLowerCase() === plan.name?.toLowerCase());
+
+                      return isCurrentPlan ? (
+                        <div className="w-full py-2.5 px-4 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                          <span>Current Active Plan</span>
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedDetailsPlan(plan);
+                            setIsDetailsModalOpen(true);
+                          }}
+                          className={`w-full py-2.5 px-4 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                            plan.isPopular
+                              ? 'bg-casa-brand hover:bg-casa-brand-hover text-white shadow-subtle'
+                              : 'bg-casa-subtle hover:bg-casa-border-light text-casa-text-primary'
+                          }`}
+                        >
+                          <span>Upgrade to {plan.name}</span>
+                          <ArrowRight className="w-3.5 h-3.5" />
+                        </button>
+                      );
+                    })()}
                   </div>
                 </div>
               );

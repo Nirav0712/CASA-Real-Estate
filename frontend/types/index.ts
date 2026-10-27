@@ -62,6 +62,12 @@ export interface User {
   trialDaysRemaining?: number;
   trialRemainingLabel?: string;
   activePackageId?: string | null;
+  activeSubscriptionId?: string | null;
+  hasActiveSubscription?: boolean;
+  activePlanName?: string | null;
+  subscriptionStatus?: string | null;
+  subscriptionExpiresAt?: string | null;
+  subscriptionStartDate?: string | null;
   kycStatus?: 'NOT_SUBMITTED' | 'PENDING' | 'APPROVED' | 'REJECTED' | 'EXEMPT' | string;
   isKycExempt?: boolean;
   isKycRequired?: boolean;

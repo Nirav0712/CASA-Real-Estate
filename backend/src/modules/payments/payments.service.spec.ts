@@ -58,6 +58,8 @@ describe('PaymentsService (Phase 13 Payments & Monetization)', () => {
 
   const mockSubscriptionModel: any = {
     findOneAndUpdate: jest.fn(),
+    findOne: jest.fn(),
+    create: jest.fn(),
   };
 
   const mockPropertyModel: any = {
@@ -68,6 +70,7 @@ describe('PaymentsService (Phase 13 Payments & Monetization)', () => {
 
   const mockUserModel: any = {
     findOne: jest.fn(),
+    findById: jest.fn(),
     findByIdAndUpdate: jest.fn().mockResolvedValue(true),
   };
 
@@ -122,6 +125,27 @@ describe('PaymentsService (Phase 13 Payments & Monetization)', () => {
 
     service = module.get<PaymentsService>(PaymentsService);
     razorpayProvider = module.get<RazorpayPaymentProvider>(RazorpayPaymentProvider);
+
+    jest.spyOn(razorpayProvider, 'createOrder').mockImplementation(async (params: any) => {
+      return {
+        id: 'order_prov_101',
+        providerOrderId: 'order_prov_101',
+        amount: params.amount,
+        currency: params.currency || 'INR',
+        receipt: params.receipt,
+        status: 'created',
+      } as any;
+    });
+
+    jest.spyOn(razorpayProvider, 'refundPayment').mockImplementation(async (params: any) => {
+      return {
+        id: 'rfnd_101',
+        refundId: 'rfnd_101',
+        paymentId: params.paymentId,
+        amount: params.amount,
+        status: 'processed',
+      } as any;
+    });
   });
 
   describe('1. Pricing Catalog & Public Gateway Configuration', () => {
@@ -511,6 +535,118 @@ describe('PaymentsService (Phase 13 Payments & Monetization)', () => {
       const isStillFeatured = await service.checkPropertyFeaturedStatus(activeProperty);
       expect(isStillFeatured).toBe(true);
       expect(mockPropertyModel.updateOne).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('8. Subscription Request Approval & Reconciliation', () => {
+    it('should approve subscription request, activate paid plan, link activeSubscriptionId, and clear trialExpired flag', async () => {
+      const mockReqDoc: any = {
+        _id: '6ad9f1d7172b180143c35701',
+        requestReference: 'CASA-SUB-REQ-101',
+        userId: '6ad9f1d7172b180143c357fb',
+        packageId: '6adee645c24043a0c94d56e5',
+        status: 'PENDING',
+        save: jest.fn().mockResolvedValue(true),
+      };
+
+      const mockPkgDoc: any = {
+        _id: '6adee645c24043a0c94d56e5',
+        name: 'Agent Silver',
+        slug: 'agent-silver',
+        price: 499,
+        billingPeriod: 'MONTHLY',
+      };
+
+      const mockTargetUser: any = {
+        _id: '6ad9f1d7172b180143c357fb',
+        name: 'Final User',
+        mobile: '+919876543210',
+        role: UserRole.AGENT,
+        accountType: 'AGENT',
+        activePackageId: null,
+        activeSubscriptionId: null,
+        trialExpired: true,
+        isTrialActive: false,
+        save: jest.fn().mockResolvedValue(true),
+      };
+
+      const mockSubDoc: any = {
+        _id: '6adf015235a23e3b94b6d69f',
+        userId: '6ad9f1d7172b180143c357fb',
+        plan: 'Agent Silver',
+        status: SubscriptionStatus.ACTIVE,
+      };
+
+      mockSubscriptionRequestModel.findById.mockResolvedValue(mockReqDoc);
+      mockPackageModel.findById.mockResolvedValue(mockPkgDoc);
+      mockUserModel.findById.mockResolvedValue(mockTargetUser);
+      mockSubscriptionModel.findOneAndUpdate.mockResolvedValue(mockSubDoc);
+
+      const result = await service.approveSubscriptionRequest(
+        '6ad9f1d7172b180143c35701',
+        mockAdmin as any,
+      );
+
+      expect(result.success).toBe(true);
+      expect(mockReqDoc.status).toBe('APPROVED');
+      expect(mockReqDoc.save).toHaveBeenCalled();
+
+      // Target user must have activeSubscriptionId, activePackageId, and trialExpired cleared
+      expect(mockTargetUser.activeSubscriptionId).toBe('6adf015235a23e3b94b6d69f');
+      expect(mockTargetUser.activePackageId).toBe('6adee645c24043a0c94d56e5');
+      expect(mockTargetUser.trialExpired).toBe(false);
+      expect(mockTargetUser.isTrialActive).toBe(false);
+      expect(mockTargetUser.save).toHaveBeenCalled();
+    });
+
+    it('should reconcile approved subscriptions idempotently on startup', async () => {
+      const mockReqDoc: any = {
+        _id: '6ad9f1d7172b180143c35701',
+        requestReference: 'CASA-SUB-REQ-101',
+        userId: '6ad9f1d7172b180143c357fb',
+        packageId: '6adee645c24043a0c94d56e5',
+        status: 'APPROVED',
+        reviewedAt: new Date(),
+      };
+
+      const mockPkgDoc: any = {
+        _id: '6adee645c24043a0c94d56e5',
+        name: 'Agent Silver',
+        slug: 'agent-silver',
+        price: 499,
+        billingPeriod: 'MONTHLY',
+      };
+
+      const mockTargetUser: any = {
+        _id: '6ad9f1d7172b180143c357fb',
+        activePackageId: null,
+        activeSubscriptionId: null,
+        trialExpired: true,
+        isTrialActive: false,
+        save: jest.fn().mockResolvedValue(true),
+      };
+
+      const mockSubDoc: any = {
+        _id: '6adf015235a23e3b94b6d69f',
+        userId: '6ad9f1d7172b180143c357fb',
+        packageId: '6adee645c24043a0c94d56e5',
+        status: SubscriptionStatus.ACTIVE,
+        endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+        save: jest.fn().mockResolvedValue(true),
+      };
+
+      mockSubscriptionRequestModel.find.mockResolvedValue([mockReqDoc]);
+      mockUserModel.findById.mockResolvedValue(mockTargetUser);
+      mockPackageModel.findById.mockResolvedValue(mockPkgDoc);
+      mockSubscriptionModel.findOne.mockResolvedValue(mockSubDoc);
+
+      const res = await service.reconcileApprovedSubscriptions();
+
+      expect(res.reconciledCount).toBe(1);
+      expect(mockTargetUser.activeSubscriptionId).toBe('6adf015235a23e3b94b6d69f');
+      expect(mockTargetUser.activePackageId).toBe('6adee645c24043a0c94d56e5');
+      expect(mockTargetUser.trialExpired).toBe(false);
+      expect(mockTargetUser.save).toHaveBeenCalled();
     });
   });
 });

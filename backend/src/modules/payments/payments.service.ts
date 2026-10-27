@@ -4,6 +4,7 @@ import {
   BadRequestException,
   ForbiddenException,
   Logger,
+  OnModuleInit,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, isValidObjectId, Types } from 'mongoose';
@@ -47,8 +48,12 @@ import { UserRole } from '../auth/enums/auth.enums';
 import { Package, PackageDocument } from '../entitlements/schemas/package.schema';
 
 @Injectable()
-export class PaymentsService {
+export class PaymentsService implements OnModuleInit {
   private readonly logger = new Logger(PaymentsService.name);
+
+  async onModuleInit() {
+    await this.reconcileApprovedSubscriptions();
+  }
 
   constructor(
     @InjectModel(Payment.name) private readonly paymentModel: Model<PaymentDocument>,
@@ -1124,14 +1129,8 @@ export class PaymentsService {
     }
     const expiryDate = new Date(now.getTime() + durationDays * 24 * 60 * 60 * 1000);
 
-    // 1. Activate Subscription on User Model
-    targetUser.activePackageId = pkg._id.toString();
-    targetUser.isTrialActive = false;
-    targetUser.trialExpired = false;
-    await targetUser.save();
-
-    // 2. Upsert Subscription collection record (reusing existing schema)
-    await this.subscriptionModel.findOneAndUpdate(
+    // 1. Upsert Subscription collection record (reusing existing schema)
+    const sub = await this.subscriptionModel.findOneAndUpdate(
       { userId: targetUser._id.toString() },
       {
         userId: targetUser._id.toString(),
@@ -1140,6 +1139,10 @@ export class PaymentsService {
         startDate: now,
         endDate: expiryDate,
         packageId: pkg._id.toString(),
+        accountType: targetUser.accountType,
+        durationMonths: durationDays >= 360 ? 12 : Math.max(1, Math.round(durationDays / 30)),
+        amountPaid: pkg.price || 0,
+        currency: 'INR',
         metadata: {
           requestReference: request.requestReference,
           approvedByAdminId: adminUser.id,
@@ -1153,9 +1156,16 @@ export class PaymentsService {
       { upsert: true, new: true },
     );
 
+    // 2. Activate Subscription and link ID on User Model
+    targetUser.activeSubscriptionId = sub._id.toString();
+    targetUser.activePackageId = pkg._id.toString();
+    targetUser.isTrialActive = false;
+    targetUser.trialExpired = false;
+    await targetUser.save();
+
     // 3. Mark request as APPROVED
     request.status = SubscriptionRequestStatus.APPROVED;
-    request.reviewedBy = new Types.ObjectId(adminUser.id);
+    request.reviewedBy = isValidObjectId(adminUser.id) ? new Types.ObjectId(adminUser.id) : new Types.ObjectId();
     request.reviewedByName = adminUser.name || 'Super Admin';
     request.reviewedAt = now;
     await request.save();
@@ -1163,7 +1173,7 @@ export class PaymentsService {
     // 4. Log in Audit Log
     try {
       await this.auditLogModel.create({
-        userId: new Types.ObjectId(adminUser.id),
+        userId: isValidObjectId(adminUser.id) ? new Types.ObjectId(adminUser.id) : new Types.ObjectId(),
         userName: adminUser.name || 'Super Admin',
         action: 'SUBSCRIPTION_REQUEST_APPROVED',
         entity: 'SubscriptionRequest',
@@ -1250,7 +1260,7 @@ export class PaymentsService {
 
     request.status = SubscriptionRequestStatus.DENIED;
     request.denialReason = reason;
-    request.reviewedBy = new Types.ObjectId(adminUser.id);
+    request.reviewedBy = isValidObjectId(adminUser.id) ? new Types.ObjectId(adminUser.id) : new Types.ObjectId();
     request.reviewedByName = adminUser.name || 'Super Admin';
     request.reviewedAt = now;
     await request.save();
@@ -1258,7 +1268,7 @@ export class PaymentsService {
     // Log in Audit Log
     try {
       await this.auditLogModel.create({
-        userId: new Types.ObjectId(adminUser.id),
+        userId: isValidObjectId(adminUser.id) ? new Types.ObjectId(adminUser.id) : new Types.ObjectId(),
         userName: adminUser.name || 'Super Admin',
         action: 'SUBSCRIPTION_REQUEST_DENIED',
         entity: 'SubscriptionRequest',
@@ -1307,5 +1317,119 @@ export class PaymentsService {
         reviewedAt: request.reviewedAt,
       },
     };
+  }
+
+  /**
+   * Safe, idempotent reconciliation for eligible approved requests.
+   * Synchronizes user accounts, active subscription models, packages, and trial state.
+   */
+  async reconcileApprovedSubscriptions(): Promise<{ reconciledCount: number }> {
+    let reconciledCount = 0;
+    try {
+      this.logger.log('Reconciling approved subscription requests and user activations...');
+      const approvedRequests = await this.subscriptionRequestModel.find({
+        status: SubscriptionRequestStatus.APPROVED,
+      });
+
+      const now = new Date();
+
+      for (const req of approvedRequests) {
+        if (!req.userId) continue;
+        const targetUser = await this.userModel.findById(req.userId);
+        if (!targetUser) continue;
+
+        const pkg = req.packageId ? await this.packageModel.findById(req.packageId) : null;
+        if (!pkg) continue;
+
+        let durationDays = 30;
+        const billingPeriodUpper = String(pkg.billingPeriod || '').toUpperCase();
+        if (billingPeriodUpper.includes('ANNUAL') || billingPeriodUpper.includes('YEAR')) {
+          durationDays = 365;
+        } else if (billingPeriodUpper.includes('QUARTER')) {
+          durationDays = 90;
+        } else if (billingPeriodUpper.includes('HALF')) {
+          durationDays = 180;
+        }
+
+        let sub = await this.subscriptionModel.findOne({
+          userId: targetUser._id.toString(),
+          packageId: pkg._id.toString(),
+        });
+
+        if (!sub) {
+          sub = await this.subscriptionModel.findOne({
+            userId: targetUser._id.toString(),
+          }).sort({ createdAt: -1 });
+        }
+
+        const reviewedAt = req.reviewedAt
+          ? new Date(req.reviewedAt)
+          : (req.createdAt ? new Date(req.createdAt) : now);
+        const calcExpiry = new Date(reviewedAt.getTime() + durationDays * 24 * 60 * 60 * 1000);
+        const finalExpiry = sub && sub.endDate && new Date(sub.endDate) > now
+          ? new Date(sub.endDate)
+          : (calcExpiry > now ? calcExpiry : new Date(now.getTime() + durationDays * 24 * 60 * 60 * 1000));
+
+        if (!sub) {
+          sub = await this.subscriptionModel.create({
+            userId: targetUser._id.toString(),
+            plan: pkg.name || SubscriptionPlan.PRO,
+            status: SubscriptionStatus.ACTIVE,
+            startDate: reviewedAt,
+            endDate: finalExpiry,
+            packageId: pkg._id.toString(),
+            accountType: targetUser.accountType,
+            durationMonths: durationDays >= 360 ? 12 : Math.max(1, Math.round(durationDays / 30)),
+            amountPaid: pkg.price || 0,
+            currency: 'INR',
+            metadata: {
+              requestReference: req.requestReference,
+              reconciled: true,
+              packageName: pkg.name,
+              packageSlug: pkg.slug,
+              amount: pkg.price,
+            },
+          });
+        } else {
+          let needsSubUpdate = false;
+          if (sub.status !== SubscriptionStatus.ACTIVE) {
+            sub.status = SubscriptionStatus.ACTIVE;
+            needsSubUpdate = true;
+          }
+          if (!sub.packageId || sub.packageId !== pkg._id.toString()) {
+            sub.packageId = pkg._id.toString();
+            needsSubUpdate = true;
+          }
+          if (new Date(sub.endDate) <= now) {
+            sub.endDate = finalExpiry;
+            needsSubUpdate = true;
+          }
+          if (needsSubUpdate) {
+            await sub.save();
+          }
+        }
+
+        const subIdStr = sub._id.toString();
+        const pkgIdStr = pkg._id.toString();
+        if (
+          targetUser.activeSubscriptionId !== subIdStr ||
+          targetUser.activePackageId !== pkgIdStr ||
+          targetUser.trialExpired ||
+          targetUser.isTrialActive
+        ) {
+          targetUser.activeSubscriptionId = subIdStr;
+          targetUser.activePackageId = pkgIdStr;
+          targetUser.trialExpired = false;
+          targetUser.isTrialActive = false;
+          await targetUser.save();
+          reconciledCount++;
+        }
+      }
+
+      this.logger.log(`Reconciled ${reconciledCount} user subscription(s) from approved requests.`);
+    } catch (err: any) {
+      this.logger.warn(`Subscription reconciliation warning: ${err?.message}`);
+    }
+    return { reconciledCount };
   }
 }

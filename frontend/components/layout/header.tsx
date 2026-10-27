@@ -45,6 +45,7 @@ import {
   Receipt,
   Video,
   ChevronDown,
+  Crown,
 } from 'lucide-react';
 
 const ADMIN_PORTAL_URL = process.env.NEXT_PUBLIC_ADMIN_URL || 'http://localhost:3001';
@@ -64,6 +65,8 @@ export function Header() {
     isTrialExpired,
     trialDaysRemaining,
     startTrial,
+    hasActiveSubscription,
+    activePlanName,
   } = useAuth();
   const toast = useToast();
   const [isLangModalOpen, setIsLangModalOpen] = React.useState(false);
@@ -221,8 +224,20 @@ export function Header() {
                 <span className="uppercase">{locale}</span>
               </button>
 
-              {/* 3-Day Trial Status Pill (Active or Expired for Supply-side accounts) */}
-              {isAuthenticated && isTrialActive && !isBuyerOrTenant && !isAdmin && (
+              {/* Active Paid Subscription Pill (Supply-side accounts) */}
+              {isAuthenticated && hasActiveSubscription && !isBuyerOrTenant && !isAdmin && (
+                <Link
+                  href="/dashboard/billing"
+                  className="hidden md:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-400 border border-amber-500/30 text-xs font-bold transition-all cursor-pointer whitespace-nowrap shadow-2xs"
+                  title={`Active Plan: ${activePlanName || 'Paid Subscription'}. Click to manage billing.`}
+                >
+                  <Crown className="w-3.5 h-3.5 text-amber-500 flex-shrink-0" />
+                  <span>{activePlanName || 'Active Plan'}</span>
+                </Link>
+              )}
+
+              {/* 3-Day Trial Status Pill (Active or Expired for Supply-side accounts with NO active paid subscription) */}
+              {isAuthenticated && !hasActiveSubscription && isTrialActive && !isBuyerOrTenant && !isAdmin && (
                 <button
                   type="button"
                   onClick={openPlanSelectionModal}
@@ -234,7 +249,7 @@ export function Header() {
                 </button>
               )}
 
-              {isAuthenticated && isTrialExpired && !isBuyerOrTenant && !isAdmin && (
+              {isAuthenticated && !hasActiveSubscription && isTrialExpired && !isBuyerOrTenant && !isAdmin && (
                 <button
                   type="button"
                   onClick={openTrialExpiredModal}
@@ -311,7 +326,24 @@ export function Header() {
                       {/* Trial & Membership Card in Dropdown (Supply-side accounts only) */}
                       {!isBuyerOrTenant && !isAdmin && (
                         <div className="px-3.5 py-2 border-b border-casa-border-light bg-casa-canvas/50">
-                          {isTrialActive ? (
+                          {hasActiveSubscription ? (
+                            <div className="space-y-1">
+                              <div className="flex items-center justify-between text-[11px]">
+                                <span className="font-bold text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                                  <Crown className="w-3 h-3 text-amber-500" /> {activePlanName || 'Active Plan'}
+                                </span>
+                                <span className="text-[9px] font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-500/15 border border-emerald-500/30 px-1.5 py-0.5 rounded uppercase">
+                                  Active
+                                </span>
+                              </div>
+                              <Link
+                                href="/dashboard/billing"
+                                className="text-[10px] text-casa-brand hover:underline font-semibold block text-start"
+                              >
+                                View billing & subscription →
+                              </Link>
+                            </div>
+                          ) : isTrialActive ? (
                             <div className="space-y-1">
                               <div className="flex items-center justify-between text-[11px]">
                                 <span className="font-bold text-emerald-600 flex items-center gap-1">
@@ -864,8 +896,23 @@ export function Header() {
                   </div>
                 </Link>
 
-                {/* Mobile Trial Pill (Supply-side accounts only) */}
-                {isTrialActive && !isBuyerOrTenant && !isAdmin && (
+                {/* Mobile Active Subscription Pill */}
+                {hasActiveSubscription && !isBuyerOrTenant && !isAdmin && (
+                  <Link
+                    href="/dashboard/billing"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                    className="w-full mb-2.5 px-2.5 py-1.5 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-700 dark:text-amber-400 text-xs font-bold flex items-center justify-between cursor-pointer"
+                  >
+                    <span className="flex items-center gap-1.5">
+                      <Crown className="w-3.5 h-3.5 text-amber-500" />
+                      {activePlanName || 'Active Plan'}
+                    </span>
+                    <span className="text-[10px] uppercase font-semibold text-emerald-600">Active →</span>
+                  </Link>
+                )}
+
+                {/* Mobile Trial Pill (Supply-side accounts with NO active paid subscription) */}
+                {!hasActiveSubscription && isTrialActive && !isBuyerOrTenant && !isAdmin && (
                   <button
                     type="button"
                     onClick={() => {
@@ -882,7 +929,7 @@ export function Header() {
                   </button>
                 )}
 
-                {isTrialExpired && !isBuyerOrTenant && !isAdmin && (
+                {!hasActiveSubscription && isTrialExpired && !isBuyerOrTenant && !isAdmin && (
                   <button
                     type="button"
                     onClick={() => {

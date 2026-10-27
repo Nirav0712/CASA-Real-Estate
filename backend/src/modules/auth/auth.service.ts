@@ -17,6 +17,8 @@ import { User, UserDocument } from './schemas/user.schema';
 import { OtpChallenge, OtpChallengeDocument } from './schemas/otp-challenge.schema';
 import { RefreshSession, RefreshSessionDocument } from './schemas/refresh-session.schema';
 import { AgentProfile, AgentProfileDocument } from '../agents/schemas/agent-profile.schema';
+import { Subscription, SubscriptionDocument } from '../payments/schemas/subscription.schema';
+import { Package, PackageDocument } from '../entitlements/schemas/package.schema';
 import { RequestOtpDto } from './dto/request-otp.dto';
 import { VerifyOtpDto } from './dto/verify-otp.dto';
 import { RegisterDto } from './dto/register.dto';
@@ -125,6 +127,10 @@ export class AuthService implements OnModuleInit {
     private readonly refreshSessionModel: Model<RefreshSessionDocument>,
     @InjectModel(AgentProfile.name)
     private readonly agentProfileModel: Model<AgentProfileDocument>,
+    @InjectModel(Subscription.name)
+    private readonly subscriptionModel: Model<SubscriptionDocument>,
+    @InjectModel(Package.name)
+    private readonly packageModel: Model<PackageDocument>,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
     private readonly mockOtpProvider: MockOtpProvider,
@@ -1088,9 +1094,56 @@ export class AuthService implements OnModuleInit {
       throw new UnauthorizedException('User profile not found.');
     }
 
+    let activeSub: any = null;
+    let activePkg: any = null;
+
+    if (this.isDbConnected() && (user._id || user.id)) {
+      const uid = (user._id || user.id).toString();
+      try {
+        activeSub = await this.subscriptionModel.findOne({
+          userId: uid,
+          status: 'ACTIVE',
+          endDate: { $gte: new Date() },
+        }).sort({ createdAt: -1 });
+
+        if (activeSub) {
+          if (activeSub.packageId && isValidObjectId(activeSub.packageId)) {
+            activePkg = await this.packageModel.findById(activeSub.packageId);
+          }
+          // Self-heal user document if activeSubscriptionId is missing or trialExpired flag is dirty
+          const subIdStr = activeSub._id.toString();
+          const pkgIdStr = activeSub.packageId ? activeSub.packageId.toString() : user.activePackageId;
+          if (
+            user.activeSubscriptionId !== subIdStr ||
+            user.activePackageId !== pkgIdStr ||
+            user.trialExpired ||
+            user.isTrialActive
+          ) {
+            user.activeSubscriptionId = subIdStr;
+            user.activePackageId = pkgIdStr;
+            user.trialExpired = false;
+            user.isTrialActive = false;
+            await this.userModel.updateOne(
+              { _id: user._id || user.id },
+              {
+                $set: {
+                  activeSubscriptionId: subIdStr,
+                  activePackageId: pkgIdStr,
+                  trialExpired: false,
+                  isTrialActive: false,
+                },
+              },
+            );
+          }
+        }
+      } catch (subErr: any) {
+        this.logger.warn(`Subscription resolution in getMe: ${subErr?.message}`);
+      }
+    }
+
     return {
       success: true,
-      user: this.sanitizeUser(user),
+      user: this.sanitizeUser(user, activeSub, activePkg),
     };
   }
 
@@ -1134,6 +1187,9 @@ export class AuthService implements OnModuleInit {
       permissions,
       status: user.status || AccountStatus.ACTIVE,
       isVerifiedAgent: norm.isVerifiedAgent,
+      activePackageId: user.activePackageId || null,
+      activeSubscriptionId: user.activeSubscriptionId || null,
+      hasActiveSubscription: Boolean(user.activeSubscriptionId && user.activePackageId),
     };
 
     const refreshPayload: JwtRefreshPayload = {
@@ -1949,7 +2005,7 @@ export class AuthService implements OnModuleInit {
   /**
    * Helper: Sanitizes user model removing internal attributes and guaranteeing authoritative structure
    */
-  sanitizeUser(user: any): AuthenticatedUser {
+  sanitizeUser(user: any, activeSub?: any, activePkg?: any): AuthenticatedUser {
     const norm = normalizeUserRoleModel({
       role: user.role,
       platformRole: user.platformRole,
@@ -1962,6 +2018,25 @@ export class AuthService implements OnModuleInit {
         ? user.permissions
         : this.getDefaultPermissions(norm.platformRole, norm.accountType);
 
+    const isConsumer =
+      norm.accountType === AccountType.BUYER ||
+      norm.accountType === AccountType.TENANT ||
+      norm.role === UserRole.BUYER ||
+      norm.role === UserRole.TENANT ||
+      norm.role === UserRole.PURCHASER;
+
+    const isPlatformAdmin =
+      norm.platformRole === PlatformRole.SUPER_ADMIN ||
+      norm.platformRole === PlatformRole.ADMIN ||
+      norm.platformRole === PlatformRole.MODERATOR;
+
+    // Check if user has an active paid subscription
+    const hasActiveSub = !isConsumer && !isPlatformAdmin && Boolean(
+      activeSub ||
+      user.hasActiveSubscription ||
+      (user.activeSubscriptionId && user.activePackageId && !user.isTrialActive)
+    );
+
     const now = new Date();
     const msRemaining = user.trialExpiresAt
       ? new Date(user.trialExpiresAt).getTime() - now.getTime()
@@ -1969,22 +2044,50 @@ export class AuthService implements OnModuleInit {
 
     let trialDaysRemaining = 0;
     let trialRemainingLabel = '';
+    
+    // When an active paid subscription exists, trial active and trial expired are both false
     const isTrialActive = Boolean(
-      user.isTrialActive && user.trialExpiresAt && msRemaining > 0
+      !hasActiveSub && user.isTrialActive && user.trialExpiresAt && msRemaining > 0
     );
     const isTrialExpired = Boolean(
-      user.trialExpired || (user.trialExpiresAt && msRemaining <= 0)
+      !hasActiveSub && (user.trialExpired || (user.trialExpiresAt && msRemaining <= 0))
     );
 
-    // Persist trial expired status in database so it cannot restart on relogin or page refresh
-    if (isTrialExpired && (!user.trialExpired || user.isTrialActive)) {
+    // If user has an active subscription, clear any dirty trialExpired flag in DB
+    if (hasActiveSub && user.trialExpired) {
+      user.trialExpired = false;
+      user.isTrialActive = false;
+      if (this.isDbConnected() && (user._id || user.id) && typeof this.userModel?.updateOne === 'function') {
+        try {
+          const res = this.userModel.updateOne(
+            { _id: user._id || user.id },
+            { $set: { trialExpired: false, isTrialActive: false } }
+          );
+          if (res && typeof (res as any).exec === 'function') {
+            (res as any).exec().catch(() => {});
+          } else if (res && typeof (res as any).catch === 'function') {
+            (res as any).catch(() => {});
+          }
+        } catch {}
+      }
+    }
+
+    // Persist trial expired status in database only when user has NO active paid subscription
+    if (!hasActiveSub && isTrialExpired && (!user.trialExpired || user.isTrialActive)) {
       user.trialExpired = true;
       user.isTrialActive = false;
-      if (this.isDbConnected() && (user._id || user.id)) {
-        this.userModel.updateOne(
-          { _id: user._id || user.id },
-          { $set: { trialExpired: true, isTrialActive: false } }
-        ).exec().catch(() => {});
+      if (this.isDbConnected() && (user._id || user.id) && typeof this.userModel?.updateOne === 'function') {
+        try {
+          const res = this.userModel.updateOne(
+            { _id: user._id || user.id },
+            { $set: { trialExpired: true, isTrialActive: false } }
+          );
+          if (res && typeof (res as any).exec === 'function') {
+            (res as any).exec().catch(() => {});
+          } else if (res && typeof (res as any).catch === 'function') {
+            (res as any).catch(() => {});
+          }
+        } catch {}
       }
     }
 
@@ -2001,29 +2104,27 @@ export class AuthService implements OnModuleInit {
       }
     }
 
-    const isConsumer =
-      norm.accountType === AccountType.BUYER ||
-      norm.accountType === AccountType.TENANT ||
-      norm.role === UserRole.BUYER ||
-      norm.role === UserRole.TENANT ||
-      norm.role === UserRole.PURCHASER;
-
-    const isPlatformAdmin =
-      norm.platformRole === PlatformRole.SUPER_ADMIN ||
-      norm.platformRole === PlatformRole.ADMIN ||
-      norm.platformRole === PlatformRole.MODERATOR;
-
     const isKycExempt = isConsumer || isPlatformAdmin;
     const isKycApproved = user.kycStatus === 'APPROVED' || norm.isVerifiedAgent === true;
 
     const isTrialEligible =
       !isConsumer &&
       !isPlatformAdmin &&
+      !hasActiveSub &&
       !user.activePackageId &&
       !user.trialStartedAt &&
       !user.trialUsed &&
       !user.trialExpired &&
       isKycApproved;
+
+    const activeSubscriptionId = user.activeSubscriptionId || (activeSub ? activeSub._id.toString() : null);
+    const activePackageId = (isConsumer || isPlatformAdmin)
+      ? null
+      : (user.activePackageId || (activeSub?.packageId ? activeSub.packageId.toString() : null));
+    const activePlanName = activePkg?.name || activeSub?.plan || user.activePlanName || null;
+    const subscriptionStatus = activeSub?.status || (hasActiveSub ? 'ACTIVE' : null);
+    const subscriptionExpiresAt = activeSub?.endDate || user.subscriptionExpiresAt || null;
+    const subscriptionStartDate = activeSub?.startDate || user.subscriptionStartDate || null;
 
     return {
       id: user._id ? user._id.toString() : user.id,
@@ -2049,7 +2150,13 @@ export class AuthService implements OnModuleInit {
       trialDaysRemaining: (isConsumer || isPlatformAdmin) ? 0 : trialDaysRemaining,
       trialRemainingLabel: (isConsumer || isPlatformAdmin) ? '' : trialRemainingLabel,
       trialUsed: (isConsumer || isPlatformAdmin) ? false : Boolean(user.trialUsed || user.trialStartedAt),
-      activePackageId: (isConsumer || isPlatformAdmin) ? null : (user.activePackageId || null),
+      activePackageId,
+      activeSubscriptionId,
+      hasActiveSubscription: hasActiveSub,
+      activePlanName,
+      subscriptionStatus,
+      subscriptionExpiresAt,
+      subscriptionStartDate,
       kycStatus: isKycExempt ? 'EXEMPT' : (user.kycStatus || 'NOT_SUBMITTED'),
       isKycExempt,
       isKycRequired: !isKycExempt,

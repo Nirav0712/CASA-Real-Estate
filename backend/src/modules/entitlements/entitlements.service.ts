@@ -1454,10 +1454,10 @@ export class EntitlementsService implements OnModuleInit {
       package: packageDoc ? { id: packageDoc._id.toString(), name: packageDoc.name, slug: packageDoc.slug, price: packageDoc.price, billingPeriod: packageDoc.billingPeriod } : null,
       subscription: subscriptionDoc ? { id: subscriptionDoc._id.toString(), status: subscriptionDoc.status, endDate: subscriptionDoc.endDate } : null,
       trial: {
-        isTrialActive: Boolean(user.trialExpiresAt && new Date() <= new Date(user.trialExpiresAt)),
-        isTrialExpired: Boolean(user.trialExpiresAt && new Date() > new Date(user.trialExpiresAt)),
+        isTrialActive: !subscriptionDoc && Boolean(user.trialExpiresAt && new Date() <= new Date(user.trialExpiresAt)),
+        isTrialExpired: !subscriptionDoc && Boolean(user.trialExpiresAt && new Date() > new Date(user.trialExpiresAt)),
         trialExpiresAt: user.trialExpiresAt || null,
-        daysRemaining: user.trialExpiresAt
+        daysRemaining: !subscriptionDoc && user.trialExpiresAt
           ? Math.max(0, Math.ceil((new Date(user.trialExpiresAt).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
           : 0,
         trialPackageId: user.trialPackageId || null,

@@ -22,6 +22,8 @@ import { MockOtpProvider } from './providers/mock-otp.provider';
 import { Msg91OtpProvider } from './providers/msg91-otp.provider';
 import { MailService } from './services/mail.service';
 import { AgentProfile } from '../agents/schemas/agent-profile.schema';
+import { Subscription } from '../payments/schemas/subscription.schema';
+import { Package } from '../entitlements/schemas/package.schema';
 import { UserRole, AccountStatus, OtpStatus, PlatformRole, AccountType } from './enums/auth.enums';
 import { hashPassword, hashToken } from './utils/password.util';
 import { ConflictException } from '@nestjs/common';
@@ -42,6 +44,7 @@ describe('AuthService (Security-First Unit & Integration Tests)', () => {
       findOne: jest.fn(),
       findById: jest.fn(),
       create: jest.fn(),
+      updateOne: jest.fn().mockReturnValue({ exec: jest.fn().mockResolvedValue({ modifiedCount: 1 }) }),
     };
 
     mockOtpChallengeModel = {
@@ -99,6 +102,18 @@ describe('AuthService (Security-First Unit & Integration Tests)', () => {
       sendPasswordResetEmail: jest.fn().mockResolvedValue({ success: true }),
     };
 
+    const mockSubscriptionModel = {
+      findOne: jest.fn().mockReturnValue({ sort: jest.fn().mockResolvedValue(null) }),
+      find: jest.fn(),
+      create: jest.fn(),
+      updateOne: jest.fn(),
+    };
+
+    const mockPackageModel = {
+      findById: jest.fn().mockResolvedValue(null),
+      findOne: jest.fn().mockResolvedValue(null),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         AuthService,
@@ -106,6 +121,8 @@ describe('AuthService (Security-First Unit & Integration Tests)', () => {
         { provide: getModelToken(OtpChallenge.name), useValue: mockOtpChallengeModel },
         { provide: getModelToken(RefreshSession.name), useValue: mockRefreshSessionModel },
         { provide: getModelToken(AgentProfile.name), useValue: mockAgentProfileModel },
+        { provide: getModelToken(Subscription.name), useValue: mockSubscriptionModel },
+        { provide: getModelToken(Package.name), useValue: mockPackageModel },
         { provide: JwtService, useValue: mockJwtService },
         { provide: ConfigService, useValue: mockConfigService },
         { provide: MockOtpProvider, useValue: mockOtpProvider },
@@ -774,4 +791,70 @@ describe('AuthService (Security-First Unit & Integration Tests)', () => {
       expect(user.passwordResetTokenHash).toBeUndefined();
     });
   });
+
+  describe('Subscription Status Priority & Trial Reconciliation', () => {
+    it('35. should prioritize active paid subscription over expired trial', () => {
+      const user = {
+        _id: '507f1f77bcf86cd799439099',
+        name: 'Agent User',
+        mobile: '+919876543210',
+        role: UserRole.AGENT,
+        accountType: AccountType.AGENT,
+        platformRole: PlatformRole.USER,
+        activePackageId: '6adee645c24043a0c94d56e5',
+        activeSubscriptionId: '6adf015235a23e3b94b6d69f',
+        trialExpiresAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000), // trial expired 2 days ago
+        trialExpired: true,
+        isTrialActive: false,
+      };
+
+      const activeSub = {
+        _id: '6adf015235a23e3b94b6d69f',
+        userId: '507f1f77bcf86cd799439099',
+        plan: 'Agent Silver',
+        status: 'ACTIVE',
+        packageId: '6adee645c24043a0c94d56e5',
+        endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+      };
+
+      const activePkg = {
+        _id: '6adee645c24043a0c94d56e5',
+        name: 'Agent Silver',
+        price: 499,
+      };
+
+      const sanitized = service.sanitizeUser(user, activeSub, activePkg);
+
+      expect(sanitized.hasActiveSubscription).toBe(true);
+      expect(sanitized.activePlanName).toBe('Agent Silver');
+      expect(sanitized.isTrialExpired).toBe(false);
+      expect(sanitized.isTrialActive).toBe(false);
+      expect(sanitized.activeSubscriptionId).toBe('6adf015235a23e3b94b6d69f');
+      expect(sanitized.subscriptionStatus).toBe('ACTIVE');
+    });
+
+    it('36. should show trial expired when user has no active paid subscription and trial date has passed', () => {
+      const user = {
+        _id: '507f1f77bcf86cd799439098',
+        name: 'Expired Trial User',
+        mobile: '+919876543211',
+        role: UserRole.AGENT,
+        accountType: AccountType.AGENT,
+        platformRole: PlatformRole.USER,
+        activePackageId: null,
+        activeSubscriptionId: null,
+        trialExpiresAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
+        trialExpired: true,
+        isTrialActive: false,
+      };
+
+      const sanitized = service.sanitizeUser(user);
+
+      expect(sanitized.hasActiveSubscription).toBe(false);
+      expect(sanitized.isTrialExpired).toBe(true);
+      expect(sanitized.isTrialActive).toBe(false);
+      expect(sanitized.activePlanName).toBeNull();
+    });
+  });
 });
+

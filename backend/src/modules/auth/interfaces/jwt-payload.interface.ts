@@ -14,6 +14,10 @@ export interface JwtAccessPayload {
   isTrialActive?: boolean;
   trialExpired?: boolean;
   activePackageId?: string | null;
+  activeSubscriptionId?: string | null;
+  hasActiveSubscription?: boolean;
+  activePlanName?: string | null;
+  subscriptionStatus?: string | null;
   kycStatus?: string;
   iat?: number;
   exp?: number;
@@ -54,6 +58,12 @@ export interface AuthenticatedUser {
   trialDaysRemaining?: number;
   trialRemainingLabel?: string;
   activePackageId?: string | null;
+  activeSubscriptionId?: string | null;
+  hasActiveSubscription?: boolean;
+  activePlanName?: string | null;
+  subscriptionStatus?: string | null;
+  subscriptionExpiresAt?: Date | string | null;
+  subscriptionStartDate?: Date | string | null;
   kycStatus?: string;
   isKycExempt?: boolean;
   isKycRequired?: boolean;

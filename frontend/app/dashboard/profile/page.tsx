@@ -58,6 +58,7 @@ import {
   Menu,
   X,
   Lock,
+  Crown,
 } from 'lucide-react';
 
 const ADMIN_PORTAL_URL = process.env.NEXT_PUBLIC_ADMIN_URL || 'http://localhost:3001';
@@ -80,6 +81,8 @@ export default function ProfileDashboardPage() {
     isTrialActive,
     isTrialExpired,
     trialDaysRemaining,
+    hasActiveSubscription,
+    activePlanName,
   } = useAuth();
 
   const toast = useToast();
@@ -391,7 +394,25 @@ export default function ProfileDashboardPage() {
                 {/* 3-Day Trial Status Card (Supply-side accounts) */}
                 {isSupplySide && !isAdmin && (
                   <div className="w-full mt-2 pt-2 border-t border-casa-border-light text-start">
-                    {isTrialActive ? (
+                    {hasActiveSubscription ? (
+                      <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 space-y-1">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="font-bold text-amber-700 dark:text-amber-400 flex items-center gap-1">
+                            <Crown className="w-3.5 h-3.5 text-amber-500" />
+                            {activePlanName || 'Active Plan'}
+                          </span>
+                          <span className="text-[9px] font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-500/15 border border-emerald-500/30 px-1.5 py-0.5 rounded uppercase">
+                            Active
+                          </span>
+                        </div>
+                        <Link
+                          href="/dashboard/billing"
+                          className="w-full text-center text-[10px] font-bold text-casa-brand hover:underline block pt-0.5"
+                        >
+                          Manage Subscription →
+                        </Link>
+                      </div>
+                    ) : isTrialActive ? (
                       <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 space-y-1.5">
                         <div className="flex items-center justify-between text-[11px]">
                           <span className="font-bold text-emerald-700 dark:text-emerald-300 flex items-center gap-1">

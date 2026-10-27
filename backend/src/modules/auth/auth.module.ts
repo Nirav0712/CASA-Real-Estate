@@ -6,6 +6,8 @@ import { User, UserSchema } from './schemas/user.schema';
 import { OtpChallenge, OtpChallengeSchema } from './schemas/otp-challenge.schema';
 import { RefreshSession, RefreshSessionSchema } from './schemas/refresh-session.schema';
 import { AgentProfile, AgentProfileSchema } from '../agents/schemas/agent-profile.schema';
+import { Subscription, SubscriptionSchema } from '../payments/schemas/subscription.schema';
+import { Package, PackageSchema } from '../entitlements/schemas/package.schema';
 import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
 import { MockOtpProvider } from './providers/mock-otp.provider';
@@ -22,6 +24,8 @@ import { RolesGuard } from './guards/roles.guard';
       { name: OtpChallenge.name, schema: OtpChallengeSchema },
       { name: RefreshSession.name, schema: RefreshSessionSchema },
       { name: AgentProfile.name, schema: AgentProfileSchema },
+      { name: Subscription.name, schema: SubscriptionSchema },
+      { name: Package.name, schema: PackageSchema },
     ]),
     JwtModule.registerAsync({
       global: true,

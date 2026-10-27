@@ -61,6 +61,10 @@ interface AuthContextType {
   trialDaysRemaining: number;
   trialRemainingLabel: string;
   startTrial: () => Promise<void>;
+  hasActiveSubscription: boolean;
+  activePlanName: string | null;
+  subscriptionStatus: string | null;
+  subscriptionExpiresAt: string | null;
 }
 
 const AuthContext = React.createContext<AuthContextType | undefined>(undefined);
@@ -405,9 +409,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, [user, token, toast]);
 
-  // Compute trial status dynamically
+  // Check if user has an active paid subscription
+  const hasActiveSubscription = React.useMemo(() => {
+    if (!user) return false;
+    return Boolean(
+      user.hasActiveSubscription ||
+      user.subscriptionStatus === 'ACTIVE' ||
+      (user.activeSubscriptionId && user.activePackageId && !user.isTrialActive)
+    );
+  }, [user]);
+
+  const activePlanName = user?.activePlanName || null;
+  const subscriptionStatus = user?.subscriptionStatus || (hasActiveSubscription ? 'ACTIVE' : null);
+  const subscriptionExpiresAt = user?.subscriptionExpiresAt || null;
+
+  // Compute trial status dynamically (active paid subscription supersedes trials)
   const trialStatus = React.useMemo(() => {
-    if (!user || isUserExempt) {
+    if (!user || isUserExempt || hasActiveSubscription) {
       return { isTrialActive: false, isTrialExpired: false, daysRemaining: 0, remainingLabel: '' };
     }
 
@@ -438,7 +456,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       daysRemaining,
       remainingLabel,
     };
-  }, [user, isUserExempt]);
+  }, [user, isUserExempt, hasActiveSubscription]);
 
   const startTrial = React.useCallback(async () => {
     if (isUserExempt) {
@@ -461,14 +479,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return res;
   }, [token, toast, isUserExempt]);
 
-  // Auto-prompt trial expired modal once per session if trial has passed
+  // Auto-prompt trial expired modal once per session only if trial has passed and user has no active paid subscription
   const hasPromptedExpiryRef = React.useRef(false);
   React.useEffect(() => {
-    if (user && !isUserExempt && trialStatus.isTrialExpired && !hasPromptedExpiryRef.current) {
+    if (user && !isUserExempt && !hasActiveSubscription && trialStatus.isTrialExpired && !hasPromptedExpiryRef.current) {
       hasPromptedExpiryRef.current = true;
       setIsTrialExpiredModalOpen(true);
     }
-  }, [user, isUserExempt, trialStatus.isTrialExpired]);
+  }, [user, isUserExempt, hasActiveSubscription, trialStatus.isTrialExpired]);
 
   const openAuthModal = React.useCallback((initialMode?: any) => {
     if (initialMode && typeof initialMode === 'string') {
@@ -647,6 +665,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         trialDaysRemaining: trialStatus.daysRemaining,
         trialRemainingLabel: trialStatus.remainingLabel,
         startTrial,
+        hasActiveSubscription,
+        activePlanName,
+        subscriptionStatus,
+        subscriptionExpiresAt,
       }}
     >
       {children}
