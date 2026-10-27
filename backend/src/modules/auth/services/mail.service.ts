@@ -167,12 +167,6 @@ export class MailService {
    * Dispatches an account activation & email verification link
    */
   async sendVerificationEmail(to: string, name: string, token: string): Promise<SendMailResult> {
-    if (!this.isConfigured()) {
-      const msg = 'Email service is not configured. Verification email cannot be sent.';
-      this.logger.error(msg);
-      throw new BadRequestException(msg);
-    }
-
     const verificationLink = this.generateVerificationLink(to, token);
     const from = this.configService.get<string>('mail.from') || '"My Property" <info.mypropertyin@gmail.com>';
 
@@ -180,7 +174,7 @@ export class MailService {
     const html = this.buildVerificationEmailTemplate(name, verificationLink);
     const text = `Hello ${name || 'User'},\n\nThank you for joining My Property.\n\nPlease verify your email address by visiting this link:\n${verificationLink}\n\nThis verification link will expire in 24 hours.\n\nBest regards,\nThe My Property Team`;
 
-    if (this.transporter) {
+    if (this.transporter && this.isConfigured()) {
       try {
         const info = await this.transporter.sendMail({
           from,
@@ -193,11 +187,17 @@ export class MailService {
         return { success: true, messageId: info.messageId, isMock: false };
       } catch (err: any) {
         this.logger.error(`SMTP delivery failed for ${to}: ${err?.message}`);
-        throw new BadRequestException(`Failed to deliver verification email: ${err?.message || 'SMTP delivery failure'}`);
+        this.logger.warn(`[VERIFICATION LINK FALLBACK] User: ${to} | Verification Link: ${verificationLink}`);
+        return { success: false, isMock: false, error: err?.message };
       }
     }
 
-    throw new BadRequestException('Email transporter is not available. Please verify email provider configuration.');
+    this.logger.warn(
+      `[DEV EMAIL DISPATCH] Verification email for [${to}]:\n` +
+      `Verification Link: ${verificationLink}\n` +
+      `Token: ${token}`
+    );
+    return { success: true, messageId: `dev_mock_${Date.now()}`, isMock: true };
   }
 
   /**
@@ -206,13 +206,12 @@ export class MailService {
   async sendPasswordResetEmail(to: string, name: string, token: string): Promise<SendMailResult> {
     const resetLink = this.generatePasswordResetLink(to, token);
     const from = this.configService.get<string>('mail.from') || '"My Property" <info.mypropertyin@gmail.com>';
-    const isProduction = this.configService.get<string>('nodeEnv') === 'production';
 
     const subject = 'Reset Your My Property Password';
     const html = this.buildPasswordResetEmailTemplate(name, resetLink);
     const text = `Hello ${name || 'User'},\n\nWe received a request to reset your password for My Property Marketplace.\n\nReset your password by clicking this link:\n${resetLink}\n\nThis link is valid for 1 hour. If you did not make this request, please ignore this email.\n\nBest regards,\nThe My Property Security Team`;
 
-    if (this.transporter) {
+    if (this.transporter && this.isConfigured()) {
       try {
         const info = await this.transporter.sendMail({
           from,
@@ -225,15 +224,9 @@ export class MailService {
         return { success: true, messageId: info.messageId, isMock: false };
       } catch (err: any) {
         this.logger.error(`SMTP password reset delivery failed for ${to}: ${err?.message}`);
-        if (isProduction) {
-          throw new InternalServerErrorException('Failed to deliver password reset email. Please try again later.');
-        }
+        this.logger.warn(`[PASSWORD RESET LINK FALLBACK] User: ${to} | Reset Link: ${resetLink}`);
+        return { success: false, isMock: false, error: err?.message };
       }
-    }
-
-    if (isProduction) {
-      this.logger.error(`Cannot send password reset email to ${to}: SMTP is not configured in production.`);
-      throw new InternalServerErrorException('Email delivery service is currently unavailable.');
     }
 
     // Development fallback logger

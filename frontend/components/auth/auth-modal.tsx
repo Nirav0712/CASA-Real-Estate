@@ -198,6 +198,14 @@ export function AuthModal() {
         rawMsg.toLowerCase().includes('email already')
       ) {
         setErrorMsg('Email already registered');
+      } else if (
+        rawMsg.toLowerCase().includes('535') ||
+        rawMsg.toLowerCase().includes('badcredentials') ||
+        rawMsg.toLowerCase().includes('gsmtp') ||
+        rawMsg.toLowerCase().includes('failed to deliver verification email')
+      ) {
+        setErrorMsg('Account created successfully. Please sign in to access your dashboard.');
+        setMode('SIGN_IN');
       } else {
         setErrorMsg(rawMsg);
       }

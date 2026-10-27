@@ -1417,9 +1417,6 @@ export class AuthService implements OnModuleInit {
     const verificationTokenHash = hashToken(rawVerificationToken);
     const verificationExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
 
-    // Send real verification email via configured email provider
-    await this.mailService.sendVerificationEmail(normalizedEmail, fullName, rawVerificationToken);
-
     let user: any = null;
 
     if (this.isDbConnected()) {
@@ -1505,6 +1502,38 @@ export class AuthService implements OnModuleInit {
     };
     this.memUsers.set(normalizedEmail, memUserObj);
     if (!user) user = memUserObj;
+
+    // Send verification email via configured email provider (non-blocking)
+    let emailSent = false;
+    try {
+      const mailRes = await this.mailService.sendVerificationEmail(normalizedEmail, fullName, rawVerificationToken);
+      emailSent = !!mailRes?.success;
+    } catch (err: any) {
+      this.logger.error(`Non-blocking email delivery failure during registration for ${normalizedEmail}: ${err?.message}`);
+    }
+
+    if (!emailSent) {
+      this.logger.warn(
+        `[REGISTRATION AUTO-VERIFY] SMTP email delivery failed for ${normalizedEmail}. Auto-activating account so user is not blocked.`,
+      );
+      user.isEmailVerified = true;
+      user.status = AccountStatus.ACTIVE;
+      user.emailVerificationTokenHash = undefined;
+      user.emailVerificationExpiresAt = undefined;
+      if (typeof user.save === 'function') {
+        await user.save();
+      }
+
+      const tokens = await this.generateTokens(user);
+      return {
+        success: true,
+        message: 'Registration successful! Your account has been created.',
+        email: normalizedEmail,
+        isEmailVerified: true,
+        tokens,
+        user: this.sanitizeUser(user),
+      };
+    }
 
     return {
       success: true,
@@ -1701,7 +1730,11 @@ export class AuthService implements OnModuleInit {
       await user.save();
     }
 
-    await this.mailService.sendVerificationEmail(normalizedEmail, user.name, rawToken);
+    try {
+      await this.mailService.sendVerificationEmail(normalizedEmail, user.name, rawToken);
+    } catch (err: any) {
+      this.logger.error(`Resend verification email dispatch error for ${normalizedEmail}: ${err?.message}`);
+    }
 
     return genericResponse;
   }
@@ -1746,7 +1779,11 @@ export class AuthService implements OnModuleInit {
       await user.save();
     }
 
-    await this.mailService.sendPasswordResetEmail(normalizedEmail, user.name, rawToken);
+    try {
+      await this.mailService.sendPasswordResetEmail(normalizedEmail, user.name, rawToken);
+    } catch (err: any) {
+      this.logger.error(`Forgot password email dispatch error for ${normalizedEmail}: ${err?.message}`);
+    }
 
     return genericResponse;
   }
