@@ -708,7 +708,7 @@ export default function AdminLocationsPage() {
       {loading ? (
         <div className="py-20 text-center space-y-3">
           <RotateCcw className="w-8 h-8 text-casa-brand animate-spin mx-auto" />
-          <p className="text-xs text-casa-text-muted font-medium">Loading database locations...</p>
+          <p className="text-xs text-casa-text-muted font-medium">Loading...</p>
         </div>
       ) : viewMode === 'tree' ? (
         /* TREE VIEW */

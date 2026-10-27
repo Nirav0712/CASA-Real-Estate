@@ -152,7 +152,7 @@ function VerifyEmailContent() {
                 Email Address Verified!
               </h2>
               <p className="text-xs text-casa-text-secondary max-w-xs mx-auto leading-relaxed">
-                Your email <strong className="text-casa-text-primary">{emailParam}</strong> has been successfully verified. Your CASA account is now active.
+                Your email <strong className="text-casa-text-primary">{emailParam}</strong> has been successfully verified. Your My Property account is now active.
               </p>
             </div>
 
@@ -229,7 +229,7 @@ function VerifyEmailContent() {
                 href="/"
                 className="text-xs text-casa-brand font-semibold hover:underline"
               >
-                ← Return to CASA Marketplace Home
+                ← Return to My Property Marketplace Home
               </Link>
             </div>
           </div>

@@ -12,7 +12,7 @@ export default function Error({
   reset: () => void;
 }) {
   useEffect(() => {
-    console.error('CASA Admin Client Error:', error);
+    console.error('My Property Admin Client Error:', error);
   }, [error]);
 
   return (

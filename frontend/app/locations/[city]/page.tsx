@@ -71,7 +71,7 @@ export async function generateMetadata({ params }: CityPageProps): Promise<Metad
     averageSqFt: 5000,
   };
 
-  const title = `Properties in ${cityInfo.name}, ${cityInfo.state} | Buy & Rent on CASA`;
+  const title = `Properties in ${cityInfo.name}, ${cityInfo.state} | Buy & Rent on My Property`;
   const description = `Explore verified residential apartments, villas, and commercial real estate for sale and rent in ${cityInfo.name}. Verified agent listings and direct owner properties.`;
   const canonicalUrl = `https://casa-real-estate-mocha.vercel.app/locations/${cityKey}`;
 
@@ -86,7 +86,7 @@ export async function generateMetadata({ params }: CityPageProps): Promise<Metad
       description,
       url: canonicalUrl,
       type: 'website',
-      siteName: 'myproperty Marketplace',
+      siteName: 'My Property Marketplace',
       images: [
         {
           url: 'https://casa-real-estate-mocha.vercel.app/og-image.jpg',
@@ -126,8 +126,8 @@ export default async function CityLocationPage({ params }: CityPageProps) {
       answer: `As of current market trends, residential properties in ${cityInfo.name} average approximately ₹${cityInfo.averageSqFt.toLocaleString()} per sq.ft, depending on prime locality, amenities, and developer reputation.`,
     },
     {
-      question: `Are properties on CASA in ${cityInfo.name} RERA verified?`,
-      answer: `Yes, CASA requires all builder projects and authorized agents in ${cityInfo.name} to display verified RERA registration numbers and compliance documentation before publishing.`,
+      question: `Are properties on My Property in ${cityInfo.name} RERA verified?`,
+      answer: `Yes, My Property requires all builder projects and authorized agents in ${cityInfo.name} to display verified RERA registration numbers and compliance documentation before publishing.`,
     },
     {
       question: `Can I schedule a physical site visit in ${cityInfo.name}?`,

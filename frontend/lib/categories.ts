@@ -1,12 +1,8 @@
 import {
   Home,
   Building,
-  Layers,
   MapPin,
-  Trees,
-  Maximize2,
   Store,
-  Warehouse,
   KeyRound,
   Scale,
   type LucideIcon,
@@ -37,153 +33,73 @@ export const CASA_CATEGORIES: CategoryDefinition[] = [
       ur: 'مکان / ولا',
     },
     description: {
-      en: 'Independent houses, villas, builder floors, and row houses.',
+      en: 'Independent houses, villas, builder floors, duplexes, and row houses.',
       hi: 'स्वतंत्र घर, विला, बिल्डर फ्लोर और रो हाउस।',
       ar: 'منازل مستقلة وفلل وأدوار سكنية فاخرة.',
       ur: 'خود مختار مکانات، ولاز اور بلڈر فلورز۔',
     },
     icon: Home,
-    count: '1,420+ Ads',
+    count: '2,420+ Ads',
     group: 'Residential',
   },
   {
-    id: 'apartment',
-    name: 'Apartment',
-    slug: 'apartment',
+    id: 'apartment-flat',
+    name: 'Apartment / Flat',
+    slug: 'apartment-flat',
     localizedNames: {
-      en: 'Apartment',
-      hi: 'अपार्टमेंट्स',
-      ar: 'شقق سكنية',
-      ur: 'اپارٹمنٹس',
+      en: 'Apartment / Flat',
+      hi: 'अपार्टमेंट / फ्लैट',
+      ar: 'شقق سكنية وفلات',
+      ur: 'اپارٹمنٹس اور فلیٹس',
     },
     description: {
-      en: 'Multi-storey condominiums and luxury gated society apartments.',
-      hi: 'बहुमंजिला सोसायटी और लक्जरी गेटेड अपार्टमेंट्स।',
-      ar: 'شقق سكنية في مجمعات متكاملة الخدمات.',
-      ur: 'کثیر منزلہ سوسائٹیز اور لگژری اپارٹمنٹس۔',
+      en: 'Multi-storey condominiums, flats, studio apartments, and luxury gated society homes.',
+      hi: 'बहुमंजिला सोसायटी, फ्लैट्स और लक्जरी गेटेड अपार्टमेंट्स।',
+      ar: 'شقق سكنية وأبراج سكنية في مجمعات متكاملة الخدمات.',
+      ur: 'کثیر منزلہ سوسائٹیز، فلیٹس اور لگژری اپارٹمنٹس۔',
     },
     icon: Building,
-    count: '4,150+ Ads',
+    count: '6,830+ Ads',
     group: 'Residential',
   },
   {
-    id: 'flats',
-    name: 'Flats',
-    slug: 'flats',
+    id: 'plot',
+    name: 'Plot',
+    slug: 'plot',
     localizedNames: {
-      en: 'Flats',
-      hi: 'फ्लैट्स',
-      ar: 'شقق مدمجة',
-      ur: 'فلیٹس',
+      en: 'Plot',
+      hi: 'प्लॉट / भूखंड',
+      ar: 'أراضي ومخططات',
+      ur: 'پلاٹس اور اراضی',
     },
     description: {
-      en: '1 BHK, 2 BHK, and 3 BHK budget-friendly residential flats.',
-      hi: '1, 2 और 3 बीएचके किफायती आवासीय फ्लैट्स।',
-      ar: 'شقق سكنية مجهزة ومناسبة للميزانية.',
-      ur: '1، 2 اور 3 بی ایچ کے رہائشی فلیٹس۔',
-    },
-    icon: Layers,
-    count: '2,680+ Ads',
-    group: 'Residential',
-  },
-  {
-    id: 'plotting-land',
-    name: 'Plotting Land',
-    slug: 'plotting-land',
-    localizedNames: {
-      en: 'Plotting Land',
-      hi: 'प्लॉटिंग लैंड',
-      ar: 'أراضي تقسيم سكني',
-      ur: 'پلاٹنگ لینڈ',
-    },
-    description: {
-      en: 'Approved residential plotted layouts with road access and utilities.',
-      hi: 'सड़क एवं बिजली-पानी सुविधा युक्त स्वीकृत आवासीय भूखंड।',
-      ar: 'أراضي مقسمة ومعتمدة للبناء مع الخدمات.',
-      ur: 'سڑکوں اور بنیادی سہولیات سے آراستہ رہائشی پلاٹس۔',
+      en: 'Approved residential plotted layouts, commercial land parcels, and acreage.',
+      hi: 'स्वीकृत आवासीय भूखंड, कमर्शियल लैंड और बड़े भूखंड।',
+      ar: 'أراضي مقسمة ومعتمدة ومخططات سكنية وتجارية.',
+      ur: 'منظور شدہ رہائشی پلاٹس اور کمرشل اراضی۔',
     },
     icon: MapPin,
-    count: '980+ Ads',
+    count: '1,530+ Ads',
     group: 'Land',
   },
   {
-    id: 'small-land',
-    name: 'Small Land',
-    slug: 'small-land',
+    id: 'shop-warehouse',
+    name: 'Shop / Warehouse',
+    slug: 'shop-warehouse',
     localizedNames: {
-      en: 'Small Land',
-      hi: 'छोटी जमीन (Small Land)',
-      ar: 'أراضي صغيرة / قطع أراضي',
-      ur: 'چھوٹی اراضی',
+      en: 'Shop / Warehouse',
+      hi: 'दुकान / वेयरहाउस (गोदाम)',
+      ar: 'محلات ومستودعات',
+      ur: 'دکانیں اور گودام',
     },
     description: {
-      en: 'Compact parcels, farmettes, and corner plots under 1 acre.',
-      hi: '1 एकड़ से कम के छोटे भूखंड और फार्मेट्स।',
-      ar: 'قطع أراضي صغيرة أقل من فدان مناسبة للمشاريع الخاصة.',
-      ur: '1 ایکڑ سے کم رقبے پر مشتمل چھوٹے قطعات اراضی۔',
-    },
-    icon: Trees,
-    count: '340+ Ads',
-    group: 'Land',
-  },
-  {
-    id: 'big-land',
-    name: 'Big Land',
-    slug: 'big-land',
-    localizedNames: {
-      en: 'Big Land',
-      hi: 'बड़ी जमीन / कृषि भूमि',
-      ar: 'أراضي زراعية واستثمارية واسعة',
-      ur: 'بڑی زرعی و صنعتی اراضی',
-    },
-    description: {
-      en: 'Large agricultural holdings, industrial zones, and highway acreage.',
-      hi: 'बड़े कृषि क्षेत्र, औद्योगिक क्षेत्र और हाईवे से लगे बड़े भूखंड।',
-      ar: 'مساحات واسعة للاستثمار الزراعي والصناعي ومشاريع التطوير.',
-      ur: 'وسیع زرعی اراضی، صنعتی زونز اور ہائی وے ایکڑز۔',
-    },
-    icon: Maximize2,
-    count: '210+ Ads',
-    group: 'Land',
-  },
-  {
-    id: 'shop',
-    name: 'Shop',
-    slug: 'shop',
-    localizedNames: {
-      en: 'Shop',
-      hi: 'दुकान / शोरूम',
-      ar: 'محل تجاري / معرض',
-      ur: 'دکان / شو روم',
-    },
-    description: {
-      en: 'Retail stores, commercial showrooms, and market corner shops.',
-      hi: 'रिटेल स्टोर्स, कमर्शियल शोरूम और मार्केट की दुकानें।',
-      ar: 'محلات تجارية ومعارض على الشوارع الرئيسية ومراكز التسوق.',
-      ur: 'ریٹیل دکانیں، کمرشل شو رومز اور مارکیٹ شاپس۔',
+      en: 'Retail stores, commercial showrooms, storage facilities, and logistics godowns.',
+      hi: 'रिटेल स्टोर्स, कमर्शियल शोरूम, भंडारण गोदाम और लॉजिस्टिक्स डिपो।',
+      ar: 'محلات تجارية ومعارض ومستودعات تخزين ومراكز لوجستية.',
+      ur: 'ریٹیل دکانیں، کمرشل شو رومز اور اسٹوریج گودام۔',
     },
     icon: Store,
-    count: '760+ Ads',
-    group: 'Commercial',
-  },
-  {
-    id: 'warehouse',
-    name: 'Warehouse',
-    slug: 'warehouse',
-    localizedNames: {
-      en: 'Warehouse',
-      hi: 'वेयरहाउस / गोदाम',
-      ar: 'مستودع / مخازن لوجستية',
-      ur: 'گودام / ویئر ہاؤس',
-    },
-    description: {
-      en: 'Storage facilities, cold storage, and logistics dispatch depots.',
-      hi: 'भंडारण गोदाम, कोल्ड स्टोरेज और लॉजिस्टिक्स डिपो।',
-      ar: 'مستودعات تخزين ومراكز لوجستية مجهزة لشحن البضائع.',
-      ur: 'اسٹوریج فیسیلٹیز، کولڈ اسٹوریج اور لاجسٹکس ڈپوز۔',
-    },
-    icon: Warehouse,
-    count: '195+ Ads',
+    count: '955+ Ads',
     group: 'Commercial',
   },
   {
@@ -197,13 +113,13 @@ export const CASA_CATEGORIES: CategoryDefinition[] = [
       ur: 'طویل مدتی لیز',
     },
     description: {
-      en: 'Long-term corporate leases, institutional spaces, and IT parks.',
-      hi: 'दीर्घकालिक कॉर्पोरेट लीज, संस्थागत जगहें और आईटी पार्क।',
-      ar: 'عقارات للإيجار طويل الأجل والمقرات المؤسسية والشركات.',
-      ur: 'کارپوریٹ لیز، دفتری عمارات اور آئی ٹی پارکس۔',
+      en: 'Long-term corporate leases, commercial office floors, and turnkey institutional spaces.',
+      hi: 'दीर्घकालिक कॉर्पोरेट लीज, कमर्शियल ऑफिस और आईटी पार्क।',
+      ar: 'عقارات للإيجار طويل الأجل والمكاتب والمقرات المؤسسية.',
+      ur: 'کارپوریٹ لیز، دفتری عمارات اور کمرشل پروجیکٹس۔',
     },
     icon: KeyRound,
-    count: '310+ Ads',
+    count: '410+ Ads',
     group: 'Commercial',
   },
   {
@@ -213,31 +129,31 @@ export const CASA_CATEGORIES: CategoryDefinition[] = [
     localizedNames: {
       en: 'Litigated',
       hi: 'न्यायाधीन / नीलामी संपत्ति (Litigated)',
-      ar: 'عقارات قضائية / مزادات',
-      ur: 'عدالتی تنازعات / نیلامی',
+      ar: 'عقارات قضائية ومزادات',
+      ur: 'عدالتی تنازعات اور نیلامی',
     },
     description: {
-      en: 'Properties under dispute resolution, court settlement, or bank auctions with clear disclosures.',
+      en: 'Dispute resolution, court settlement, or bank SARFAESI auctions with verified legal disclosures.',
       hi: 'विवाद समाधान, कोर्ट सेटलमेंट या बैंक नीलामी के तहत पूर्ण प्रकटीकरण वाली संपत्तियां।',
       ar: 'عقارات تخضع لتسويات قضائية أو مزادات بنكية مع إفصاحات كاملة.',
       ur: 'عدالتی یا بینک نیلامی کے تحت قانونی طور پر واضح شرائط والی پراپرٹیز۔',
     },
     icon: Scale,
-    count: '65+ Ads',
+    count: '85+ Ads',
     group: 'Special',
   },
   {
     id: 'pg',
-    name: 'PG',
+    name: 'PG (Paying Guest)',
     slug: 'pg',
     localizedNames: {
       en: 'PG (Paying Guest)',
       hi: 'पीजी / पेइंग गेस्ट',
       ar: 'سكن ضيوف / كوليفينج',
-      ur: 'پی جی / ہاسٹل',
+      ur: 'پی جی اور ہاسٹل',
     },
     description: {
-      en: 'Paying guest accommodation, student housing, and co-living rooms.',
+      en: 'Paying guest accommodation, student housing, and co-living rooms with meal options.',
       hi: 'पेइंग गेस्ट आवास, छात्र आवास और को-लिविंग स्पेस।',
       ar: 'أماكن إقامة للضيوف وسكن طلاب ومساحات معيشة مشتركة.',
       ur: 'طلباء اور پروفیشنلز کے لیے پی جی اور ہاسٹل کی سہولیات۔',
@@ -248,13 +164,80 @@ export const CASA_CATEGORIES: CategoryDefinition[] = [
   },
 ];
 
+// Mapping for legacy categories to standard 7 categories
+export const LEGACY_CATEGORY_MAP: Record<string, string> = {
+  // Plotting Land, Small Land, Big Land -> Plot
+  'plotting land': 'plot',
+  'plotting-land': 'plot',
+  'small land': 'plot',
+  'small-land': 'plot',
+  'big land': 'plot',
+  'big-land': 'plot',
+  'land': 'plot',
+  'agricultural land': 'plot',
+  'residential plot': 'plot',
+  'commercial plot': 'plot',
+
+  // Flats, Apartment -> Apartment / Flat
+  'flats': 'apartment-flat',
+  'flat': 'apartment-flat',
+  'apartment': 'apartment-flat',
+  'apartments': 'apartment-flat',
+  'builder floor': 'apartment-flat',
+  'penthouse': 'apartment-flat',
+
+  // Shop, Warehouse -> Shop / Warehouse
+  'shop': 'shop-warehouse',
+  'shops': 'shop-warehouse',
+  'warehouse': 'shop-warehouse',
+  'warehouses': 'shop-warehouse',
+  'godown': 'shop-warehouse',
+  'showroom': 'shop-warehouse',
+
+  // House / Home
+  'house': 'house-home',
+  'home': 'house-home',
+  'villa': 'house-home',
+  'villas': 'house-home',
+
+  // Lease
+  'commercial lease': 'lease',
+  'office space': 'lease',
+  'commercial office space': 'lease',
+
+  // Litigated
+  'auction': 'litigated',
+  'bank auction': 'litigated',
+
+  // PG
+  'paying guest': 'pg',
+  'co-living': 'pg',
+  'hostel': 'pg',
+};
+
 export function getAllCategories(): CategoryDefinition[] {
   return CASA_CATEGORIES;
 }
 
-export function getCategoryBySlug(slug: string): CategoryDefinition | undefined {
+export function getCategoryBySlug(slugOrName: string): CategoryDefinition | undefined {
+  if (!slugOrName) return undefined;
+  const clean = slugOrName.trim().toLowerCase();
+
+  // 1. Direct match by slug or canonical name
+  const direct = CASA_CATEGORIES.find(
+    (c) => c.slug.toLowerCase() === clean || c.name.toLowerCase() === clean,
+  );
+  if (direct) return direct;
+
+  // 2. Legacy category alias mapping
+  const mappedSlug = LEGACY_CATEGORY_MAP[clean];
+  if (mappedSlug) {
+    return CASA_CATEGORIES.find((c) => c.slug === mappedSlug);
+  }
+
+  // 3. Fallback partial match
   return CASA_CATEGORIES.find(
-    (c) => c.slug.toLowerCase() === slug.toLowerCase() || c.name.toLowerCase() === slug.toLowerCase(),
+    (c) => clean.includes(c.slug) || c.slug.includes(clean) || clean.includes(c.name.toLowerCase()),
   );
 }
 

@@ -13,9 +13,9 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: 'myproperty — Administrative Governance & Operations Portal',
+  title: 'My Property — Administrative Governance & Operations Portal',
   description:
-    'Internal moderation queue, listing approvals, taxonomy configuration, user role management, and audit logging for myproperty.',
+    'Internal moderation queue, listing approvals, taxonomy configuration, user role management, and audit logging for My Property.',
 };
 
 export default function RootLayout({

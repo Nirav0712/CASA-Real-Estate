@@ -1957,7 +1957,7 @@ export class EntitlementsService implements OnModuleInit {
         success: true,
         userType: rawUserType || 'buyer',
         isConsumer: true,
-        message: 'Buyers and Tenants enjoy free, unlimited property browsing and direct inquiries on CASA.',
+        message: 'Buyers and Tenants enjoy free, unlimited property browsing and direct inquiries on My Property.',
         plans: [],
         freeTrialStatus: null,
       };

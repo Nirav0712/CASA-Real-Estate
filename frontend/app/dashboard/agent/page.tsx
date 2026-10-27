@@ -117,7 +117,7 @@ export default function AgentDashboardPage() {
             {isVerified ? (
               <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
                 <ShieldCheck className="w-3.5 h-3.5 mr-1 text-emerald-600" />
-                CASA Verified
+                My Property Verified
               </span>
             ) : (
               <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200">

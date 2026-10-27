@@ -21,19 +21,156 @@ import {
   ListingFreshnessOption,
 } from './dto/search-properties.dto';
 
-const INITIAL_SEED_CATEGORIES = [
-  { code: 'HOUSE', name: 'House / Home', description: 'Independent villas, kothis, duplexes, bungalows', sortOrder: 1 },
-  { code: 'APARTMENT', name: 'Apartment', description: 'Multistorey apartments, high-rises, penthouses', sortOrder: 2 },
-  { code: 'FLATS', name: 'Flats', description: 'Builder floors, budget society flats', sortOrder: 3 },
-  { code: 'PLOTTING_LAND', name: 'Plotting Land', description: 'Approved layout residential plots, gated townships', sortOrder: 4 },
-  { code: 'SMALL_LAND', name: 'Small Land', description: 'Small farmettes, homestead land parcels under 1 acre', sortOrder: 5 },
-  { code: 'BIG_LAND', name: 'Big Land', description: 'Large commercial/agricultural tracts, highway frontages', sortOrder: 6 },
-  { code: 'SHOP', name: 'Shop', description: 'Retail shops, high-street storefronts, showrooms', sortOrder: 7 },
-  { code: 'WAREHOUSE', name: 'Warehouse', description: 'Logistics hubs, cold storage, industrial godowns', sortOrder: 8 },
-  { code: 'LEASE', name: 'Lease', description: 'Commercial office floors, turnkey corporate spaces', sortOrder: 9 },
-  { code: 'LITIGATED', name: 'Litigated', description: 'Court-disclosed assets, SARFAESI bank auctions', sortOrder: 10 },
-  { code: 'PG', name: 'PG', description: 'Paying Guest accommodation, student housing, co-living spaces', sortOrder: 11 },
+export const STANDARDIZED_CATEGORIES = [
+  { code: 'HOUSE_HOME', name: 'House / Home', description: 'Independent houses, villas, builder floors, and row houses', sortOrder: 1 },
+  { code: 'APARTMENT_FLAT', name: 'Apartment / Flat', description: 'Multi-storey condominiums, flats, studio apartments, and luxury gated society homes', sortOrder: 2 },
+  { code: 'PLOT', name: 'Plot', description: 'Approved residential plotted layouts, commercial land parcels, and acreage', sortOrder: 3 },
+  { code: 'SHOP_WAREHOUSE', name: 'Shop / Warehouse', description: 'Retail stores, commercial showrooms, storage facilities, and logistics godowns', sortOrder: 4 },
+  { code: 'LEASE', name: 'Lease', description: 'Long-term corporate leases, commercial office floors, and institutional spaces', sortOrder: 5 },
+  { code: 'LITIGATED', name: 'Litigated', description: 'Dispute resolution, court settlement, or bank SARFAESI auctions with legal disclosures', sortOrder: 6 },
+  { code: 'PG', name: 'PG (Paying Guest)', description: 'Paying guest accommodation, student housing, and co-living rooms', sortOrder: 7 },
 ];
+
+const INITIAL_SEED_CATEGORIES = STANDARDIZED_CATEGORIES;
+
+export function mapCategoryToAliases(catNameOrSlug: string): string[] {
+  if (!catNameOrSlug) return [];
+  const clean = catNameOrSlug.trim().toLowerCase();
+
+  // Plotting Land, Small Land, Big Land -> Plot
+  if (
+    clean === 'plot' ||
+    clean === 'plotting land' ||
+    clean === 'plotting-land' ||
+    clean === 'small land' ||
+    clean === 'small-land' ||
+    clean === 'big land' ||
+    clean === 'big-land' ||
+    clean === 'land' ||
+    clean === 'agricultural land' ||
+    clean === 'plotting_land' ||
+    clean === 'small_land' ||
+    clean === 'big_land'
+  ) {
+    return [
+      'Plot',
+      'Plotting Land',
+      'Small Land',
+      'Big Land',
+      'PLOTTING_LAND',
+      'SMALL_LAND',
+      'BIG_LAND',
+      'plot',
+      'plotting-land',
+      'small-land',
+      'big-land',
+    ];
+  }
+
+  // Flats, Apartment -> Apartment / Flat
+  if (
+    clean === 'apartment / flat' ||
+    clean === 'apartment-flat' ||
+    clean === 'apartment' ||
+    clean === 'apartments' ||
+    clean === 'flats' ||
+    clean === 'flat' ||
+    clean === 'apartment/flat' ||
+    clean === 'apartments/flats'
+  ) {
+    return [
+      'Apartment / Flat',
+      'Apartment',
+      'Flats',
+      'Flat',
+      'Apartments',
+      'APARTMENT',
+      'FLATS',
+      'apartment-flat',
+      'flats',
+      'apartment',
+    ];
+  }
+
+  // Shop, Warehouse -> Shop / Warehouse
+  if (
+    clean === 'shop / warehouse' ||
+    clean === 'shop-warehouse' ||
+    clean === 'shop' ||
+    clean === 'shops' ||
+    clean === 'warehouse' ||
+    clean === 'warehouses' ||
+    clean === 'godown' ||
+    clean === 'shop/warehouse'
+  ) {
+    return [
+      'Shop / Warehouse',
+      'Shop',
+      'Warehouse',
+      'Shops',
+      'Warehouses',
+      'Godown',
+      'SHOP',
+      'WAREHOUSE',
+      'shop-warehouse',
+      'shop',
+      'warehouse',
+    ];
+  }
+
+  // House / Home
+  if (
+    clean === 'house / home' ||
+    clean === 'house-home' ||
+    clean === 'house' ||
+    clean === 'home' ||
+    clean === 'houses' ||
+    clean === 'villa' ||
+    clean === 'villas' ||
+    clean === 'house/home'
+  ) {
+    return [
+      'House / Home',
+      'House',
+      'Home',
+      'Houses',
+      'Villa',
+      'Villas',
+      'HOUSE',
+      'house-home',
+    ];
+  }
+
+  // Lease
+  if (
+    clean === 'lease' ||
+    clean === 'commercial lease' ||
+    clean === 'office lease'
+  ) {
+    return ['Lease', 'Commercial Lease', 'LEASE', 'lease', 'commercial lease'];
+  }
+
+  // Litigated
+  if (
+    clean === 'litigated' ||
+    clean === 'auction' ||
+    clean === 'bank auction'
+  ) {
+    return ['Litigated', 'Auction', 'Bank Auction', 'LITIGATED', 'litigated'];
+  }
+
+  // PG (Paying Guest)
+  if (
+    clean === 'pg' ||
+    clean === 'pg (paying guest)' ||
+    clean === 'paying guest' ||
+    clean === 'co-living'
+  ) {
+    return ['PG (Paying Guest)', 'PG', 'Paying Guest', 'pg', 'paying-guest'];
+  }
+
+  return [catNameOrSlug];
+}
 
 const INITIAL_SEED_PROPERTIES = [
   {
@@ -437,7 +574,7 @@ export class PropertiesService implements OnModuleInit {
         });
         if (count >= maxProjects) {
           throw new BadRequestException(
-            `You have reached your active project listings limit (${count}/${maxProjects}). Upgrade your CASA subscription plan to publish more projects.`,
+            `You have reached your active project listings limit (${count}/${maxProjects}). Upgrade your My Property subscription plan to publish more projects.`,
           );
         }
       }
@@ -457,7 +594,7 @@ export class PropertiesService implements OnModuleInit {
         });
         if (count >= maxProperties) {
           throw new BadRequestException(
-            `You have reached your active property listings limit (${count}/${maxProperties}). Upgrade your CASA subscription plan to post additional properties.`,
+            `You have reached your active property listings limit (${count}/${maxProperties}). Upgrade your My Property subscription plan to post additional properties.`,
           );
         }
       }
@@ -864,8 +1001,12 @@ export class PropertiesService implements OnModuleInit {
       }
 
       if (query.category && query.category !== 'all') {
-        const catNormalized = query.category.trim();
-        filter.category = new RegExp(catNormalized, 'i');
+        const aliases = mapCategoryToAliases(query.category);
+        filter.category = {
+          $in: aliases.map(
+            (alias) => new RegExp(`^${alias.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i'),
+          ),
+        };
       }
 
       if (query.country && query.country !== 'all') {
@@ -991,8 +1132,12 @@ export class PropertiesService implements OnModuleInit {
 
       // 3. Category Filter
       if (dto.category && dto.category !== 'all') {
-        const catClean = dto.category.trim();
-        filter.category = new RegExp(`^${catClean.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i');
+        const aliases = mapCategoryToAliases(dto.category);
+        filter.category = {
+          $in: aliases.map(
+            (alias) => new RegExp(`^${alias.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i'),
+          ),
+        };
       }
 
       // 3b. Subcategory Filter
@@ -2278,24 +2423,13 @@ export class PropertiesService implements OnModuleInit {
   // ==========================================
 
   async findAllCategories() {
-    const categories = await this.categoryModel.find().sort({ sortOrder: 1 }).lean();
-    if (!categories || categories.length === 0) {
-      return INITIAL_SEED_CATEGORIES.map((c, i) => ({ ...c, id: `cat-${i + 1}`, isActive: true, totalListings: 0 }));
-    }
-    const hasPg = categories.some((c: any) => c.code === 'PG' || c.name === 'PG');
-    if (!hasPg) {
-      categories.push({
-        _id: 'cat-pg',
-        id: 'cat-pg',
-        code: 'PG',
-        name: 'PG',
-        description: 'Paying Guest accommodation, student housing, co-living spaces',
-        sortOrder: 11,
-        isActive: true,
-        totalListings: 0,
-      } as any);
-    }
-    return categories;
+    return STANDARDIZED_CATEGORIES.map((c, i) => ({
+      _id: `cat-${c.code.toLowerCase()}`,
+      id: `cat-${c.code.toLowerCase()}`,
+      ...c,
+      isActive: true,
+      totalListings: 0,
+    }));
   }
 
   async createCategory(dto: { name: string; code?: string; description?: string }) {

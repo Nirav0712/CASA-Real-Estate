@@ -71,7 +71,7 @@ export default function RoleBasedDashboardHubPage() {
         </div>
         <div>
           <h1 className="text-2xl md:text-3xl font-bold text-casa-text-primary">
-            CASA Role-Based Portal
+            My Property Role-Based Portal
           </h1>
           <p className="text-sm text-casa-text-secondary mt-2 max-w-lg mx-auto">
             Please sign in to access your tailored dashboard for Buyers, Property Owners, or Real Estate Brokers.
@@ -139,10 +139,10 @@ export default function RoleBasedDashboardHubPage() {
             <span className="text-xs text-casa-text-muted font-medium">Logged in as {user.name}</span>
           </div>
           <h1 className="text-xl md:text-2xl font-bold text-casa-text-primary">
-            CASA Marketplace & Role Command Center
+            My Property Marketplace & Role Command Center
           </h1>
           <p className="text-xs md:text-sm text-casa-text-secondary max-w-xl">
-            As a system administrator, you have full omni-channel access to all role portals, moderation queues, and the CASA Governance Admin System.
+            As a system administrator, you have full omni-channel access to all role portals, moderation queues, and the My Property Governance Admin System.
           </p>
         </div>
 

@@ -163,7 +163,7 @@ export default function AdminPropertiesPage() {
     plotLength: '',
     plotBreadth: '',
     roadWidthFt: '',
-    advertiserName: 'CASA Premier Realty',
+    advertiserName: 'My Property Premier Realty',
     advertiserPhone: '+917359237870',
     contactNumbers: [{ countryCode: '+91', number: '7359237870', isPrimary: true }] as ContactNumber[],
     advertiserRole: 'SUPER_ADMIN',
@@ -196,7 +196,7 @@ export default function AdminPropertiesPage() {
     plotLength: '',
     plotBreadth: '',
     roadWidthFt: '',
-    advertiserName: 'CASA Premier Realty',
+    advertiserName: 'My Property Premier Realty',
     advertiserPhone: '+917359237870',
     contactNumbers: [{ countryCode: '+91', number: '7359237870', isPrimary: true }] as ContactNumber[],
     reraNumber: '',
@@ -459,7 +459,7 @@ export default function AdminPropertiesPage() {
       toast.error('Permission Denied', 'Only Super Admin can permanently delete properties.');
       return;
     }
-    if (!confirm(`Are you sure you want to permanently delete "${prop.title}" from MongoDB Atlas?`)) return;
+    if (!confirm(`Are you sure you want to permanently delete "${prop.title}"?`)) return;
     try {
       await deleteAdminProperty(prop.id);
       toast.success('Property Deleted', `"${prop.title}" removed from database.`);
@@ -494,7 +494,7 @@ export default function AdminPropertiesPage() {
       return;
     }
     if (selectedIds.length === 0) return;
-    const confirmMsg = `Are you sure you want to permanently delete ${selectedIds.length} selected properties from MongoDB Atlas? This action cannot be undone.`;
+    const confirmMsg = `Are you sure you want to permanently delete ${selectedIds.length} selected properties? This action cannot be undone.`;
     if (!confirm(confirmMsg)) return;
 
     setIsBulkDeleting(true);
@@ -508,7 +508,7 @@ export default function AdminPropertiesPage() {
       if (succeeded > 0) {
         toast.success(
           'Bulk Delete Successful',
-          `Successfully deleted ${succeeded} properties from MongoDB Atlas.`,
+          `Successfully deleted ${succeeded} properties.`,
         );
       }
       if (failed > 0) {
@@ -574,7 +574,7 @@ export default function AdminPropertiesPage() {
       plotBreadth: (prop.specs as any)?.plotBreadth ? String((prop.specs as any).plotBreadth) : '',
       roadWidthFt: (prop.specs as any)?.roadWidthFt ? String((prop.specs as any).roadWidthFt) : '',
       advertiserName:
-        prop.advertiserName || prop.advertiser?.name || 'CASA Premier Realty',
+        prop.advertiserName || prop.advertiser?.name || 'My Property Premier Realty',
       advertiserPhone:
         prop.advertiserPhone || prop.advertiser?.phone || '+917359237870',
       contactNumbers: normalizeContactNumbers(
@@ -815,7 +815,7 @@ export default function AdminPropertiesPage() {
 
       const res = await updateAdminProperty(editProp.id, payload);
       if (res.success) {
-        toast.success('Property Updated', `"${editProp.title}" updated in MongoDB Atlas.`);
+        toast.success('Property Updated', `"${editProp.title}" updated successfully.`);
         setIsEditOpen(false);
         setEditingProperty(null);
         await loadData();
@@ -944,7 +944,7 @@ export default function AdminPropertiesPage() {
       if (result.isBackendAvailable && result.data && !result.error) {
         toast.success(
           'Property Created',
-          `"${newProp.title}" created in MongoDB Atlas!`,
+          `"${newProp.title}" created successfully!`,
         );
         setIsAddOpen(false);
         setUploadedImages([]);
@@ -978,7 +978,7 @@ export default function AdminPropertiesPage() {
           plotLength: '',
           plotBreadth: '',
           roadWidthFt: '',
-          advertiserName: 'CASA Premier Realty',
+          advertiserName: 'My Property Premier Realty',
           advertiserPhone: '+917359237870',
           contactNumbers: [{ countryCode: '+91', number: '7359237870', isPrimary: true }] as ContactNumber[],
           reraNumber: '',
@@ -1011,7 +1011,7 @@ export default function AdminPropertiesPage() {
             </h1>
           </div>
           <p className="text-xs md:text-sm text-casa-text-secondary mt-1">
-            Database-driven lifecycle governance & moderation synced with MongoDB Atlas.
+            Database-driven lifecycle governance & moderation.
           </p>
         </div>
 
@@ -1215,7 +1215,7 @@ export default function AdminPropertiesPage() {
               {isLoading ? (
                 <tr>
                   <td colSpan={8} className="px-6 py-12 text-center text-casa-text-muted">
-                    Loading live properties from MongoDB Atlas...
+                    Loading...
                   </td>
                 </tr>
               ) : properties.filter((item) => {
@@ -1902,17 +1902,12 @@ export default function AdminPropertiesPage() {
                 ) : (
                   <>
                     <option value="House / Home">House / Home</option>
-                    <option value="Apartment">Apartment</option>
-                    <option value="Flats">Flats</option>
-                    <option value="PG (Paying Guest)">PG (Paying Guest)</option>
-                    <option value="Commercial Office Space">Commercial Office Space</option>
-                    <option value="Plotting Land">Plotting Land</option>
-                    <option value="Small Land">Small Land</option>
-                    <option value="Big Land">Big Land</option>
-                    <option value="Shop">Shop</option>
-                    <option value="Warehouse">Warehouse</option>
+                    <option value="Apartment / Flat">Apartment / Flat</option>
+                    <option value="Plot">Plot</option>
+                    <option value="Shop / Warehouse">Shop / Warehouse</option>
                     <option value="Lease">Lease</option>
                     <option value="Litigated">Litigated</option>
+                    <option value="PG (Paying Guest)">PG (Paying Guest)</option>
                   </>
                 )}
               </select>
@@ -2546,17 +2541,12 @@ export default function AdminPropertiesPage() {
                   ) : (
                     <>
                       <option value="House / Home">House / Home</option>
-                      <option value="Apartment">Apartment</option>
-                      <option value="Flats">Flats</option>
-                      <option value="PG (Paying Guest)">PG (Paying Guest)</option>
-                      <option value="Commercial Office Space">Commercial Office Space</option>
-                      <option value="Plotting Land">Plotting Land</option>
-                      <option value="Small Land">Small Land</option>
-                      <option value="Big Land">Big Land</option>
-                      <option value="Shop">Shop</option>
-                      <option value="Warehouse">Warehouse</option>
+                      <option value="Apartment / Flat">Apartment / Flat</option>
+                      <option value="Plot">Plot</option>
+                      <option value="Shop / Warehouse">Shop / Warehouse</option>
                       <option value="Lease">Lease</option>
                       <option value="Litigated">Litigated</option>
+                      <option value="PG (Paying Guest)">PG (Paying Guest)</option>
                     </>
                   )}
                 </select>
@@ -3215,7 +3205,7 @@ export default function AdminPropertiesPage() {
                 disabled={isEditSubmitting}
                 className="bg-casa-brand hover:bg-casa-brand-hover text-white text-xs"
               >
-                {isEditSubmitting ? 'Saving Changes...' : 'Save & Update in MongoDB Atlas'}
+                {isEditSubmitting ? 'Saving Changes...' : 'Save & Update'}
               </Button>
             </div>
           </form>

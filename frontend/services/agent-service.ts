@@ -64,8 +64,14 @@ export interface AgentVerificationResponse {
   kycRejectionReason?: string;
   kycApprovedAt?: string;
   isTrialActive?: boolean;
+  isTrialExpired?: boolean;
   trialStartedAt?: string;
   trialExpiresAt?: string;
+  hasActiveSubscription?: boolean;
+  activePlanName?: string | null;
+  subscriptionStatus?: string | null;
+  subscriptionExpiresAt?: string | null;
+  subscriptionStartDate?: string | null;
   accountType?: string;
   reraNumber?: string;
   reraState?: string;

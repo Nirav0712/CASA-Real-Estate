@@ -617,7 +617,7 @@ export default function UsersPage() {
         {loading ? (
           <div className="p-12 text-center text-casa-text-muted flex flex-col items-center justify-center gap-2">
             <RefreshCw className="w-6 h-6 animate-spin text-casa-brand" />
-            <p className="text-xs">Loading live MongoDB user records...</p>
+            <p className="text-xs">Loading...</p>
           </div>
         ) : error ? (
           <div className="p-12 text-center text-red-500 space-y-2">
@@ -898,7 +898,7 @@ export default function UsersPage() {
                 </div>
                 <div>
                   <h2 className="text-lg font-bold text-casa-text-primary">User Governance Profile</h2>
-                  <p className="text-xs text-casa-text-muted">Live MongoDB Database Record</p>
+                  <p className="text-xs text-casa-text-muted">Verified User Record</p>
                 </div>
               </div>
               <Button

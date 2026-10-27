@@ -220,9 +220,9 @@ export default function AgentVerificationPage() {
             <ShieldCheck className="w-8 h-8" />
           </div>
           <div>
-            <h3 className="text-lg font-bold text-emerald-900">CASA Verified Agent Active</h3>
+            <h3 className="text-lg font-bold text-emerald-900">My Property Verified Agent Active</h3>
             <p className="text-sm text-emerald-700 mt-1">
-              Your RERA credentials ({formData.reraNumber || 'Registered'}) are verified by the CASA governance team.
+              Your RERA credentials ({formData.reraNumber || 'Registered'}) are verified by the My Property governance team.
               Your listings display the official verified trust badge.
             </p>
             {verifiedAt && (

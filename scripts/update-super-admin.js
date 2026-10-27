@@ -3,7 +3,7 @@
  *
  * Requirements:
  * 1. Find existing Super Admin account ('nirav', 'prajapatinirav710@gmail.com', mobile: '+919925843531')
- * 2. Update email to 'thedigitalconnect712@gmail.com'
+ * 2. Update email to 'info.mypropertyin@gmail.com'
  * 3. Hash password using bcrypt (12 rounds) as defined in backend/src/modules/auth/utils/password.util.ts
  * 4. Preserve existing SUPER_ADMIN role, permissions, status (ACTIVE), and all associated data
  * 5. Do not modify other accounts or create duplicates
@@ -24,7 +24,7 @@ dotenv.config({ path: path.join(__dirname, '../backend/.env') });
 const BCRYPT_SALT_ROUNDS = 12;
 const MIN_PASSWORD_LENGTH = 8;
 const TARGET_OLD_EMAIL = 'prajapatinirav710@gmail.com';
-const TARGET_NEW_EMAIL = 'thedigitalconnect712@gmail.com';
+const TARGET_NEW_EMAIL = 'info.mypropertyin@gmail.com';
 const TARGET_MOBILE = '+919925843531';
 
 async function getPasswordInput() {

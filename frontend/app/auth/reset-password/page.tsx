@@ -136,7 +136,7 @@ function ResetPasswordContent() {
                 onClick={handleGoToSignIn}
                 className="font-bold py-3 shadow-subtle"
               >
-                <span>Sign In to CASA</span>
+                <span>Sign In to My Property</span>
                 <ArrowRight className="w-4 h-4" />
               </Button>
             </div>
@@ -148,7 +148,7 @@ function ResetPasswordContent() {
                 Choose a New Password
               </h2>
               <p className="text-xs text-casa-text-muted max-w-xs mx-auto">
-                Set a strong password of at least 8 characters for your CASA account.
+                Set a strong password of at least 8 characters for your My Property account.
               </p>
             </div>
 
@@ -249,7 +249,7 @@ function ResetPasswordContent() {
                   href="/"
                   className="text-xs text-casa-brand font-semibold hover:underline"
                 >
-                  ← Return to CASA Marketplace
+                  ← Return to My Property Marketplace
                 </Link>
               </div>
             </form>

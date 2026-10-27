@@ -150,7 +150,7 @@ export default function AgentProfilePage() {
             )}
           </div>
           <p className="text-sm text-slate-500 mt-1">
-            Configure your professional public profile visible to buyers and property sellers across CASA.
+            Configure your professional public profile visible to buyers and property sellers across My Property.
           </p>
         </div>
 

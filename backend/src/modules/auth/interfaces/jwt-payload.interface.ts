@@ -64,6 +64,7 @@ export interface AuthenticatedUser {
   subscriptionStatus?: string | null;
   subscriptionExpiresAt?: Date | string | null;
   subscriptionStartDate?: Date | string | null;
+  billingPeriod?: string | null;
   kycStatus?: string;
   isKycExempt?: boolean;
   isKycRequired?: boolean;

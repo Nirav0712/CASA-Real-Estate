@@ -65,6 +65,7 @@ interface AuthContextType {
   activePlanName: string | null;
   subscriptionStatus: string | null;
   subscriptionExpiresAt: string | null;
+  subscriptionStartDate: string | null;
 }
 
 const AuthContext = React.createContext<AuthContextType | undefined>(undefined);
@@ -415,18 +416,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return Boolean(
       user.hasActiveSubscription ||
       user.subscriptionStatus === 'ACTIVE' ||
-      (user.activeSubscriptionId && user.activePackageId && !user.isTrialActive)
+      (user.activeSubscriptionId && user.activePackageId && !user.isTrialActive && (!user.subscriptionExpiresAt || new Date(user.subscriptionExpiresAt).getTime() > Date.now()))
     );
   }, [user]);
 
   const activePlanName = user?.activePlanName || null;
   const subscriptionStatus = user?.subscriptionStatus || (hasActiveSubscription ? 'ACTIVE' : null);
   const subscriptionExpiresAt = user?.subscriptionExpiresAt || null;
+  const subscriptionStartDate = user?.subscriptionStartDate || null;
 
   // Compute trial status dynamically (active paid subscription supersedes trials)
   const trialStatus = React.useMemo(() => {
     if (!user || isUserExempt || hasActiveSubscription) {
       return { isTrialActive: false, isTrialExpired: false, daysRemaining: 0, remainingLabel: '' };
+    }
+
+    // Expired or cancelled paid subscription: trial has already passed and must not restart
+    if (subscriptionStatus === 'EXPIRED' || subscriptionStatus === 'CANCELLED') {
+      return { isTrialActive: false, isTrialExpired: true, daysRemaining: 0, remainingLabel: 'Trial Expired' };
     }
 
     const hasStoredExpired = Boolean(user.trialExpired || user.isTrialExpired);
@@ -456,7 +463,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       daysRemaining,
       remainingLabel,
     };
-  }, [user, isUserExempt, hasActiveSubscription]);
+  }, [user, isUserExempt, hasActiveSubscription, subscriptionStatus]);
 
   const startTrial = React.useCallback(async () => {
     if (isUserExempt) {
@@ -669,6 +676,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         activePlanName,
         subscriptionStatus,
         subscriptionExpiresAt,
+        subscriptionStartDate,
       }}
     >
       {children}

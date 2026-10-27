@@ -113,6 +113,18 @@ export class User {
   @Prop({ type: String, default: null, index: true })
   activeSubscriptionId?: string | null;
 
+  @Prop({ type: String, default: null })
+  activePlanName?: string | null;
+
+  @Prop({ type: String, default: null, index: true })
+  subscriptionStatus?: string | null;
+
+  @Prop({ type: Date, required: false })
+  subscriptionExpiresAt?: Date;
+
+  @Prop({ type: Date, required: false })
+  subscriptionStartDate?: Date;
+
   @Prop({ type: Date, required: false })
   trialStartedAt?: Date;
 

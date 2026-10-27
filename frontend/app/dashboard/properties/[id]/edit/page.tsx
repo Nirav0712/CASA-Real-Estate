@@ -93,9 +93,9 @@ export default function EditPropertyPage() {
 
   const [formData, setFormData] = React.useState({
     // Step 1: Category & Basic
-    categoryGroup: 'RESIDENTIAL',
-    category: 'Apartment',
-    subcategory: 'Flat/Apartment',
+    categoryGroup: 'APARTMENT_FLAT',
+    category: 'Apartment / Flat',
+    subcategory: 'Flat / Apartment',
     listingType: 'SALE' as 'SALE' | 'RENT' | 'LEASE' | 'PG_COLIVING' | 'COMMERCIAL_LEASE',
     titleEn: '',
     descriptionEn: '',

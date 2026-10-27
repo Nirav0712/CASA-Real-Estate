@@ -156,7 +156,7 @@ export default function FeaturedRequestsAdminPage() {
             <h1 className="text-2xl font-bold text-casa-text-primary">Featured Property Requests</h1>
           </div>
           <p className="text-xs text-casa-text-secondary mt-1">
-            Review and govern Broker requests for premium featured placement on the CASA marketplace.
+            Review and govern Broker requests for premium featured placement on the My Property marketplace.
           </p>
         </div>
         <div className="flex items-center gap-2">

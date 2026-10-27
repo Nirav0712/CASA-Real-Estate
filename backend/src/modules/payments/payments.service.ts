@@ -5,10 +5,12 @@ import {
   ForbiddenException,
   Logger,
   OnModuleInit,
+  Optional,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, isValidObjectId, Types } from 'mongoose';
 import * as crypto from 'crypto';
+import { MailService } from '../auth/services/mail.service';
 import { Payment, PaymentDocument } from './schemas/payment.schema';
 import { Subscription, SubscriptionDocument } from './schemas/subscription.schema';
 import {
@@ -65,6 +67,7 @@ export class PaymentsService implements OnModuleInit {
     @InjectModel(Package.name) private readonly packageModel: Model<PackageDocument>,
     @InjectModel(Notification.name) private readonly notificationModel: Model<NotificationDocument>,
     private readonly razorpayProvider: RazorpayPaymentProvider,
+    @Optional() private readonly mailService?: MailService,
   ) {}
 
   private isAdmin(user: AuthenticatedUser): boolean {
@@ -961,6 +964,22 @@ export class PaymentsService implements OnModuleInit {
 
     this.logger.log(`📥 Subscription request created: ${requestReference} by user ${user.name} for plan ${pkg.name}`);
 
+    // Send confirmation email if email available
+    if (user.email && this.mailService) {
+      this.mailService
+        .sendSubscriptionRequestReceivedEmail(
+          user.email,
+          user.name || 'Valued User',
+          pkg.name,
+          pkg.price || 0,
+          pkg.billingPeriod || 'MONTHLY',
+          requestReference,
+        )
+        .catch((mailErr) => {
+          this.logger.warn(`Could not dispatch subscription request received email: ${mailErr?.message}`);
+        });
+    }
+
     return {
       success: true,
       message: 'Subscription request recorded successfully.',
@@ -1159,6 +1178,10 @@ export class PaymentsService implements OnModuleInit {
     // 2. Activate Subscription and link ID on User Model
     targetUser.activeSubscriptionId = sub._id.toString();
     targetUser.activePackageId = pkg._id.toString();
+    targetUser.activePlanName = pkg.name;
+    targetUser.subscriptionStatus = 'ACTIVE';
+    targetUser.subscriptionExpiresAt = expiryDate;
+    targetUser.subscriptionStartDate = now;
     targetUser.isTrialActive = false;
     targetUser.trialExpired = false;
     await targetUser.save();
@@ -1214,6 +1237,21 @@ export class PaymentsService implements OnModuleInit {
     }
 
     this.logger.log(`✅ Subscription request ${request.requestReference} APPROVED by ${adminUser.name} for user ${targetUser.name}`);
+
+    // Send approval email if recipient email available
+    if (targetUser.email && this.mailService) {
+      this.mailService
+        .sendSubscriptionApprovedEmail(
+          targetUser.email,
+          targetUser.name || 'Valued User',
+          pkg.name,
+          expiryDate,
+          request.requestReference,
+        )
+        .catch((mailErr) => {
+          this.logger.warn(`Could not dispatch subscription approval email: ${mailErr?.message}`);
+        });
+    }
 
     return {
       success: true,
@@ -1304,6 +1342,24 @@ export class PaymentsService implements OnModuleInit {
     }
 
     this.logger.log(`❌ Subscription request ${request.requestReference} DENIED by ${adminUser.name}`);
+
+    // Send rejection email if recipient email available
+    if (this.mailService) {
+      const recipientEmail = request.userEmail || (await this.userModel.findById(request.userId).select('email').lean())?.email;
+      if (recipientEmail) {
+        this.mailService
+          .sendSubscriptionRejectedEmail(
+            recipientEmail,
+            request.userName || 'Valued User',
+            request.planName,
+            reason,
+            request.requestReference,
+          )
+          .catch((mailErr) => {
+            this.logger.warn(`Could not dispatch subscription rejection email: ${mailErr?.message}`);
+          });
+      }
+    }
 
     return {
       success: true,

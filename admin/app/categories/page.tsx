@@ -98,7 +98,7 @@ export default function CategoriesPage() {
       if (res.ok) {
         toast.success(
           'Category Created Live',
-          `"${newCat.name}" is now stored in MongoDB Atlas with custom PC photo!`,
+          `"${newCat.name}" is now stored with custom photo!`,
         );
         setIsAddOpen(false);
         setUploadedCatImage('');
@@ -157,7 +157,7 @@ export default function CategoriesPage() {
               <Layers className="w-5 h-5" />
             </div>
             <h1 className="text-xl md:text-2xl font-bold text-casa-text-primary">
-              Live Property Categories (MongoDB Atlas)
+              Live Property Categories
             </h1>
           </div>
           <p className="text-xs md:text-sm text-casa-text-secondary mt-1">
@@ -178,7 +178,7 @@ export default function CategoriesPage() {
 
       {isLoading ? (
         <div className="p-12 text-center text-xs text-casa-text-muted">
-          Loading live categories from database...
+          Loading...
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -241,7 +241,7 @@ export default function CategoriesPage() {
 
               <div className="mt-4 pt-3 border-t border-casa-border-light flex items-center justify-between text-xs text-casa-text-muted">
                 <span>{cat.totalListings || 0} Live Listings</span>
-                <span className="text-casa-brand font-medium">MongoDB Atlas</span>
+                <span className="text-casa-brand font-medium">Active Taxonomy</span>
               </div>
             </Card>
           ))}

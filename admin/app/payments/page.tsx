@@ -646,7 +646,7 @@ export default function PaymentsPage() {
             {isTransactionsLoading ? (
               <div className="p-12 text-center text-xs text-casa-text-muted">
                 <RefreshCw className="w-6 h-6 animate-spin mx-auto mb-2 text-casa-brand" />
-                Loading transaction records from MongoDB Atlas...
+                Loading...
               </div>
             ) : transactions.length === 0 ? (
               <div className="p-12 text-center text-casa-text-muted">

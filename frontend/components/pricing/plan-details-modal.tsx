@@ -94,7 +94,7 @@ export function PlanDetailsModal({
             ? plan.features.slice(0, 4).join(', ')
             : plan.description || 'Full platform features';
 
-        const messageText = `Hello CASA Sales Team, I would like to subscribe to ${plan.name}. User: ${user?.name || 'Customer'}. Registered Mobile: ${user?.mobile || user?.normalizedMobile || ''}. Plan Price: ₹${plan.price.toLocaleString('en-IN')}. Billing Period: ${plan.billingPeriod || 'Monthly'}. Plan Features: ${featureSummary}. Request Reference: ${ref}. Please review my subscription activation request.`;
+        const messageText = `Hello My Property Team, I would like to subscribe to ${plan.name}. User: ${user?.name || 'Customer'}. Registered Mobile: ${user?.mobile || user?.normalizedMobile || ''}. Plan Price: ₹${plan.price.toLocaleString('en-IN')}. Billing Period: ${plan.billingPeriod || 'Monthly'}. Plan Features: ${featureSummary}. Request Reference: ${ref}. Please review my subscription activation request.`;
 
         window.open(
           `https://wa.me/${cleanWa}?text=${encodeURIComponent(messageText)}`,

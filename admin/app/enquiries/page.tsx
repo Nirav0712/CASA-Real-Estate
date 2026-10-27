@@ -291,7 +291,7 @@ export default function EnquiriesPage() {
         {isLoading ? (
           <div className="p-12 text-center text-xs text-casa-text-muted bg-casa-surface rounded-xl border border-casa-border-light">
             <RefreshCw className="w-6 h-6 animate-spin mx-auto mb-2 text-casa-brand" />
-            Loading CRM Leads from MongoDB Atlas...
+            Loading...
           </div>
         ) : leads.length === 0 ? (
           <div className="p-12 text-center text-casa-text-muted bg-casa-surface rounded-xl border border-casa-border-light">

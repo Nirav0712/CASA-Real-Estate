@@ -171,7 +171,7 @@ export default function PricingPage() {
         key: gatewayConfig.keyId,
         amount: Math.round(order.amount * 100),
         currency: order.currency || 'INR',
-        name: 'CASA Real Estate Marketplace',
+        name: 'My Property Real Estate Marketplace',
         description: `${plan.name} Plan (${selectedDuration} Months)`,
         order_id: order.providerOrderId,
         handler: async (response: any) => {
@@ -183,7 +183,7 @@ export default function PricingPage() {
             });
             toast.success(
               'Payment Verified!',
-              `Your subscription to ${plan.name} is now active. Welcome to CASA!`,
+              `Your subscription to ${plan.name} is now active. Welcome to My Property!`,
             );
             if (refreshUser) await refreshUser();
             await loadPlans();
@@ -235,7 +235,7 @@ export default function PricingPage() {
             </span>
           </h1>
           <p className="text-base sm:text-lg text-slate-400 leading-relaxed">
-            Choose the ideal plan tailored for Builders, Brokers, and Agents. Scale your property inventory, project launches, and verified sales team with CASA Real Estate Marketplace.
+            Choose the ideal plan tailored for Builders, Brokers, and Agents. Scale your property inventory, project launches, and verified sales team with My Property Real Estate Marketplace.
           </p>
         </div>
 
@@ -395,7 +395,7 @@ export default function PricingPage() {
                 Zero Platform Fees For Buyers & Tenants
               </h2>
               <p className="text-sm sm:text-base text-slate-300 leading-relaxed">
-                As a home seeker or commercial property buyer, you never pay to browse listings, connect with verified agents and builders, or schedule property viewings on CASA.
+                As a home seeker or commercial property buyer, you never pay to browse listings, connect with verified agents and builders, or schedule property viewings on My Property.
               </p>
             </div>
 
@@ -606,7 +606,7 @@ export default function PricingPage() {
                       <div className="flex items-center justify-center gap-3 pt-1 text-xs">
                         {plan.whatsappNumber && (
                           <a
-                            href={`https://wa.me/${plan.whatsappNumber.replace(/\D/g, '')}?text=Hi%20CASA,%20I%20am%20interested%20in%20the%20${encodeURIComponent(plan.name)}%20Plan`}
+                            href={`https://wa.me/${plan.whatsappNumber.replace(/\D/g, '')}?text=Hi%20My%20Property%20Team,%20I%20am%20interested%20in%20the%20${encodeURIComponent(plan.name)}%20Plan`}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="inline-flex items-center gap-1 text-emerald-400 hover:text-emerald-300 transition-colors"
@@ -668,20 +668,20 @@ export default function PricingPage() {
         <div className="max-w-4xl mx-auto pt-6 space-y-6">
           <div className="text-center space-y-2">
             <h2 className="text-2xl font-bold text-white">Frequently Asked Questions</h2>
-            <p className="text-sm text-slate-400">Everything you need to know about CASA subscriptions and billing.</p>
+            <p className="text-sm text-slate-400">Everything you need to know about My Property subscriptions and billing.</p>
           </div>
 
           <div className="space-y-4">
             <FaqItem
               question="How does the First 50 Users Free Trial offer work?"
-              answer="The first 50 eligible Builders, Brokers, and Independent Agents who sign up receive 3 Months (90 days) of completely free access to CASA Real Estate Marketplace. The offer provides full access to 5 active property listings and 2 project listings with 1 team seat. Slots are allocated automatically on a first-come, first-served basis."
+              answer="The first 50 eligible Builders, Brokers, and Independent Agents who sign up receive 3 Months (90 days) of completely free access to My Property Real Estate Marketplace. The offer provides full access to 5 active property listings and 2 project listings with 1 team seat. Slots are allocated automatically on a first-come, first-served basis."
             />
             <FaqItem
               question="How are multi-month duration discounts calculated?"
               answer="When selecting 2 Months, 3 Months, 6 Months, or 1 Year durations, you receive pre-configured discounted rates. For example, the Advanced Plan offers ₹14,999 for 1 year compared to ₹1,499 per month, saving you nearly ₹3,000 annually. Durations can be chosen from the top dropdown."
             />
             <FaqItem
-              question="What payment methods does CASA accept?"
+              question="What payment methods does My Property accept?"
               answer="We accept all major credit and debit cards, UPI (Google Pay, PhonePe, Paytm), NetBanking across 50+ Indian banks, and Corporate Wallets via cryptographically verified Razorpay payment processing."
             />
             <FaqItem
@@ -690,7 +690,7 @@ export default function PricingPage() {
             />
             <FaqItem
               question="Do draft or archived listings count against my property limit?"
-              answer="No. Only published, live listings on the CASA marketplace count toward your active listing allocation. You can create unlimited drafts and archive completed deals without reducing your plan capacity."
+              answer="No. Only published, live listings on the My Property marketplace count toward your active listing allocation. You can create unlimited drafts and archive completed deals without reducing your plan capacity."
             />
           </div>
         </div>
@@ -715,7 +715,7 @@ export default function PricingPage() {
                 Claim 3 Months Free Access
               </h3>
               <p className="text-xs text-slate-300 leading-relaxed">
-                You are about to activate your 90-day introductory free trial on CASA Real Estate Marketplace.
+                You are about to activate your 90-day introductory free trial on My Property Real Estate Marketplace.
               </p>
             </div>
 

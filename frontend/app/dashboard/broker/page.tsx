@@ -187,7 +187,7 @@ export default function BrokerDashboardPage() {
               </h3>
             </div>
             <p className="text-xs text-casa-text-secondary">
-              Keep your agency credentials and broker certificates up-to-date to retain CASA Verified Broker trust badges.
+              Keep your agency credentials and broker certificates up-to-date to retain My Property Verified Broker trust badges.
             </p>
             <div className="pt-2">
               <Link href="/dashboard/agent/verification">

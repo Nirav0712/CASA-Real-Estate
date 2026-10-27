@@ -174,11 +174,11 @@ export class MailService {
     }
 
     const verificationLink = this.generateVerificationLink(to, token);
-    const from = this.configService.get<string>('mail.from') || '"CASA Real Estate" <no-reply@casarealestate.com>';
+    const from = this.configService.get<string>('mail.from') || '"My Property" <info.mypropertyin@gmail.com>';
 
-    const subject = 'Activate Your CASA Account — Verify Email';
+    const subject = 'Activate Your My Property Account — Verify Email';
     const html = this.buildVerificationEmailTemplate(name, verificationLink);
-    const text = `Hello ${name || 'User'},\n\nThank you for joining CASA Real Estate.\n\nPlease verify your email address by visiting this link:\n${verificationLink}\n\nThis verification link will expire in 24 hours.\n\nBest regards,\nThe CASA Team`;
+    const text = `Hello ${name || 'User'},\n\nThank you for joining My Property.\n\nPlease verify your email address by visiting this link:\n${verificationLink}\n\nThis verification link will expire in 24 hours.\n\nBest regards,\nThe My Property Team`;
 
     if (this.transporter) {
       try {
@@ -205,12 +205,12 @@ export class MailService {
    */
   async sendPasswordResetEmail(to: string, name: string, token: string): Promise<SendMailResult> {
     const resetLink = this.generatePasswordResetLink(to, token);
-    const from = this.configService.get<string>('mail.from') || '"myproperty" <no-reply@myproperty.com>';
+    const from = this.configService.get<string>('mail.from') || '"My Property" <info.mypropertyin@gmail.com>';
     const isProduction = this.configService.get<string>('nodeEnv') === 'production';
 
-    const subject = 'Reset Your myproperty Password';
+    const subject = 'Reset Your My Property Password';
     const html = this.buildPasswordResetEmailTemplate(name, resetLink);
-    const text = `Hello ${name || 'User'},\n\nWe received a request to reset your password for myproperty Marketplace.\n\nReset your password by clicking this link:\n${resetLink}\n\nThis link is valid for 1 hour. If you did not make this request, please ignore this email.\n\nBest regards,\nThe myproperty Security Team`;
+    const text = `Hello ${name || 'User'},\n\nWe received a request to reset your password for My Property Marketplace.\n\nReset your password by clicking this link:\n${resetLink}\n\nThis link is valid for 1 hour. If you did not make this request, please ignore this email.\n\nBest regards,\nThe My Property Security Team`;
 
     if (this.transporter) {
       try {
@@ -255,7 +255,7 @@ export class MailService {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Confirm Your Email - myproperty</title>
+  <title>Confirm Your Email - My Property</title>
   <style>
     body { margin: 0; padding: 0; background-color: #f1f5f9; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; }
     .container { max-width: 580px; margin: 40px auto; background: #ffffff; border-radius: 20px; overflow: hidden; border: 1px solid #e2e8f0; box-shadow: 0 10px 25px rgba(0,0,0,0.06); }
@@ -275,12 +275,12 @@ export class MailService {
 <body>
   <div class="container">
     <div class="header">
-      <div class="logo-badge">myproperty</div>
+      <div class="logo-badge">My Property</div>
       <h1>Confirm Your Email Address</h1>
     </div>
     <div class="content">
       <div class="greeting">Hello ${safeName},</div>
-      <p>Thank you for registering on <strong>myproperty Marketplace</strong>. To complete your registration and activate your account, please confirm your email address by clicking the button below:</p>
+      <p>Thank you for registering on <strong>My Property Marketplace</strong>. To complete your registration and activate your account, please confirm your email address by clicking the button below:</p>
       
       <div class="button-container">
         <a href="${link}" class="button" target="_blank">Confirm Email &amp; Activate Account</a>
@@ -294,11 +294,11 @@ export class MailService {
       <p style="word-break: break-all; font-size: 13px; color: #0284c7;"><a href="${link}">${link}</a></p>
 
       <div class="notice">
-        This confirmation link will expire in <strong>24 hours</strong>. If you did not create an account on myproperty, please disregard this email.
+        This confirmation link will expire in <strong>24 hours</strong>. If you did not create an account on My Property, please disregard this email.
       </div>
     </div>
     <div class="footer">
-      &copy; ${new Date().getFullYear()} myproperty Marketplace. All rights reserved.
+      &copy; ${new Date().getFullYear()} My Property Marketplace. All rights reserved.
     </div>
   </div>
 </body>
@@ -313,7 +313,7 @@ export class MailService {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Reset Password - myproperty</title>
+  <title>Reset Password - My Property</title>
   <style>
     body { margin: 0; padding: 0; background-color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; }
     .container { max-width: 580px; margin: 40px auto; background: #ffffff; border-radius: 16px; overflow: hidden; border: 1px solid #e2e8f0; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
@@ -330,11 +330,11 @@ export class MailService {
 <body>
   <div class="container">
     <div class="header">
-      <h1>myproperty Security</h1>
+      <h1>My Property Security</h1>
     </div>
     <div class="content">
       <div class="greeting">Hello, ${safeName}</div>
-      <p>We received a request to reset your password for your myproperty account. Click the button below to choose a new, secure password.</p>
+      <p>We received a request to reset your password for your My Property account. Click the button below to choose a new, secure password.</p>
       <div class="button-container">
         <a href="${link}" class="button" target="_blank">Reset Password</a>
       </div>
@@ -345,7 +345,7 @@ export class MailService {
       </div>
     </div>
     <div class="footer">
-      &copy; ${new Date().getFullYear()} myproperty Marketplace. Security &amp; Trust.
+      &copy; ${new Date().getFullYear()} My Property Marketplace. Security &amp; Trust.
     </div>
   </div>
 </body>
@@ -356,7 +356,7 @@ export class MailService {
    * Dispatches KYC Approval Email only if properly configured
    */
   async sendKycApprovedEmail(to: string, name: string, trialExpiresAt?: Date): Promise<SendMailResult> {
-    const from = this.configService.get<string>('mail.from') || '"myproperty" <no-reply@myproperty.com>';
+    const from = this.configService.get<string>('mail.from') || '"My Property" <info.mypropertyin@gmail.com>';
 
     const expiryStr = trialExpiresAt
       ? trialExpiresAt.toLocaleDateString('en-IN', {
@@ -365,8 +365,8 @@ export class MailService {
         })
       : 'in 3 days';
 
-    const subject = 'Congratulations! Your myproperty KYC Verification is Approved';
-    const text = `Hello ${name || 'User'},\n\nYour KYC verification application has been approved by the Super Admin.\n\nYour 3-Day Free Trial is now active until: ${expiryStr}.\n\nYou can access your dashboard and publish listings at: ${cleanUrl(this.configService.get<string>('cors.frontendUrl'), 'http://localhost:3000')}/dashboard\n\nBest regards,\nThe myproperty Compliance Team`;
+    const subject = 'Congratulations! Your My Property KYC Verification is Approved';
+    const text = `Hello ${name || 'User'},\n\nYour KYC verification application has been approved by the Super Admin.\n\nYour 3-Day Free Trial is now active until: ${expiryStr}.\n\nYou can access your dashboard and publish listings at: ${cleanUrl(this.configService.get<string>('cors.frontendUrl'), 'http://localhost:3000')}/dashboard\n\nBest regards,\nThe My Property Compliance Team`;
 
     if (this.transporter) {
       try {
@@ -393,10 +393,10 @@ export class MailService {
    * Dispatches KYC Rejection Email only if properly configured
    */
   async sendKycRejectedEmail(to: string, name: string, reason: string): Promise<SendMailResult> {
-    const from = this.configService.get<string>('mail.from') || '"myproperty" <no-reply@myproperty.com>';
+    const from = this.configService.get<string>('mail.from') || '"My Property" <info.mypropertyin@gmail.com>';
 
-    const subject = 'myproperty KYC Verification Update — Action Required';
-    const text = `Hello ${name || 'User'},\n\nWe reviewed your KYC verification documents, but were unable to approve them due to the following reason:\n\n${reason}\n\nPlease visit your dashboard to upload corrected documents:\n${cleanUrl(this.configService.get<string>('cors.frontendUrl'), 'http://localhost:3000')}/dashboard/kyc\n\nBest regards,\nThe myproperty Compliance Team`;
+    const subject = 'My Property KYC Verification Update — Action Required';
+    const text = `Hello ${name || 'User'},\n\nWe reviewed your KYC verification documents, but were unable to approve them due to the following reason:\n\n${reason}\n\nPlease visit your dashboard to upload corrected documents:\n${cleanUrl(this.configService.get<string>('cors.frontendUrl'), 'http://localhost:3000')}/dashboard/kyc\n\nBest regards,\nThe My Property Compliance Team`;
 
     if (this.transporter) {
       try {
@@ -416,6 +416,119 @@ export class MailService {
 
     // SMTP not configured - log for development but do NOT fake success
     this.logger.warn(`[SMTP UNCONFIGURED] KYC Rejection email for [${to}] was not sent because SMTP is unconfigured.`);
+    return { success: false, isMock: true, error: 'SMTP delivery service is not configured' };
+  }
+
+  /**
+   * Dispatches Subscription Request Received Confirmation Email
+   */
+  async sendSubscriptionRequestReceivedEmail(
+    to: string,
+    name: string,
+    planName: string,
+    price: number,
+    billingPeriod: string,
+    requestReference: string,
+  ): Promise<SendMailResult> {
+    const from = this.configService.get<string>('mail.from') || '"My Property" <info.mypropertyin@gmail.com>';
+
+    const subject = `Subscription Request Received: ${planName} — My Property`;
+    const text = `Hello ${name || 'User'},\n\nWe have received your subscription request for the ${planName} plan (₹${price.toLocaleString('en-IN')} / ${billingPeriod.toLowerCase()}).\n\nYour Request Reference is: ${requestReference}\n\nOur sales & operations team will review and activate your subscription shortly.\n\nBest regards,\nThe My Property Team`;
+
+    if (this.transporter) {
+      try {
+        const info = await this.transporter.sendMail({
+          from,
+          to,
+          subject,
+          text,
+        });
+        this.logger.log(`📧 Subscription request confirmation email sent to ${to} (Message ID: ${info.messageId})`);
+        return { success: true, messageId: info.messageId, isMock: false };
+      } catch (err: any) {
+        this.logger.error(`SMTP subscription request confirmation delivery failed for ${to}: ${err?.message}`);
+        return { success: false, isMock: false, error: err.message };
+      }
+    }
+
+    this.logger.warn(`[SMTP UNCONFIGURED] Subscription Request confirmation email for [${to}] was not sent because SMTP is unconfigured.`);
+    return { success: false, isMock: true, error: 'SMTP delivery service is not configured' };
+  }
+
+  /**
+   * Dispatches Subscription Plan Approved & Activated Email
+   */
+  async sendSubscriptionApprovedEmail(
+    to: string,
+    name: string,
+    planName: string,
+    expiryDate: Date,
+    requestReference: string,
+  ): Promise<SendMailResult> {
+    const from = this.configService.get<string>('mail.from') || '"My Property" <info.mypropertyin@gmail.com>';
+
+    const expiryStr = expiryDate
+      ? expiryDate.toLocaleDateString('en-IN', {
+          dateStyle: 'full',
+          timeZone: 'Asia/Kolkata',
+        })
+      : 'Active';
+
+    const subject = `Your ${planName} Subscription is Approved & Active! — My Property`;
+    const text = `Hello ${name || 'User'},\n\nGreat news! Your subscription request (${requestReference}) for the ${planName} plan has been APPROVED by the Super Admin.\n\nYour subscription entitlements are now active.\nPlan Validity: until ${expiryStr}.\n\nYou can access your dashboard and listing quotas at: ${cleanUrl(this.configService.get<string>('cors.frontendUrl'), 'http://localhost:3000')}/dashboard\n\nThank you for choosing My Property!\n\nBest regards,\nThe My Property Team`;
+
+    if (this.transporter) {
+      try {
+        const info = await this.transporter.sendMail({
+          from,
+          to,
+          subject,
+          text,
+        });
+        this.logger.log(`📧 Subscription approved email sent to ${to} (Message ID: ${info.messageId})`);
+        return { success: true, messageId: info.messageId, isMock: false };
+      } catch (err: any) {
+        this.logger.error(`SMTP subscription approval delivery failed for ${to}: ${err?.message}`);
+        return { success: false, isMock: false, error: err.message };
+      }
+    }
+
+    this.logger.warn(`[SMTP UNCONFIGURED] Subscription approved email for [${to}] was not sent because SMTP is unconfigured.`);
+    return { success: false, isMock: true, error: 'SMTP delivery service is not configured' };
+  }
+
+  /**
+   * Dispatches Subscription Plan Rejected/Declined Email
+   */
+  async sendSubscriptionRejectedEmail(
+    to: string,
+    name: string,
+    planName: string,
+    reason: string,
+    requestReference: string,
+  ): Promise<SendMailResult> {
+    const from = this.configService.get<string>('mail.from') || '"My Property" <info.mypropertyin@gmail.com>';
+
+    const subject = `Subscription Request Update: ${planName} — My Property`;
+    const text = `Hello ${name || 'User'},\n\nWe reviewed your subscription request (${requestReference}) for the ${planName} plan, but were unable to approve it at this time.\n\nReason: ${reason}\n\nIf you have questions or wish to explore alternative plans, please contact our support team or connect via WhatsApp.\n\nBest regards,\nThe My Property Team`;
+
+    if (this.transporter) {
+      try {
+        const info = await this.transporter.sendMail({
+          from,
+          to,
+          subject,
+          text,
+        });
+        this.logger.log(`📧 Subscription declined email sent to ${to} (Message ID: ${info.messageId})`);
+        return { success: true, messageId: info.messageId, isMock: false };
+      } catch (err: any) {
+        this.logger.error(`SMTP subscription declined delivery failed for ${to}: ${err?.message}`);
+        return { success: false, isMock: false, error: err.message };
+      }
+    }
+
+    this.logger.warn(`[SMTP UNCONFIGURED] Subscription declined email for [${to}] was not sent because SMTP is unconfigured.`);
     return { success: false, isMock: true, error: 'SMTP delivery service is not configured' };
   }
 }

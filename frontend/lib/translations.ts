@@ -43,7 +43,7 @@ export const SUPPORTED_LOCALES: Record<Locale, LocaleConfig> = {
 export const DICTIONARY = {
   en: {
     // Navigation
-    brand: 'myproperty',
+    brand: 'My Property',
     tagline: 'Real Estate',
     home: 'Home',
     buyProperty: 'Buy Property',

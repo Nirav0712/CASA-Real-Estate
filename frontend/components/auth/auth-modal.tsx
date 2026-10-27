@@ -396,7 +396,7 @@ export function AuthModal() {
               <p className="text-xs text-casa-text-secondary max-w-sm mx-auto leading-relaxed">
                 We sent a secure activation link to{' '}
                 <strong className="text-casa-text-primary">{registeredEmail}</strong>.
-                Please verify your email address to log in to CASA Marketplace.
+                Please verify your email address to log in to My Property Marketplace.
               </p>
             </div>
 
@@ -589,7 +589,7 @@ export function AuthModal() {
                 loading={loading}
                 className="shadow-subtle py-2.5 font-bold"
               >
-                <span>Sign In to CASA</span>
+                <span>Sign In to My Property</span>
                 <ArrowRight className="w-4 h-4" />
               </Button>
             </div>
@@ -806,7 +806,7 @@ export function AuthModal() {
                 className="mt-0.5 rounded border-casa-border-medium text-casa-brand focus:ring-casa-brand/20 cursor-pointer"
               />
               <label htmlFor="agree-terms" className="text-[11px] text-casa-text-muted leading-relaxed cursor-pointer select-none">
-                I agree to CASA&apos;s{' '}
+                I agree to My Property&apos;s{' '}
                 <a href="#" className="text-casa-brand hover:underline">
                   Terms of Service
                 </a>{' '}

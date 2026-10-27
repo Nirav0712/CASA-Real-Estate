@@ -171,7 +171,7 @@ export default function PropertyDossierPage() {
         <div className="p-4 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-900 rounded-2xl flex items-center gap-3 text-emerald-800 dark:text-emerald-300 text-xs">
           <CheckCircle2 className="w-5 h-5 flex-shrink-0 text-emerald-600" />
           <div>
-            <span className="font-bold block">Live on CASA Marketplace</span>
+            <span className="font-bold block">Live on My Property Marketplace</span>
             <span>This listing is approved, indexed, and visible to all prospective buyers.</span>
           </div>
         </div>
@@ -182,7 +182,7 @@ export default function PropertyDossierPage() {
           <Clock className="w-5 h-5 flex-shrink-0 text-amber-600" />
           <div>
             <span className="font-bold block">In Moderation Review</span>
-            <span>MyProperty administrators are currently reviewing your documents and photos.</span>
+            <span>My Property administrators are currently reviewing your documents and photos.</span>
           </div>
         </div>
       )}

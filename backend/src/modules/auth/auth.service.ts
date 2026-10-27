@@ -1096,45 +1096,97 @@ export class AuthService implements OnModuleInit {
 
     let activeSub: any = null;
     let activePkg: any = null;
+    let latestSub: any = null;
 
     if (this.isDbConnected() && (user._id || user.id)) {
       const uid = (user._id || user.id).toString();
       try {
-        activeSub = await this.subscriptionModel.findOne({
-          userId: uid,
-          status: 'ACTIVE',
-          endDate: { $gte: new Date() },
-        }).sort({ createdAt: -1 });
+        const userQuery: any[] = [{ userId: uid }];
+        if (isValidObjectId(uid)) {
+          userQuery.push({ userId: new Types.ObjectId(uid) });
+        }
+
+        const allSubs = await this.subscriptionModel
+          .find({ $or: userQuery })
+          .sort({ createdAt: -1 })
+          .lean();
+
+        if (allSubs && allSubs.length > 0) {
+          latestSub = allSubs[0];
+          activeSub =
+            allSubs.find(
+              (s: any) =>
+                s.status === 'ACTIVE' &&
+                (!s.endDate || new Date(s.endDate) >= new Date()),
+            ) || null;
+        }
 
         if (activeSub) {
           if (activeSub.packageId && isValidObjectId(activeSub.packageId)) {
-            activePkg = await this.packageModel.findById(activeSub.packageId);
+            activePkg = await this.packageModel.findById(activeSub.packageId).lean();
           }
-          // Self-heal user document if activeSubscriptionId is missing or trialExpired flag is dirty
           const subIdStr = activeSub._id.toString();
-          const pkgIdStr = activeSub.packageId ? activeSub.packageId.toString() : user.activePackageId;
-          if (
-            user.activeSubscriptionId !== subIdStr ||
-            user.activePackageId !== pkgIdStr ||
-            user.trialExpired ||
-            user.isTrialActive
-          ) {
-            user.activeSubscriptionId = subIdStr;
-            user.activePackageId = pkgIdStr;
-            user.trialExpired = false;
-            user.isTrialActive = false;
-            await this.userModel.updateOne(
-              { _id: user._id || user.id },
-              {
-                $set: {
-                  activeSubscriptionId: subIdStr,
-                  activePackageId: pkgIdStr,
-                  trialExpired: false,
-                  isTrialActive: false,
-                },
+          const pkgIdStr = activeSub.packageId
+            ? activeSub.packageId.toString()
+            : (user.activePackageId || null);
+          const planName = activePkg?.name || activeSub.plan || 'Active Plan';
+
+          user.activeSubscriptionId = subIdStr;
+          user.activePackageId = pkgIdStr;
+          user.activePlanName = planName;
+          user.subscriptionStatus = 'ACTIVE';
+          user.subscriptionExpiresAt = activeSub.endDate;
+          user.subscriptionStartDate = activeSub.startDate;
+          user.trialExpired = false;
+          user.isTrialActive = false;
+
+          await this.userModel.updateOne(
+            { _id: user._id || user.id },
+            {
+              $set: {
+                activeSubscriptionId: subIdStr,
+                activePackageId: pkgIdStr,
+                activePlanName: planName,
+                subscriptionStatus: 'ACTIVE',
+                subscriptionExpiresAt: activeSub.endDate,
+                subscriptionStartDate: activeSub.startDate,
+                trialExpired: false,
+                isTrialActive: false,
               },
-            );
+            },
+          );
+        } else if (latestSub) {
+          if (latestSub.packageId && isValidObjectId(latestSub.packageId)) {
+            activePkg = await this.packageModel.findById(latestSub.packageId).lean();
           }
+          const isCancelled = latestSub.status === 'CANCELLED';
+          const subStatus = isCancelled ? 'CANCELLED' : 'EXPIRED';
+          const planName = activePkg?.name || latestSub.plan || 'Subscription';
+
+          user.activeSubscriptionId = null;
+          user.activePackageId = null;
+          user.activePlanName = planName;
+          user.subscriptionStatus = subStatus;
+          user.subscriptionExpiresAt = latestSub.endDate;
+          user.subscriptionStartDate = latestSub.startDate;
+          user.isTrialActive = false;
+          user.trialExpired = true;
+
+          await this.userModel.updateOne(
+            { _id: user._id || user.id },
+            {
+              $set: {
+                activeSubscriptionId: null,
+                activePackageId: null,
+                activePlanName: planName,
+                subscriptionStatus: subStatus,
+                subscriptionExpiresAt: latestSub.endDate,
+                subscriptionStartDate: latestSub.startDate,
+                isTrialActive: false,
+                trialExpired: true,
+              },
+            },
+          );
         }
       } catch (subErr: any) {
         this.logger.warn(`Subscription resolution in getMe: ${subErr?.message}`);
@@ -2122,13 +2174,14 @@ export class AuthService implements OnModuleInit {
       ? null
       : (user.activePackageId || (activeSub?.packageId ? activeSub.packageId.toString() : null));
     const activePlanName = activePkg?.name || activeSub?.plan || user.activePlanName || null;
-    const subscriptionStatus = activeSub?.status || (hasActiveSub ? 'ACTIVE' : null);
+    const subscriptionStatus = user.subscriptionStatus || activeSub?.status || (hasActiveSub ? 'ACTIVE' : null);
     const subscriptionExpiresAt = activeSub?.endDate || user.subscriptionExpiresAt || null;
     const subscriptionStartDate = activeSub?.startDate || user.subscriptionStartDate || null;
+    const billingPeriod = activePkg?.billingPeriod || (activeSub?.durationMonths === 12 ? 'Yearly' : 'Monthly') || 'Monthly';
 
     return {
       id: user._id ? user._id.toString() : user.id,
-      name: user.name || 'CASA User',
+      name: user.name || 'My Property User',
       mobile: user.mobile,
       normalizedMobile: user.normalizedMobile,
       email: user.email,
@@ -2157,6 +2210,7 @@ export class AuthService implements OnModuleInit {
       subscriptionStatus,
       subscriptionExpiresAt,
       subscriptionStartDate,
+      billingPeriod: (isConsumer || isPlatformAdmin) ? null : billingPeriod,
       kycStatus: isKycExempt ? 'EXEMPT' : (user.kycStatus || 'NOT_SUBMITTED'),
       isKycExempt,
       isKycRequired: !isKycExempt,

@@ -392,6 +392,18 @@ export class AgentsService {
       .sort({ createdAt: -1 })
       .lean();
 
+    const hasActiveSub = Boolean(
+      userDoc?.subscriptionStatus === 'ACTIVE' ||
+      (userDoc?.activeSubscriptionId && userDoc?.activePackageId && (!userDoc?.subscriptionExpiresAt || new Date(userDoc.subscriptionExpiresAt) >= new Date()))
+    );
+
+    const isTrialActive = Boolean(
+      !hasActiveSub && userDoc?.isTrialActive && userDoc?.trialExpiresAt && new Date() <= new Date(userDoc.trialExpiresAt)
+    );
+    const isTrialExpired = Boolean(
+      !hasActiveSub && (userDoc?.trialExpired || (userDoc?.trialExpiresAt && new Date() > new Date(userDoc.trialExpiresAt)))
+    );
+
     return {
       verificationStatus: profile.verificationStatus,
       isVerifiedAgent: profile.isVerifiedAgent,
@@ -401,7 +413,13 @@ export class AgentsService {
       isKycRequired: true,
       kycRejectionReason: userDoc?.kycRejectionReason || (profile.rejectionReasons && profile.rejectionReasons[0]),
       kycApprovedAt: userDoc?.kycApprovedAt,
-      isTrialActive: Boolean(userDoc?.isTrialActive || (userDoc?.trialExpiresAt && new Date() <= new Date(userDoc.trialExpiresAt))),
+      hasActiveSubscription: hasActiveSub,
+      activePlanName: userDoc?.activePlanName || (hasActiveSub ? 'Active Plan' : null),
+      subscriptionStatus: userDoc?.subscriptionStatus || (hasActiveSub ? 'ACTIVE' : null),
+      subscriptionExpiresAt: userDoc?.subscriptionExpiresAt || null,
+      subscriptionStartDate: userDoc?.subscriptionStartDate || null,
+      isTrialActive,
+      isTrialExpired,
       trialStartedAt: userDoc?.trialStartedAt,
       trialExpiresAt: userDoc?.trialExpiresAt,
       accountType: userDoc?.accountType || user.accountType || user.role,

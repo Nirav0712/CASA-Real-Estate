@@ -189,7 +189,7 @@ export default function PurchasersPage() {
         {loading ? (
           <div className="p-12 text-center text-casa-text-muted flex flex-col items-center justify-center gap-2">
             <RefreshCw className="w-6 h-6 animate-spin text-casa-brand" />
-            <p className="text-xs">Loading live subscriber records from database...</p>
+            <p className="text-xs">Loading...</p>
           </div>
         ) : error ? (
           <div className="p-12 text-center text-red-500 space-y-2">

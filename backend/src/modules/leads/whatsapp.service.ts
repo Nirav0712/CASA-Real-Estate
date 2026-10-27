@@ -133,7 +133,7 @@ export class WhatsAppService {
     });
 
     const messageText =
-      `*New myproperty Property Enquiry Received!*\n\n` +
+      `*New My Property Property Enquiry Received!*\n\n` +
       `*Property:* ${payload.propertyTitle}\n` +
       `*Property ID:* ${payload.propertyId}\n` +
       `*Property Link:* ${propUrl}\n\n` +
@@ -143,7 +143,7 @@ export class WhatsAppService {
       (payload.customerEmail ? `*Email:* ${payload.customerEmail}\n` : '') +
       `*Date:* ${dateStr}\n\n` +
       `*Enquiry Message:*\n"${payload.message}"\n\n` +
-      `_Please respond promptly via myproperty CRM or direct call._`;
+      `_Please respond promptly via My Property CRM or direct call._`;
 
     // 1. Send to configured lead destination number (e.g. Admin / Central CRM)
     const primaryResult = await this.dispatchMessage(this.leadDestinationNumber, messageText);
@@ -169,13 +169,13 @@ export class WhatsAppService {
 
     const recipient = this.formatMobileNumber(payload.customerMobile);
     const messageText =
-      `*myproperty — KYC Documents Received*\n\n` +
+      `*My Property — KYC Documents Received*\n\n` +
       `Hello ${payload.customerName},\n\n` +
       `Your verification documents for your *${payload.accountType.replace(/_/g, ' ')}* account have been submitted successfully.\n\n` +
       `Our compliance team is currently reviewing your application.\n\n` +
       `*Notice:* You may receive a verification call from *${this.verificationCallNumber}* to complete your KYC.\n\n` +
       `Once approved by the Super Admin, your *3-Day Free Trial* will begin automatically.\n\n` +
-      `Thank you for choosing myproperty!`;
+      `Thank you for choosing My Property!`;
 
     return this.dispatchMessage(recipient, messageText);
   }
@@ -195,7 +195,7 @@ export class WhatsAppService {
       : 'in 3 days';
 
     const messageText =
-      `*Congratulations! Your myproperty Account is Approved!*\n\n` +
+      `*Congratulations! Your My Property Account is Approved!*\n\n` +
       `Dear ${payload.customerName},\n\n` +
       `Your KYC verification for your *${payload.accountType.replace(/_/g, ' ')}* account has been *APPROVED* by the Super Admin.\n\n` +
       `*Your 3-Day Free Trial is now ACTIVE!* 🎉\n` +
@@ -215,11 +215,11 @@ export class WhatsAppService {
 
     const recipient = this.formatMobileNumber(payload.customerMobile);
     const messageText =
-      `*myproperty Verification Update — Action Required*\n\n` +
+      `*My Property Verification Update — Action Required*\n\n` +
       `Dear ${payload.customerName},\n\n` +
       `We reviewed your KYC documents for your *${payload.accountType.replace(/_/g, ' ')}* account, but were unable to approve them due to the following reason:\n\n` +
       `*Reason:* ${payload.reason || 'Document illegible or information mismatch.'}\n\n` +
-      `Please log in to your myproperty dashboard to re-upload clear replacement documents:\n` +
+      `Please log in to your My Property dashboard to re-upload clear replacement documents:\n` +
       `${this.frontendUrl}/dashboard/kyc\n\n` +
       `For help, our verification officer may call you from *${this.verificationCallNumber}*.`;
 
@@ -241,7 +241,7 @@ export class WhatsAppService {
       : 'Ongoing';
 
     const messageText =
-      `*myproperty — Subscription Updated*\n\n` +
+      `*My Property — Subscription Updated*\n\n` +
       `Dear ${payload.customerName},\n\n` +
       `Your account package has been updated by Super Admin.\n\n` +
       `*Account Type:* ${payload.accountType.replace(/_/g, ' ')}\n` +
@@ -249,7 +249,7 @@ export class WhatsAppService {
       `*Validity / Expiry Date:* ${expiryStr}\n\n` +
       `Your new listing and lead quotas are active immediately.\n` +
       `View your account: ${this.frontendUrl}/dashboard\n\n` +
-      `Thank you for partnering with myproperty!`;
+      `Thank you for partnering with My Property!`;
 
     return this.dispatchMessage(recipient, messageText);
   }

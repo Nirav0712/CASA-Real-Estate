@@ -520,7 +520,7 @@ export class EngagementService {
 
     const buyerMobile = buyerUser?.mobile || user.mobile;
     const buyerName = buyerUser?.name || 'Interested Buyer';
-    const propTitleEn = typeof property.title === 'string' ? property.title : property.title?.en || 'CASA Listing';
+    const propTitleEn = typeof property.title === 'string' ? property.title : property.title?.en || 'My Property Listing';
 
     // Upsert or reuse existing Lead in CRM for buyer + property
     let lead = await this.leadModel.findOne({

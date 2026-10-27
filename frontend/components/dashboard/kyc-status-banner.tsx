@@ -16,6 +16,9 @@ import {
   Calendar,
   CheckCircle2,
   FileText,
+  Crown,
+  AlertTriangle,
+  Zap,
 } from 'lucide-react';
 
 interface KycStatusBannerProps {
@@ -42,6 +45,21 @@ export function isKycExempt(
     role === 'ADMIN';
 
   return isBuyer || isTenant || isSuperAdmin;
+}
+
+function formatDateTime(val?: string | Date | null): string {
+  if (!val) return '—';
+  try {
+    const d = new Date(val);
+    if (isNaN(d.getTime())) return '—';
+    return d.toLocaleDateString('en-IN', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+    });
+  } catch {
+    return '—';
+  }
 }
 
 export function KycStatusBanner({ className = '', onRefresh }: KycStatusBannerProps) {
@@ -103,28 +121,40 @@ export function KycStatusBanner({ className = '', onRefresh }: KycStatusBannerPr
     user?.trialExpiresAt ||
     null;
 
-  // Calculate remaining trial days
-  let trialRemainingDays = 0;
-  if (trialExpiresAt) {
-    const diff = new Date(trialExpiresAt).getTime() - Date.now();
-    trialRemainingDays = Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
-  }
+  const trialRemainingDays = trialExpiresAt
+    ? Math.max(0, Math.ceil((new Date(trialExpiresAt).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
+    : 0;
 
-  const formatDateTime = (dateVal: string | null | undefined) => {
-    if (!dateVal) return '—';
-    try {
-      const d = new Date(dateVal);
-      return d.toLocaleDateString('en-IN', {
-        day: 'numeric',
-        month: 'short',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-      });
-    } catch {
-      return '—';
-    }
-  };
+  // Authoritative Subscription and Trial Status
+  const hasActiveSubscription = Boolean(
+    verification?.hasActiveSubscription ||
+    user?.hasActiveSubscription ||
+    user?.subscriptionStatus === 'ACTIVE' ||
+    (user?.activeSubscriptionId && user?.activePackageId && (!user?.subscriptionExpiresAt || new Date(user.subscriptionExpiresAt).getTime() > Date.now()))
+  );
+
+  const activePlanName = verification?.activePlanName || user?.activePlanName || (hasActiveSubscription ? 'Active Plan' : null);
+  const subscriptionStatus = verification?.subscriptionStatus || user?.subscriptionStatus || (hasActiveSubscription ? 'ACTIVE' : null);
+  const subscriptionExpiresAt = verification?.subscriptionExpiresAt || user?.subscriptionExpiresAt || null;
+  const subscriptionStartDate = verification?.subscriptionStartDate || user?.subscriptionStartDate || null;
+
+  const isSubExpiredOrCancelled = Boolean(
+    !hasActiveSubscription &&
+    (subscriptionStatus === 'EXPIRED' || subscriptionStatus === 'CANCELLED')
+  );
+
+  const isTrialActive = Boolean(
+    !hasActiveSubscription &&
+    !isSubExpiredOrCancelled &&
+    (verification?.isTrialActive ?? user?.isTrialActive ?? false) &&
+    trialRemainingDays > 0
+  );
+
+  const isTrialExpired = Boolean(
+    !hasActiveSubscription &&
+    !isSubExpiredOrCancelled &&
+    (verification?.isTrialExpired ?? user?.trialExpired ?? user?.isTrialExpired ?? (trialExpiresAt ? new Date(trialExpiresAt).getTime() <= Date.now() : true))
+  );
 
   return (
     <div className={`space-y-3 ${className}`}>
@@ -146,14 +176,17 @@ export function KycStatusBanner({ className = '', onRefresh }: KycStatusBannerPr
                   </span>
                 </div>
                 <p className="text-xs text-emerald-800 dark:text-emerald-300">
-                  Your identity and business documents have been verified by the Super Admin. The official CASA Verified Trust Badge is active on all your listings.
+                  Your identity and business documents have been verified by the Super Admin. The official My Property Verified Trust Badge is active on all your listings.
                 </p>
               </div>
             </div>
 
             <div className="flex items-center gap-2 self-start sm:self-auto shrink-0">
               <button
-                onClick={fetchLiveStatus}
+                onClick={async () => {
+                  await Promise.allSettled([fetchLiveStatus(), refreshUser?.()]);
+                  onRefresh?.();
+                }}
                 disabled={isRefreshing}
                 title="Refresh verification status from real database"
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-emerald-300 dark:border-emerald-700 bg-white dark:bg-gray-900 text-xs font-semibold text-emerald-800 dark:text-emerald-200 hover:bg-emerald-50 transition shadow-xs disabled:opacity-60"
@@ -170,52 +203,208 @@ export function KycStatusBanner({ className = '', onRefresh }: KycStatusBannerPr
             </div>
           </div>
 
-          {/* 3-Day Free Trial Card on Approval (Requirement 3) */}
-          <div className="bg-white dark:bg-gray-900/90 border border-emerald-200 dark:border-emerald-800/80 rounded-xl p-4 shadow-xs">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 rounded-lg shrink-0">
-                  <Sparkles className="w-5 h-5" />
+          {/* STATE A: Super Admin-approved active plan (Hide 3-day trial and Trial Expired) */}
+          {hasActiveSubscription && (
+            <div className="bg-white dark:bg-gray-900/90 border border-emerald-300 dark:border-emerald-700/80 rounded-xl p-4 shadow-xs">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 bg-gradient-to-br from-amber-500 to-amber-600 text-white rounded-xl shadow-xs shrink-0">
+                    <Crown className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-extrabold text-casa-text-primary">
+                        {activePlanName || 'Active Plan'}
+                      </span>
+                      <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                        Active Plan
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-casa-text-muted mt-0.5">
+                      Super Admin Approved — Full property publishing quotas and buyer leads access are unlocked.
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-bold text-casa-text-primary">
-                      3-Day Free Trial
+
+                {/* Plan Validity Grid */}
+                <div className="flex flex-wrap items-center gap-4 text-xs bg-slate-50 dark:bg-slate-800/50 px-3.5 py-2 rounded-lg border border-slate-200 dark:border-slate-700">
+                  {subscriptionStartDate && (
+                    <>
+                      <div className="space-y-0.5">
+                        <span className="text-[10px] font-semibold text-casa-text-muted uppercase tracking-wider block">
+                          Activated On
+                        </span>
+                        <span className="font-bold text-casa-text-primary">
+                          {formatDateTime(subscriptionStartDate)}
+                        </span>
+                      </div>
+                      <div className="w-px h-7 bg-slate-300 dark:bg-slate-700 hidden sm:block" />
+                    </>
+                  )}
+                  <div className="space-y-0.5">
+                    <span className="text-[10px] font-semibold text-casa-text-muted uppercase tracking-wider block">
+                      Plan Validity Until
                     </span>
-                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-200">
-                      {trialRemainingDays > 0 ? `${trialRemainingDays} Day${trialRemainingDays !== 1 ? 's' : ''} Remaining` : 'Completed / Active'}
+                    <span className="font-bold text-casa-text-primary">
+                      {formatDateTime(subscriptionExpiresAt)}
                     </span>
                   </div>
-                  <p className="text-[11px] text-casa-text-muted mt-0.5">
-                    Account Status: <strong className="text-emerald-700 dark:text-emerald-400">Active</strong> — You can publish property listings and receive direct buyer leads.
-                  </p>
-                </div>
-              </div>
-
-              {/* Trial Dates Grid */}
-              <div className="flex flex-wrap items-center gap-4 text-xs bg-slate-50 dark:bg-slate-800/50 px-3.5 py-2 rounded-lg border border-slate-200 dark:border-slate-700">
-                <div className="space-y-0.5">
-                  <span className="text-[10px] font-semibold text-casa-text-muted uppercase tracking-wider block">
-                    Trial Start Date
-                  </span>
-                  <span className="font-bold text-casa-text-primary">
-                    {formatDateTime(trialStartedAt)}
-                  </span>
-                </div>
-                <div className="w-px h-7 bg-slate-300 dark:bg-slate-700 hidden sm:block" />
-                <div className="space-y-0.5">
-                  <span className="text-[10px] font-semibold text-casa-text-muted uppercase tracking-wider block">
-                    Trial Expiry Date
-                  </span>
-                  <span className="font-bold text-casa-text-primary">
-                    {formatDateTime(trialExpiresAt)}
-                  </span>
+                  <Link
+                    href="/dashboard/billing"
+                    className="inline-flex items-center gap-1 text-xs font-bold text-casa-brand hover:underline ms-2"
+                  >
+                    <span>Manage Billing</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </Link>
                 </div>
               </div>
             </div>
-          </div>
+          )}
+
+          {/* STATE B: Active 3-Day Free Trial (Shown only if no active plan and trial is active) */}
+          {!hasActiveSubscription && isTrialActive && (
+            <div className="bg-white dark:bg-gray-900/90 border border-emerald-200 dark:border-emerald-800/80 rounded-xl p-4 shadow-xs">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 rounded-lg shrink-0">
+                    <Sparkles className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-bold text-casa-text-primary">
+                        3-Day Free Trial
+                      </span>
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-200">
+                        {trialRemainingDays > 0 ? `${trialRemainingDays} Day${trialRemainingDays !== 1 ? 's' : ''} Remaining` : 'Active'}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-casa-text-muted mt-0.5">
+                      Account Status: <strong className="text-emerald-700 dark:text-emerald-400">Active</strong> — You can publish property listings and receive direct buyer leads.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Trial Dates Grid */}
+                <div className="flex flex-wrap items-center gap-4 text-xs bg-slate-50 dark:bg-slate-800/50 px-3.5 py-2 rounded-lg border border-slate-200 dark:border-slate-700">
+                  <div className="space-y-0.5">
+                    <span className="text-[10px] font-semibold text-casa-text-muted uppercase tracking-wider block">
+                      Trial Start Date
+                    </span>
+                    <span className="font-bold text-casa-text-primary">
+                      {formatDateTime(trialStartedAt)}
+                    </span>
+                  </div>
+                  <div className="w-px h-7 bg-slate-300 dark:bg-slate-700 hidden sm:block" />
+                  <div className="space-y-0.5">
+                    <span className="text-[10px] font-semibold text-casa-text-muted uppercase tracking-wider block">
+                      Trial Expiry Date
+                    </span>
+                    <span className="font-bold text-casa-text-primary">
+                      {formatDateTime(trialExpiresAt)}
+                    </span>
+                  </div>
+                  <Link
+                    href="/pricing"
+                    className="inline-flex items-center gap-1 text-xs font-bold text-casa-brand hover:underline ms-2"
+                  >
+                    <span>Upgrade Plan</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </Link>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* STATE C: Expired / Cancelled Plan (Trial has expired; never restart trial automatically) */}
+          {!hasActiveSubscription && isSubExpiredOrCancelled && (
+            <div className="bg-rose-50/70 dark:bg-rose-950/40 border border-rose-300 dark:border-rose-800/80 rounded-xl p-4 shadow-xs space-y-3">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 bg-rose-600 text-white rounded-xl shadow-xs shrink-0">
+                    <AlertCircle className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-bold text-rose-950 dark:text-rose-100">
+                        {activePlanName ? `${activePlanName} Plan Expired` : 'Subscription Plan Expired'}
+                      </span>
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-rose-200 dark:bg-rose-900 text-rose-900 dark:text-rose-200">
+                        {subscriptionStatus === 'CANCELLED' ? 'Cancelled' : 'Expired'}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-rose-800 dark:text-rose-300 mt-0.5">
+                      Your subscription ended on {formatDateTime(subscriptionExpiresAt)}. Renew your plan to restore full property publishing privileges.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 self-start md:self-auto shrink-0">
+                  <a
+                    href="https://wa.me/917069754589?text=Hello%20My%20Property%20Team,%20I%20would%20like%20to%20renew%20my%20subscription%20plan."
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-rose-300 dark:border-rose-700 bg-white dark:bg-gray-900 text-xs font-semibold text-rose-800 dark:text-rose-200 hover:bg-rose-100/50 transition shadow-xs"
+                  >
+                    <Phone className="w-3.5 h-3.5" />
+                    <span>Contact Sales</span>
+                  </a>
+                  <Link href="/pricing">
+                    <button className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow-xs transition">
+                      <Zap className="w-3.5 h-3.5" />
+                      <span>Renew Subscription</span>
+                    </button>
+                  </Link>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* STATE D: Expired Trial, No Active Plan (Show Trial Expired with available plans) */}
+          {!hasActiveSubscription && isTrialExpired && !isSubExpiredOrCancelled && (
+            <div className="bg-amber-50/80 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800/80 rounded-xl p-4 shadow-xs space-y-3">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 bg-amber-500 text-white rounded-xl shadow-xs shrink-0">
+                    <AlertTriangle className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-bold text-amber-950 dark:text-amber-100">
+                        3-Day Free Trial Expired
+                      </span>
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-amber-200 dark:bg-amber-900 text-amber-900 dark:text-amber-200">
+                        Plan Required
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-amber-800 dark:text-amber-300 mt-0.5">
+                      Your complimentary trial has concluded. Select an Agent or Broker subscription plan to keep publishing listings and receiving buyer inquiries.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 self-start md:self-auto shrink-0">
+                  <a
+                    href="https://wa.me/917069754589?text=Hello%20My%20Property%20Team,%20my%203-day%20trial%20has%20expired%20and%20I%20am%20ready%20to%20activate%20a%20plan."
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-amber-300 dark:border-amber-700 bg-white dark:bg-gray-900 text-xs font-semibold text-amber-800 dark:text-amber-200 hover:bg-amber-100/50 transition shadow-xs"
+                  >
+                    <Phone className="w-3.5 h-3.5" />
+                    <span>Call Sales (+91 7069754589)</span>
+                  </a>
+                  <Link href="/pricing">
+                    <button className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold shadow-xs transition">
+                      <Crown className="w-3.5 h-3.5" />
+                      <span>Choose Subscription Plan</span>
+                    </button>
+                  </Link>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
+
 
       {/* 2. KYC REJECTED */}
       {isRejected && (

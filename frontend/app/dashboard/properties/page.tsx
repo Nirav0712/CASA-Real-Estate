@@ -142,7 +142,7 @@ export default function MyPropertiesPage() {
           </div>
           <h2 className="text-xl font-bold text-casa-text-primary">Sign In to Manage Your Listings</h2>
           <p className="text-xs text-casa-text-secondary">
-            Access your multi-step listing drafts, view moderation feedback, and submit properties for CASA approval.
+            Access your multi-step listing drafts, view moderation feedback, and submit properties for My Property approval.
           </p>
           <button
             type="button"
@@ -259,7 +259,7 @@ export default function MyPropertiesPage() {
         isLoading ? (
         <div className="py-20 text-center text-casa-text-muted text-sm space-y-2">
           <RefreshCw className="w-6 h-6 animate-spin mx-auto text-casa-brand" />
-          <p>Loading your property listings from MongoDB...</p>
+          <p>Loading...</p>
         </div>
       ) : properties.length === 0 ? (
         <div className="py-16 text-center bg-casa-surface border border-casa-border-light rounded-2xl shadow-subtle space-y-4">
@@ -269,7 +269,7 @@ export default function MyPropertiesPage() {
           <div className="space-y-1">
             <h3 className="text-base font-bold text-casa-text-primary">No Properties Listed Yet</h3>
             <p className="text-xs text-casa-text-secondary max-w-sm mx-auto">
-              Create your first listing draft using our intuitive 8-step wizard and submit it for CASA verification.
+              Create your first listing draft using our intuitive 8-step wizard and submit it for My Property verification.
             </p>
           </div>
           <Link

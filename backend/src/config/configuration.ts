@@ -108,7 +108,7 @@ export default () => {
       secure: cleanString(process.env.SMTP_SECURE).toLowerCase() === 'true',
       user: cleanString(process.env.SMTP_USER),
       pass: cleanString(process.env.SMTP_PASS),
-      from: cleanString(process.env.EMAIL_FROM, '"myproperty" <no-reply@myproperty.com>'),
+      from: cleanString(process.env.EMAIL_FROM, '"My Property" <info.mypropertyin@gmail.com>'),
       verificationUrl,
       passwordResetUrl,
       devLog: cleanString(process.env.EMAIL_DEV_LOG, 'true').toLowerCase() === 'true',

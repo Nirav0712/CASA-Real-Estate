@@ -345,9 +345,9 @@ export default function NewPropertyWizardPage() {
   // Wizard Form State
   const [formData, setFormData] = React.useState({
     // Step 1: Category & Basic
-    categoryGroup: 'RESIDENTIAL',
-    category: 'Apartment',
-    subcategory: 'Flat/Apartment',
+    categoryGroup: 'APARTMENT_FLAT',
+    category: 'Apartment / Flat',
+    subcategory: 'Flat / Apartment',
     listingType: 'SALE' as 'SALE' | 'RENT' | 'LEASE' | 'PG_COLIVING' | 'COMMERCIAL_LEASE',
     titleEn: '',
     descriptionEn: '',
@@ -1100,7 +1100,7 @@ export default function NewPropertyWizardPage() {
             </span>
           </h1>
           <p className="text-xs text-casa-text-secondary">
-            Dynamic, category-aware verified listing creation wizard for CASA Marketplace.
+            Dynamic, category-aware verified listing creation wizard for My Property Marketplace.
           </p>
         </div>
 
@@ -1305,23 +1305,23 @@ export default function NewPropertyWizardPage() {
                 if (newType === 'PLOTTED_DEVELOPMENT') {
                   setFormData((prev) => ({
                     ...prev,
-                    categoryGroup: 'PLOTS_LAND',
-                    category: 'Plot / Land',
+                    categoryGroup: 'PLOT',
+                    category: 'Plot',
                     subcategory: 'Residential Plot',
                   }));
                 } else if (newType === 'COMMERCIAL_BUILDING') {
                   setFormData((prev) => ({
                     ...prev,
-                    categoryGroup: 'COMMERCIAL',
-                    category: 'Commercial',
-                    subcategory: 'Office Space',
+                    categoryGroup: 'SHOP_WAREHOUSE',
+                    category: 'Shop / Warehouse',
+                    subcategory: 'Showroom',
                   }));
                 } else if (newType === 'RESIDENTIAL_BUILDING') {
                   setFormData((prev) => ({
                     ...prev,
-                    categoryGroup: 'RESIDENTIAL',
-                    category: 'Apartment',
-                    subcategory: 'Flat/Apartment',
+                    categoryGroup: 'APARTMENT_FLAT',
+                    category: 'Apartment / Flat',
+                    subcategory: 'Flat / Apartment',
                   }));
                 }
               }}
@@ -1927,7 +1927,7 @@ export default function NewPropertyWizardPage() {
                     <AlertCircle className="w-4 h-4 flex-shrink-0" />
                     <span>
                       <strong>Audit Notice:</strong> Upon submission, your listing status will be set to{' '}
-                      <span className="font-bold underline">Pending RERA Verification</span>. CASA Compliance Admins will audit your registration number before conferring the verified green checkmark badge.
+                      <span className="font-bold underline">Pending RERA Verification</span>. My Property Compliance Admins will audit your registration number before conferring the verified green checkmark badge.
                     </span>
                   </div>
                 </div>
@@ -2840,7 +2840,7 @@ export default function NewPropertyWizardPage() {
                 <span>Live Marketplace Listing Preview</span>
               </h2>
               <p className="text-xs text-casa-text-secondary mt-0.5">
-                Review how your listing and RERA credentials appear to prospective buyers on CASA Marketplace.
+                Review how your listing and RERA credentials appear to prospective buyers on My Property Marketplace.
               </p>
             </div>
 
@@ -2900,7 +2900,7 @@ export default function NewPropertyWizardPage() {
                       </span>
                       <span className="text-[10px] text-casa-text-muted">
                         {formData.reraRegistered === 'YES'
-                          ? 'Verification Status: PENDING CASA ADMIN AUDIT'
+                          ? 'Verification Status: PENDING MY PROPERTY ADMIN AUDIT'
                           : 'Exempt from mandatory promoter registration'}
                       </span>
                     </div>
