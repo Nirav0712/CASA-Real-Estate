@@ -5,6 +5,7 @@ import {
   ForbiddenException,
   ConflictException,
   NotFoundException,
+  InternalServerErrorException,
   Logger,
   OnModuleInit,
 } from '@nestjs/common';
@@ -1582,7 +1583,7 @@ export class AuthService implements OnModuleInit {
       if (verificationEmailSent) {
         this.logger.log(`📧 Verification email dispatched successfully to ${normalizedEmail}`);
       } else {
-        this.logger.warn(`Verification email delivery not completed for ${normalizedEmail}: ${mailRes?.error || 'unconfigured'}`);
+        this.logger.error(`Verification email delivery failed for ${normalizedEmail}: ${mailRes?.error || 'unconfigured'}`);
       }
     } catch (err: any) {
       this.logger.error(`Non-blocking verification email delivery failure during registration for ${normalizedEmail}: ${err?.message}`);
@@ -1591,7 +1592,9 @@ export class AuthService implements OnModuleInit {
     // Return unverified registration response without session tokens
     return {
       success: true,
-      message: 'Registration successful! Please verify your email address before signing in.',
+      message: verificationEmailSent
+        ? 'Registration successful! Please verify your email address before signing in.'
+        : 'Registration completed. Verification email could not be delivered at this time. Please use "Resend Verification Email" on the Sign In page.',
       email: normalizedEmail,
       isEmailVerified: false,
       verificationEmailSent,
@@ -1804,6 +1807,29 @@ export class AuthService implements OnModuleInit {
       await user.save();
     }
 
+    if (this.isDbConnected() && (user._id || user.id) && typeof this.userModel?.updateOne === 'function') {
+      try {
+        const res = this.userModel.updateOne(
+          { _id: user._id || user.id },
+          {
+            $set: {
+              isEmailVerified: true,
+              status: user.status === AccountStatus.PENDING_VERIFICATION ? AccountStatus.ACTIVE : user.status,
+            },
+            $unset: {
+              emailVerificationTokenHash: 1,
+              emailVerificationExpiresAt: 1,
+            },
+          },
+        );
+        if (res && typeof (res as any).exec === 'function') {
+          await (res as any).exec().catch(() => {});
+        } else if (res && typeof (res as any).catch === 'function') {
+          await (res as any).catch(() => {});
+        }
+      } catch {}
+    }
+
     return {
       success: true,
       message: 'Email address verified successfully. You may now log in.',
@@ -1854,13 +1880,41 @@ export class AuthService implements OnModuleInit {
       await user.save();
     }
 
-    try {
-      await this.mailService.sendVerificationEmail(normalizedEmail, user.name, rawToken);
-    } catch (err: any) {
-      this.logger.error(`Resend verification email dispatch error for ${normalizedEmail}: ${err?.message}`);
+    if (this.isDbConnected() && (user._id || user.id) && typeof this.userModel?.updateOne === 'function') {
+      try {
+        const res = this.userModel.updateOne(
+          { _id: user._id || user.id },
+          {
+            $set: {
+              emailVerificationTokenHash: tokenHash,
+              emailVerificationExpiresAt: verificationExpiresAt,
+            },
+          },
+        );
+        if (res && typeof (res as any).exec === 'function') {
+          await (res as any).exec().catch(() => {});
+        } else if (res && typeof (res as any).catch === 'function') {
+          await (res as any).catch(() => {});
+        }
+      } catch {}
     }
 
-    return genericResponse;
+    try {
+      const mailRes = await this.mailService.sendVerificationEmail(normalizedEmail, user.name, rawToken);
+      if (!mailRes?.success) {
+        this.logger.error(`Resend verification email delivery failed for ${normalizedEmail}: ${mailRes?.error}`);
+        throw new InternalServerErrorException('Failed to deliver verification email. Please check your email address or try again shortly.');
+      }
+    } catch (err: any) {
+      this.logger.error(`Resend verification email dispatch error for ${normalizedEmail}: ${err?.message}`);
+      if (err instanceof InternalServerErrorException) throw err;
+      throw new InternalServerErrorException('Failed to deliver verification email. Please try again shortly.');
+    }
+
+    return {
+      success: true,
+      message: 'Verification link has been sent to your email address.',
+    };
   }
 
   /**

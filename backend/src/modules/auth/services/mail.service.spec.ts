@@ -222,4 +222,63 @@ MyProperty`;
       expect(res.error).toBe('SMTP Connection Refused');
     });
   });
+
+  describe('Verification Email Dispatch & Template Compliance', () => {
+    it('11. should dispatch verification email with exact subject "Verify Your MyProperty Account" and "Verify & Approve Account" button', async () => {
+      const mockTransporter = {
+        sendMail: jest.fn().mockResolvedValue({ messageId: 'msg_verify_123' }),
+      };
+
+      const service = await createServiceWithConfig({
+        nodeEnv: 'production',
+        'mail.host': 'smtp.gmail.com',
+        'mail.user': 'info.mypropertyin@gmail.com',
+        'mail.pass': 'secretpass',
+        'mail.from': '"MyProperty" <info.mypropertyin@gmail.com>',
+      });
+
+      (service as any).transporter = mockTransporter;
+
+      const res = await service.sendVerificationEmail('buyer@example.com', 'Aarav Sharma', 'token_abc123');
+
+      expect(res.success).toBe(true);
+      expect(res.messageId).toBe('msg_verify_123');
+      expect(res.isMock).toBe(false);
+
+      expect(mockTransporter.sendMail).toHaveBeenCalledTimes(1);
+      const callArg = mockTransporter.sendMail.mock.calls[0][0];
+
+      expect(callArg.to).toBe('buyer@example.com');
+      expect(callArg.from).toBe('"MyProperty" <info.mypropertyin@gmail.com>');
+      expect(callArg.subject).toBe('Verify Your MyProperty Account');
+
+      expect(callArg.html).toContain('Verify Your MyProperty Account');
+      expect(callArg.html).toContain('Verify &amp; Approve Account');
+      expect(callArg.html).toContain('MyProperty');
+      expect(callArg.html).toContain('24 hours');
+      expect(callArg.text).toContain('Welcome to MyProperty');
+      expect(callArg.text).toContain('24 hours');
+    });
+
+    it('12. should return error when verification email SMTP delivery fails without throwing', async () => {
+      const mockTransporter = {
+        sendMail: jest.fn().mockRejectedValue(new Error('Invalid recipient address')),
+      };
+
+      const service = await createServiceWithConfig({
+        nodeEnv: 'production',
+        'mail.host': 'smtp.gmail.com',
+        'mail.user': 'info.mypropertyin@gmail.com',
+        'mail.pass': 'secretpass',
+      });
+
+      (service as any).transporter = mockTransporter;
+
+      const res = await service.sendVerificationEmail('invalid@domain.notexist', 'Test User', 'token_xyz');
+
+      expect(res.success).toBe(false);
+      expect(res.isMock).toBe(false);
+      expect(res.error).toBe('Invalid recipient address');
+    });
+  });
 });

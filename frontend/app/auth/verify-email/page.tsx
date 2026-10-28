@@ -149,10 +149,10 @@ function VerifyEmailContent() {
 
             <div className="space-y-1.5">
               <h2 className="text-xl font-bold text-casa-text-primary">
-                Email Address Verified!
+                Email Verified Successfully!
               </h2>
-              <p className="text-xs text-casa-text-secondary max-w-xs mx-auto leading-relaxed">
-                Your email <strong className="text-casa-text-primary">{emailParam}</strong> has been successfully verified. Your My Property account is now active.
+              <p className="text-sm font-medium text-casa-text-secondary max-w-xs mx-auto leading-relaxed">
+                You can now sign in to MyProperty.
               </p>
             </div>
 
@@ -164,7 +164,7 @@ function VerifyEmailContent() {
                 onClick={handleGoToSignIn}
                 className="font-bold py-3 shadow-subtle"
               >
-                <span>Sign In to Your Account</span>
+                <span>Sign In Now</span>
                 <ArrowRight className="w-4 h-4" />
               </Button>
             </div>

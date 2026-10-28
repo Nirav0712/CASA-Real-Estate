@@ -28,16 +28,39 @@ export class MailService {
   isConfigured(): boolean {
     const host = this.configService.get<string>('mail.host') || process.env.SMTP_HOST;
     const user = this.configService.get<string>('mail.user') || process.env.SMTP_USER;
-    const pass = this.configService.get<string>('mail.pass') || process.env.SMTP_PASS;
-    return Boolean(host && user && pass);
+    const rawPass = this.configService.get<string>('mail.pass') || process.env.SMTP_PASS;
+    return Boolean(host && user && rawPass);
+  }
+
+  private createNodemailerTransport(port = 587, secure = false): nodemailer.Transporter | null {
+    const host = this.configService.get<string>('mail.host') || process.env.SMTP_HOST;
+    const user = this.configService.get<string>('mail.user') || process.env.SMTP_USER;
+    const rawPass = this.configService.get<string>('mail.pass') || process.env.SMTP_PASS;
+    const pass = rawPass ? rawPass.replace(/\s+/g, '') : '';
+
+    if (!host || !user || !pass) return null;
+
+    return nodemailer.createTransport({
+      host,
+      port,
+      secure: secure || port === 465,
+      auth: { user, pass },
+      tls: {
+        rejectUnauthorized: this.configService.get<string>('nodeEnv') === 'production',
+      },
+      connectionTimeout: 10000,
+      greetingTimeout: 10000,
+      socketTimeout: 15000,
+    });
   }
 
   private initTransporter() {
-    const host = this.configService.get<string>('mail.host');
-    const port = this.configService.get<number>('mail.port') || 587;
-    const secure = this.configService.get<boolean>('mail.secure') || false;
-    const user = this.configService.get<string>('mail.user');
-    const pass = this.configService.get<string>('mail.pass');
+    const host = this.configService.get<string>('mail.host') || process.env.SMTP_HOST;
+    const port = Number(this.configService.get<number>('mail.port') || process.env.SMTP_PORT) || 587;
+    const secure = this.configService.get<boolean>('mail.secure') || process.env.SMTP_SECURE === 'true' || port === 465;
+    const user = this.configService.get<string>('mail.user') || process.env.SMTP_USER;
+    const rawPass = this.configService.get<string>('mail.pass') || process.env.SMTP_PASS;
+    const pass = rawPass ? rawPass.replace(/\s+/g, '') : '';
 
     if (host && user && pass) {
       try {
@@ -49,6 +72,9 @@ export class MailService {
           tls: {
             rejectUnauthorized: this.configService.get<string>('nodeEnv') === 'production',
           },
+          connectionTimeout: 10000,
+          greetingTimeout: 10000,
+          socketTimeout: 15000,
         });
         this.logger.log(`✅ SMTP Transporter initialized for host: ${host}:${port}`);
 
@@ -184,34 +210,53 @@ export class MailService {
       process.env.EMAIL_FROM ||
       '"MyProperty" <info.mypropertyin@gmail.com>';
 
-    const subject = 'Verify Your Email Address — MyProperty';
+    const subject = 'Verify Your MyProperty Account';
     const html = this.buildVerificationEmailTemplate(name, verificationLink);
-    const text = `Hello ${name || 'User'},\n\nThank you for registering on MyProperty.\n\nPlease verify your email address by visiting this link:\n${verificationLink}\n\nThis verification link will expire in 24 hours.\n\nBest regards,\nTeam MyProperty`;
+    const text = `Hello ${name || 'User'},\n\nWelcome to MyProperty — your trusted real estate marketplace!\n\nTo protect your account security, you must verify your email address before signing in.\n\nPlease verify and approve your account by visiting this link:\n${verificationLink}\n\nThis verification link will expire in 24 hours. If this link expires, you can request a new link from the MyProperty sign-in page.\n\nIf you did not register for a MyProperty account, please disregard this email.\n\nBest regards,\nTeam MyProperty\ninfo.mypropertyin@gmail.com`;
 
-    if (this.transporter && this.isConfigured()) {
-      try {
-        const info = await this.transporter.sendMail({
-          from,
-          to,
-          subject,
-          text,
-          html,
-        });
-        this.logger.log(`📧 Verification email successfully sent to ${to} (Message ID: ${info.messageId})`);
-        return { success: true, messageId: info.messageId, isMock: false };
-      } catch (err: any) {
-        this.logger.error(`SMTP delivery failed for ${to}: ${err?.message}`);
-        this.logger.warn(`[VERIFICATION LINK FALLBACK] User: ${to} | Verification Link: ${verificationLink}`);
-        return { success: false, isMock: false, error: err?.message };
+    if (this.isConfigured()) {
+      if (!this.transporter) {
+        this.initTransporter();
+      }
+
+      if (this.transporter) {
+        try {
+          const info = await this.transporter.sendMail({
+            from,
+            to,
+            subject,
+            text,
+            html,
+          });
+          this.logger.log(`📧 Verification email successfully sent to ${to} (Message ID: ${info.messageId})`);
+          return { success: true, messageId: info.messageId, isMock: false };
+        } catch (err: any) {
+          this.logger.warn(`Primary SMTP delivery failed for ${to} (${err?.message}). Attempting Gmail SSL fallback...`);
+          try {
+            const fallbackTransporter = this.createNodemailerTransport(465, true);
+            if (fallbackTransporter) {
+              const fallbackInfo = await fallbackTransporter.sendMail({
+                from,
+                to,
+                subject,
+                text,
+                html,
+              });
+              this.logger.log(`📧 Verification email successfully sent via SSL fallback to ${to} (Message ID: ${fallbackInfo.messageId})`);
+              this.transporter = fallbackTransporter;
+              return { success: true, messageId: fallbackInfo.messageId, isMock: false };
+            }
+          } catch (fallbackErr: any) {
+            this.logger.error(`Fallback SMTP delivery also failed for ${to}: ${fallbackErr?.message}`);
+          }
+          this.logger.error(`SMTP delivery failed for ${to}: ${err?.message}`);
+          return { success: false, isMock: false, error: err?.message };
+        }
       }
     }
 
-    this.logger.warn(
-      `[DEV EMAIL DISPATCH] Verification email for [${to}]:\n` +
-      `Verification Link: ${verificationLink}\n` +
-      `Token: ${token}`
-    );
-    return { success: true, messageId: `dev_mock_${Date.now()}`, isMock: true };
+    this.logger.warn(`[SMTP UNCONFIGURED] Verification email for [${to}] was not sent because SMTP is unconfigured.`);
+    return { success: false, isMock: true, error: 'SMTP delivery service is not configured' };
   }
 
   /**
@@ -350,54 +395,73 @@ export class MailService {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Verify Your Email - MyProperty</title>
+  <title>Verify Your MyProperty Account</title>
   <style>
-    body { margin: 0; padding: 0; background-color: #f1f5f9; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; }
-    .container { max-width: 580px; margin: 40px auto; background: #ffffff; border-radius: 20px; overflow: hidden; border: 1px solid #e2e8f0; box-shadow: 0 10px 25px rgba(0,0,0,0.06); }
-    .header { background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%); padding: 36px 24px; text-align: center; }
-    .logo-badge { display: inline-block; background: rgba(255,255,255,0.2); padding: 8px 16px; border-radius: 30px; color: #ffffff; font-size: 13px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 12px; }
-    .header h1 { margin: 0; color: #ffffff; font-size: 26px; font-weight: 800; letter-spacing: -0.5px; }
-    .content { padding: 36px 32px; color: #334155; font-size: 15px; line-height: 1.6; }
+    body { margin: 0; padding: 0; background-color: #f1f5f9; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; -webkit-font-smoothing: antialiased; }
+    .container { max-width: 600px; margin: 40px auto; background: #ffffff; border-radius: 20px; overflow: hidden; border: 1px solid #e2e8f0; box-shadow: 0 12px 32px rgba(15, 23, 42, 0.08); }
+    .header { background: linear-gradient(135deg, #0f172a 0%, #0284c7 100%); padding: 36px 32px; text-align: center; }
+    .logo-badge { display: inline-block; background: rgba(255, 255, 255, 0.15); backdrop-filter: blur(8px); padding: 8px 18px; border-radius: 30px; color: #ffffff; font-size: 13px; font-weight: 800; letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 12px; border: 1px solid rgba(255, 255, 255, 0.2); }
+    .header h1 { margin: 0; color: #ffffff; font-size: 26px; font-weight: 800; letter-spacing: -0.5px; line-height: 1.25; }
+    .header p { margin: 8px 0 0 0; color: #e0f2fe; font-size: 14px; }
+    .content { padding: 40px 36px; color: #334155; font-size: 15px; line-height: 1.65; }
     .greeting { font-size: 20px; font-weight: 700; color: #0f172a; margin-bottom: 16px; }
-    .info-card { background: #f8fafc; border-left: 4px solid #0284c7; padding: 16px 20px; border-radius: 8px; margin: 24px 0; font-size: 14px; color: #475569; }
-    .button-container { text-align: center; margin: 32px 0; }
-    .button { background: linear-gradient(135deg, #0284c7 0%, #026ca3 100%); color: #ffffff !important; padding: 16px 40px; border-radius: 12px; font-size: 16px; font-weight: 700; text-decoration: none; display: inline-block; box-shadow: 0 4px 14px rgba(2, 132, 199, 0.35); }
-    .device-note { background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 12px; padding: 14px 18px; margin-top: 24px; font-size: 13px; color: #1e40af; line-height: 1.5; }
-    .notice { font-size: 13px; color: #64748b; margin-top: 24px; padding-top: 20px; border-top: 1px solid #f1f5f9; }
-    .footer { background: #f8fafc; padding: 24px; text-align: center; font-size: 12px; color: #94a3b8; border-top: 1px solid #f1f5f9; }
+    .welcome-intro { font-size: 15px; color: #334155; line-height: 1.6; margin-bottom: 16px; }
+    .explanation-card { background: #f0f9ff; border: 1px solid #bae6fd; border-left: 4px solid #0284c7; padding: 16px 20px; border-radius: 12px; margin: 24px 0; font-size: 14px; color: #0369a1; line-height: 1.55; }
+    .button-container { text-align: center; margin: 36px 0; }
+    .button { background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%); color: #ffffff !important; padding: 18px 44px; border-radius: 12px; font-size: 16px; font-weight: 800; text-decoration: none; display: inline-block; box-shadow: 0 6px 20px rgba(2, 132, 199, 0.35); letter-spacing: 0.3px; }
+    .fallback-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px 20px; margin: 24px 0; word-break: break-all; }
+    .fallback-label { font-size: 12px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
+    .fallback-url { font-size: 13px; color: #0284c7; text-decoration: underline; line-height: 1.5; }
+    .security-notice { background: #fffbeb; border: 1px solid #fef3c7; border-radius: 12px; padding: 14px 18px; margin-top: 24px; font-size: 13px; color: #92400e; line-height: 1.5; }
+    .signature { margin-top: 32px; padding-top: 24px; border-top: 1px solid #e2e8f0; font-size: 14px; color: #475569; }
+    .footer { background: #f8fafc; padding: 24px 36px; text-align: center; font-size: 12px; color: #94a3b8; border-top: 1px solid #e2e8f0; line-height: 1.6; }
   </style>
 </head>
 <body>
   <div class="container">
     <div class="header">
       <div class="logo-badge">MyProperty</div>
-      <h1>Verify Your Email Address</h1>
+      <h1>Verify Your MyProperty Account</h1>
+      <p>India's Trusted Real Estate Marketplace</p>
     </div>
     <div class="content">
       <div class="greeting">Hello ${safeName},</div>
-      <p>Thank you for registering on <strong>MyProperty</strong>. To complete your registration and activate your account, please verify your email address by clicking the button below:</p>
+      <p class="welcome-intro">
+        Welcome to <strong>MyProperty</strong>! We are excited to have you join our marketplace for discovering, buying, renting, and listing verified properties.
+      </p>
       
+      <div class="explanation-card">
+        🛡️ <strong>Action Required:</strong> To protect your account security and activate your marketplace access, you must verify your email address before signing in.
+      </div>
+
       <div class="button-container">
-        <a href="${link}" class="button" target="_blank">Verify My Email</a>
+        <a href="${link}" class="button" target="_blank" rel="noopener noreferrer">Verify &amp; Approve Account</a>
       </div>
 
-      <div class="device-note">
-        💡 <strong>Note:</strong> Once you click this verification button, your email address will be verified and you can log in to your account from any web browser.
+      <div class="fallback-card">
+        <div class="fallback-label">Alternative Plain-Text Link</div>
+        <div class="fallback-url">
+          <a href="${link}" target="_blank" rel="noopener noreferrer">${link}</a>
+        </div>
       </div>
 
-      <p style="margin-top: 24px;">If the button above does not work, copy and paste this link into your browser:</p>
-      <p style="word-break: break-all; font-size: 13px; color: #0284c7;"><a href="${link}">${link}</a></p>
+      <div class="security-notice">
+        ⏳ <strong>Expiry &amp; Resend:</strong> This secure verification link is valid for <strong>24 hours</strong>. If the link expires before you verify, you can request a new verification email from the MyProperty sign-in page.
+      </div>
 
-      <div class="notice">
-        This verification link will expire in <strong>24 hours</strong>. If you did not create an account on MyProperty, please disregard this email.
+      <div class="signature">
+        Warm regards,<br>
+        <strong>Team MyProperty</strong><br>
+        Official Sender: <a href="mailto:info.mypropertyin@gmail.com" style="color: #0284c7; text-decoration: none;">info.mypropertyin@gmail.com</a>
       </div>
     </div>
     <div class="footer">
-      &copy; ${new Date().getFullYear()} MyProperty Marketplace. All rights reserved.
+      &copy; ${new Date().getFullYear()} MyProperty Real Estate Marketplace. All rights reserved.<br>
+      If you did not create an account on MyProperty, please ignore this email or contact support at info.mypropertyin@gmail.com.
     </div>
   </div>
 </body>
-</html>`;
+</html>`.trim();
   }
 
   private buildPasswordResetEmailTemplate(name: string, link: string): string {

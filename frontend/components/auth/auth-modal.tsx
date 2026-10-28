@@ -196,7 +196,11 @@ export function AuthModal() {
         setRegisteredEmail(null);
         setMode('SIGN_IN');
         setAuthModalMode('SIGN_IN');
-        setSuccessBanner('Registration successful! Please verify your email address before signing in.');
+        if (res.verificationEmailSent === false) {
+          setSuccessBanner('Registration completed! However, email delivery encountered an issue. Please click "Resend Verification Email" below to receive your link.');
+        } else {
+          setSuccessBanner('Registration successful! Please verify your email address before signing in.');
+        }
         setPassword('');
         setConfirmPassword('');
         setErrorMsg('');
@@ -213,18 +217,6 @@ export function AuthModal() {
         rawMsg.toLowerCase().includes('email already')
       ) {
         setErrorMsg('Email already registered');
-      } else if (
-        rawMsg.toLowerCase().includes('535') ||
-        rawMsg.toLowerCase().includes('badcredentials') ||
-        rawMsg.toLowerCase().includes('gsmtp') ||
-        rawMsg.toLowerCase().includes('failed to deliver verification email')
-      ) {
-        setRegisteredEmail(null);
-        setMode('SIGN_IN');
-        setAuthModalMode('SIGN_IN');
-        setSuccessBanner('Registration successful! Please verify your email address before signing in.');
-        setPassword('');
-        setConfirmPassword('');
       } else {
         setErrorMsg(rawMsg);
       }
@@ -263,8 +255,9 @@ export function AuthModal() {
       await authService.resendVerification({ email: targetEmail });
       setResendNotice('Verification link resent! Please check your inbox.');
       setResendCooldown(60);
-    } catch {
-      setResendNotice('Unable to resend at this moment. Please wait a few seconds.');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Unable to resend verification link at this moment.';
+      setResendNotice(msg);
     }
   };
 

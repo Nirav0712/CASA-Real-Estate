@@ -106,6 +106,7 @@ export interface RegisterResponse {
   message: string;
   email: string;
   isEmailVerified: boolean;
+  verificationEmailSent?: boolean;
 }
 
 export interface LoginData {
