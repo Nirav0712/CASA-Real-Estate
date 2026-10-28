@@ -36,6 +36,7 @@ import {
   createPaymentOrder,
   getPublicGatewayConfig,
   verifyPayment,
+  loadRazorpaySdk,
 } from '@/services/payment-service';
 
 const USER_TYPES = [
@@ -140,11 +141,23 @@ export default function PricingPage() {
         },
       });
 
-      // 2. Fetch Razorpay Public Key
-      const gatewayConfig = await getPublicGatewayConfig();
+      // 2. Fetch Razorpay Public Key & Load Checkout SDK
+      const [gatewayConfig, isSdkLoaded] = await Promise.all([
+        getPublicGatewayConfig(),
+        loadRazorpaySdk(),
+      ]);
 
-      if (!gatewayConfig.keyId || typeof window === 'undefined' || !(window as any).Razorpay) {
-        // Fallback simulation / instant mock verification if Razorpay SDK isn't loaded
+      const canUseLiveGateway = Boolean(
+        gatewayConfig.isConfigured &&
+        gatewayConfig.keyId &&
+        !gatewayConfig.keyId.includes('placeholder') &&
+        isSdkLoaded &&
+        typeof window !== 'undefined' &&
+        (window as any).Razorpay
+      );
+
+      if (!canUseLiveGateway) {
+        // Fallback simulation / instant mock verification if Razorpay SDK isn't configured/loaded
         toast.info(
           'Checkout Initiated',
           `Order ${order.orderId} generated for ₹${order.amount.toLocaleString()}. Verifying transaction...`,

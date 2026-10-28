@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import Script from 'next/script';
 import { Inter, Noto_Sans_Arabic } from 'next/font/google';
 import '@/styles/globals.css';
 import { Header, Footer } from '@/components/layout/header';
@@ -54,6 +55,10 @@ export default function RootLayout({
                     <PlanSelectionModal />
                     <TrialExpiredModal />
                     <LoginProtectionModal />
+                    <Script
+                      src="https://checkout.razorpay.com/v1/checkout.js"
+                      strategy="lazyOnload"
+                    />
                   </ComparisonProvider>
                 </SavedPropertiesProvider>
               </AuthProvider>

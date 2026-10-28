@@ -339,6 +339,37 @@ describe('PaymentsService (Phase 13 Payments & Monetization)', () => {
       );
     });
 
+    it('should accept sandbox mock signature and activate subscription in simulation mode', async () => {
+      const mockPaymentDoc = {
+        _id: 'pay-mock-123',
+        orderId: 'CASA_ORD_MOCK_101',
+        providerOrderId: 'order_prov_mock_101',
+        userId: mockUser.id,
+        amount: 999,
+        currency: 'INR',
+        purpose: PaymentPurpose.SUBSCRIPTION,
+        productCode: 'SUBSCRIPTION_PRO',
+        status: PaymentStatus.CREATED,
+        metadata: { durationMonths: 1 },
+        save: jest.fn().mockResolvedValue(true),
+      };
+      mockPaymentModel.findOne.mockResolvedValue(mockPaymentDoc);
+      mockUserModel.findById.mockReturnValue({
+        lean: jest.fn().mockResolvedValue({ _id: mockUser.id, accountType: 'AGENT' }),
+      } as any);
+      mockSubscriptionModel.findOneAndUpdate.mockResolvedValue({ _id: 'sub-mock-1' } as any);
+
+      const res = await service.verifyPayment(mockUser as any, {
+        orderId: 'CASA_ORD_MOCK_101',
+        razorpayPaymentId: 'pay_mock_1234567890',
+        razorpaySignature: 'mock_signature_dev_pass',
+      });
+
+      expect(res.success).toBe(true);
+      expect(mockPaymentDoc.status).toBe(PaymentStatus.PAID);
+      expect(mockPaymentDoc.save).toHaveBeenCalled();
+    });
+
     it('should verify valid signature, mark PAID, and activate FEATURED_PROPERTY service', async () => {
       const providerOrderId = 'order_prov_101';
       const providerPaymentId = 'pay_test_999';

@@ -11,6 +11,7 @@ import {
   verifyPayment,
   getPublicGatewayConfig,
   getMySubscriptionRequests,
+  loadRazorpaySdk,
 } from '@/services/payment-service';
 import {
   getActivePackages,
@@ -187,17 +188,29 @@ export default function BillingDashboardPage() {
         },
       });
 
-      // 2. Fetch Razorpay Public Key
-      const gatewayConfig = await getPublicGatewayConfig();
+      // 2. Fetch Razorpay Public Key & Load Checkout SDK
+      const [gatewayConfig, isSdkLoaded] = await Promise.all([
+        getPublicGatewayConfig(),
+        loadRazorpaySdk(),
+      ]);
 
-      if (!gatewayConfig.keyId || typeof window === 'undefined' || !(window as any).Razorpay) {
+      const canUseLiveGateway = Boolean(
+        gatewayConfig.isConfigured &&
+        gatewayConfig.keyId &&
+        !gatewayConfig.keyId.includes('placeholder') &&
+        isSdkLoaded &&
+        typeof window !== 'undefined' &&
+        (window as any).Razorpay
+      );
+
+      if (!canUseLiveGateway) {
         // Fallback simulation / instant mock verification if Razorpay SDK isn't loaded
         toast.info(
           'Checkout Initiated',
           `Order ${order.orderId} prepared for ₹${plan.price.toLocaleString()}. Proceeding with verification.`,
         );
 
-        // Simulate successful checkout completion in staging/dev
+        // Simulate successful checkout completion in staging/sandbox
         await verifyPayment({
           orderId: order.orderId,
           razorpayPaymentId: `pay_mock_${Date.now()}`,
