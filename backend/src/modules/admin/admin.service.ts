@@ -3643,7 +3643,9 @@ export class AdminService implements OnModuleInit {
       settings = await this.systemSettingModel.create({
         appName: 'myproperty Marketplace',
         companySalesNumber: '+91 98765 43210',
+        companySalesWhatsapp: '+91 98765 43210',
         companyServiceNumber: '+91 98765 43211',
+        customerSupportPhone: '+91 70697 54589',
         companySalesEmail: 'sales@myproperty.com',
         companySupportEmail: 'support@myproperty.com',
         companyAddress: 'Vibhuti Khand, Gomti Nagar, Lucknow, Uttar Pradesh, 226010',
@@ -3675,6 +3677,7 @@ export class AdminService implements OnModuleInit {
       companySalesNumber: settings.companySalesNumber || '+91 98765 43210',
       companySalesWhatsapp: settings.companySalesWhatsapp || settings.companySalesNumber || '+91 98765 43210',
       companyServiceNumber: settings.companyServiceNumber || '+91 98765 43211',
+      customerSupportPhone: settings.customerSupportPhone || '+91 70697 54589',
       companySalesEmail: settings.companySalesEmail || 'sales@myproperty.com',
       companySupportEmail: settings.companySupportEmail || 'support@myproperty.com',
       companyAddress: settings.companyAddress || 'Vibhuti Khand, Gomti Nagar, Lucknow, UP',

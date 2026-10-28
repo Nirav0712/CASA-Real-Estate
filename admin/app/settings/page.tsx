@@ -34,6 +34,7 @@ export default function SettingsPage() {
     companySalesNumber: '+91 98765 43210',
     companySalesWhatsapp: '+91 98765 43210',
     companyServiceNumber: '+91 98765 43211',
+    customerSupportPhone: '+91 70697 54589',
     companySalesEmail: 'sales@myproperty.com',
     companySupportEmail: 'support@myproperty.com',
     companyAddress: 'Vibhuti Khand, Gomti Nagar, Lucknow, Uttar Pradesh, 226010',
@@ -65,12 +66,24 @@ export default function SettingsPage() {
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Validate Customer Support Phone Number
+    const rawSupportPhone = (form.customerSupportPhone || '').trim();
+    const supportDigits = rawSupportPhone.replace(/\D/g, '');
+    if (!rawSupportPhone || supportDigits.length < 7) {
+      toast.error(
+        'Invalid Support Number',
+        'Customer Support Phone Number must contain at least 7 digits (e.g. +91 70697 54589).',
+      );
+      return;
+    }
+
     setIsSaving(true);
     try {
       await updateSystemSettings(form);
       toast.success(
         'Configuration Saved',
-        'Company contact hotlines, trial parameters, and platform settings saved successfully.',
+        'Customer support number, company hotlines, and platform settings saved successfully.',
       );
     } catch (err: any) {
       toast.error('Save Error', err.message || 'Failed to save configuration.');
@@ -165,11 +178,30 @@ export default function SettingsPage() {
               </span>
             </div>
 
-            {/* Customer Service Number */}
+            {/* Customer Support Phone Number */}
             <div className="p-4 rounded-xl bg-casa-canvas border border-casa-border-light space-y-2">
               <label className="font-bold text-casa-text-primary flex items-center gap-1.5">
                 <Headphones className="w-3.5 h-3.5 text-casa-brand" />
-                Support / Service Number
+                Customer Support Phone Number
+              </label>
+              <input
+                type="text"
+                required
+                placeholder="e.g. +91 70697 54589"
+                value={form.customerSupportPhone || ''}
+                onChange={(e) => handleChange('customerSupportPhone', e.target.value)}
+                className="w-full px-3 py-2 bg-casa-surface border border-casa-border-light rounded-xl font-mono text-casa-text-primary text-xs font-semibold focus:outline-none focus:border-casa-brand"
+              />
+              <span className="text-[11px] text-casa-text-muted block">
+                Official support hotline displayed in website header as "Call for Support".
+              </span>
+            </div>
+
+            {/* Customer Service Number */}
+            <div className="p-4 rounded-xl bg-casa-canvas border border-casa-border-light space-y-2">
+              <label className="font-bold text-casa-text-primary flex items-center gap-1.5">
+                <PhoneCall className="w-3.5 h-3.5 text-casa-brand" />
+                Secondary Service / Operator Number
               </label>
               <input
                 type="text"

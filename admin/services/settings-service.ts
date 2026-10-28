@@ -8,6 +8,7 @@ export interface SystemSettingsRecord {
   companySalesNumber: string;
   companySalesWhatsapp?: string;
   companyServiceNumber: string;
+  customerSupportPhone?: string;
   companySalesEmail: string;
   companySupportEmail: string;
   companyAddress: string;
@@ -35,6 +36,7 @@ export async function getSystemSettings(): Promise<SystemSettingsRecord> {
     companySalesNumber: payload?.companySalesNumber || '+91 98765 43210',
     companySalesWhatsapp: payload?.companySalesWhatsapp || payload?.companySalesNumber || '+91 98765 43210',
     companyServiceNumber: payload?.companyServiceNumber || '+91 98765 43211',
+    customerSupportPhone: payload?.customerSupportPhone || '+91 70697 54589',
     companySalesEmail: payload?.companySalesEmail || 'sales@myproperty.com',
     companySupportEmail: payload?.companySupportEmail || 'support@myproperty.com',
     companyAddress: payload?.companyAddress || 'Vibhuti Khand, Gomti Nagar, Lucknow, UP',

@@ -34,6 +34,7 @@ export interface CompanySettings {
   companySalesNumber: string;
   companySalesWhatsapp?: string;
   companyServiceNumber: string;
+  customerSupportPhone?: string;
   companySalesEmail: string;
   companySupportEmail: string;
   companyAddress: string;
@@ -153,13 +154,17 @@ export async function getPublicCompanySettings(): Promise<CompanySettings> {
       appName: 'myproperty Marketplace',
       companySalesNumber: '+91 98765 43210',
       companyServiceNumber: '+91 98765 43211',
+      customerSupportPhone: '+91 70697 54589',
       companySalesEmail: 'sales@myproperty.com',
       companySupportEmail: 'support@myproperty.com',
       companyAddress: 'Vibhuti Khand, Gomti Nagar, Lucknow, UP',
       trialDays: 3,
     };
   }
-  return result.data;
+  return {
+    ...result.data,
+    customerSupportPhone: result.data.customerSupportPhone || '+91 70697 54589',
+  };
 }
 
 export function checkPermission(permissions: string[] | undefined, required: string): boolean {

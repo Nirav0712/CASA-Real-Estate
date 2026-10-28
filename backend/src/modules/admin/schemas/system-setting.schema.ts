@@ -17,6 +17,9 @@ export class SystemSetting {
   @Prop({ default: '+91 98765 43211' })
   companyServiceNumber: string;
 
+  @Prop({ default: '+91 70697 54589' })
+  customerSupportPhone: string;
+
   @Prop({ default: 'sales@myproperty.com' })
   companySalesEmail: string;
 

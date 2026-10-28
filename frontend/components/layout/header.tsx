@@ -41,12 +41,14 @@ import {
   Shield,
   MapPin,
   PhoneCall,
+  Headphones,
   CreditCard,
   Receipt,
   Video,
   ChevronDown,
   Crown,
 } from 'lucide-react';
+import { getPublicCompanySettings } from '@/services/entitlements-service';
 
 const ADMIN_PORTAL_URL = process.env.NEXT_PUBLIC_ADMIN_URL || 'http://localhost:3001';
 
@@ -79,6 +81,27 @@ export function Header() {
   });
   const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = React.useState(false);
+  const [supportPhone, setSupportPhone] = React.useState<string>('+91 70697 54589');
+
+  React.useEffect(() => {
+    let isMounted = true;
+    getPublicCompanySettings()
+      .then((settings) => {
+        if (isMounted && settings?.customerSupportPhone) {
+          setSupportPhone(settings.customerSupportPhone);
+        }
+      })
+      .catch(() => {
+        // Default initialized safely
+      });
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const dialableSupportPhone = React.useMemo(() => {
+    return supportPhone.replace(/[^\d+]/g, '');
+  }, [supportPhone]);
 
   const isAdmin = Boolean(user && ['SUPER_ADMIN', 'ADMIN', 'MODERATOR'].includes(user.role));
   const isDeveloper = Boolean(user && user.role === 'DEVELOPER');
@@ -159,9 +182,14 @@ export function Header() {
               <Link href="/" className="hover:text-casa-brand transition-colors">
                 {t('home')}
               </Link>
-              <Link href="/properties" className="hover:text-casa-brand text-casa-brand font-semibold transition-colors flex items-center gap-1">
-                <Search className="w-3.5 h-3.5" />
-                <span>Search</span>
+              <Link
+                href="/properties"
+                className="hover:text-casa-brand text-casa-brand p-1.5 hover:bg-casa-subtle rounded-xl transition-colors inline-flex items-center justify-center cursor-pointer"
+                title="Search Properties"
+                aria-label="Search Properties"
+              >
+                <Search className="w-4 h-4" />
+                <span className="sr-only">Search Properties</span>
               </Link>
               <Link href="/#featured" className="hover:text-casa-brand transition-colors">
                 {t('buyProperty')}
@@ -180,6 +208,27 @@ export function Header() {
 
             {/* Controls: Theme, Language, Auth, Post Ad */}
             <div className="flex items-center gap-2 sm:gap-3">
+              {/* Call for Support Link (Desktop) */}
+              <a
+                href={`tel:${dialableSupportPhone}`}
+                title={`Call for Support: ${supportPhone}`}
+                aria-label={`Call for Support: ${supportPhone}`}
+                className="hidden md:inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border border-casa-border-light hover:border-emerald-500/50 bg-casa-surface hover:bg-emerald-500/10 dark:hover:bg-emerald-950/20 text-xs font-semibold text-casa-text-primary hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors shadow-2xs group cursor-pointer"
+              >
+                <Headphones className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 group-hover:scale-110 transition-transform flex-shrink-0" />
+                <span className="whitespace-nowrap">Call for Support</span>
+              </a>
+
+              {/* Call for Support Icon (Mobile / Tablet Header) */}
+              <a
+                href={`tel:${dialableSupportPhone}`}
+                title={`Call for Support: ${supportPhone}`}
+                aria-label={`Call for Support: ${supportPhone}`}
+                className="md:hidden p-2 text-casa-text-secondary hover:text-emerald-600 hover:bg-casa-subtle rounded-xl transition-colors inline-flex items-center justify-center cursor-pointer border border-casa-border-light"
+              >
+                <Headphones className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+              </a>
+
               {/* Theme Toggle Button */}
               <button
                 type="button"
@@ -816,6 +865,26 @@ export function Header() {
         title={<Logo size="sm" height={32} href="/" />}
       >
         <div className="flex flex-col gap-6 text-start">
+          {/* Call for Support Link (Mobile Drawer) */}
+          <a
+            href={`tel:${dialableSupportPhone}`}
+            onClick={() => setIsMobileMenuOpen(false)}
+            className="p-3 rounded-2xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/40 text-emerald-800 dark:text-emerald-300 flex items-center justify-between transition-colors cursor-pointer shadow-xs"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-xl bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 flex items-center justify-center flex-shrink-0">
+                <Headphones className="w-4 h-4" />
+              </div>
+              <div>
+                <span className="text-xs font-bold block leading-none">Call for Support</span>
+                <span className="text-[11px] font-mono text-emerald-600 dark:text-emerald-400 mt-1 block">
+                  {supportPhone}
+                </span>
+              </div>
+            </div>
+            <PhoneCall className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+          </a>
+
           <div className="flex flex-col gap-1">
             <span className="text-[10px] font-bold text-casa-text-muted uppercase tracking-wider mb-2">
               Navigation
