@@ -135,6 +135,8 @@ describe('AdminService Moderation & User Governance (Phase 08)', () => {
       create: jest.fn(),
       aggregate: jest.fn().mockResolvedValue([]),
       updateMany: jest.fn().mockResolvedValue({ modifiedCount: 0 }),
+      deleteOne: jest.fn().mockResolvedValue({ deletedCount: 1 }),
+      deleteMany: jest.fn().mockResolvedValue({ deletedCount: 1 }),
     };
 
     mockAuditLogModel = {
@@ -163,6 +165,7 @@ describe('AdminService Moderation & User Governance (Phase 08)', () => {
 
     mockRefreshSessionModel = {
       updateMany: jest.fn().mockResolvedValue({ modifiedCount: 1 }),
+      deleteMany: jest.fn().mockResolvedValue({ deletedCount: 1 }),
     };
 
     const mockAgentProfileModel = {
@@ -178,6 +181,7 @@ describe('AdminService Moderation & User Governance (Phase 08)', () => {
       }),
       findOneAndUpdate: jest.fn().mockResolvedValue(true),
       distinct: jest.fn().mockResolvedValue([]),
+      deleteMany: jest.fn().mockResolvedValue({ deletedCount: 1 }),
     };
 
     const mockAgentDocumentModel = {
@@ -189,6 +193,7 @@ describe('AdminService Moderation & User Governance (Phase 08)', () => {
       }),
       updateMany: jest.fn().mockResolvedValue({ modifiedCount: 1 }),
       distinct: jest.fn().mockResolvedValue([]),
+      deleteMany: jest.fn().mockResolvedValue({ deletedCount: 1 }),
     };
 
     mockAuthService = {
@@ -196,6 +201,9 @@ describe('AdminService Moderation & User Governance (Phase 08)', () => {
         platformRole: user.platformRole || (user.role === 'SUPER_ADMIN' ? 'SUPER_ADMIN' : 'USER'),
         accountType: user.accountType !== undefined ? user.accountType : (user.role === 'SUPER_ADMIN' ? null : 'AGENT'),
       })),
+      deleteMemUser: jest.fn().mockReturnValue(true),
+      getMemUserById: jest.fn(),
+      revokeUserSessions: jest.fn(),
     };
 
     mockRoleModel = {
@@ -259,7 +267,10 @@ describe('AdminService Moderation & User Governance (Phase 08)', () => {
         },
         {
           provide: getModelToken('Subscription'),
-          useValue: { find: jest.fn().mockReturnValue({ lean: jest.fn().mockResolvedValue([]) }) },
+          useValue: {
+            find: jest.fn().mockReturnValue({ lean: jest.fn().mockResolvedValue([]) }),
+            deleteMany: jest.fn().mockResolvedValue({ deletedCount: 1 }),
+          },
         },
         {
           provide: getModelToken(FeaturedPropertyRequest.name),
@@ -267,6 +278,7 @@ describe('AdminService Moderation & User Governance (Phase 08)', () => {
             find: jest.fn().mockReturnValue({ sort: jest.fn().mockReturnValue({ skip: jest.fn().mockReturnValue({ limit: jest.fn().mockReturnValue({ lean: jest.fn().mockResolvedValue([]) }) }) }) }),
             findOne: jest.fn().mockReturnValue({ lean: jest.fn().mockResolvedValue(null) }),
             countDocuments: jest.fn().mockResolvedValue(0),
+            deleteMany: jest.fn().mockResolvedValue({ deletedCount: 1 }),
           },
         },
         {
@@ -855,6 +867,51 @@ describe('AdminService Moderation & User Governance (Phase 08)', () => {
       expect(logs.data.length).toBeGreaterThan(0);
       expect(logs.data[0].action).toBe('USER_STATUS_CHANGED');
       expect(logs.pagination.total).toBe(1);
+    });
+
+    it('should permanently delete user, clean up DB records by id/email/mobile, sessions, agent documents, subscriptions, and memUser cache', async () => {
+      const targetUser = {
+        _id: '507f1f77bcf86cd799439077',
+        name: 'Deleted User',
+        email: 'deleted@example.com',
+        mobile: '9123456789',
+        normalizedMobile: '+919123456789',
+        role: UserRole.AGENT,
+        status: AccountStatus.ACTIVE,
+      };
+      mockUserModel.findOne.mockResolvedValue(targetUser);
+
+      const res = await service.deleteUser('507f1f77bcf86cd799439077', 'Permanent removal', mockAdminUser);
+
+      expect(res.success).toBe(true);
+      expect(res.deletedUserId).toBe('507f1f77bcf86cd799439077');
+      expect(mockUserModel.deleteMany).toHaveBeenCalledWith({
+        $or: [
+          { _id: '507f1f77bcf86cd799439077' },
+          { email: 'deleted@example.com' },
+          { normalizedMobile: '+919123456789' },
+          { mobile: '+919123456789' },
+        ],
+      });
+      expect(mockAuthService.revokeUserSessions).toHaveBeenCalledWith('507f1f77bcf86cd799439077');
+      expect(mockAuthService.deleteMemUser).toHaveBeenCalledWith('deleted@example.com');
+      expect(mockAuthService.deleteMemUser).toHaveBeenCalledWith('+919123456789');
+      expect(mockAuthService.deleteMemUser).toHaveBeenCalledWith('507f1f77bcf86cd799439077');
+    });
+
+    it('should prevent an admin from deleting their own account', async () => {
+      const selfUser = {
+        _id: 'user-admin-001',
+        name: 'Admin User',
+        email: 'admin@casa.com',
+        normalizedMobile: '+919876543210',
+        role: UserRole.ADMIN,
+      };
+      mockUserModel.findOne.mockResolvedValue(selfUser);
+
+      await expect(
+        service.deleteUser('user-admin-001', 'Self delete attempt', mockAdminUser),
+      ).rejects.toThrow(BadRequestException);
     });
   });
 

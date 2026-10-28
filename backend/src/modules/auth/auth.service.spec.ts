@@ -100,6 +100,8 @@ describe('AuthService (Security-First Unit & Integration Tests)', () => {
     mockMailService = {
       sendVerificationEmail: jest.fn().mockResolvedValue({ success: true }),
       sendPasswordResetEmail: jest.fn().mockResolvedValue({ success: true }),
+      sendWelcomeEmail: jest.fn().mockResolvedValue({ success: true }),
+      isConfigured: jest.fn().mockReturnValue(true),
     };
 
     const mockSubscriptionModel = {
@@ -422,7 +424,8 @@ describe('AuthService (Security-First Unit & Integration Tests)', () => {
       expect(res.success).toBe(true);
       expect(res.email).toBe('newuser@example.com');
       expect(res.user).toBeDefined();
-      expect(mockMailService.sendVerificationEmail).toHaveBeenCalled();
+      expect(res.isEmailVerified).toBe(true);
+      expect(mockMailService.sendWelcomeEmail).toHaveBeenCalledWith('newuser@example.com', 'New User');
     });
 
     it('18. should reject registration when passwords do not match', async () => {
@@ -481,6 +484,83 @@ describe('AuthService (Security-First Unit & Integration Tests)', () => {
         }),
       ).rejects.toThrow(BadRequestException);
     });
+
+    it('21b. should cleanly allow re-registration of a previously deleted user with fresh KYC and trial state', async () => {
+      // 1. Simulate prior user existence in memUsers and deletion
+      const userEmail = 'deleted.user@example.com';
+      (service as any).memUsers.set(userEmail, {
+        _id: 'old_deleted_user_id',
+        name: 'Old User',
+        email: userEmail,
+        mobile: '9888877777',
+        normalizedMobile: '+919888877777',
+        kycStatus: 'APPROVED',
+        isVerifiedAgent: true,
+        trialExpired: true,
+      });
+
+      // Admin deletes user
+      const deleted = service.deleteMemUser(userEmail);
+      expect(deleted).toBe(true);
+      expect((service as any).memUsers.has(userEmail)).toBe(false);
+
+      // 2. Re-register using same email
+      mockUserModel.findOne.mockResolvedValue(null);
+      mockUserModel.create.mockImplementation((doc: any) => ({
+        ...doc,
+        _id: 'new_re_registered_user_id',
+        save: jest.fn().mockResolvedValue(true),
+      }));
+
+      const res = await service.register({
+        fullName: 'Fresh User',
+        email: userEmail,
+        mobile: '9888877777',
+        password: 'Password123!',
+        confirmPassword: 'Password123!',
+        accountType: AccountType.AGENT,
+      });
+
+      expect(res.success).toBe(true);
+      expect(res.email).toBe(userEmail);
+      expect(res.isEmailVerified).toBe(true);
+      expect(res.tokens).toBeDefined();
+
+      // Ensure KYC status was reset to fresh 'NOT_SUBMITTED' and NOT automatically verified
+      const memUser = service.getMemUserById(userEmail);
+      expect(memUser).toBeDefined();
+      expect(memUser?.kycStatus).toBe('NOT_SUBMITTED');
+      expect(memUser?.isVerifiedAgent).toBe(false);
+      expect(memUser?.trialExpired).toBe(false);
+      expect(memUser?.isTrialActive).toBe(false);
+
+      // Ensure welcome email was dispatched
+      expect(mockMailService.sendWelcomeEmail).toHaveBeenCalledWith(userEmail, 'Fresh User');
+    });
+
+    it('21c. should proceed with registration successfully even if welcome email encounters failure', async () => {
+      mockMailService.sendWelcomeEmail.mockRejectedValueOnce(new Error('SMTP Transport Connection Timeout'));
+
+      mockUserModel.findOne.mockResolvedValue(null);
+      mockUserModel.create.mockImplementation((doc: any) => ({
+        ...doc,
+        _id: 'user_resilience_id',
+        save: jest.fn().mockResolvedValue(true),
+      }));
+
+      const res = await service.register({
+        fullName: 'Resilient User',
+        email: 'resilient@example.com',
+        mobile: '9777766666',
+        password: 'Password123!',
+        confirmPassword: 'Password123!',
+      });
+
+      expect(res.success).toBe(true);
+      expect(res.isEmailVerified).toBe(true);
+      expect(res.tokens).toBeDefined();
+      expect(res.user).toBeDefined();
+    });
   });
 
   describe('Step 2B: Email/Password Login', () => {
@@ -513,6 +593,61 @@ describe('AuthService (Security-First Unit & Integration Tests)', () => {
       expect(res.success).toBe(true);
       expect(res.tokens.accessToken).toBe('mock_jwt_token_xyz');
       expect(res.user.email).toBe('loginuser@example.com');
+    });
+
+    it('22b. should allow newly registered user with kycStatus NOT_SUBMITTED to login immediately without KYC blocking', async () => {
+      const hashedPassword = await hashPassword('ValidPassword123!');
+      const mockFreshUser = {
+        _id: 'user_fresh_kyc_not_submitted',
+        name: 'Fresh Agent',
+        email: 'freshagent@example.com',
+        mobile: '+919876543210',
+        normalizedMobile: '+919876543210',
+        passwordHash: hashedPassword,
+        isEmailVerified: true,
+        status: AccountStatus.ACTIVE,
+        role: UserRole.AGENT,
+        platformRole: PlatformRole.USER,
+        accountType: AccountType.AGENT,
+        kycStatus: 'NOT_SUBMITTED',
+        isVerifiedAgent: false,
+        save: jest.fn().mockResolvedValue(true),
+      };
+
+      mockUserModel.findOne.mockReturnValue({
+        select: jest.fn().mockResolvedValue(mockFreshUser),
+      });
+
+      const res = await service.login({
+        email: 'freshagent@example.com',
+        password: 'ValidPassword123!',
+      });
+
+      expect(res.success).toBe(true);
+      expect(res.tokens.accessToken).toBe('mock_jwt_token_xyz');
+      expect(res.user.kycStatus).toBe('NOT_SUBMITTED');
+    });
+
+    it('22c. should require approved KYC status before starting 3-day free trial', async () => {
+      const unverifiedUser = {
+        _id: '507f1f77bcf86cd799439011',
+        name: 'Pending Agent',
+        role: UserRole.AGENT,
+        platformRole: PlatformRole.USER,
+        accountType: AccountType.AGENT,
+        kycStatus: 'NOT_SUBMITTED',
+        isVerifiedAgent: false,
+        save: jest.fn().mockResolvedValue(true),
+      };
+
+      mockUserModel.findById.mockResolvedValue(unverifiedUser);
+
+      await expect(service.startTrial('507f1f77bcf86cd799439011')).rejects.toThrow(
+        BadRequestException,
+      );
+      await expect(service.startTrial('507f1f77bcf86cd799439011')).rejects.toThrow(
+        /KYC verification and Super Admin approval are required/i,
+      );
     });
 
     it('23. should reject login with invalid password using generic error', async () => {

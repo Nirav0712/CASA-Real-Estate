@@ -168,7 +168,11 @@ export class MailService {
    */
   async sendVerificationEmail(to: string, name: string, token: string): Promise<SendMailResult> {
     const verificationLink = this.generateVerificationLink(to, token);
-    const from = this.configService.get<string>('mail.from') || '"My Property" <info.mypropertyin@gmail.com>';
+    const from =
+      this.configService.get<string>('mail.from') ||
+      process.env.MAIL_FROM ||
+      process.env.EMAIL_FROM ||
+      '"My Property" <info.mypropertyin@gmail.com>';
 
     const subject = 'Activate Your My Property Account — Verify Email';
     const html = this.buildVerificationEmailTemplate(name, verificationLink);
@@ -205,7 +209,11 @@ export class MailService {
    */
   async sendPasswordResetEmail(to: string, name: string, token: string): Promise<SendMailResult> {
     const resetLink = this.generatePasswordResetLink(to, token);
-    const from = this.configService.get<string>('mail.from') || '"My Property" <info.mypropertyin@gmail.com>';
+    const from =
+      this.configService.get<string>('mail.from') ||
+      process.env.MAIL_FROM ||
+      process.env.EMAIL_FROM ||
+      '"My Property" <info.mypropertyin@gmail.com>';
 
     const subject = 'Reset Your My Property Password';
     const html = this.buildPasswordResetEmailTemplate(name, resetLink);
@@ -238,6 +246,90 @@ export class MailService {
     );
 
     return { success: true, messageId: `dev_mock_${Date.now()}`, isMock: true };
+  }
+
+  /**
+   * Dispatches a welcome email to newly registered users
+   */
+  async sendWelcomeEmail(to: string, userName: string): Promise<SendMailResult> {
+    const from =
+      this.configService.get<string>('mail.from') ||
+      process.env.MAIL_FROM ||
+      process.env.EMAIL_FROM ||
+      '"My Property" <info.mypropertyin@gmail.com>';
+
+    const subject = 'Welcome to MyProperty!';
+    const html = this.buildWelcomeEmailTemplate(userName);
+    const text = `Hello ${userName || 'User'},\n\nWelcome to MyProperty!\n\nThank you for joining MyProperty, your platform for discovering and listing properties.\n\nYour account has been successfully created. You can now sign in to your account and explore MyProperty.\n\nWe're happy to have you with us!\n\nBest regards,\nTeam MyProperty\nMyProperty`;
+
+    if (this.transporter && this.isConfigured()) {
+      try {
+        const info = await this.transporter.sendMail({
+          from,
+          to,
+          subject,
+          text,
+          html,
+        });
+        this.logger.log(`📧 Welcome email successfully sent to ${to} (Message ID: ${info.messageId})`);
+        return { success: true, messageId: info.messageId, isMock: false };
+      } catch (err: any) {
+        this.logger.error(`SMTP delivery failed for welcome email to ${to}: ${err?.message}`);
+        return { success: false, isMock: false, error: err?.message };
+      }
+    }
+
+    this.logger.warn(`[SMTP UNCONFIGURED] Welcome email for [${to}] was not sent because SMTP is unconfigured.`);
+    return { success: false, isMock: true, error: 'SMTP delivery service is not configured' };
+  }
+
+  private buildWelcomeEmailTemplate(userName: string): string {
+    const safeName = userName ? userName.replace(/</g, '&lt;').replace(/>/g, '&gt;') : 'User';
+    return `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Welcome to MyProperty!</title>
+  <style>
+    body { margin: 0; padding: 0; background-color: #f1f5f9; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; }
+    .container { max-width: 580px; margin: 40px auto; background: #ffffff; border-radius: 20px; overflow: hidden; border: 1px solid #e2e8f0; box-shadow: 0 10px 25px rgba(0,0,0,0.06); }
+    .header { background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%); padding: 36px 24px; text-align: center; }
+    .logo-badge { display: inline-block; background: rgba(255,255,255,0.2); padding: 8px 16px; border-radius: 30px; color: #ffffff; font-size: 13px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 12px; }
+    .header h1 { margin: 0; color: #ffffff; font-size: 26px; font-weight: 800; letter-spacing: -0.5px; }
+    .content { padding: 36px 32px; color: #334155; font-size: 15px; line-height: 1.6; }
+    .greeting { font-size: 20px; font-weight: 700; color: #0f172a; margin-bottom: 16px; }
+    .message { font-size: 15px; color: #334155; line-height: 1.6; margin-bottom: 20px; }
+    .signature { margin-top: 32px; border-top: 1px solid #e2e8f0; padding-top: 16px; color: #475569; font-size: 15px; line-height: 1.6; }
+    .footer { background: #f8fafc; padding: 24px 32px; text-align: center; font-size: 13px; color: #64748b; border-top: 1px solid #e2e8f0; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div class="logo-badge">MyProperty</div>
+      <h1>Welcome to MyProperty!</h1>
+    </div>
+    <div class="content">
+      <div class="greeting">Hello ${safeName},</div>
+      <p class="message"><strong>Welcome to MyProperty!</strong></p>
+      <p class="message">Thank you for joining MyProperty, your platform for discovering and listing properties.</p>
+      <p class="message">Your account has been successfully created. You can now sign in to your account and explore MyProperty.</p>
+      <p class="message">We're happy to have you with us!</p>
+      <div class="signature">
+        Best regards,<br>
+        <strong>Team MyProperty</strong><br>
+        MyProperty
+      </div>
+    </div>
+    <div class="footer">
+      <p style="margin: 0;">&copy; ${new Date().getFullYear()} MyProperty Marketplace. All rights reserved.</p>
+    </div>
+  </div>
+</body>
+</html>
+`.trim();
   }
 
   private buildVerificationEmailTemplate(name: string, link: string): string {

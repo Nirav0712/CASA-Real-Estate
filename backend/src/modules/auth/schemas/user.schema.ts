@@ -32,6 +32,9 @@ export class User {
   @Prop({ default: false, index: true })
   isMobileVerified: boolean;
 
+  @Prop({ type: Boolean, default: false })
+  welcomeEmailSent?: boolean;
+
   @Prop({ required: false, select: false })
   emailVerificationTokenHash?: string;
 

@@ -1890,7 +1890,9 @@ export class AdminService implements OnModuleInit {
   }
 
   async deleteUser(id: string, reason?: string, actor?: AuthenticatedUser) {
-    const query: any = isValidObjectId(id) ? { _id: id } : { $or: [{ id }, { normalizedMobile: id }, { mobile: id }] };
+    const query: any = isValidObjectId(id)
+      ? { _id: id }
+      : { $or: [{ id }, { normalizedMobile: id }, { mobile: id }, { email: id.toLowerCase().trim() }] };
     const user = await this.userModel.findOne(query);
 
     let memUser: any = null;
@@ -1904,10 +1906,17 @@ export class AdminService implements OnModuleInit {
     const userIdStr = user ? user._id.toString() : memUser._id;
     const userRole = user ? user.role : memUser.role;
     const userMobile = user ? user.normalizedMobile || user.mobile : memUser.normalizedMobile || memUser.mobile;
+    const userEmail = user ? user.email : memUser.email;
+    const normalizedEmail = userEmail ? userEmail.toLowerCase().trim() : undefined;
     const userName = user ? user.name : memUser.name;
 
     // Security Rule 1: User cannot delete own account
-    if (actor && (userIdStr === actor.id || userMobile === actor.normalizedMobile)) {
+    if (
+      actor &&
+      (userIdStr === actor.id ||
+        (userMobile && userMobile === actor.normalizedMobile) ||
+        (normalizedEmail && actor.email && normalizedEmail === actor.email.toLowerCase().trim()))
+    ) {
       throw new BadRequestException('Administrators cannot delete their own account.');
     }
 
@@ -1927,10 +1936,14 @@ export class AdminService implements OnModuleInit {
       }
     }
 
-    // Cleanup: Invalidate refresh sessions
+    // Invalidate refresh sessions & revoke in-memory sessions
     try {
-      if (user) {
-        await this.refreshSessionModel.deleteMany({ userId: user._id });
+      if (userIdStr) {
+        this.authService.revokeUserSessions(userIdStr);
+      }
+      const targetUserId = user ? user._id : userIdStr;
+      if (typeof this.refreshSessionModel?.deleteMany === 'function') {
+        await this.refreshSessionModel.deleteMany({ userId: targetUserId });
       }
     } catch (err: any) {
       this.logger.warn(`Session cleanup warning on user delete: ${err?.message}`);
@@ -1938,22 +1951,60 @@ export class AdminService implements OnModuleInit {
 
     // Cleanup: Agent verification & profile
     try {
-      if (user) {
-        await this.agentDocumentModel?.deleteMany({ userId: user._id });
-        await this.agentProfileModel?.deleteMany({ userId: user._id });
+      const targetUserId = user ? user._id : userIdStr;
+      if (typeof this.agentDocumentModel?.deleteMany === 'function') {
+        await this.agentDocumentModel.deleteMany({ userId: targetUserId });
+      }
+      if (typeof this.agentProfileModel?.deleteMany === 'function') {
+        await this.agentProfileModel.deleteMany({ userId: targetUserId });
       }
     } catch (err: any) {
       this.logger.warn(`Agent profile cleanup note on delete: ${err?.message}`);
     }
 
-    // Delete DB user
-    if (user) {
-      await this.userModel.deleteOne({ _id: user._id });
+    // Cleanup: Subscriptions & featured requests
+    try {
+      const targetUserId = user ? user._id : userIdStr;
+      if (typeof this.subscriptionModel?.deleteMany === 'function') {
+        await this.subscriptionModel.deleteMany({ userId: targetUserId });
+      }
+      if (typeof this.featuredRequestModel?.deleteMany === 'function') {
+        await this.featuredRequestModel.deleteMany({ userId: targetUserId });
+      }
+    } catch (err: any) {
+      this.logger.warn(`Subscription & request cleanup note on delete: ${err?.message}`);
     }
 
-    // Delete memUser fallback
+    // Delete DB user
+    if (user) {
+      if (typeof this.userModel.deleteMany === 'function') {
+        await this.userModel.deleteMany({
+          $or: [
+            { _id: user._id },
+            ...(normalizedEmail ? [{ email: normalizedEmail }] : []),
+            ...(userMobile ? [{ normalizedMobile: userMobile }, { mobile: userMobile }] : []),
+          ],
+        });
+      } else if (typeof this.userModel.deleteOne === 'function') {
+        await this.userModel.deleteOne({ _id: user._id });
+      }
+    } else if (normalizedEmail || userMobile) {
+      if (typeof this.userModel.deleteMany === 'function') {
+        await this.userModel.deleteMany({
+          $or: [
+            ...(normalizedEmail ? [{ email: normalizedEmail }] : []),
+            ...(userMobile ? [{ normalizedMobile: userMobile }, { mobile: userMobile }] : []),
+          ],
+        });
+      }
+    }
+
+    // Delete memUser fallback across all identifier keys (ID, mobile, email)
     this.authService.deleteMemUser(id);
+    if (userIdStr && userIdStr !== id) this.authService.deleteMemUser(userIdStr);
     if (userMobile) this.authService.deleteMemUser(userMobile);
+    if (userEmail) this.authService.deleteMemUser(userEmail);
+    if (normalizedEmail && normalizedEmail !== userEmail) this.authService.deleteMemUser(normalizedEmail);
 
     // Record Audit Log
     await this.recordAuditLog({
@@ -1965,14 +2016,14 @@ export class AdminService implements OnModuleInit {
       targetUserName: userName,
       targetEntity: 'USER',
       targetEntityId: userIdStr,
-      previousValue: { name: userName, role: userRole, mobile: userMobile },
+      previousValue: { name: userName, role: userRole, mobile: userMobile, email: userEmail },
       newValue: null,
       reason: reason || 'User account deleted by administrator',
     });
 
     return {
       success: true,
-      message: `User ${userName || userMobile} successfully deleted.`,
+      message: `User ${userName || userMobile || userEmail} successfully deleted.`,
       deletedUserId: userIdStr,
     };
   }

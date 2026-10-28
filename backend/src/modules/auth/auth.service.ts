@@ -74,6 +74,21 @@ interface InMemoryUser {
   permissions?: string[];
   status: AccountStatus;
   isVerifiedAgent: boolean;
+  welcomeEmailSent?: boolean;
+  kycStatus?: string;
+  isTrialActive?: boolean;
+  trialUsed?: boolean;
+  trialExpired?: boolean;
+  isTrialEligible?: boolean;
+  trialStartedAt?: Date;
+  trialExpiresAt?: Date;
+  trialPackageId?: string | null;
+  activePackageId?: string | null;
+  activeSubscriptionId?: string | null;
+  activePlanName?: string | null;
+  subscriptionStatus?: string | null;
+  subscriptionExpiresAt?: Date;
+  subscriptionStartDate?: Date;
   avatar?: string;
   lastLoginAt?: Date;
   createdAt: Date;
@@ -254,20 +269,41 @@ export class AuthService implements OnModuleInit {
   }
 
   getMemUserById(id: string): InMemoryUser | undefined {
-    for (const u of this.memUsers.values()) {
-      if (u._id === id || u.normalizedMobile === id || u.mobile === id) return u;
+    if (!id) return undefined;
+    const target = id.toLowerCase().trim();
+    for (const [key, u] of this.memUsers.entries()) {
+      if (
+        u._id === id ||
+        u.normalizedMobile === id ||
+        u.mobile === id ||
+        (u.email && u.email.toLowerCase().trim() === target) ||
+        key.toLowerCase().trim() === target ||
+        key === id
+      ) {
+        return u;
+      }
     }
     return undefined;
   }
 
   deleteMemUser(id: string): boolean {
-    for (const [key, u] of this.memUsers.entries()) {
-      if (u._id === id || u.normalizedMobile === id || u.mobile === id) {
+    if (!id) return false;
+    const target = id.toLowerCase().trim();
+    let deleted = false;
+    for (const [key, u] of Array.from(this.memUsers.entries())) {
+      if (
+        u._id === id ||
+        u.normalizedMobile === id ||
+        u.mobile === id ||
+        (u.email && u.email.toLowerCase().trim() === target) ||
+        key.toLowerCase().trim() === target ||
+        key === id
+      ) {
         this.memUsers.delete(key);
-        return true;
+        deleted = true;
       }
     }
-    return false;
+    return deleted;
   }
 
   updateMemUserStatus(id?: string, status?: AccountStatus): boolean {
@@ -1349,9 +1385,9 @@ export class AuthService implements OnModuleInit {
       throw new ConflictException('Email already registered');
     }
 
-    // 4. Verify email provider is properly configured
+    // 4. Verify email provider is available (non-blocking warning if unconfigured)
     if (typeof this.mailService?.isConfigured === 'function' && !this.mailService.isConfigured()) {
-      throw new BadRequestException('Email service provider is not configured. Verification email cannot be sent.');
+      this.logger.warn('Email service provider is not configured. Registration will proceed and welcome email will be logged/mocked.');
     }
 
     // Security & Role mapping: Support both standard system roles and dynamic custom roles
@@ -1412,11 +1448,6 @@ export class AuthService implements OnModuleInit {
         ? dynamicPermissions
         : this.getDefaultPermissions(finalPlatformRole, finalAccountType);
 
-    // 5. Generate single-use email verification token
-    const rawVerificationToken = crypto.randomBytes(32).toString('hex');
-    const verificationTokenHash = hashToken(rawVerificationToken);
-    const verificationExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
-
     let user: any = null;
 
     if (this.isDbConnected()) {
@@ -1433,35 +1464,62 @@ export class AuthService implements OnModuleInit {
           existingByMobile.email = normalizedEmail;
           existingByMobile.name = fullName;
           existingByMobile.passwordHash = passwordHash;
-          existingByMobile.isEmailVerified = false;
-          existingByMobile.status = AccountStatus.PENDING_VERIFICATION;
+          existingByMobile.isEmailVerified = true;
+          existingByMobile.status = AccountStatus.ACTIVE;
           existingByMobile.platformRole = finalPlatformRole;
           existingByMobile.accountType = finalAccountType;
           existingByMobile.role = finalRole;
           existingByMobile.permissions = finalPermissions;
           existingByMobile.customRoleId = customRoleId || null;
-          existingByMobile.emailVerificationTokenHash = verificationTokenHash;
-          existingByMobile.emailVerificationExpiresAt = verificationExpiresAt;
+          existingByMobile.isVerifiedAgent = false;
+          existingByMobile.kycStatus = 'NOT_SUBMITTED';
+          existingByMobile.kycFrontDocumentUrl = undefined;
+          existingByMobile.kycBackDocumentUrl = undefined;
+          existingByMobile.kycDocumentNumber = undefined;
+          existingByMobile.kycApprovedAt = undefined;
+          existingByMobile.kycApprovedBy = undefined;
+          existingByMobile.kycRejectionReason = undefined;
+          existingByMobile.isTrialActive = false;
+          existingByMobile.trialUsed = false;
+          existingByMobile.trialExpired = false;
+          existingByMobile.isTrialEligible = true;
+          existingByMobile.trialStartedAt = undefined;
+          existingByMobile.trialExpiresAt = undefined;
+          existingByMobile.trialPackageId = null;
+          existingByMobile.activePackageId = null;
+          existingByMobile.activeSubscriptionId = null;
+          existingByMobile.activePlanName = null;
+          existingByMobile.subscriptionStatus = null;
+          existingByMobile.subscriptionExpiresAt = undefined;
+          existingByMobile.subscriptionStartDate = undefined;
+          existingByMobile.welcomeEmailSent = false;
+          existingByMobile.emailVerificationTokenHash = undefined;
+          existingByMobile.emailVerificationExpiresAt = undefined;
           await existingByMobile.save();
           user = existingByMobile;
         } else {
-          // Create new user in PENDING_VERIFICATION state until email is confirmed
+          // Create new user directly in ACTIVE state with fresh KYC NOT_SUBMITTED status
           user = await this.userModel.create({
             name: fullName,
             email: normalizedEmail,
             mobile: nationalDigits,
             normalizedMobile,
             passwordHash,
-            isEmailVerified: false,
+            isEmailVerified: true,
             isMobileVerified: false,
-            emailVerificationTokenHash: verificationTokenHash,
-            emailVerificationExpiresAt: verificationExpiresAt,
             platformRole: finalPlatformRole,
             accountType: finalAccountType,
             role: finalRole,
             permissions: finalPermissions,
             customRoleId: customRoleId || null,
-            status: AccountStatus.PENDING_VERIFICATION,
+            status: AccountStatus.ACTIVE,
+            isVerifiedAgent: false,
+            kycStatus: 'NOT_SUBMITTED',
+            welcomeEmailSent: false,
+            isTrialActive: false,
+            trialUsed: false,
+            trialExpired: false,
+            isTrialEligible: true,
             agencyName: dto.agencyName?.trim() || undefined,
           });
         }
@@ -1479,23 +1537,27 @@ export class AuthService implements OnModuleInit {
     }
 
     // Update in-memory user store for fallback/test resilience
-    const memUserObj = {
+    const memUserObj: InMemoryUser = {
       _id: user?._id?.toString() || new Types.ObjectId().toString(),
       name: fullName,
       email: normalizedEmail,
       mobile: nationalDigits,
       normalizedMobile,
       passwordHash,
-      isEmailVerified: false,
+      isEmailVerified: true,
       isMobileVerified: false,
-      emailVerificationTokenHash: verificationTokenHash,
-      emailVerificationExpiresAt: verificationExpiresAt,
       platformRole: finalPlatformRole,
       accountType: finalAccountType,
       role: finalRole,
       permissions: finalPermissions,
-      status: AccountStatus.PENDING_VERIFICATION,
+      status: AccountStatus.ACTIVE,
       isVerifiedAgent: false,
+      kycStatus: 'NOT_SUBMITTED',
+      welcomeEmailSent: false,
+      isTrialActive: false,
+      trialUsed: false,
+      trialExpired: false,
+      isTrialEligible: true,
       agencyName: dto.agencyName?.trim() || undefined,
       createdAt: now,
       updatedAt: now,
@@ -1503,43 +1565,38 @@ export class AuthService implements OnModuleInit {
     this.memUsers.set(normalizedEmail, memUserObj);
     if (!user) user = memUserObj;
 
-    // Send verification email via configured email provider (non-blocking)
-    let emailSent = false;
+    // Send Welcome Email immediately after user creation (non-blocking)
+    let welcomeEmailSent = false;
     try {
-      const mailRes = await this.mailService.sendVerificationEmail(normalizedEmail, fullName, rawVerificationToken);
-      emailSent = !!mailRes?.success;
-    } catch (err: any) {
-      this.logger.error(`Non-blocking email delivery failure during registration for ${normalizedEmail}: ${err?.message}`);
-    }
-
-    if (!emailSent) {
-      this.logger.warn(
-        `[REGISTRATION AUTO-VERIFY] SMTP email delivery failed for ${normalizedEmail}. Auto-activating account so user is not blocked.`,
-      );
-      user.isEmailVerified = true;
-      user.status = AccountStatus.ACTIVE;
-      user.emailVerificationTokenHash = undefined;
-      user.emailVerificationExpiresAt = undefined;
-      if (typeof user.save === 'function') {
-        await user.save();
+      const mailRes = await this.mailService.sendWelcomeEmail(normalizedEmail, fullName);
+      welcomeEmailSent = Boolean(mailRes?.success);
+      if (welcomeEmailSent) {
+        this.logger.log(`📧 Welcome email dispatched successfully to ${normalizedEmail}`);
+      } else {
+        this.logger.warn(`Welcome email delivery not completed for ${normalizedEmail}: ${mailRes?.error || 'unconfigured'}`);
       }
-
-      const tokens = await this.generateTokens(user);
-      return {
-        success: true,
-        message: 'Registration successful! Your account has been created.',
-        email: normalizedEmail,
-        isEmailVerified: true,
-        tokens,
-        user: this.sanitizeUser(user),
-      };
+    } catch (err: any) {
+      this.logger.error(`Non-blocking welcome email delivery failure during registration for ${normalizedEmail}: ${err?.message}`);
     }
 
+    if (welcomeEmailSent) {
+      user.welcomeEmailSent = true;
+      if (typeof user.save === 'function') {
+        await user.save().catch(() => {});
+      }
+      if (this.memUsers.has(normalizedEmail)) {
+        this.memUsers.get(normalizedEmail)!.welcomeEmailSent = true;
+      }
+    }
+
+    const tokens = await this.generateTokens(user, metadata);
     return {
       success: true,
-      message: 'Registration successful! A verification link has been sent to your email. Please verify your email before signing in.',
+      message: 'Registration successful! Your account has been created. You can now sign in to your account and explore MyProperty.',
       email: normalizedEmail,
-      isEmailVerified: false,
+      isEmailVerified: true,
+      welcomeEmailSent,
+      tokens,
       user: this.sanitizeUser(user),
     };
   }
