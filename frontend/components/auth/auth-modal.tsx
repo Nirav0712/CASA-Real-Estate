@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import { useRouter } from 'next/navigation';
 import { Modal } from '@/components/ui/modal';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -26,6 +27,7 @@ import * as authService from '@/services/auth-service';
 import { getPublicRoles, PublicRoleItem } from '@/services/entitlements-service';
 
 export function AuthModal() {
+  const router = useRouter();
   const {
     isAuthModalOpen,
     closeAuthModal,
@@ -56,6 +58,7 @@ export function AuthModal() {
   const [loading, setLoading] = React.useState(false);
   const [errorMsg, setErrorMsg] = React.useState('');
   const [registeredEmail, setRegisteredEmail] = React.useState<string | null>(null);
+  const [successBanner, setSuccessBanner] = React.useState('');
   const [forgotSubmitted, setForgotSubmitted] = React.useState(false);
   const [resendCooldown, setResendCooldown] = React.useState(0);
   const [resendNotice, setResendNotice] = React.useState('');
@@ -80,6 +83,7 @@ export function AuthModal() {
   React.useEffect(() => {
     if (!isAuthModalOpen) {
       setErrorMsg('');
+      setSuccessBanner('');
       setRegisteredEmail(null);
       setForgotSubmitted(false);
       setResendNotice('');
@@ -110,6 +114,7 @@ export function AuthModal() {
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
+    setSuccessBanner('');
 
     if (!email.trim() || !password) {
       setErrorMsg('Please enter both your email address and password.');
@@ -130,6 +135,7 @@ export function AuthModal() {
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
+    setSuccessBanner('');
 
     if (!fullName.trim()) {
       setErrorMsg('Please enter your full name.');
@@ -186,8 +192,17 @@ export function AuthModal() {
         agencyName: isProfessional ? agencyName.trim() || undefined : undefined,
       });
 
-      if (!(res as any).tokens?.accessToken) {
-        setRegisteredEmail(email.trim());
+      if (res?.success) {
+        setRegisteredEmail(null);
+        setMode('SIGN_IN');
+        setAuthModalMode('SIGN_IN');
+        setSuccessBanner('Registration successful! Please verify your email address before signing in.');
+        setPassword('');
+        setConfirmPassword('');
+        setErrorMsg('');
+        if (typeof window !== 'undefined' && window.location.pathname.includes('/auth/register')) {
+          router.push('/auth/login');
+        }
       }
     } catch (err: unknown) {
       const rawMsg = err instanceof Error ? err.message : 'Registration failed. Please try again.';
@@ -204,8 +219,12 @@ export function AuthModal() {
         rawMsg.toLowerCase().includes('gsmtp') ||
         rawMsg.toLowerCase().includes('failed to deliver verification email')
       ) {
-        setErrorMsg('Account created successfully. Please sign in to access your dashboard.');
+        setRegisteredEmail(null);
         setMode('SIGN_IN');
+        setAuthModalMode('SIGN_IN');
+        setSuccessBanner('Registration successful! Please verify your email address before signing in.');
+        setPassword('');
+        setConfirmPassword('');
       } else {
         setErrorMsg(rawMsg);
       }
@@ -337,6 +356,7 @@ export function AuthModal() {
                 setMode('REGISTER');
                 setAuthModalMode('REGISTER');
                 setErrorMsg('');
+                setSuccessBanner('');
               }}
               className={`py-2 px-3 rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
                 mode === 'REGISTER'
@@ -347,6 +367,19 @@ export function AuthModal() {
               <UserIcon className="w-3.5 h-3.5" />
               <span>Create Account</span>
             </button>
+          </div>
+        )}
+
+        {/* Registration Success Banner on Sign In */}
+        {successBanner && mode === 'SIGN_IN' && !registeredEmail && (
+          <div className="p-3 bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-900 rounded-xl text-xs text-emerald-800 dark:text-emerald-200 font-medium flex items-start gap-2.5">
+            <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 flex-shrink-0 mt-0.5" />
+            <div className="space-y-1">
+              <p className="font-semibold">{successBanner}</p>
+              <p className="text-[11px] text-emerald-700 dark:text-emerald-300 font-normal">
+                Check your inbox for the verification email. After clicking the verification link, enter your credentials below to sign in.
+              </p>
+            </div>
           </div>
         )}
 

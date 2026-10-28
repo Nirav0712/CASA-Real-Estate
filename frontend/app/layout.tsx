@@ -14,6 +14,7 @@ import { ComparisonBar } from '@/components/property/comparison-bar';
 import { PlanSelectionModal } from '@/components/pricing/plan-selection-modal';
 import { TrialExpiredModal } from '@/components/pricing/trial-expired-modal';
 import { LoginProtectionModal } from '@/components/auth/login-protection-modal';
+import { PostLoginModal } from '@/components/auth/post-login-modal';
 
 const inter = Inter({
   subsets: ['latin'],
@@ -55,6 +56,7 @@ export default function RootLayout({
                     <PlanSelectionModal />
                     <TrialExpiredModal />
                     <LoginProtectionModal />
+                    <PostLoginModal />
                     <Script
                       src="https://checkout.razorpay.com/v1/checkout.js"
                       strategy="lazyOnload"

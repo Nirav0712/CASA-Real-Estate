@@ -117,10 +117,9 @@ export class AuthController {
     const userAgent = req.headers['user-agent'];
     const result = await this.authService.register(dto, { ipAddress, userAgent });
 
-    if ((result as any).tokens) {
-      this.setRefreshTokenCookie(res, (result as any).tokens.refreshToken);
-      this.setAccessTokenCookie(res, (result as any).tokens.accessToken);
-    }
+    // Registration and login are strictly separated: Do not authenticate or attach session cookies
+    this.clearRefreshTokenCookie(res);
+    this.clearAccessTokenCookie(res);
 
     return result;
   }

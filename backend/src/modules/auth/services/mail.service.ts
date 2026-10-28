@@ -51,6 +51,16 @@ export class MailService {
           },
         });
         this.logger.log(`✅ SMTP Transporter initialized for host: ${host}:${port}`);
+
+        this.transporter.verify((verifyErr) => {
+          if (verifyErr) {
+            this.logger.warn(
+              `⚠️ SMTP credentials rejected by ${host} for user "${user}": ${verifyErr.message}. Ensure a valid Google App Password is configured.`,
+            );
+          } else {
+            this.logger.log(`🎉 SMTP Authenticated successfully: Ready to dispatch from ${user}`);
+          }
+        });
       } catch (err: any) {
         this.logger.error(`Failed to initialize SMTP transporter: ${err?.message}`);
         this.transporter = null;
@@ -172,11 +182,11 @@ export class MailService {
       this.configService.get<string>('mail.from') ||
       process.env.MAIL_FROM ||
       process.env.EMAIL_FROM ||
-      '"My Property" <info.mypropertyin@gmail.com>';
+      '"MyProperty" <info.mypropertyin@gmail.com>';
 
-    const subject = 'Activate Your My Property Account — Verify Email';
+    const subject = 'Verify Your Email Address — MyProperty';
     const html = this.buildVerificationEmailTemplate(name, verificationLink);
-    const text = `Hello ${name || 'User'},\n\nThank you for joining My Property.\n\nPlease verify your email address by visiting this link:\n${verificationLink}\n\nThis verification link will expire in 24 hours.\n\nBest regards,\nThe My Property Team`;
+    const text = `Hello ${name || 'User'},\n\nThank you for registering on MyProperty.\n\nPlease verify your email address by visiting this link:\n${verificationLink}\n\nThis verification link will expire in 24 hours.\n\nBest regards,\nTeam MyProperty`;
 
     if (this.transporter && this.isConfigured()) {
       try {
@@ -213,11 +223,11 @@ export class MailService {
       this.configService.get<string>('mail.from') ||
       process.env.MAIL_FROM ||
       process.env.EMAIL_FROM ||
-      '"My Property" <info.mypropertyin@gmail.com>';
+      '"MyProperty" <info.mypropertyin@gmail.com>';
 
-    const subject = 'Reset Your My Property Password';
+    const subject = 'Reset Your MyProperty Password';
     const html = this.buildPasswordResetEmailTemplate(name, resetLink);
-    const text = `Hello ${name || 'User'},\n\nWe received a request to reset your password for My Property Marketplace.\n\nReset your password by clicking this link:\n${resetLink}\n\nThis link is valid for 1 hour. If you did not make this request, please ignore this email.\n\nBest regards,\nThe My Property Security Team`;
+    const text = `Hello ${name || 'User'},\n\nWe received a request to reset your password for MyProperty Marketplace.\n\nReset your password by clicking this link:\n${resetLink}\n\nThis link is valid for 1 hour. If you did not make this request, please ignore this email.\n\nBest regards,\nThe MyProperty Security Team`;
 
     if (this.transporter && this.isConfigured()) {
       try {
@@ -256,7 +266,7 @@ export class MailService {
       this.configService.get<string>('mail.from') ||
       process.env.MAIL_FROM ||
       process.env.EMAIL_FROM ||
-      '"My Property" <info.mypropertyin@gmail.com>';
+      '"MyProperty" <info.mypropertyin@gmail.com>';
 
     const subject = 'Welcome to MyProperty!';
     const html = this.buildWelcomeEmailTemplate(userName);
@@ -340,7 +350,7 @@ export class MailService {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Confirm Your Email - My Property</title>
+  <title>Verify Your Email - MyProperty</title>
   <style>
     body { margin: 0; padding: 0; background-color: #f1f5f9; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; }
     .container { max-width: 580px; margin: 40px auto; background: #ffffff; border-radius: 20px; overflow: hidden; border: 1px solid #e2e8f0; box-shadow: 0 10px 25px rgba(0,0,0,0.06); }
@@ -360,30 +370,30 @@ export class MailService {
 <body>
   <div class="container">
     <div class="header">
-      <div class="logo-badge">My Property</div>
-      <h1>Confirm Your Email Address</h1>
+      <div class="logo-badge">MyProperty</div>
+      <h1>Verify Your Email Address</h1>
     </div>
     <div class="content">
       <div class="greeting">Hello ${safeName},</div>
-      <p>Thank you for registering on <strong>My Property Marketplace</strong>. To complete your registration and activate your account, please confirm your email address by clicking the button below:</p>
+      <p>Thank you for registering on <strong>MyProperty</strong>. To complete your registration and activate your account, please verify your email address by clicking the button below:</p>
       
       <div class="button-container">
-        <a href="${link}" class="button" target="_blank">Confirm Email &amp; Activate Account</a>
+        <a href="${link}" class="button" target="_blank">Verify My Email</a>
       </div>
 
       <div class="device-note">
-        💡 <strong>Note:</strong> Once you click this confirmation button, your account will be activated immediately and you can log in to your dashboard from your computer or any web browser.
+        💡 <strong>Note:</strong> Once you click this verification button, your email address will be verified and you can log in to your account from any web browser.
       </div>
 
       <p style="margin-top: 24px;">If the button above does not work, copy and paste this link into your browser:</p>
       <p style="word-break: break-all; font-size: 13px; color: #0284c7;"><a href="${link}">${link}</a></p>
 
       <div class="notice">
-        This confirmation link will expire in <strong>24 hours</strong>. If you did not create an account on My Property, please disregard this email.
+        This verification link will expire in <strong>24 hours</strong>. If you did not create an account on MyProperty, please disregard this email.
       </div>
     </div>
     <div class="footer">
-      &copy; ${new Date().getFullYear()} My Property Marketplace. All rights reserved.
+      &copy; ${new Date().getFullYear()} MyProperty Marketplace. All rights reserved.
     </div>
   </div>
 </body>
@@ -441,7 +451,7 @@ export class MailService {
    * Dispatches KYC Approval Email only if properly configured
    */
   async sendKycApprovedEmail(to: string, name: string, trialExpiresAt?: Date): Promise<SendMailResult> {
-    const from = this.configService.get<string>('mail.from') || '"My Property" <info.mypropertyin@gmail.com>';
+    const from = this.configService.get<string>('mail.from') || '"MyProperty" <info.mypropertyin@gmail.com>';
 
     const expiryStr = trialExpiresAt
       ? trialExpiresAt.toLocaleDateString('en-IN', {
@@ -478,7 +488,7 @@ export class MailService {
    * Dispatches KYC Rejection Email only if properly configured
    */
   async sendKycRejectedEmail(to: string, name: string, reason: string): Promise<SendMailResult> {
-    const from = this.configService.get<string>('mail.from') || '"My Property" <info.mypropertyin@gmail.com>';
+    const from = this.configService.get<string>('mail.from') || '"MyProperty" <info.mypropertyin@gmail.com>';
 
     const subject = 'My Property KYC Verification Update — Action Required';
     const text = `Hello ${name || 'User'},\n\nWe reviewed your KYC verification documents, but were unable to approve them due to the following reason:\n\n${reason}\n\nPlease visit your dashboard to upload corrected documents:\n${cleanUrl(this.configService.get<string>('cors.frontendUrl'), 'http://localhost:3000')}/dashboard/kyc\n\nBest regards,\nThe My Property Compliance Team`;
@@ -515,7 +525,7 @@ export class MailService {
     billingPeriod: string,
     requestReference: string,
   ): Promise<SendMailResult> {
-    const from = this.configService.get<string>('mail.from') || '"My Property" <info.mypropertyin@gmail.com>';
+    const from = this.configService.get<string>('mail.from') || '"MyProperty" <info.mypropertyin@gmail.com>';
 
     const subject = `Subscription Request Received: ${planName} — My Property`;
     const text = `Hello ${name || 'User'},\n\nWe have received your subscription request for the ${planName} plan (₹${price.toLocaleString('en-IN')} / ${billingPeriod.toLowerCase()}).\n\nYour Request Reference is: ${requestReference}\n\nOur sales & operations team will review and activate your subscription shortly.\n\nBest regards,\nThe My Property Team`;
@@ -550,7 +560,7 @@ export class MailService {
     expiryDate: Date,
     requestReference: string,
   ): Promise<SendMailResult> {
-    const from = this.configService.get<string>('mail.from') || '"My Property" <info.mypropertyin@gmail.com>';
+    const from = this.configService.get<string>('mail.from') || '"MyProperty" <info.mypropertyin@gmail.com>';
 
     const expiryStr = expiryDate
       ? expiryDate.toLocaleDateString('en-IN', {
@@ -592,7 +602,7 @@ export class MailService {
     reason: string,
     requestReference: string,
   ): Promise<SendMailResult> {
-    const from = this.configService.get<string>('mail.from') || '"My Property" <info.mypropertyin@gmail.com>';
+    const from = this.configService.get<string>('mail.from') || '"MyProperty" <info.mypropertyin@gmail.com>';
 
     const subject = `Subscription Request Update: ${planName} — My Property`;
     const text = `Hello ${name || 'User'},\n\nWe reviewed your subscription request (${requestReference}) for the ${planName} plan, but were unable to approve it at this time.\n\nReason: ${reason}\n\nIf you have questions or wish to explore alternative plans, please contact our support team or connect via WhatsApp.\n\nBest regards,\nThe My Property Team`;

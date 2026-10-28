@@ -404,13 +404,13 @@ describe('AuthService (Security-First Unit & Integration Tests)', () => {
   });
 
   describe('Step 2B: Email/Password Registration', () => {
-    it('17. should successfully register a new user and activate account immediately without email verification', async () => {
+    it('17. should successfully register a new user in pending verification state without granting immediate login tokens', async () => {
       mockUserModel.findOne.mockResolvedValue(null);
       mockUserModel.create.mockResolvedValue({
         _id: 'user_new_1',
         email: 'newuser@example.com',
-        status: AccountStatus.ACTIVE,
-        isEmailVerified: true,
+        status: AccountStatus.PENDING_VERIFICATION,
+        isEmailVerified: false,
       });
 
       const res = await service.register({
@@ -424,8 +424,12 @@ describe('AuthService (Security-First Unit & Integration Tests)', () => {
       expect(res.success).toBe(true);
       expect(res.email).toBe('newuser@example.com');
       expect(res.user).toBeDefined();
-      expect(res.isEmailVerified).toBe(true);
-      expect(mockMailService.sendWelcomeEmail).toHaveBeenCalledWith('newuser@example.com', 'New User');
+      expect(res.isEmailVerified).toBe(false);
+      expect(mockMailService.sendVerificationEmail).toHaveBeenCalledWith(
+        'newuser@example.com',
+        'New User',
+        expect.any(String),
+      );
     });
 
     it('18. should reject registration when passwords do not match', async () => {
@@ -523,8 +527,7 @@ describe('AuthService (Security-First Unit & Integration Tests)', () => {
 
       expect(res.success).toBe(true);
       expect(res.email).toBe(userEmail);
-      expect(res.isEmailVerified).toBe(true);
-      expect(res.tokens).toBeDefined();
+      expect(res.isEmailVerified).toBe(false);
 
       // Ensure KYC status was reset to fresh 'NOT_SUBMITTED' and NOT automatically verified
       const memUser = service.getMemUserById(userEmail);
@@ -534,12 +537,16 @@ describe('AuthService (Security-First Unit & Integration Tests)', () => {
       expect(memUser?.trialExpired).toBe(false);
       expect(memUser?.isTrialActive).toBe(false);
 
-      // Ensure welcome email was dispatched
-      expect(mockMailService.sendWelcomeEmail).toHaveBeenCalledWith(userEmail, 'Fresh User');
+      // Ensure verification email was dispatched
+      expect(mockMailService.sendVerificationEmail).toHaveBeenCalledWith(
+        userEmail,
+        'Fresh User',
+        expect.any(String),
+      );
     });
 
-    it('21c. should proceed with registration successfully even if welcome email encounters failure', async () => {
-      mockMailService.sendWelcomeEmail.mockRejectedValueOnce(new Error('SMTP Transport Connection Timeout'));
+    it('21c. should proceed with registration successfully even if verification email encounters failure', async () => {
+      mockMailService.sendVerificationEmail.mockRejectedValueOnce(new Error('SMTP Transport Connection Timeout'));
 
       mockUserModel.findOne.mockResolvedValue(null);
       mockUserModel.create.mockImplementation((doc: any) => ({
@@ -557,8 +564,7 @@ describe('AuthService (Security-First Unit & Integration Tests)', () => {
       });
 
       expect(res.success).toBe(true);
-      expect(res.isEmailVerified).toBe(true);
-      expect(res.tokens).toBeDefined();
+      expect(res.isEmailVerified).toBe(false);
       expect(res.user).toBeDefined();
     });
   });

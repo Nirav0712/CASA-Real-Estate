@@ -545,22 +545,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     async (data: RegisterData): Promise<RegisterResponse> => {
       try {
         const res = await authService.register(data);
-        if ((res as any).tokens?.accessToken && (res as any).user) {
-          setUser((res as any).user);
-          setToken((res as any).tokens.accessToken);
-          if (typeof window !== 'undefined') {
-            localStorage.setItem('casa_access_token', (res as any).tokens.accessToken);
-            localStorage.setItem('casa_user', JSON.stringify((res as any).user));
-          }
-          setIsAuthModalOpen(false);
-          toast.success(
-            'Account Created',
-            `Welcome to myproperty, ${(res as any).user.name || (res as any).user.email}!`,
-          );
-        } else {
-          setIsAuthModalOpen(false);
-        }
-
+        // Registration does NOT log the user in.
+        // User must verify email and manually sign in.
+        toast.success(
+          'Registration Successful',
+          'Registration successful! Please verify your email address before signing in.',
+        );
         return res;
       } catch (err: unknown) {
         const message = err instanceof Error ? err.message : 'Registration failed. Please try again.';
