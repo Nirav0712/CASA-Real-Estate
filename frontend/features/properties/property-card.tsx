@@ -9,6 +9,7 @@ import { Card, Badge } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { formatPrice } from '@/lib/utils';
 import { buildWhatsAppEnquiryUrl } from '@/lib/whatsapp';
+import { createLead } from '@/services/lead-service';
 import { getCategoryLabel } from '@/lib/categories';
 import { useLanguage } from '@/contexts/language-context';
 import { useToast } from '@/contexts/toast-context';
@@ -36,7 +37,7 @@ export function PropertyCard({ property }: { property: Property }) {
   const router = useRouter();
   const { locale, t, isRtl } = useLanguage();
   const toast = useToast();
-  const { isAuthenticated, openLoginProtection } = useAuth();
+  const { user, isAuthenticated, openLoginProtection } = useAuth();
   const { isSaved, toggleSave } = useSavedProperties();
   const { isCompared, addToCompare, removeFromCompare } = useComparison();
   const [isHovered, setIsHovered] = React.useState(false);
@@ -121,7 +122,7 @@ export function PropertyCard({ property }: { property: Property }) {
     router.push(`/property/${property.slug}`);
   };
 
-  const handleWhatsAppClick = (e: React.MouseEvent) => {
+  const handleWhatsAppClick = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
     if (!isAuthenticated) {
@@ -133,13 +134,28 @@ export function PropertyCard({ property }: { property: Property }) {
       return;
     }
     if (whatsappUrl) {
-      window.open(whatsappUrl, '_blank', 'noopener,noreferrer');
+      // Record inquiry before opening WhatsApp
+      try {
+        await createLead({
+          propertyId: (property as any)._id || property.id,
+          name: user?.name || 'Interested Buyer',
+          mobile: user?.mobile || '',
+          email: user?.email || undefined,
+          source: 'WHATSAPP',
+          message: `Inquiry via WhatsApp click for ${localizedTitle}`,
+          subject: `WhatsApp Inquiry: ${localizedTitle}`,
+        }).catch((err) => {
+          console.warn('Inquiry recording error on WhatsApp click:', err);
+        });
+      } finally {
+        window.open(whatsappUrl, '_blank', 'noopener,noreferrer');
+      }
     } else {
       router.push(`/property/${property.slug}?continueAction=whatsapp`);
     }
   };
 
-  const handleCallClick = (e: React.MouseEvent) => {
+  const handleCallClick = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
     if (!isAuthenticated) {
@@ -151,7 +167,22 @@ export function PropertyCard({ property }: { property: Property }) {
       return;
     }
     if (property.advertiser?.phone) {
-      window.location.href = `tel:${property.advertiser.phone}`;
+      // Record inquiry before opening dialer
+      try {
+        await createLead({
+          propertyId: (property as any)._id || property.id,
+          name: user?.name || 'Interested Buyer',
+          mobile: user?.mobile || '',
+          email: user?.email || undefined,
+          source: 'CALL',
+          message: `Inquiry via Call click for ${localizedTitle}`,
+          subject: `Call Inquiry: ${localizedTitle}`,
+        }).catch((err) => {
+          console.warn('Inquiry recording error on Call click:', err);
+        });
+      } finally {
+        window.location.href = `tel:${property.advertiser.phone}`;
+      }
     } else {
       router.push(`/property/${property.slug}?continueAction=call`);
     }

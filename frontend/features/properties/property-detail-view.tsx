@@ -302,6 +302,18 @@ export function PropertyDetailView({
           location: `${currentProperty.location.locality}, ${currentProperty.location.city}`,
         });
         toast.success('Continuing Enquiry', 'Opening WhatsApp chat with verified advertiser...');
+        // Record WhatsApp inquiry before opening
+        createLead({
+          propertyId: (property as any)._id || property.id,
+          name: user?.name || 'Interested Buyer',
+          mobile: user?.mobile || '',
+          email: user?.email || undefined,
+          source: 'WHATSAPP',
+          message: `Inquiry via WhatsApp continuation for ${localizedTitle}`,
+          subject: `WhatsApp Inquiry: ${localizedTitle}`,
+        }).catch((err) => {
+          console.warn('Inquiry recording error on WhatsApp continuation:', err);
+        });
         setTimeout(() => {
           window.open(waUrl, '_blank', 'noopener,noreferrer');
         }, 500);
@@ -314,6 +326,18 @@ export function PropertyDetailView({
       const targetPhone = currentProperty.advertiser?.phone;
       if (targetPhone) {
         toast.info('Connecting Call', `Connecting to verified advertiser: ${targetPhone}`);
+        // Record Call inquiry before opening dialer
+        createLead({
+          propertyId: (property as any)._id || property.id,
+          name: user?.name || 'Interested Buyer',
+          mobile: user?.mobile || '',
+          email: user?.email || undefined,
+          source: 'CALL',
+          message: `Inquiry via Call continuation for ${localizedTitle}`,
+          subject: `Call Inquiry: ${localizedTitle}`,
+        }).catch((err) => {
+          console.warn('Inquiry recording error on Call continuation:', err);
+        });
         setTimeout(() => {
           window.location.href = `tel:${targetPhone}`;
         }, 500);
@@ -1726,10 +1750,25 @@ export function PropertyDetailView({
                     size="md"
                     fullWidth
                     className="shadow-subtle text-xs font-bold flex items-center justify-center gap-2"
-                    onClick={(e) => {
+                    onClick={async (e) => {
                       if (handleProtectedAction('WHATSAPP', e)) {
                         if (whatsappUrl) {
-                          window.open(whatsappUrl, '_blank', 'noopener,noreferrer');
+                          // Record inquiry before opening WhatsApp
+                          try {
+                            await createLead({
+                              propertyId: (property as any)._id || property.id,
+                              name: user?.name || 'Interested Buyer',
+                              mobile: user?.mobile || '',
+                              email: user?.email || undefined,
+                              source: 'WHATSAPP',
+                              message: `Inquiry via WhatsApp click for ${localizedTitle}`,
+                              subject: `WhatsApp Inquiry: ${localizedTitle}`,
+                            }).catch((err) => {
+                              console.warn('Inquiry recording error on WhatsApp click:', err);
+                            });
+                          } finally {
+                            window.open(whatsappUrl, '_blank', 'noopener,noreferrer');
+                          }
                         }
                       }
                     }}
@@ -1746,10 +1785,25 @@ export function PropertyDetailView({
                       size="md"
                       fullWidth
                       className="text-xs font-semibold flex items-center justify-center gap-2"
-                      onClick={(e) => {
+                      onClick={async (e) => {
                         if (handleProtectedAction('CALL', e)) {
                           if (currentProperty.advertiser?.phone) {
-                            window.location.href = `tel:${currentProperty.advertiser.phone}`;
+                            // Record inquiry before dialing
+                            try {
+                              await createLead({
+                                propertyId: (property as any)._id || property.id,
+                                name: user?.name || 'Interested Buyer',
+                                mobile: user?.mobile || '',
+                                email: user?.email || undefined,
+                                source: 'CALL',
+                                message: `Inquiry via Call click for ${localizedTitle}`,
+                                subject: `Call Inquiry: ${localizedTitle}`,
+                              }).catch((err) => {
+                                console.warn('Inquiry recording error on Call click:', err);
+                              });
+                            } finally {
+                              window.location.href = `tel:${currentProperty.advertiser.phone}`;
+                            }
                           }
                         }
                       }}
@@ -1782,6 +1836,17 @@ export function PropertyDetailView({
                               <a
                                 key={idx}
                                 href={`tel:${c.countryCode}${c.number}`}
+                                onClick={() => {
+                                  createLead({
+                                    propertyId: (property as any)._id || property.id,
+                                    name: user?.name || 'Interested Buyer',
+                                    mobile: user?.mobile || '',
+                                    email: user?.email || undefined,
+                                    source: 'CALL',
+                                    message: `Inquiry via alternate phone call (${c.countryCode}${c.number}) for ${localizedTitle}`,
+                                    subject: `Call Inquiry: ${localizedTitle}`,
+                                  }).catch(() => {});
+                                }}
                                 className="inline-flex items-center justify-between px-3 py-1.5 text-xs font-medium rounded-lg bg-casa-surface-secondary text-casa-text-primary hover:bg-casa-brand/10 hover:text-casa-brand border border-casa-border transition-colors"
                               >
                                 <span className="flex items-center gap-1.5">

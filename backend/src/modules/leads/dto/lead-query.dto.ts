@@ -59,4 +59,14 @@ export class LeadQueryDto {
   @IsOptional()
   @IsString()
   q?: string;
+
+  @ApiPropertyOptional({ example: 'usr-123' })
+  @IsOptional()
+  @IsString()
+  purchaserId?: string;
+
+  @ApiPropertyOptional({ example: 'usr-123' })
+  @IsOptional()
+  @IsString()
+  userId?: string;
 }

@@ -23,6 +23,11 @@ export class PurchaserEnquiryQueryDto {
   @IsString()
   status?: string;
 
+  @ApiPropertyOptional({ example: 'WHATSAPP' })
+  @IsOptional()
+  @IsString()
+  source?: string;
+
   @ApiPropertyOptional({ example: 'Gomti Nagar' })
   @IsOptional()
   @IsString()

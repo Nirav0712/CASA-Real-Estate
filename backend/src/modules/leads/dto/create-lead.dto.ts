@@ -8,17 +8,17 @@ export class CreateLeadDto {
   @IsString()
   propertyId: string;
 
-  @ApiProperty({ example: 'Rohit Malhotra' })
-  @IsNotEmpty({ message: 'Name is required' })
+  @ApiPropertyOptional({ example: 'Rohit Malhotra' })
+  @IsOptional()
   @IsString()
-  name: string;
+  name?: string;
 
-  @ApiProperty({ example: '+919876543210' })
-  @IsNotEmpty({ message: 'Contact mobile number is required' })
+  @ApiPropertyOptional({ example: '+919876543210' })
+  @IsOptional()
   @Matches(/^(\+?[0-9]{1,4})?[0-9]{10}$/, {
     message: 'Please provide a valid 10-digit mobile number with optional country code',
   })
-  mobile: string;
+  mobile?: string;
 
   @ApiPropertyOptional({ example: 'rohit@example.com' })
   @IsOptional()
@@ -30,10 +30,10 @@ export class CreateLeadDto {
   @IsString()
   subject?: string;
 
-  @ApiProperty({ example: 'Hi, I am interested in scheduling a site visit for this 4 BHK Villa.' })
-  @IsNotEmpty({ message: 'Message is required' })
+  @ApiPropertyOptional({ example: 'Hi, I am interested in scheduling a site visit for this 4 BHK Villa.' })
+  @IsOptional()
   @IsString()
-  message: string;
+  message?: string;
 
   @ApiPropertyOptional({
     enum: Object.values(LeadSource),

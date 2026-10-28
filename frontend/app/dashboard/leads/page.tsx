@@ -30,7 +30,27 @@ import {
   CheckCircle2,
   TrendingUp,
   FileText,
+  MessageCircle,
+  PhoneCall,
 } from 'lucide-react';
+
+function getWhatsAppUrl(phone?: string, propertyTitle?: string, leadName?: string): string | null {
+  if (!phone) return null;
+  const digits = phone.replace(/\D/g, '');
+  if (!digits || digits.length < 7) return null;
+  const fullNumber = digits.length === 10 ? `91${digits}` : digits;
+  const greeting = leadName && leadName !== 'Inquiry' ? `Hello ${leadName}, ` : 'Hello, ';
+  const text = propertyTitle
+    ? `${greeting}I am contacting you regarding your inquiry for "${propertyTitle}" on MyProperty.`
+    : `${greeting}I am contacting you regarding your inquiry on MyProperty.`;
+  return `https://wa.me/${fullNumber}?text=${encodeURIComponent(text)}`;
+}
+
+function getTelUrl(phone?: string): string | null {
+  if (!phone) return null;
+  const clean = phone.replace(/[^\d+]/g, '');
+  return clean ? `tel:${clean}` : null;
+}
 
 const STATUS_TABS: { label: string; value?: LeadStatus }[] = [
   { label: 'All Leads' },
@@ -462,8 +482,21 @@ export default function LeadsPage() {
                   className="p-4 sm:p-5 hover:bg-slate-50/80 transition cursor-pointer flex flex-col sm:flex-row sm:items-center justify-between gap-4"
                 >
                   <div className="space-y-1.5 min-w-0">
-                    <div className="flex items-center space-x-3">
+                    <div className="flex flex-wrap items-center gap-2">
                       <span className="font-bold text-slate-900 text-sm">{leadName}</span>
+                      {lead.source === 'WHATSAPP' ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                          <MessageCircle className="w-3 h-3 text-emerald-600" /> WhatsApp
+                        </span>
+                      ) : lead.source === 'CALL' ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                          <PhoneCall className="w-3 h-3 text-blue-600" /> Call
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                          <FileText className="w-3 h-3 text-indigo-600" /> Form
+                        </span>
+                      )}
                       <span
                         className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
                           leadStatus === 'NEW'
@@ -487,7 +520,7 @@ export default function LeadsPage() {
                     </div>
 
                     <p className="text-xs text-slate-600 truncate font-medium">
-                      Property: {leadPropTitle}
+                      Property: {leadPropTitle} {lead.propertyId ? <span className="font-mono text-slate-400">({lead.propertyId.slice(-6)})</span> : null}
                     </p>
 
                     <p className="text-xs text-slate-500 line-clamp-1 italic">
@@ -642,6 +675,28 @@ export default function LeadsPage() {
                         </a>
                       </div>
                     )}
+                    {/* Direct Contact Buttons */}
+                    <div className="pt-2 border-t border-slate-200 flex items-center gap-2">
+                      {getTelUrl(activeLead.mobile || activeLead.contactPhone) ? (
+                        <a
+                          href={getTelUrl(activeLead.mobile || activeLead.contactPhone)!}
+                          className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-bold rounded-xl bg-blue-600 hover:bg-blue-700 text-white shadow-xs transition"
+                        >
+                          <Phone className="w-3.5 h-3.5" /> Call Buyer
+                        </a>
+                      ) : null}
+                      {getWhatsAppUrl(activeLead.mobile || activeLead.contactPhone, propertyTitle, activeLead.name) ? (
+                        <a
+                          href={getWhatsAppUrl(activeLead.mobile || activeLead.contactPhone, propertyTitle, activeLead.name)!}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-bold rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs transition"
+                        >
+                          <MessageCircle className="w-3.5 h-3.5" /> WhatsApp Buyer
+                        </a>
+                      ) : null}
+                    </div>
+
                     {activeLead.preferredLocation && (
                       <div className="flex items-center justify-between">
                         <span className="text-slate-500">Preferred Location:</span>
@@ -658,9 +713,9 @@ export default function LeadsPage() {
                     )}
                     {activeLead.source && (
                       <div className="flex items-center justify-between">
-                        <span className="text-slate-500">Source:</span>
+                        <span className="text-slate-500">Inquiry Type:</span>
                         <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-slate-200/70 text-slate-700">
-                          {activeLead.source}
+                          {activeLead.source === 'WHATSAPP' ? 'WhatsApp Click' : activeLead.source === 'CALL' ? 'Phone Call Click' : activeLead.source}
                         </span>
                       </div>
                     )}
@@ -677,10 +732,19 @@ export default function LeadsPage() {
                             {propertySlug && <ExternalLink className="w-3 h-3 ml-1 text-slate-400 shrink-0" />}
                           </Link>
                           <div className="text-[11px] text-slate-400 mt-0.5">
+                            {activeLead.propertyId ? <span className="font-mono mr-2">ID: {activeLead.propertyId}</span> : null}
                             {propertyLocation}{propertyPriceFormatted ? ` • ${propertyPriceFormatted}` : ''}
                           </div>
                         </div>
                       </div>
+                      {(activeLead.propertyAdvertiserName || activeLead.brokerId) && (
+                        <div className="flex items-center justify-between text-[11px] text-slate-500 mt-1 pt-1 border-t border-slate-100">
+                          <span>Listing Owner/Broker:</span>
+                          <span className="font-semibold text-slate-700">
+                            {activeLead.propertyAdvertiserName || (activeLead.brokerId ? `Broker #${activeLead.brokerId.slice(-6)}` : 'Direct Listing')}
+                          </span>
+                        </div>
+                      )}
                     </div>
                     <div className="pt-2 border-t border-slate-200">
                       <span className="text-slate-500 block mb-1">Customer Message:</span>

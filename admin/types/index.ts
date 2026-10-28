@@ -664,6 +664,7 @@ export interface LeadRecord {
   assignedAgent?: { id: string; name: string; mobile: string; role: string } | null;
   assignedBy?: string;
   ownerId?: string;
+  brokerId?: string;
   purchaserId?: string;
   name: string;
   contactName?: string;

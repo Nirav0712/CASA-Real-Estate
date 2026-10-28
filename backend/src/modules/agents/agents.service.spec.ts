@@ -48,7 +48,7 @@ describe('AgentsService', () => {
     updateMany: jest.fn().mockResolvedValue({ modifiedCount: 1 }),
   };
 
-  const mockUserModel = {
+  const mockUserModel: any = {
     findById: jest.fn().mockReturnValue({
       lean: jest.fn().mockResolvedValue({
         _id: 'user-agent-1',
@@ -62,6 +62,9 @@ describe('AgentsService', () => {
       }),
     }),
     findByIdAndUpdate: jest.fn().mockResolvedValue(true),
+    findOne: jest.fn().mockResolvedValue(null),
+    countDocuments: jest.fn().mockResolvedValue(0),
+    create: jest.fn().mockImplementation((doc) => ({ ...doc, _id: 'doc-id-1', createdAt: new Date() })),
   };
 
   const mockPropertyModel = {
@@ -321,5 +324,100 @@ describe('AgentsService', () => {
         documentUrl: 'data:image/png;base64,dummy',
       }),
     ).rejects.toThrow('KYC verification is not required or applicable for Property Buyer, Rental Tenant, or Super Admin accounts.');
+  });
+
+  describe('createBrokerEmployee', () => {
+    it('should successfully create employee with project:create and standard employee permissions', async () => {
+      const brokerUser: AuthenticatedUser = {
+        id: 'broker-123',
+        name: 'Broker Master',
+        mobile: '+919876543210',
+        normalizedMobile: '+919876543210',
+        role: UserRole.BROKER,
+        platformRole: PlatformRole.USER,
+        accountType: AccountType.BROKER,
+        status: AccountStatus.ACTIVE,
+        isVerifiedAgent: true,
+      };
+
+      const brokerDoc = {
+        _id: 'broker-123',
+        id: 'broker-123',
+        role: UserRole.BROKER,
+        isVerifiedAgent: true,
+        kycStatus: 'APPROVED',
+      };
+      (mockUserModel.findById as jest.Mock).mockReturnValue({
+        ...brokerDoc,
+        lean: jest.fn().mockResolvedValue(brokerDoc),
+      });
+
+      mockUserModel.countDocuments = jest.fn().mockResolvedValue(0);
+      mockUserModel.findOne = jest.fn().mockResolvedValue(null);
+      mockUserModel.create = jest.fn().mockImplementation((doc) => ({
+        ...doc,
+        _id: 'new-emp-1',
+        createdAt: new Date(),
+      }));
+
+      const res = await service.createBrokerEmployee(brokerUser, {
+        name: 'Patel Associate',
+        mobile: '+917567469366',
+        email: 'patelfinal297@gmail.com',
+        designation: 'Associate Broker',
+        password: 'password123',
+        permissions: ['property:view', 'property:create', 'project:create', 'lead:view', 'crm:view'],
+      });
+
+      expect(res.success).toBe(true);
+      expect(res.employee.permissions).toContain('project:create');
+      expect(mockUserModel.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: 'Patel Associate',
+          mobile: '+917567469366',
+          brokerId: 'broker-123',
+          grantedPermissions: ['property:view', 'property:create', 'project:create', 'lead:view', 'crm:view'],
+        }),
+      );
+    });
+
+    it('should reject employee creation if unauthorized administrative permission is provided', async () => {
+      const brokerUser: AuthenticatedUser = {
+        id: 'broker-123',
+        name: 'Broker Master',
+        mobile: '+919876543210',
+        normalizedMobile: '+919876543210',
+        role: UserRole.BROKER,
+        platformRole: PlatformRole.USER,
+        accountType: AccountType.BROKER,
+        status: AccountStatus.ACTIVE,
+        isVerifiedAgent: true,
+      };
+
+      const brokerDoc = {
+        _id: 'broker-123',
+        id: 'broker-123',
+        role: UserRole.BROKER,
+        isVerifiedAgent: true,
+        kycStatus: 'APPROVED',
+      };
+      (mockUserModel.findById as jest.Mock).mockReturnValue({
+        ...brokerDoc,
+        lean: jest.fn().mockResolvedValue(brokerDoc),
+      });
+
+      mockUserModel.countDocuments = jest.fn().mockResolvedValue(0);
+
+      await expect(
+        service.createBrokerEmployee(brokerUser, {
+          name: 'Patel Associate',
+          mobile: '+917567469366',
+          email: 'patelfinal297@gmail.com',
+          designation: 'Associate Broker',
+          password: 'password123',
+          permissions: ['property:view', 'user:suspend' as any],
+        }),
+      ).rejects.toThrow('Cannot assign permission "user:suspend". This permission is not authorized for broker employee delegation.');
+    });
   });
 });

@@ -795,7 +795,9 @@ export interface Lead {
   assignedAgent?: { id: string; name: string; mobile: string; role: string };
   assignedBy?: string;
   ownerId?: string;
+  brokerId?: string;
   purchaserId?: string;
+  propertyAdvertiserName?: string;
   name: string;
   contactName?: string;
   mobile: string;

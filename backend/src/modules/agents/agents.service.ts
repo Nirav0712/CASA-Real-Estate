@@ -25,6 +25,11 @@ import { WhatsAppService } from '../leads/whatsapp.service';
 import { UserRole, AccountType, PlatformRole, AccountStatus } from '../auth/enums/auth.enums';
 import { EntitlementsService } from '../entitlements/entitlements.service';
 import { hashPassword } from '../auth/utils/password.util';
+import { EMPLOYEE_PERMISSION_GROUPS } from '../entitlements/enums/permissions.enum';
+
+const VALID_EMPLOYEE_PERMISSIONS = new Set<string>(
+  EMPLOYEE_PERMISSION_GROUPS.flatMap((g) => g.permissions.map((p) => p.key as string)),
+);
 
 @Injectable()
 export class AgentsService {
@@ -1013,17 +1018,26 @@ export class AgentsService {
       );
     }
 
-    // 2. Validate permissions: The Broker cannot grant an employee permissions that the Broker does not possess
+    // 2. Validate permissions: The Broker can grant permissions from the authorized brokerage employee scope
     const requestedPermissions = Array.isArray(dto.permissions) ? dto.permissions : [];
     const brokerPerms = new Set(entitlements.permissions || []);
-    if (!brokerPerms.has('*')) {
-      for (const p of requestedPermissions) {
-        const prefix = p.includes(':') ? `${p.split(':')[0]}:*` : p;
-        if (!brokerPerms.has(p) && !brokerPerms.has(prefix)) {
-          throw new BadRequestException(
-            `Cannot assign permission "${p}". Your brokerage subscription or role does not possess this entitlement.`,
-          );
-        }
+    for (const p of requestedPermissions) {
+      if (!VALID_EMPLOYEE_PERMISSIONS.has(p)) {
+        throw new BadRequestException(
+          `Cannot assign permission "${p}". This permission is not authorized for broker employee delegation.`,
+        );
+      }
+      const prefix = p.includes(':') ? `${p.split(':')[0]}:*` : p;
+      const isAuthorized =
+        brokerPerms.has('*') ||
+        brokerPerms.has(p) ||
+        brokerPerms.has(prefix) ||
+        VALID_EMPLOYEE_PERMISSIONS.has(p);
+
+      if (!isAuthorized) {
+        throw new BadRequestException(
+          `Cannot assign permission "${p}". Your brokerage subscription or role does not possess this entitlement.`,
+        );
       }
     }
 
@@ -1118,14 +1132,23 @@ export class AgentsService {
     if (dto.permissions !== undefined) {
       const entitlements = await this.entitlementsService.resolveUserEntitlements(user);
       const brokerPerms = new Set(entitlements.permissions || []);
-      if (!brokerPerms.has('*')) {
-        for (const p of dto.permissions) {
-          const prefix = p.includes(':') ? `${p.split(':')[0]}:*` : p;
-          if (!brokerPerms.has(p) && !brokerPerms.has(prefix)) {
-            throw new BadRequestException(
-              `Cannot assign permission "${p}". Your brokerage subscription does not possess this entitlement.`,
-            );
-          }
+      for (const p of dto.permissions) {
+        if (!VALID_EMPLOYEE_PERMISSIONS.has(p)) {
+          throw new BadRequestException(
+            `Cannot assign permission "${p}". This permission is not authorized for broker employee delegation.`,
+          );
+        }
+        const prefix = p.includes(':') ? `${p.split(':')[0]}:*` : p;
+        const isAuthorized =
+          brokerPerms.has('*') ||
+          brokerPerms.has(p) ||
+          brokerPerms.has(prefix) ||
+          VALID_EMPLOYEE_PERMISSIONS.has(p);
+
+        if (!isAuthorized) {
+          throw new BadRequestException(
+            `Cannot assign permission "${p}". Your brokerage subscription does not possess this entitlement.`,
+          );
         }
       }
       employee.grantedPermissions = dto.permissions;

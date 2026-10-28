@@ -375,11 +375,13 @@ export class EntitlementsService implements OnModuleInit {
           dataScope: DataScope.OWN,
           permissions: [
             Permission.PROPERTY_VIEW, Permission.PROPERTY_CREATE, Permission.PROPERTY_EDIT, Permission.PROPERTY_DELETE,
-            Permission.PROPERTY_PUBLISH, Permission.PROPERTY_CONTACT_VIEW, Permission.LEAD_VIEW, Permission.LEAD_CREATE,
+            Permission.PROPERTY_PUBLISH, Permission.PROPERTY_CONTACT_VIEW, Permission.PROJECT_VIEW, Permission.PROJECT_CREATE,
+            Permission.PROJECT_EDIT, Permission.PROJECT_MANAGE, Permission.REEL_VIEW, Permission.REEL_CREATE,
+            Permission.REEL_EDIT, Permission.REEL_DELETE, Permission.LEAD_VIEW, Permission.LEAD_CREATE,
             Permission.LEAD_EDIT, Permission.ENQUIRY_VIEW, Permission.ENQUIRY_MANAGE, Permission.CHAT_VIEW, Permission.CHAT_START,
-            Permission.CHAT_REPLY, Permission.CRM_VIEW, Permission.CRM_CREATE, Permission.CRM_EDIT, Permission.ANALYTICS_VIEW,
-            Permission.ANALYTICS_ADVANCED, Permission.SITE_VISIT_VIEW, Permission.SITE_VISIT_MANAGE, Permission.PROMOTION_CREATE,
-            Permission.PAYMENT_CREATE,
+            Permission.CHAT_REPLY, Permission.CRM_VIEW, Permission.CRM_CREATE, Permission.CRM_EDIT, Permission.CRM_FOLLOWUP,
+            Permission.ANALYTICS_VIEW, Permission.ANALYTICS_ADVANCED, Permission.SITE_VISIT_VIEW, Permission.SITE_VISIT_MANAGE,
+            Permission.PROMOTION_CREATE, Permission.PAYMENT_CREATE,
           ],
           dashboardConfig: {
             overview: true, properties: true, leads: true, enquiries: true, chat: true,
@@ -397,10 +399,12 @@ export class EntitlementsService implements OnModuleInit {
           dataScope: DataScope.OWN,
           permissions: [
             Permission.PROPERTY_VIEW, Permission.PROPERTY_CREATE, Permission.PROPERTY_EDIT, Permission.PROPERTY_DELETE,
-            Permission.PROPERTY_PUBLISH, Permission.PROPERTY_CONTACT_VIEW, Permission.LEAD_VIEW, Permission.LEAD_CREATE,
+            Permission.PROPERTY_PUBLISH, Permission.PROPERTY_CONTACT_VIEW, Permission.PROJECT_VIEW, Permission.PROJECT_CREATE,
+            Permission.PROJECT_EDIT, Permission.PROJECT_MANAGE, Permission.REEL_VIEW, Permission.REEL_CREATE,
+            Permission.REEL_EDIT, Permission.REEL_DELETE, Permission.LEAD_VIEW, Permission.LEAD_CREATE,
             Permission.LEAD_EDIT, Permission.LEAD_ASSIGN, Permission.ENQUIRY_VIEW, Permission.ENQUIRY_MANAGE,
             Permission.CHAT_VIEW, Permission.CHAT_START, Permission.CHAT_REPLY, Permission.CRM_VIEW, Permission.CRM_CREATE,
-            Permission.CRM_EDIT, Permission.SITE_VISIT_VIEW, Permission.SITE_VISIT_MANAGE, Permission.REVIEW_VIEW,
+            Permission.CRM_EDIT, Permission.CRM_FOLLOWUP, Permission.SITE_VISIT_VIEW, Permission.SITE_VISIT_MANAGE, Permission.REVIEW_VIEW,
             Permission.REVIEW_MANAGE, Permission.PROMOTION_CREATE, Permission.ANALYTICS_VIEW, Permission.PAYMENT_CREATE,
           ],
           dashboardConfig: {
@@ -419,10 +423,12 @@ export class EntitlementsService implements OnModuleInit {
           dataScope: DataScope.OWN,
           permissions: [
             Permission.PROPERTY_VIEW, Permission.PROPERTY_CREATE, Permission.PROPERTY_EDIT, Permission.PROPERTY_DELETE,
-            Permission.PROPERTY_PUBLISH, Permission.PROPERTY_CONTACT_VIEW, Permission.LEAD_VIEW, Permission.LEAD_CREATE,
+            Permission.PROPERTY_PUBLISH, Permission.PROPERTY_CONTACT_VIEW, Permission.PROJECT_VIEW, Permission.PROJECT_CREATE,
+            Permission.PROJECT_EDIT, Permission.PROJECT_MANAGE, Permission.REEL_VIEW, Permission.REEL_CREATE,
+            Permission.REEL_EDIT, Permission.REEL_DELETE, Permission.LEAD_VIEW, Permission.LEAD_CREATE,
             Permission.LEAD_EDIT, Permission.LEAD_ASSIGN, Permission.ENQUIRY_VIEW, Permission.ENQUIRY_MANAGE,
             Permission.CHAT_VIEW, Permission.CHAT_START, Permission.CHAT_REPLY, Permission.CRM_VIEW, Permission.CRM_CREATE,
-            Permission.CRM_EDIT, Permission.SITE_VISIT_VIEW, Permission.SITE_VISIT_MANAGE, Permission.REVIEW_VIEW,
+            Permission.CRM_EDIT, Permission.CRM_FOLLOWUP, Permission.SITE_VISIT_VIEW, Permission.SITE_VISIT_MANAGE, Permission.REVIEW_VIEW,
             Permission.REVIEW_MANAGE, Permission.PROMOTION_CREATE, Permission.ANALYTICS_VIEW, Permission.PAYMENT_CREATE,
           ],
           dashboardConfig: {
@@ -495,7 +501,19 @@ export class EntitlementsService implements OnModuleInit {
       for (const r of systemRoles) {
         await this.roleModel.findOneAndUpdate(
           { slug: r.slug },
-          { $setOnInsert: r },
+          {
+            $set: {
+              permissions: r.permissions,
+              name: r.name,
+              description: r.description,
+              platformRole: r.platformRole,
+              accountType: r.accountType,
+              isActive: r.isActive,
+              dataScope: r.dataScope,
+              dashboardConfig: r.dashboardConfig,
+            },
+            $setOnInsert: { isSystemRole: true },
+          },
           { upsert: true, new: true },
         );
       }
@@ -553,10 +571,20 @@ export class EntitlementsService implements OnModuleInit {
             Permission.PROPERTY_EDIT,
             Permission.PROPERTY_PUBLISH,
             Permission.PROPERTY_CONTACT_VIEW,
+            Permission.PROJECT_VIEW,
+            Permission.PROJECT_CREATE,
+            Permission.PROJECT_EDIT,
+            Permission.PROJECT_MANAGE,
+            Permission.REEL_VIEW,
+            Permission.REEL_CREATE,
+            Permission.REEL_EDIT,
+            Permission.REEL_DELETE,
             Permission.LEAD_VIEW,
             Permission.CHAT_START,
             Permission.CHAT_REPLY,
             Permission.ENQUIRY_VIEW,
+            Permission.CRM_VIEW,
+            Permission.CRM_FOLLOWUP,
           ],
         },
         {
@@ -607,10 +635,19 @@ export class EntitlementsService implements OnModuleInit {
             Permission.PROPERTY_EDIT,
             Permission.PROPERTY_PUBLISH,
             Permission.PROPERTY_CONTACT_VIEW,
+            Permission.PROJECT_VIEW,
+            Permission.PROJECT_CREATE,
+            Permission.PROJECT_EDIT,
+            Permission.PROJECT_MANAGE,
+            Permission.REEL_VIEW,
+            Permission.REEL_CREATE,
+            Permission.REEL_EDIT,
+            Permission.REEL_DELETE,
             Permission.LEAD_VIEW,
             Permission.LEAD_EDIT,
             Permission.CRM_VIEW,
             Permission.CRM_CREATE,
+            Permission.CRM_FOLLOWUP,
             Permission.CHAT_START,
             Permission.CHAT_REPLY,
             Permission.ANALYTICS_VIEW,
@@ -665,6 +702,14 @@ export class EntitlementsService implements OnModuleInit {
             Permission.PROPERTY_PUBLISH,
             Permission.PROPERTY_FEATURE,
             Permission.PROPERTY_CONTACT_VIEW,
+            Permission.PROJECT_VIEW,
+            Permission.PROJECT_CREATE,
+            Permission.PROJECT_EDIT,
+            Permission.PROJECT_MANAGE,
+            Permission.REEL_VIEW,
+            Permission.REEL_CREATE,
+            Permission.REEL_EDIT,
+            Permission.REEL_DELETE,
             Permission.LEAD_VIEW,
             Permission.LEAD_EDIT,
             Permission.LEAD_EXPORT,
@@ -672,6 +717,7 @@ export class EntitlementsService implements OnModuleInit {
             Permission.CRM_CREATE,
             Permission.CRM_EDIT,
             Permission.CRM_EXPORT,
+            Permission.CRM_FOLLOWUP,
             Permission.CHAT_START,
             Permission.CHAT_REPLY,
             Permission.ANALYTICS_ADVANCED,
@@ -726,6 +772,14 @@ export class EntitlementsService implements OnModuleInit {
             Permission.PROPERTY_PUBLISH,
             Permission.PROPERTY_FEATURE,
             Permission.PROPERTY_CONTACT_VIEW,
+            Permission.PROJECT_VIEW,
+            Permission.PROJECT_CREATE,
+            Permission.PROJECT_EDIT,
+            Permission.PROJECT_MANAGE,
+            Permission.REEL_VIEW,
+            Permission.REEL_CREATE,
+            Permission.REEL_EDIT,
+            Permission.REEL_DELETE,
             Permission.LEAD_VIEW,
             Permission.LEAD_EDIT,
             Permission.LEAD_EXPORT,
@@ -733,6 +787,7 @@ export class EntitlementsService implements OnModuleInit {
             Permission.CRM_CREATE,
             Permission.CRM_EDIT,
             Permission.CRM_EXPORT,
+            Permission.CRM_FOLLOWUP,
             Permission.CHAT_START,
             Permission.CHAT_REPLY,
             Permission.ANALYTICS_ADVANCED,
@@ -1406,6 +1461,46 @@ export class EntitlementsService implements OnModuleInit {
     }
 
     for (const p of granted) combined.add(p);
+
+    // If user is a Broker, Agent, Developer, or Broker Employee, ensure core domain permissions are present
+    const isBrokerOrAgent =
+      ['BROKER', 'AGENT', 'DEVELOPER', 'BROKER_AGENT'].includes(userRole) ||
+      ['BROKER', 'AGENT', 'DEVELOPER', 'BROKER_AGENT'].includes(userAccountType);
+    if (isBrokerOrAgent) {
+      const brokerDomainPermissions = [
+        Permission.PROPERTY_VIEW,
+        Permission.PROPERTY_CREATE,
+        Permission.PROPERTY_EDIT,
+        Permission.PROPERTY_PUBLISH,
+        Permission.PROJECT_VIEW,
+        Permission.PROJECT_CREATE,
+        Permission.PROJECT_EDIT,
+        Permission.PROJECT_MANAGE,
+        Permission.REEL_VIEW,
+        Permission.REEL_CREATE,
+        Permission.REEL_EDIT,
+        Permission.REEL_DELETE,
+        Permission.LEAD_VIEW,
+        Permission.LEAD_CREATE,
+        Permission.LEAD_EDIT,
+        Permission.LEAD_ASSIGN,
+        Permission.ENQUIRY_VIEW,
+        Permission.ENQUIRY_MANAGE,
+        Permission.CRM_VIEW,
+        Permission.CRM_CREATE,
+        Permission.CRM_EDIT,
+        Permission.CRM_FOLLOWUP,
+        Permission.CHAT_VIEW,
+        Permission.CHAT_START,
+        Permission.CHAT_REPLY,
+        Permission.SITE_VISIT_VIEW,
+        Permission.SITE_VISIT_MANAGE,
+        Permission.ANALYTICS_VIEW,
+      ];
+      for (const perm of brokerDomainPermissions) {
+        combined.add(perm);
+      }
+    }
 
     const effectivePermissions = Array.from(combined).filter((p) => !denied.has(p));
 

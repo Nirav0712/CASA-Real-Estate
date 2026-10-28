@@ -137,19 +137,22 @@ export class Lead {
   @Prop()
   assignedBy?: string;
 
+  @Prop({ index: true })
+  brokerId?: string;
+
   @Prop({ required: true, index: true })
   ownerId: string;
 
   @Prop({ index: true })
   purchaserId?: string;
 
-  @Prop({ required: true, trim: true })
+  @Prop({ default: 'Interested Buyer', trim: true })
   name: string;
 
   @Prop({ trim: true })
   contactName?: string;
 
-  @Prop({ required: true, trim: true })
+  @Prop({ default: 'Not Provided', trim: true })
   mobile: string;
 
   @Prop({ trim: true })
@@ -164,7 +167,7 @@ export class Lead {
   @Prop({ trim: true })
   subject?: string;
 
-  @Prop({ required: true })
+  @Prop({ default: 'Inquiry for property' })
   message: string;
 
   @Prop({ type: Object })
@@ -253,9 +256,11 @@ export const LeadSchema = SchemaFactory.createForClass(Lead);
 LeadSchema.index({ agentId: 1, createdAt: -1 });
 LeadSchema.index({ assignedAgentId: 1, createdAt: -1 });
 LeadSchema.index({ ownerId: 1, createdAt: -1 });
+LeadSchema.index({ brokerId: 1, createdAt: -1 });
 LeadSchema.index({ purchaserId: 1, createdAt: -1 });
 LeadSchema.index({ propertyId: 1, createdAt: -1 });
 LeadSchema.index({ agentId: 1, status: 1 });
 LeadSchema.index({ assignedAgentId: 1, status: 1 });
+LeadSchema.index({ brokerId: 1, status: 1 });
 LeadSchema.index({ status: 1, nextFollowUpAt: 1 });
 LeadSchema.index({ 'followUps.assignedTo': 1, 'followUps.status': 1, 'followUps.dueAt': 1 });

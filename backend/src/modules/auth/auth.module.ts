@@ -14,6 +14,7 @@ import { MockOtpProvider } from './providers/mock-otp.provider';
 import { Msg91OtpProvider } from './providers/msg91-otp.provider';
 import { MailService } from './services/mail.service';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
+import { OptionalJwtAuthGuard } from './guards/optional-jwt-auth.guard';
 import { RolesGuard } from './guards/roles.guard';
 
 @Global()
@@ -46,6 +47,7 @@ import { RolesGuard } from './guards/roles.guard';
     MockOtpProvider,
     Msg91OtpProvider,
     JwtAuthGuard,
+    OptionalJwtAuthGuard,
     RolesGuard,
   ],
   exports: [
@@ -53,6 +55,7 @@ import { RolesGuard } from './guards/roles.guard';
     MailService,
     JwtModule,
     JwtAuthGuard,
+    OptionalJwtAuthGuard,
     RolesGuard,
     MongooseModule,
   ],

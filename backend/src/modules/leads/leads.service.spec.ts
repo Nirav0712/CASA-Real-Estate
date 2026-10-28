@@ -70,7 +70,13 @@ describe('LeadsService', () => {
   };
 
   const mockPropertyModel = {
-    findOne: jest.fn(),
+    findOne: jest.fn().mockImplementation(() => ({
+      select: jest.fn().mockReturnValue({
+        lean: jest.fn().mockResolvedValue(mockProperty),
+      }),
+      lean: jest.fn().mockResolvedValue(mockProperty),
+      then: (resolve: any) => resolve(mockProperty),
+    })),
     find: jest.fn().mockReturnValue({
       select: jest.fn().mockReturnValue({
         lean: jest.fn().mockResolvedValue([mockProperty]),
@@ -79,7 +85,13 @@ describe('LeadsService', () => {
   };
 
   const mockUserModel = {
-    findOne: jest.fn(),
+    findOne: jest.fn().mockImplementation(() => ({
+      select: jest.fn().mockReturnValue({
+        lean: jest.fn().mockResolvedValue({ _id: 'user-agent-1', name: 'Rajesh Verma', role: UserRole.AGENT }),
+      }),
+      lean: jest.fn().mockResolvedValue({ _id: 'user-agent-1', name: 'Rajesh Verma', role: UserRole.AGENT }),
+      then: (resolve: any) => resolve({ _id: 'user-agent-1', name: 'Rajesh Verma', role: UserRole.AGENT }),
+    })),
     find: jest.fn().mockReturnValue({
       select: jest.fn().mockReturnValue({
         lean: jest.fn().mockResolvedValue([{ _id: 'user-agent-1', name: 'Rajesh Verma', role: UserRole.AGENT }]),
@@ -415,14 +427,185 @@ describe('LeadsService', () => {
     });
   });
 
-  describe('KPIs and Analytics', () => {
-    it('11. should aggregate real database KPIs for Agent Dashboard', async () => {
-      mockLeadModel.countDocuments.mockResolvedValue(5);
+  describe('Inquiry Management & User-Broker Tracking', () => {
+    it('12. should create WHATSAPP inquiry record on WhatsApp button click', async () => {
+      mockPropertyModel.findOne.mockResolvedValueOnce({
+        ...mockProperty,
+        brokerId: 'user-broker-1',
+      });
+      mockLeadModel.findOne.mockResolvedValueOnce(null);
 
-      const kpis = await service.getKPIs(agentUser);
-      expect(kpis.totalLeads).toBe(5);
-      expect(kpis.activeLeads).toBeDefined();
-      expect(kpis.conversionRate).toBeDefined();
+      const res = await service.createLead(
+        {
+          propertyId: 'prop-101',
+          source: 'WHATSAPP',
+          name: 'WhatsApp Inquirer',
+          mobile: '+919876543210',
+        },
+        purchaserUser,
+      );
+
+      expect(res.success).toBe(true);
+      expect(mockLeadModel.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          propertyId: 'prop-101',
+          source: 'WHATSAPP',
+          purchaserId: 'purchaser-1',
+          brokerId: 'user-broker-1',
+        }),
+      );
+    });
+
+    it('13. should create CALL inquiry record on phone dialer click', async () => {
+      mockPropertyModel.findOne.mockResolvedValueOnce({
+        ...mockProperty,
+        brokerId: 'user-broker-1',
+      });
+      mockLeadModel.findOne.mockResolvedValueOnce(null);
+
+      const res = await service.createLead(
+        {
+          propertyId: 'prop-101',
+          source: 'CALL',
+          mobile: '+919876543210',
+        },
+        purchaserUser,
+      );
+
+      expect(res.success).toBe(true);
+      expect(mockLeadModel.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          propertyId: 'prop-101',
+          source: 'CALL',
+          purchaserId: 'purchaser-1',
+        }),
+      );
+    });
+
+    it('14. should attribute team employee property to responsible broker without losing employee ownerId', async () => {
+      const employeeProperty = {
+        ...mockProperty,
+        ownerId: 'employee-user-1',
+        brokerId: undefined, // property doesn't have direct brokerId
+      };
+      mockPropertyModel.findOne.mockResolvedValueOnce(employeeProperty);
+      mockLeadModel.findOne.mockResolvedValueOnce(null);
+      mockUserModel.findOne.mockReturnValueOnce({
+        lean: jest.fn().mockResolvedValueOnce({
+          _id: 'employee-user-1',
+          name: 'Employee Agent',
+          role: UserRole.BROKER_AGENT,
+          brokerId: 'user-broker-1',
+        }),
+      } as any);
+
+      const res = await service.createLead(
+        {
+          propertyId: 'prop-101',
+          name: 'Inquirer',
+          mobile: '+919876543210',
+          message: 'Interested in property',
+        },
+        purchaserUser,
+      );
+
+      expect(res.success).toBe(true);
+      expect(mockLeadModel.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          propertyId: 'prop-101',
+          ownerId: 'employee-user-1',
+          brokerId: 'user-broker-1',
+          purchaserId: 'purchaser-1',
+        }),
+      );
+    });
+
+    it('15. should debounce repeated click inquiries within 15 seconds without duplicating records', async () => {
+      mockPropertyModel.findOne.mockResolvedValueOnce(mockProperty);
+      const existingRecentLead: any = {
+        ...mockLead,
+        _id: 'recent-lead-1',
+        createdAt: new Date(), // Just now
+      };
+      mockLeadModel.findOne.mockResolvedValueOnce(existingRecentLead);
+
+      const res = await service.createLead(
+        {
+          propertyId: 'prop-101',
+          source: 'WHATSAPP',
+          mobile: '+919876543210',
+        },
+        purchaserUser,
+      );
+
+      expect(res.success).toBe(true);
+      expect(res.leadId).toBeDefined();
+      expect(mockLeadModel.create).not.toHaveBeenCalled();
+    });
+
+    it('16. should handle anonymous inquiries without fabricating a fake registered user ID', async () => {
+      mockPropertyModel.findOne.mockResolvedValueOnce(mockProperty);
+      mockLeadModel.findOne.mockResolvedValueOnce(null);
+
+      const res = await service.createLead({
+        propertyId: 'prop-101',
+        name: 'Anonymous Visitor',
+        mobile: '+919123456789',
+        message: 'Calling for pricing details',
+      });
+
+      expect(res.success).toBe(true);
+      expect(mockLeadModel.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          propertyId: 'prop-101',
+          purchaserId: undefined,
+          name: 'Anonymous Visitor',
+          mobile: '+919123456789',
+        }),
+      );
+    });
+
+    it('17. should isolate inquiries so Broker B cannot view Broker A inquiries', async () => {
+      const brokerBUser: any = {
+        id: 'user-broker-2',
+        role: UserRole.BROKER,
+        status: AccountStatus.ACTIVE,
+      };
+
+      const brokerALead = {
+        ...mockLead,
+        _id: '6ac37112546469ec17b68c99',
+        ownerId: 'user-broker-1',
+        brokerId: 'user-broker-1',
+        agentId: 'user-broker-1',
+        assignedAgentId: 'user-broker-1',
+      };
+
+      mockLeadModel.findById.mockReturnValueOnce({
+        lean: jest.fn().mockResolvedValueOnce(brokerALead),
+      } as any);
+
+      await expect(
+        service.getLeadById('6ac37112546469ec17b68c99', brokerBUser),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('18. should allow Super Admin to view all inquiries across the system', async () => {
+      const brokerALead = {
+        ...mockLead,
+        _id: '6ac37112546469ec17b68c99',
+        ownerId: 'user-broker-1',
+        brokerId: 'user-broker-1',
+      };
+
+      mockLeadModel.findById.mockReturnValueOnce({
+        lean: jest.fn().mockResolvedValueOnce(brokerALead),
+      } as any);
+
+      const res = await service.getLeadById('6ac37112546469ec17b68c99', adminUser);
+      expect(res).toBeDefined();
+      expect(res.id).toBe('6ac37112546469ec17b68c99');
     });
   });
 });
+

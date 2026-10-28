@@ -19,6 +19,7 @@ import { CreateLeadFollowUpDto } from './dto/create-lead-follow-up.dto';
 import { SetFollowUpDto } from './dto/set-follow-up.dto';
 import { LeadQueryDto } from './dto/lead-query.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { OptionalJwtAuthGuard } from '../auth/guards/optional-jwt-auth.guard';
 import { PermissionsGuard } from '../entitlements/guards/permissions.guard';
 import { RequirePermissions } from '../entitlements/decorators/require-permissions.decorator';
 import { Permission } from '../entitlements/enums/permissions.enum';
@@ -31,6 +32,7 @@ export class LeadsController {
   constructor(private readonly leadsService: LeadsService) {}
 
   @Post()
+  @UseGuards(OptionalJwtAuthGuard)
   @ApiOperation({ summary: 'Submit a property enquiry / create a lead' })
   @ApiResponse({ status: 201, description: 'Enquiry submitted and routed to advertiser' })
   createLead(

@@ -80,58 +80,10 @@ export class LeadsService {
 
     const cleanPropId = property.id || property._id.toString();
     const purchaserId = purchaser?.id;
-    const mobile = dto.mobile.trim();
+    const cleanName = (dto.name && dto.name.trim()) || purchaser?.name || 'Interested Buyer';
+    const mobile = (dto.mobile && dto.mobile.trim()) || purchaser?.mobile || purchaser?.normalizedMobile || 'Not Provided';
 
-    // 2. Check for existing active lead from the same purchaser for the same property
-    const activeFilter: any = {
-      propertyId: cleanPropId,
-      status: { $nin: [LeadStatus.CONVERTED, LeadStatus.LOST, LeadStatus.CANCELLED, LeadStatus.CLOSED] },
-      $or: [
-        ...(purchaserId ? [{ purchaserId }] : []),
-        { mobile },
-      ],
-    };
-
-    const existingActiveLead = await this.leadModel.findOne(activeFilter);
-
-    if (existingActiveLead) {
-      // Append note and activity to existing active lead instead of creating spam duplicate
-      const updateNote = {
-        text: `Repeated inquiry received from ${dto.name}: "${dto.message.trim()}"`,
-        authorId: purchaserId || 'public_visitor',
-        authorName: dto.name.trim(),
-        createdAt: new Date(),
-      };
-
-      const updateActivity: LeadActivity = {
-        _id: new Types.ObjectId().toString(),
-        actorId: purchaserId || 'public_visitor',
-        actorName: dto.name.trim(),
-        actorRole: purchaser?.role || 'GUEST',
-        type: ActivityType.NOTE,
-        note: `New message received on active enquiry: "${dto.message.trim()}"`,
-        metadata: { source: dto.source || LeadSource.PROPERTY_ENQUIRY },
-        createdAt: new Date(),
-      };
-
-      existingActiveLead.notes.push(updateNote);
-      existingActiveLead.activities.push(updateActivity);
-      existingActiveLead.lastContactAt = new Date();
-      if (dto.email && !existingActiveLead.email) {
-        existingActiveLead.email = dto.email.trim().toLowerCase();
-      }
-      await existingActiveLead.save();
-
-      this.logger.log(`ℹ️ Updated existing active Lead: ${existingActiveLead._id} for property ${cleanPropId}`);
-
-      return {
-        success: true,
-        message: 'Your enquiry has been updated and forwarded to the advertiser.',
-        leadId: existingActiveLead._id.toString(),
-      };
-    }
-
-    // 3. Derive recipient server-side and snapshot property details
+    // 2. Derive recipient server-side and snapshot property details
     const recipientOwnerId = property.ownerId || property.createdBy || 'usr-system';
     const recipientAgentId = property.advertiserId || property.ownerId || recipientOwnerId;
 
@@ -155,6 +107,105 @@ export class LeadsService {
     const propertyAdvertiserPhone = property.advertiser?.phone || '';
     const propertyAgencyName = property.advertiser?.agencyName || '';
 
+    // Resolve brokerId for team / agency tracking
+    let resolvedBrokerId: string | undefined = property.brokerId;
+    if (!resolvedBrokerId && recipientOwnerId && recipientOwnerId !== 'usr-system') {
+      try {
+        const ownerUser = await this.userModel
+          .findOne({
+            $or: [
+              ...(isValidObjectId(recipientOwnerId) ? [{ _id: recipientOwnerId }] : []),
+              { mobile: recipientOwnerId },
+            ],
+          })
+          .lean();
+
+        if (ownerUser) {
+          if (ownerUser.brokerId || ownerUser.parentUserId || ownerUser.agencyId) {
+            resolvedBrokerId = ownerUser.brokerId || ownerUser.parentUserId || ownerUser.agencyId;
+          } else if (ownerUser.role === UserRole.BROKER || ownerUser.accountType === AccountType.BROKER) {
+            resolvedBrokerId = ownerUser._id ? ownerUser._id.toString() : (ownerUser as any).id;
+          }
+        }
+      } catch {
+        // Fallback gracefully
+      }
+    }
+
+    const rawMsg = dto.message && dto.message.trim();
+    const defaultMsg =
+      dto.source === LeadSource.WHATSAPP
+        ? `Initiated WhatsApp inquiry for ${propertyTitle}`
+        : dto.source === LeadSource.CALL
+        ? `Initiated phone call for ${propertyTitle}`
+        : `Interested in ${propertyTitle}`;
+    const cleanMessage = rawMsg || defaultMsg;
+
+    // 3. Check for existing active lead from the same purchaser for the same property
+    const activeFilter: any = {
+      propertyId: cleanPropId,
+      status: { $nin: [LeadStatus.CONVERTED, LeadStatus.LOST, LeadStatus.CANCELLED, LeadStatus.CLOSED] },
+      $or: [
+        ...(purchaserId ? [{ purchaserId }] : []),
+        ...(mobile && mobile !== 'Not Provided' ? [{ mobile }] : []),
+      ],
+    };
+
+    if (activeFilter.$or.length > 0) {
+      const existingActiveLead = await this.leadModel.findOne(activeFilter);
+
+      if (existingActiveLead) {
+        // Debounce: check if inquiry occurred within the last 15 seconds with the same source
+        const lastActionTime = existingActiveLead.lastContactAt || existingActiveLead.createdAt || new Date(0);
+        const timeDiffSeconds = (Date.now() - new Date(lastActionTime).getTime()) / 1000;
+        const sameSource = existingActiveLead.source === (dto.source || LeadSource.PROPERTY_ENQUIRY);
+
+        if (timeDiffSeconds < 15 && sameSource) {
+          this.logger.log(`ℹ️ Debounced rapid repeat inquiry for lead ${existingActiveLead._id}`);
+          return {
+            success: true,
+            message: 'Your enquiry has been received.',
+            leadId: existingActiveLead._id.toString(),
+          };
+        }
+
+        // Append note and activity to existing active lead instead of creating spam duplicate
+        const updateNote = {
+          text: `Repeated inquiry received from ${cleanName}: "${cleanMessage}"`,
+          authorId: purchaserId || 'public_visitor',
+          authorName: cleanName,
+          createdAt: new Date(),
+        };
+
+        const updateActivity: LeadActivity = {
+          _id: new Types.ObjectId().toString(),
+          actorId: purchaserId || 'public_visitor',
+          actorName: cleanName,
+          actorRole: purchaser?.role || 'GUEST',
+          type: ActivityType.NOTE,
+          note: `New message received on active enquiry: "${cleanMessage}"`,
+          metadata: { source: dto.source || LeadSource.PROPERTY_ENQUIRY },
+          createdAt: new Date(),
+        };
+
+        existingActiveLead.notes.push(updateNote);
+        existingActiveLead.activities.push(updateActivity);
+        existingActiveLead.lastContactAt = new Date();
+        if (dto.email && !existingActiveLead.email) {
+          existingActiveLead.email = dto.email.trim().toLowerCase();
+        }
+        await existingActiveLead.save();
+
+        this.logger.log(`ℹ️ Updated existing active Lead: ${existingActiveLead._id} for property ${cleanPropId}`);
+
+        return {
+          success: true,
+          message: 'Your enquiry has been updated and forwarded to the advertiser.',
+          leadId: existingActiveLead._id.toString(),
+        };
+      }
+    }
+
     const lead = await this.leadModel.create({
       propertyId: cleanPropId,
       propertyTitle,
@@ -168,15 +219,16 @@ export class LeadsService {
       agentId: recipientAgentId,
       assignedAgentId: recipientAgentId,
       ownerId: recipientOwnerId,
+      brokerId: resolvedBrokerId,
       purchaserId: purchaserId,
-      name: dto.name.trim(),
-      contactName: dto.name.trim(),
+      name: cleanName,
+      contactName: cleanName,
       mobile: mobile,
       contactPhone: mobile,
       email: dto.email?.trim().toLowerCase(),
       contactEmail: dto.email?.trim().toLowerCase(),
       subject: dto.subject?.trim() || `Inquiry for ${propertyTitle}`,
-      message: dto.message.trim(),
+      message: cleanMessage,
       budget: dto.budget,
       preferredLocation: dto.preferredLocation,
       source: dto.source || LeadSource.PROPERTY_ENQUIRY,
@@ -184,9 +236,9 @@ export class LeadsService {
       priority: LeadPriority.MEDIUM,
       notes: [
         {
-          text: `Inquiry received from public marketplace: "${dto.message.trim()}"`,
+          text: `Inquiry received from public marketplace: "${cleanMessage}"`,
           authorId: purchaserId || 'public_visitor',
-          authorName: dto.name.trim(),
+          authorName: cleanName,
           createdAt: new Date(),
         },
       ],
@@ -194,10 +246,10 @@ export class LeadsService {
         {
           _id: new Types.ObjectId().toString(),
           actorId: purchaserId || 'public_visitor',
-          actorName: dto.name.trim(),
+          actorName: cleanName,
           actorRole: purchaser?.role || 'GUEST',
           type: ActivityType.NOTE,
-          note: `Lead created from public marketplace enquiry: "${dto.message.trim()}"`,
+          note: `Lead created from public marketplace enquiry: "${cleanMessage}"`,
           metadata: { source: dto.source || LeadSource.PROPERTY_ENQUIRY, propertyId: cleanPropId },
           createdAt: new Date(),
         },
@@ -216,7 +268,7 @@ export class LeadsService {
         propertyId: cleanPropId,
         propertyTitle,
         propertySlug,
-        customerName: dto.name.trim(),
+        customerName: cleanName,
         customerMobile: mobile,
         customerEmail: dto.email?.trim(),
         message: dto.message.trim(),
@@ -241,14 +293,14 @@ export class LeadsService {
     await this.auditLogModel.create({
       action: 'LEAD_CREATED',
       actorUserId: purchaserId || 'anonymous_public',
-      actorName: dto.name.trim(),
+      actorName: dto.name ? dto.name.trim() : cleanName,
       actorRole: purchaser?.role || 'GUEST',
       targetUserId: recipientAgentId,
       targetEntity: 'LEAD',
       targetEntityId: lead._id.toString(),
       newValue: {
         propertyId: cleanPropId,
-        leadName: dto.name.trim(),
+        leadName: dto.name ? dto.name.trim() : cleanName,
         mobile: mobile,
         source: lead.source,
       },
@@ -282,12 +334,14 @@ export class LeadsService {
           filter.$or = [
             { assignedAgentId: { $in: userIdentifiers } },
             { propertyId: { $in: assignedProps } },
+            { ownerId: { $in: userIdentifiers } },
           ];
         } else {
           filter.$or = [
             { assignedAgentId: { $in: userIdentifiers } },
             { agentId: { $in: userIdentifiers } },
-            ...(effectiveBrokerId ? [{ ownerId: effectiveBrokerId }, { agentId: effectiveBrokerId }] : []),
+            { ownerId: { $in: userIdentifiers } },
+            ...(effectiveBrokerId ? [{ brokerId: effectiveBrokerId }, { ownerId: effectiveBrokerId }, { agentId: effectiveBrokerId }] : []),
           ];
         }
       } else {
@@ -295,6 +349,7 @@ export class LeadsService {
           { agentId: { $in: userIdentifiers } },
           { assignedAgentId: { $in: userIdentifiers } },
           { ownerId: { $in: userIdentifiers } },
+          { brokerId: { $in: userIdentifiers } },
         ];
       }
     } else {
@@ -303,6 +358,8 @@ export class LeadsService {
         filter.$or = [
           { agentId: queryDto.agentId },
           { assignedAgentId: queryDto.agentId },
+          { brokerId: queryDto.agentId },
+          { ownerId: queryDto.agentId },
         ];
       }
       if (queryDto.unassigned === 'true') {
@@ -329,6 +386,11 @@ export class LeadsService {
 
     if (queryDto.propertyId) {
       filter.propertyId = queryDto.propertyId;
+    }
+
+    const targetPurchaser = queryDto.purchaserId || queryDto.userId;
+    if (targetPurchaser) {
+      filter.purchaserId = targetPurchaser;
     }
 
     if (queryDto.startDate || queryDto.endDate) {
@@ -450,6 +512,9 @@ export class LeadsService {
         source: l.source,
         status: l.status,
         priority: l.priority,
+        ownerId: l.ownerId,
+        brokerId: l.brokerId,
+        purchaserId: l.purchaserId,
         assignedAgentId: l.assignedAgentId || l.agentId,
         assignedAgent: agentInfo,
         assignedBy: l.assignedBy,
@@ -521,7 +586,8 @@ export class LeadsService {
         const isDirectAssigned = Boolean(lead.assignedAgentId && userIdentifiers.includes(lead.assignedAgentId));
         const belongsToBroker = Boolean(
           (lead.agentId && (lead.agentId === effectiveBrokerId || userIdentifiers.includes(lead.agentId))) ||
-          (lead.ownerId && lead.ownerId === effectiveBrokerId),
+          (lead.ownerId && lead.ownerId === effectiveBrokerId) ||
+          (lead.brokerId && lead.brokerId === effectiveBrokerId),
         );
 
         if (Array.isArray(assignedProps) && assignedProps.length > 0) {
@@ -534,7 +600,8 @@ export class LeadsService {
         isAgentOrOwner = Boolean(
           (lead.agentId && userIdentifiers.includes(lead.agentId)) ||
           (lead.assignedAgentId && userIdentifiers.includes(lead.assignedAgentId)) ||
-          (lead.ownerId && userIdentifiers.includes(lead.ownerId)),
+          (lead.ownerId && userIdentifiers.includes(lead.ownerId)) ||
+          (lead.brokerId && userIdentifiers.includes(lead.brokerId)),
         );
         isAuthorized = isAgentOrOwner;
       }
@@ -650,6 +717,9 @@ export class LeadsService {
       source: lead.source,
       status: lead.status,
       priority: lead.priority,
+      ownerId: lead.ownerId,
+      brokerId: lead.brokerId,
+      purchaserId: lead.purchaserId,
       assignedAgentId: lead.assignedAgentId || lead.agentId,
       assignedAgent: assignedUser
         ? {
@@ -697,6 +767,7 @@ export class LeadsService {
       (lead.agentId && userIdentifiers.includes(lead.agentId)) ||
       (lead.assignedAgentId && userIdentifiers.includes(lead.assignedAgentId)) ||
       (lead.ownerId && userIdentifiers.includes(lead.ownerId)) ||
+      (lead.brokerId && userIdentifiers.includes(lead.brokerId)) ||
       this.isAdmin(user);
 
     if (!isAuthorized) {
@@ -789,6 +860,7 @@ export class LeadsService {
       (lead.agentId && userIdentifiers.includes(lead.agentId)) ||
       (lead.assignedAgentId && userIdentifiers.includes(lead.assignedAgentId)) ||
       (lead.ownerId && userIdentifiers.includes(lead.ownerId)) ||
+      (lead.brokerId && userIdentifiers.includes(lead.brokerId)) ||
       this.isAdmin(user);
 
     if (!isAuthorized) {
@@ -835,6 +907,7 @@ export class LeadsService {
     const canAssign =
       this.isAdmin(user) ||
       (lead.ownerId && userIdentifiers.includes(lead.ownerId)) ||
+      (lead.brokerId && userIdentifiers.includes(lead.brokerId)) ||
       (lead.agentId && userIdentifiers.includes(lead.agentId)) ||
       (lead.assignedAgentId && userIdentifiers.includes(lead.assignedAgentId));
 
@@ -960,6 +1033,7 @@ export class LeadsService {
       (lead.agentId && userIdentifiers.includes(lead.agentId)) ||
       (lead.assignedAgentId && userIdentifiers.includes(lead.assignedAgentId)) ||
       (lead.ownerId && userIdentifiers.includes(lead.ownerId)) ||
+      (lead.brokerId && userIdentifiers.includes(lead.brokerId)) ||
       this.isAdmin(user);
 
     if (!isAuthorized) {
@@ -1029,6 +1103,7 @@ export class LeadsService {
       (lead.agentId && userIdentifiers.includes(lead.agentId)) ||
       (lead.assignedAgentId && userIdentifiers.includes(lead.assignedAgentId)) ||
       (lead.ownerId && userIdentifiers.includes(lead.ownerId)) ||
+      (lead.brokerId && userIdentifiers.includes(lead.brokerId)) ||
       this.isAdmin(user);
 
     if (!isAuthorized) {
@@ -1075,6 +1150,7 @@ export class LeadsService {
       (lead.agentId && userIdentifiers.includes(lead.agentId)) ||
       (lead.assignedAgentId && userIdentifiers.includes(lead.assignedAgentId)) ||
       (lead.ownerId && userIdentifiers.includes(lead.ownerId)) ||
+      (lead.brokerId && userIdentifiers.includes(lead.brokerId)) ||
       this.isAdmin(user);
 
     if (!isAuthorized) {
@@ -1277,6 +1353,7 @@ export class LeadsService {
       $or: [
         { agentId: { $in: userIdentifiers } },
         { assignedAgentId: { $in: userIdentifiers } },
+        { brokerId: { $in: userIdentifiers } },
         { 'followUps.assignedTo': { $in: userIdentifiers } },
       ],
       'followUps.status': FollowUpStatus.PENDING,
@@ -1351,6 +1428,7 @@ export class LeadsService {
             { agentId: { $in: userIdentifiers } },
             { assignedAgentId: { $in: userIdentifiers } },
             { ownerId: { $in: userIdentifiers } },
+            { brokerId: { $in: userIdentifiers } },
           ],
         };
 
@@ -1409,6 +1487,7 @@ export class LeadsService {
             { agentId: { $in: userIdentifiers } },
             { assignedAgentId: { $in: userIdentifiers } },
             { ownerId: { $in: userIdentifiers } },
+            { brokerId: { $in: userIdentifiers } },
           ],
         };
 

@@ -572,6 +572,10 @@ export class PurchaserService {
       filter.status = queryDto.status;
     }
 
+    if (queryDto.source && queryDto.source !== 'ALL') {
+      filter.source = queryDto.source;
+    }
+
     if (queryDto.q && queryDto.q.trim()) {
       const regex = new RegExp(queryDto.q.trim(), 'i');
       filter.$and = filter.$and || [];
