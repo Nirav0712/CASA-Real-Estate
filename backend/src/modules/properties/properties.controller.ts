@@ -176,6 +176,32 @@ export class PropertiesController {
     return this.propertiesService.submitProperty(id, user);
   }
 
+  @Post(':id/broker-approve')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Broker approves an employee listing for Super Admin review' })
+  @ApiResponse({ status: 200, description: 'Listing approved and forwarded to Super Admin review' })
+  brokerApproveProperty(
+    @Param('id') id: string,
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() body?: { note?: string },
+  ) {
+    return this.propertiesService.brokerApproveProperty(id, user, body?.note);
+  }
+
+  @Post(':id/broker-reject')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Broker rejects an employee listing with a feedback reason' })
+  @ApiResponse({ status: 200, description: 'Listing rejected back to employee' })
+  brokerRejectProperty(
+    @Param('id') id: string,
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() body: { reason: string },
+  ) {
+    return this.propertiesService.brokerRejectProperty(id, user, body?.reason);
+  }
+
   @Get('id/:id')
   @ApiOperation({ summary: 'Get single property by MongoDB ID or ID string' })
   @ApiResponse({ status: 200, description: 'Property details returned' })

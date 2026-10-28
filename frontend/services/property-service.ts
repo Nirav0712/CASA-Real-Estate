@@ -268,6 +268,44 @@ export async function submitPropertyForApproval(id: string): Promise<{ success: 
   return result.data;
 }
 
+export async function brokerApproveProperty(
+  id: string,
+  note?: string,
+): Promise<{ success: boolean; message: string; property: Property }> {
+  const result = await fetchApi<{ success: boolean; message: string; property: Property }>(
+    `/properties/${encodeURIComponent(id)}/broker-approve`,
+    {
+      method: 'POST',
+      body: JSON.stringify({ note }),
+    },
+  );
+
+  if (!result.isBackendAvailable || result.error || !result.data) {
+    throw new Error(result.error || 'Failed to approve employee property listing.');
+  }
+
+  return result.data;
+}
+
+export async function brokerRejectProperty(
+  id: string,
+  reason: string,
+): Promise<{ success: boolean; message: string; property: Property }> {
+  const result = await fetchApi<{ success: boolean; message: string; property: Property }>(
+    `/properties/${encodeURIComponent(id)}/broker-reject`,
+    {
+      method: 'POST',
+      body: JSON.stringify({ reason }),
+    },
+  );
+
+  if (!result.isBackendAvailable || result.error || !result.data) {
+    throw new Error(result.error || 'Failed to reject employee property listing.');
+  }
+
+  return result.data;
+}
+
 export async function deleteProperty(id: string): Promise<{ success: boolean; message: string }> {
   const result = await fetchApi<{ success: boolean; message: string }>(
     `/properties/${encodeURIComponent(id)}`,

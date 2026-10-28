@@ -52,6 +52,42 @@ describe('PropertiesService (Phase 06 Lifecycle & Security)', () => {
     isVerifiedAgent: true,
   };
 
+  const mockBrokerUser: AuthenticatedUser = {
+    id: 'broker-1',
+    name: 'Broker Master',
+    mobile: '9876543210',
+    normalizedMobile: '+919876543210',
+    role: UserRole.BROKER,
+    platformRole: PlatformRole.USER,
+    accountType: AccountType.BROKER,
+    status: AccountStatus.ACTIVE,
+    isVerifiedAgent: true,
+  };
+
+  const mockOtherBrokerUser: AuthenticatedUser = {
+    id: 'broker-2',
+    name: 'Other Broker',
+    mobile: '9876543299',
+    normalizedMobile: '+919876543299',
+    role: UserRole.BROKER,
+    platformRole: PlatformRole.USER,
+    accountType: AccountType.BROKER,
+    status: AccountStatus.ACTIVE,
+    isVerifiedAgent: true,
+  };
+
+  const mockEmployeeUser: AuthenticatedUser = {
+    id: 'employee-1',
+    name: 'Broker Employee 1',
+    mobile: '9876500001',
+    normalizedMobile: '+919876500001',
+    role: UserRole.BROKER_AGENT,
+    platformRole: PlatformRole.USER,
+    accountType: AccountType.BROKER_AGENT,
+    status: AccountStatus.ACTIVE,
+    isVerifiedAgent: true,
+  };
+
   const samplePropertyDoc = {
     id: 'prop-test-1',
     slug: 'spacious-3bhk-villa-gomti-nagar',
@@ -66,7 +102,7 @@ describe('PropertiesService (Phase 06 Lifecycle & Security)', () => {
     listingType: 'SALE',
     price: { amount: 7500000, currency: 'INR', isNegotiable: true },
     location: { city: 'Lucknow', locality: 'Gomti Nagar' },
-    moderation: { history: [] },
+    moderation: { history: [] } as any,
     save: jest.fn().mockResolvedValue(true),
   };
 
@@ -118,6 +154,9 @@ describe('PropertiesService (Phase 06 Lifecycle & Security)', () => {
         select: jest.fn().mockReturnValue({
           lean: jest.fn().mockResolvedValue(null),
         }),
+      }),
+      findById: jest.fn().mockReturnValue({
+        lean: jest.fn().mockResolvedValue(null),
       }),
     };
 
@@ -275,6 +314,157 @@ describe('PropertiesService (Phase 06 Lifecycle & Security)', () => {
       await expect(service.submitProperty('prop-test-1', mockOtherUser)).rejects.toThrow(
         ForbiddenException,
       );
+    });
+
+    it('should transition direct broker-owned listing directly to PENDING_REVIEW', async () => {
+      const mockDoc = {
+        ...samplePropertyDoc,
+        id: 'prop-broker-1',
+        ownerId: 'broker-1',
+        brokerId: 'broker-1',
+        createdBy: 'broker-1',
+        status: 'DRAFT',
+        save: jest.fn().mockResolvedValue(true),
+      };
+      mockPropertyModel.findOne.mockResolvedValue(mockDoc);
+
+      const res = await service.submitProperty('prop-broker-1', mockBrokerUser);
+      expect(res.success).toBe(true);
+      expect(mockDoc.status).toBe('PENDING_REVIEW');
+    });
+  });
+
+  describe('Broker Approval Workflow for Employee Listings', () => {
+    it('should transition employee listing to PENDING_BROKER_APPROVAL upon submission', async () => {
+      const mockDoc = {
+        ...samplePropertyDoc,
+        id: 'prop-emp-1',
+        ownerId: 'broker-1',
+        brokerId: 'broker-1',
+        createdBy: 'employee-1',
+        status: 'DRAFT',
+        save: jest.fn().mockResolvedValue(true),
+      };
+      mockPropertyModel.findOne.mockResolvedValue(mockDoc);
+      mockUserModel.findById.mockReturnValue({
+        lean: jest.fn().mockResolvedValue({
+          brokerId: 'broker-1',
+          grantedPermissions: ['property:publish'],
+        }),
+      });
+
+      const res = await service.submitProperty('prop-emp-1', mockEmployeeUser);
+      expect(res.success).toBe(true);
+      expect(res.message).toContain('broker approval');
+      expect(mockDoc.status).toBe('PENDING_BROKER_APPROVAL');
+      expect(mockDoc.isPublished).toBe(false);
+      expect(mockDoc.save).toHaveBeenCalled();
+    });
+
+    it('should allow owning broker to approve employee listing (moving to PENDING_REVIEW)', async () => {
+      const mockDoc = {
+        ...samplePropertyDoc,
+        id: 'prop-emp-1',
+        brokerId: 'broker-1',
+        createdBy: 'employee-1',
+        status: 'PENDING_BROKER_APPROVAL',
+        save: jest.fn().mockResolvedValue(true),
+      };
+      mockPropertyModel.findOne.mockResolvedValue(mockDoc);
+
+      const res = await service.brokerApproveProperty('prop-emp-1', mockBrokerUser, 'Verified by broker');
+      expect(res.success).toBe(true);
+      expect(mockDoc.status).toBe('PENDING_REVIEW');
+      expect(mockDoc.isPublished).toBe(false);
+      expect((mockDoc.moderation as any).brokerApprovedBy).toBe('Broker Master');
+      expect(mockDoc.save).toHaveBeenCalled();
+    });
+
+    it('should allow owning broker to reject employee listing with feedback reason', async () => {
+      const mockDoc = {
+        ...samplePropertyDoc,
+        id: 'prop-emp-1',
+        brokerId: 'broker-1',
+        createdBy: 'employee-1',
+        status: 'PENDING_BROKER_APPROVAL',
+        save: jest.fn().mockResolvedValue(true),
+      };
+      mockPropertyModel.findOne.mockResolvedValue(mockDoc);
+
+      const res = await service.brokerRejectProperty('prop-emp-1', mockBrokerUser, 'Upload clear floor plan');
+      expect(res.success).toBe(true);
+      expect(mockDoc.status).toBe('REJECTED');
+      expect((mockDoc.moderation as any).rejectionReason).toBe('Upload clear floor plan');
+      expect((mockDoc.moderation as any).brokerRejectedBy).toBe('Broker Master');
+      expect(mockDoc.save).toHaveBeenCalled();
+    });
+
+    it('should allow employee to resubmit rejected listing back to PENDING_BROKER_APPROVAL', async () => {
+      const mockDoc = {
+        ...samplePropertyDoc,
+        id: 'prop-emp-1',
+        brokerId: 'broker-1',
+        createdBy: 'employee-1',
+        status: 'REJECTED',
+        save: jest.fn().mockResolvedValue(true),
+      };
+      mockPropertyModel.findOne.mockResolvedValue(mockDoc);
+      mockUserModel.findById.mockReturnValue({
+        lean: jest.fn().mockResolvedValue({
+          brokerId: 'broker-1',
+          grantedPermissions: ['property:publish'],
+        }),
+      });
+
+      const res = await service.submitProperty('prop-emp-1', mockEmployeeUser);
+      expect(res.success).toBe(true);
+      expect(mockDoc.status).toBe('PENDING_BROKER_APPROVAL');
+      expect(mockDoc.isPublished).toBe(false);
+    });
+
+    it('should forbid cross-broker approval of another brokerage employee listing', async () => {
+      const mockDoc = {
+        ...samplePropertyDoc,
+        id: 'prop-emp-1',
+        brokerId: 'broker-1',
+        createdBy: 'employee-1',
+        status: 'PENDING_BROKER_APPROVAL',
+      };
+      mockPropertyModel.findOne.mockResolvedValue(mockDoc);
+
+      await expect(
+        service.brokerApproveProperty('prop-emp-1', mockOtherBrokerUser),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('should forbid employee from approving their own listing', async () => {
+      const mockDoc = {
+        ...samplePropertyDoc,
+        id: 'prop-emp-1',
+        brokerId: 'broker-1',
+        createdBy: 'employee-1',
+        status: 'PENDING_BROKER_APPROVAL',
+      };
+      mockPropertyModel.findOne.mockResolvedValue(mockDoc);
+
+      await expect(
+        service.brokerApproveProperty('prop-emp-1', mockEmployeeUser),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('should reject approval if listing is not in PENDING_BROKER_APPROVAL status', async () => {
+      const mockDoc = {
+        ...samplePropertyDoc,
+        id: 'prop-emp-1',
+        brokerId: 'broker-1',
+        createdBy: 'employee-1',
+        status: 'DRAFT',
+      };
+      mockPropertyModel.findOne.mockResolvedValue(mockDoc);
+
+      await expect(
+        service.brokerApproveProperty('prop-emp-1', mockBrokerUser),
+      ).rejects.toThrow(BadRequestException);
     });
   });
 

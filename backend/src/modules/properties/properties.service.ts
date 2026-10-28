@@ -564,7 +564,7 @@ export class PropertiesService implements OnModuleInit {
       if (maxProjects !== undefined && maxProjects !== -1) {
         const count = await this.propertyModel.countDocuments({
           isParentProject: true,
-          status: { $in: ['PUBLISHED', 'ACTIVE', 'PENDING_REVIEW', 'PENDING_APPROVAL'] },
+          status: { $in: ['PUBLISHED', 'ACTIVE', 'PENDING_REVIEW', 'PENDING_APPROVAL', 'PENDING_BROKER_APPROVAL'] },
           $or: [
             { ownerId: { $in: companyUserIds } },
             { advertiserId: { $in: companyUserIds } },
@@ -584,7 +584,7 @@ export class PropertiesService implements OnModuleInit {
         const count = await this.propertyModel.countDocuments({
           isParentProject: { $ne: true },
           isChildUnit: { $ne: true },
-          status: { $in: ['PUBLISHED', 'ACTIVE', 'PENDING_REVIEW', 'PENDING_APPROVAL'] },
+          status: { $in: ['PUBLISHED', 'ACTIVE', 'PENDING_REVIEW', 'PENDING_APPROVAL', 'PENDING_BROKER_APPROVAL'] },
           $or: [
             { ownerId: { $in: companyUserIds } },
             { advertiserId: { $in: companyUserIds } },
@@ -1897,12 +1897,27 @@ export class PropertiesService implements OnModuleInit {
       ? dto.units.filter((u: any) => u.availabilityStatus === 'AVAILABLE').length
       : (dto.availableUnits || totalUnits);
 
+    const isEmployeeUser = user?.role === UserRole.BROKER_AGENT || user?.accountType === AccountType.BROKER_AGENT;
+    let effectiveBrokerId = dto.brokerId;
+    if (isEmployeeUser && user?.id) {
+      const empUser = await this.userModel.findById(user.id).lean();
+      effectiveBrokerId = empUser?.brokerId || empUser?.parentUserId || empUser?.agencyId || (user as any)?.brokerId;
+    } else if (
+      user?.role === UserRole.BROKER ||
+      user?.role === UserRole.AGENT ||
+      user?.accountType === AccountType.BROKER ||
+      user?.accountType === AccountType.AGENT
+    ) {
+      effectiveBrokerId = user.id;
+    }
+
     const propertyRecord = {
       id,
       referenceId,
       slug,
       ownerId,
       advertiserId: ownerId,
+      brokerId: effectiveBrokerId,
       createdBy: user?.id || 'system',
       updatedBy: user?.id || 'system',
       title: titleObj,
@@ -2352,6 +2367,44 @@ export class PropertiesService implements OnModuleInit {
     }
 
     const previousStatus = property.status;
+    const isEmployee = user.role === UserRole.BROKER_AGENT || user.accountType === AccountType.BROKER_AGENT;
+
+    if (isEmployee) {
+      const empUser = await this.userModel.findById(user.id).lean();
+      const effectiveBrokerId = empUser?.brokerId || empUser?.parentUserId || empUser?.agencyId || (user as any)?.brokerId;
+      if (effectiveBrokerId && !property.brokerId) {
+        property.brokerId = effectiveBrokerId;
+      }
+
+      property.status = 'PENDING_BROKER_APPROVAL';
+      property.isPublished = false;
+
+      property.moderation = {
+        ...(property.moderation || {}),
+        previousStatus,
+        history: [
+          ...(property.moderation?.history || []),
+          {
+            action: 'SUBMITTED_FOR_BROKER_APPROVAL',
+            actorId: user.id,
+            actorRole: user.role,
+            previousStatus,
+            newStatus: 'PENDING_BROKER_APPROVAL',
+            timestamp: new Date(),
+          },
+        ],
+      };
+
+      await property.save();
+      this.logger.log(`📥 Property "${property.id}" submitted for broker approval by employee ${user.name || user.id}`);
+
+      return {
+        success: true,
+        message: 'Your property has been submitted for broker approval.',
+        property,
+      };
+    }
+
     property.status = 'PENDING_REVIEW';
     property.isPublished = false;
 
@@ -2377,6 +2430,219 @@ export class PropertiesService implements OnModuleInit {
     return {
       success: true,
       message: 'Your property has been submitted for myproperty review.',
+      property,
+    };
+  }
+
+  async brokerApproveProperty(id: string, user: AuthenticatedUser, note?: string) {
+    if (!user) {
+      throw new ForbiddenException('Authentication required.');
+    }
+
+    const isEmployee = user.role === UserRole.BROKER_AGENT || user.accountType === AccountType.BROKER_AGENT;
+    if (isEmployee) {
+      throw new ForbiddenException('Employees cannot approve property listings.');
+    }
+
+    const isBrokerOrAdmin =
+      user.role === UserRole.BROKER ||
+      user.role === UserRole.AGENT ||
+      user.accountType === AccountType.BROKER ||
+      user.accountType === AccountType.AGENT ||
+      user.role === UserRole.ADMIN ||
+      user.role === UserRole.SUPER_ADMIN ||
+      user.platformRole === PlatformRole.ADMIN ||
+      user.platformRole === PlatformRole.SUPER_ADMIN;
+
+    if (!isBrokerOrAdmin) {
+      throw new ForbiddenException('Only authorized brokers can approve employee property submissions.');
+    }
+
+    const query: any = { $or: [{ id }, { slug: id }] };
+    if (isValidObjectId(id)) {
+      query.$or.push({ _id: id });
+    }
+
+    const property = await this.propertyModel.findOne(query);
+    if (!property) {
+      throw new NotFoundException(`Property "${id}" not found`);
+    }
+
+    if (property.status !== 'PENDING_BROKER_APPROVAL') {
+      throw new BadRequestException(
+        `Property is not pending broker approval (current status: "${property.status}").`,
+      );
+    }
+
+    const isDirectAdmin =
+      user.role === UserRole.ADMIN ||
+      user.role === UserRole.SUPER_ADMIN ||
+      user.platformRole === PlatformRole.ADMIN ||
+      user.platformRole === PlatformRole.SUPER_ADMIN;
+
+    if (!isDirectAdmin) {
+      const isOwningBroker =
+        property.brokerId === user.id ||
+        property.ownerId === user.id ||
+        property.advertiserId === user.id ||
+        property.createdBy === user.id;
+
+      let createdByMyEmployee = false;
+      if (!isOwningBroker && property.createdBy) {
+        const creatorUser = await this.userModel.findById(property.createdBy).lean();
+        if (creatorUser) {
+          const creatorBrokerId = creatorUser.brokerId || creatorUser.parentUserId || creatorUser.agencyId;
+          if (creatorBrokerId === user.id) {
+            createdByMyEmployee = true;
+            property.brokerId = user.id;
+          }
+        }
+      }
+
+      if (!isOwningBroker && !createdByMyEmployee) {
+        throw new ForbiddenException('You cannot approve listings belonging to another brokerage.');
+      }
+    }
+
+    const previousStatus = property.status;
+    property.status = 'PENDING_REVIEW';
+    property.isPublished = false;
+
+    property.moderation = {
+      ...(property.moderation || {}),
+      brokerApprovedBy: user.name || user.email || user.id,
+      brokerApprovedAt: new Date(),
+      previousStatus,
+      history: [
+        ...(property.moderation?.history || []),
+        {
+          action: 'BROKER_APPROVED',
+          actorId: user.id,
+          actorRole: user.role,
+          previousStatus,
+          newStatus: 'PENDING_REVIEW',
+          remarks: note || 'Approved by Broker. Forwarded for Super Admin review.',
+          timestamp: new Date(),
+        },
+      ],
+    };
+
+    await property.save();
+    this.logger.log(`✅ Property "${property.id}" approved by broker ${user.name || user.id} and moved to PENDING_REVIEW`);
+
+    return {
+      success: true,
+      message: 'Property approved by broker and moved to Super Admin review queue.',
+      property,
+    };
+  }
+
+  async brokerRejectProperty(id: string, user: AuthenticatedUser, reason: string) {
+    if (!user) {
+      throw new ForbiddenException('Authentication required.');
+    }
+
+    const isEmployee = user.role === UserRole.BROKER_AGENT || user.accountType === AccountType.BROKER_AGENT;
+    if (isEmployee) {
+      throw new ForbiddenException('Employees cannot reject property listings.');
+    }
+
+    const isBrokerOrAdmin =
+      user.role === UserRole.BROKER ||
+      user.role === UserRole.AGENT ||
+      user.accountType === AccountType.BROKER ||
+      user.accountType === AccountType.AGENT ||
+      user.role === UserRole.ADMIN ||
+      user.role === UserRole.SUPER_ADMIN ||
+      user.platformRole === PlatformRole.ADMIN ||
+      user.platformRole === PlatformRole.SUPER_ADMIN;
+
+    if (!isBrokerOrAdmin) {
+      throw new ForbiddenException('Only authorized brokers can reject employee property submissions.');
+    }
+
+    const trimmedReason = (reason || '').trim();
+    if (!trimmedReason) {
+      throw new BadRequestException('A rejection reason is required to provide actionable feedback.');
+    }
+
+    const query: any = { $or: [{ id }, { slug: id }] };
+    if (isValidObjectId(id)) {
+      query.$or.push({ _id: id });
+    }
+
+    const property = await this.propertyModel.findOne(query);
+    if (!property) {
+      throw new NotFoundException(`Property "${id}" not found`);
+    }
+
+    if (property.status !== 'PENDING_BROKER_APPROVAL') {
+      throw new BadRequestException(
+        `Property is not pending broker approval (current status: "${property.status}").`,
+      );
+    }
+
+    const isDirectAdmin =
+      user.role === UserRole.ADMIN ||
+      user.role === UserRole.SUPER_ADMIN ||
+      user.platformRole === PlatformRole.ADMIN ||
+      user.platformRole === PlatformRole.SUPER_ADMIN;
+
+    if (!isDirectAdmin) {
+      const isOwningBroker =
+        property.brokerId === user.id ||
+        property.ownerId === user.id ||
+        property.advertiserId === user.id ||
+        property.createdBy === user.id;
+
+      let createdByMyEmployee = false;
+      if (!isOwningBroker && property.createdBy) {
+        const creatorUser = await this.userModel.findById(property.createdBy).lean();
+        if (creatorUser) {
+          const creatorBrokerId = creatorUser.brokerId || creatorUser.parentUserId || creatorUser.agencyId;
+          if (creatorBrokerId === user.id) {
+            createdByMyEmployee = true;
+            property.brokerId = user.id;
+          }
+        }
+      }
+
+      if (!isOwningBroker && !createdByMyEmployee) {
+        throw new ForbiddenException('You cannot reject listings belonging to another brokerage.');
+      }
+    }
+
+    const previousStatus = property.status;
+    property.status = 'REJECTED';
+    property.isPublished = false;
+
+    property.moderation = {
+      ...(property.moderation || {}),
+      rejectionReason: trimmedReason,
+      adminRemark: trimmedReason,
+      brokerRejectedBy: user.name || user.email || user.id,
+      brokerRejectedAt: new Date(),
+      previousStatus,
+      history: [
+        ...(property.moderation?.history || []),
+        {
+          action: 'BROKER_REJECTED',
+          actorId: user.id,
+          actorRole: user.role,
+          previousStatus,
+          newStatus: 'REJECTED',
+          remarks: trimmedReason,
+          timestamp: new Date(),
+        },
+      ],
+    };
+
+    await property.save();
+    this.logger.log(`❌ Property "${property.id}" rejected by broker ${user.name || user.id} with reason: ${trimmedReason}`);
+
+    return {
+      success: true,
+      message: 'Property rejected. Feedback provided to employee.',
       property,
     };
   }

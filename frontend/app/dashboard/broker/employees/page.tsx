@@ -182,8 +182,13 @@ export default function BrokerEmployeesPage() {
       return;
     }
 
-    if (!editingEmployee && (!password || password.length < 6)) {
-      toast.error('Validation Error', 'A secure initial password (min 6 chars) is required.');
+    if (!editingEmployee && (!password || password.length < 8)) {
+      toast.error('Validation Error', 'A secure initial password (minimum 8 characters) is required.');
+      return;
+    }
+
+    if (editingEmployee && password && password.length < 8) {
+      toast.error('Validation Error', 'New password must be at least 8 characters long.');
       return;
     }
 
@@ -575,7 +580,7 @@ export default function BrokerEmployeesPage() {
                 <input
                   type="password"
                   required={!editingEmployee}
-                  placeholder={editingEmployee ? 'Leave blank to preserve existing password' : 'Enter a secure initial password (min 6 chars)'}
+                  placeholder={editingEmployee ? 'Leave blank to preserve existing password' : 'Enter a secure initial password (minimum 8 characters)'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className="w-full px-3 py-2 bg-casa-surface border border-casa-border-light rounded-xl text-casa-text-primary focus:outline-hidden focus:border-casa-brand"

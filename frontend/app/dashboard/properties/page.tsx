@@ -8,6 +8,8 @@ import { formatPrice } from '@/lib/utils';
 import {
   getMyProperties,
   submitPropertyForApproval,
+  brokerApproveProperty,
+  brokerRejectProperty,
   createFeaturedRequest,
   getMyFeaturedRequests,
 } from '@/services/property-service';
@@ -49,8 +51,26 @@ export default function MyPropertiesPage() {
   const [hasPermission, setHasPermission] = React.useState<boolean | null>(null);
   const [submittingId, setSubmittingId] = React.useState<string | null>(null);
 
+  // Broker Approval & Rejection State
+  const [approvingId, setApprovingId] = React.useState<string | null>(null);
+  const [rejectModalProperty, setRejectModalProperty] = React.useState<Property | null>(null);
+  const [rejectReason, setRejectReason] = React.useState<string>('');
+  const [isSubmittingReject, setIsSubmittingReject] = React.useState(false);
+
+  const isBroker = Boolean(
+    user?.role === 'BROKER' ||
+    user?.role === 'AGENT' ||
+    (user as any)?.accountType === 'BROKER' ||
+    (user as any)?.accountType === 'AGENT' ||
+    user?.role === 'ADMIN' ||
+    user?.role === 'SUPER_ADMIN'
+  );
+  const isEmployee = Boolean(
+    user?.role === 'BROKER_AGENT' || (user as any)?.accountType === 'BROKER_AGENT'
+  );
+
   // Tab & Featured State
-  const [activeTab, setActiveTab] = React.useState<'properties' | 'featured_requests'>('properties');
+  const [activeTab, setActiveTab] = React.useState<'properties' | 'pending_broker' | 'featured_requests'>('properties');
   const [featuredRequests, setFeaturedRequests] = React.useState<FeaturedPropertyRequest[]>([]);
   const [loadingFeatured, setLoadingFeatured] = React.useState(false);
 
@@ -107,10 +127,11 @@ export default function MyPropertiesPage() {
   const handleSubmitForReview = async (prop: Property) => {
     setSubmittingId(prop.id);
     try {
-      await submitPropertyForApproval(prop.id);
+      const res = await submitPropertyForApproval(prop.id);
+      const title = typeof prop.title === 'string' ? prop.title : prop.title.en;
       toast.success(
-        'Submitted for Review',
-        `"${typeof prop.title === 'string' ? prop.title : prop.title.en}" is now in MyProperty Moderation Queue.`,
+        isEmployee ? 'Submitted for Broker Approval' : 'Submitted for Review',
+        res.message || `"${title}" has been submitted for review.`,
       );
       await loadProperties();
     } catch (err: unknown) {
@@ -118,6 +139,52 @@ export default function MyPropertiesPage() {
       toast.error('Submission Failed', msg);
     } finally {
       setSubmittingId(null);
+    }
+  };
+
+  const handleBrokerApprove = async (prop: Property) => {
+    setApprovingId(prop.id);
+    try {
+      await brokerApproveProperty(prop.id);
+      const title = typeof prop.title === 'string' ? prop.title : prop.title.en;
+      toast.success(
+        'Listing Approved',
+        `"${title}" has been approved and moved to Super Admin review queue.`,
+      );
+      await loadProperties();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Approval failed';
+      toast.error('Approval Failed', msg);
+    } finally {
+      setApprovingId(null);
+    }
+  };
+
+  const handleBrokerReject = async () => {
+    if (!rejectModalProperty) return;
+    if (!rejectReason.trim()) {
+      toast.error('Validation Error', 'Please specify a rejection reason for your employee.');
+      return;
+    }
+    setIsSubmittingReject(true);
+    try {
+      await brokerRejectProperty(rejectModalProperty.id, rejectReason.trim());
+      const title =
+        typeof rejectModalProperty.title === 'string'
+          ? rejectModalProperty.title
+          : rejectModalProperty.title.en;
+      toast.success(
+        'Listing Rejected',
+        `"${title}" was rejected. Feedback returned to employee.`,
+      );
+      setRejectModalProperty(null);
+      setRejectReason('');
+      await loadProperties();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Rejection failed';
+      toast.error('Rejection Failed', msg);
+    } finally {
+      setIsSubmittingReject(false);
     }
   };
 
@@ -240,6 +307,24 @@ export default function MyPropertiesPage() {
         >
           My Properties ({properties.length})
         </button>
+        {isBroker && (
+          <button
+            type="button"
+            onClick={() => setActiveTab('pending_broker')}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition-colors flex items-center gap-1.5 ${
+              activeTab === 'pending_broker'
+                ? 'bg-purple-600 text-white shadow-xs'
+                : 'text-casa-text-secondary hover:text-casa-text-primary hover:bg-casa-subtle'
+            }`}
+          >
+            <Clock className="w-3.5 h-3.5 text-purple-400" />
+            <span>
+              Pending Broker Approval (
+              {properties.filter((p) => p.status === 'PENDING_BROKER_APPROVAL').length}
+              )
+            </span>
+          </button>
+        )}
         <button
           type="button"
           onClick={() => setActiveTab('featured_requests')}
@@ -255,34 +340,55 @@ export default function MyPropertiesPage() {
       </div>
 
       {/* Properties List */}
-      {activeTab === 'properties' && (
-        isLoading ? (
-        <div className="py-20 text-center text-casa-text-muted text-sm space-y-2">
-          <RefreshCw className="w-6 h-6 animate-spin mx-auto text-casa-brand" />
-          <p>Loading...</p>
-        </div>
-      ) : properties.length === 0 ? (
-        <div className="py-16 text-center bg-casa-surface border border-casa-border-light rounded-2xl shadow-subtle space-y-4">
-          <div className="w-14 h-14 rounded-full bg-casa-subtle flex items-center justify-center text-casa-text-muted mx-auto">
-            <Home className="w-7 h-7" />
-          </div>
-          <div className="space-y-1">
-            <h3 className="text-base font-bold text-casa-text-primary">No Properties Listed Yet</h3>
-            <p className="text-xs text-casa-text-secondary max-w-sm mx-auto">
-              Create your first listing draft using our intuitive 8-step wizard and submit it for My Property verification.
-            </p>
-          </div>
-          <Link
-            href="/dashboard/properties/new"
-            className="inline-flex items-center gap-2 px-5 py-2.5 text-xs font-semibold text-white bg-casa-brand hover:bg-casa-brand-hover rounded-xl shadow-2xs transition-colors"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Start 8-Step Listing Wizard</span>
-          </Link>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-          {properties.map((item) => {
+      {(activeTab === 'properties' || activeTab === 'pending_broker') && (() => {
+        const displayedProperties =
+          activeTab === 'pending_broker'
+            ? properties.filter((p) => p.status === 'PENDING_BROKER_APPROVAL')
+            : properties;
+
+        if (isLoading) {
+          return (
+            <div className="py-20 text-center text-casa-text-muted text-sm space-y-2">
+              <RefreshCw className="w-6 h-6 animate-spin mx-auto text-casa-brand" />
+              <p>Loading...</p>
+            </div>
+          );
+        }
+
+        if (displayedProperties.length === 0) {
+          return (
+            <div className="py-16 text-center bg-casa-surface border border-casa-border-light rounded-2xl shadow-subtle space-y-4">
+              <div className="w-14 h-14 rounded-full bg-casa-subtle flex items-center justify-center text-casa-text-muted mx-auto">
+                <Home className="w-7 h-7" />
+              </div>
+              <div className="space-y-1">
+                <h3 className="text-base font-bold text-casa-text-primary">
+                  {activeTab === 'pending_broker'
+                    ? 'No Employee Listings Pending Approval'
+                    : 'No Properties Listed Yet'}
+                </h3>
+                <p className="text-xs text-casa-text-secondary max-w-sm mx-auto">
+                  {activeTab === 'pending_broker'
+                    ? 'All employee listings have been reviewed or no listings are currently pending.'
+                    : 'Create your first listing draft using our intuitive 8-step wizard and submit it for My Property verification.'}
+                </p>
+              </div>
+              {activeTab !== 'pending_broker' && (
+                <Link
+                  href="/dashboard/properties/new"
+                  className="inline-flex items-center gap-2 px-5 py-2.5 text-xs font-semibold text-white bg-casa-brand hover:bg-casa-brand-hover rounded-xl shadow-2xs transition-colors"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Start 8-Step Listing Wizard</span>
+                </Link>
+              )}
+            </div>
+          );
+        }
+
+        return (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+            {displayedProperties.map((item) => {
             const titleStr = typeof item.title === 'string' ? item.title : item.title?.en || 'Untitled';
             const priceNum = typeof item.price === 'number' ? item.price : item.price?.amount || 0;
             const locStr =
@@ -291,6 +397,7 @@ export default function MyPropertiesPage() {
                 : `${item.location?.locality || ''}, ${item.location?.city || 'Lucknow'}`;
 
             const isDraft = item.status === 'DRAFT';
+            const isPendingBroker = item.status === 'PENDING_BROKER_APPROVAL';
             const isPending = item.status === 'PENDING_REVIEW' || item.status === 'PENDING_APPROVAL';
             const isApproved = item.status === 'APPROVED';
             const isPublished = item.status === 'PUBLISHED' || item.status === 'ACTIVE';
@@ -322,6 +429,12 @@ export default function MyPropertiesPage() {
                       <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-500 text-white shadow-xs">
                         <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
                         Live on Marketplace
+                      </span>
+                    )}
+                    {isPendingBroker && (
+                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-purple-600 text-white shadow-xs">
+                        <Clock className="w-3 h-3" />
+                        {isBroker && !isEmployee ? 'Pending Your Approval' : 'Pending Broker Approval'}
                       </span>
                     )}
                     {isPending && (
@@ -433,8 +546,44 @@ export default function MyPropertiesPage() {
                         className="flex items-center gap-1 px-3 py-1.5 text-[11px] font-bold text-white bg-casa-brand hover:bg-casa-brand-hover rounded-xl transition-colors cursor-pointer disabled:opacity-50"
                       >
                         <Send className="w-3 h-3" />
-                        <span>{isRejected ? 'Resubmit for Review' : 'Submit for Review'}</span>
+                        <span>
+                          {isRejected
+                            ? (isEmployee ? 'Resubmit for Broker Approval' : 'Resubmit for Review')
+                            : (isEmployee ? 'Submit for Broker Approval' : 'Submit for Review')}
+                        </span>
                       </button>
+                    )}
+
+                    {/* Broker Approval Actions: Approve or Reject */}
+                    {isPendingBroker && isBroker && !isEmployee && (
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          disabled={approvingId === item.id}
+                          onClick={() => handleBrokerApprove(item)}
+                          className="flex items-center gap-1 px-2.5 py-1 text-[11px] font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg transition-colors cursor-pointer disabled:opacity-50"
+                          title="Approve employee listing and forward to Super Admin"
+                        >
+                          {approvingId === item.id ? (
+                            <RefreshCw className="w-3 h-3 animate-spin" />
+                          ) : (
+                            <CheckCircle2 className="w-3 h-3" />
+                          )}
+                          <span>Approve</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setRejectModalProperty(item);
+                            setRejectReason('');
+                          }}
+                          className="flex items-center gap-1 px-2.5 py-1 text-[11px] font-bold text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors cursor-pointer"
+                          title="Reject listing with feedback to employee"
+                        >
+                          <X className="w-3 h-3" />
+                          <span>Reject</span>
+                        </button>
+                      </div>
                     )}
 
                     {/* Monetization: Feature Property Button */}
@@ -461,7 +610,8 @@ export default function MyPropertiesPage() {
             );
           })}
         </div>
-      ))}
+      );
+    })()}
 
       {/* Featured Promotion Requests List */}
       {activeTab === 'featured_requests' && (
@@ -758,6 +908,63 @@ export default function MyPropertiesPage() {
                     <span>Submit for Admin Approval</span>
                   </>
                 )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Rejection Modal for Broker */}
+      {rejectModalProperty && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-casa-surface border border-casa-border-light rounded-2xl max-w-md w-full p-5 space-y-4 shadow-xl">
+            <div className="flex items-center justify-between border-b border-casa-border-light pb-3">
+              <div className="flex items-center gap-2 text-red-600">
+                <AlertCircle className="w-5 h-5" />
+                <h3 className="font-bold text-sm text-casa-text-primary">Reject Employee Listing</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setRejectModalProperty(null)}
+                className="p-1 text-casa-text-muted hover:text-casa-text-primary rounded-lg cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <p className="text-xs text-casa-text-secondary">
+              Provide actionable feedback explaining why this listing was rejected. Your employee can review this feedback, edit their listing, and resubmit it for approval.
+            </p>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-casa-text-primary">
+                Rejection Reason / Feedback <span className="text-red-500">*</span>
+              </label>
+              <textarea
+                rows={3}
+                required
+                value={rejectReason}
+                onChange={(e) => setRejectReason(e.target.value)}
+                placeholder="e.g. Please update the carpet area and attach the verified title certificate."
+                className="w-full px-3 py-2 text-xs bg-casa-canvas border border-casa-border-light rounded-xl text-casa-text-primary focus:outline-hidden focus:border-casa-brand"
+              />
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-casa-border-light">
+              <button
+                type="button"
+                onClick={() => setRejectModalProperty(null)}
+                className="px-3 py-1.5 text-xs text-casa-text-secondary hover:text-casa-text-primary rounded-xl cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={isSubmittingReject || !rejectReason.trim()}
+                onClick={handleBrokerReject}
+                className="px-4 py-1.5 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-xl transition-colors disabled:opacity-50 cursor-pointer"
+              >
+                {isSubmittingReject ? 'Rejecting...' : 'Confirm Rejection'}
               </button>
             </div>
           </div>

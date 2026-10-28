@@ -654,6 +654,12 @@ export class AdminService implements OnModuleInit {
       throw new NotFoundException(`Property with ID "${id}" was not found in MongoDB.`);
     }
 
+    if (property.status === 'PENDING_BROKER_APPROVAL') {
+      throw new BadRequestException(
+        'Cannot approve listing pending broker approval. The broker must approve this employee listing first.',
+      );
+    }
+
     const previousStatus = property.status;
     const adminIdentifier = user?.name || user?.email || 'Admin Moderator';
 

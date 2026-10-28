@@ -121,6 +121,16 @@ describe('LeadsService', () => {
     isVerifiedAgent: false,
   };
 
+  const brokerUser: any = {
+    id: 'user-broker-1',
+    mobile: '+919988776655',
+    normalizedMobile: '+919988776655',
+    name: 'Broker Apex',
+    role: UserRole.BROKER,
+    status: AccountStatus.ACTIVE,
+    isVerifiedAgent: true,
+  };
+
   beforeEach(async () => {
     jest.clearAllMocks();
 
@@ -294,6 +304,55 @@ describe('LeadsService', () => {
       expect(mockAuditLogModel.create).toHaveBeenCalledWith(
         expect.objectContaining({ action: 'LEAD_ASSIGNED' }),
       );
+    });
+
+    it('7b. should allow Broker to assign lead to their own employee (UserRole.BROKER_AGENT)', async () => {
+      const brokerLead: any = {
+        ...mockLead,
+        ownerId: 'user-broker-1',
+        agentId: 'user-broker-1',
+        notes: [],
+        activities: [],
+        save: jest.fn().mockResolvedValue(true),
+      };
+      mockLeadModel.findById.mockResolvedValueOnce(brokerLead);
+      mockUserModel.findOne.mockResolvedValueOnce({
+        _id: 'employee-1',
+        name: 'Employee One',
+        role: UserRole.BROKER_AGENT,
+        brokerId: 'user-broker-1',
+      });
+
+      const res = await service.assignLead('6ac37112546469ec17b68c99', brokerUser, {
+        assignedAgentId: 'employee-1',
+        note: 'Assigned to team employee',
+      });
+
+      expect(res.success).toBe(true);
+      expect(brokerLead.assignedAgentId).toBe('employee-1');
+      expect(brokerLead.assignedBy).toBe('user-broker-1');
+    });
+
+    it('7c. should reject Broker assigning lead to employee of another brokerage', async () => {
+      const brokerLead: any = {
+        ...mockLead,
+        ownerId: 'user-broker-1',
+        agentId: 'user-broker-1',
+        save: jest.fn().mockResolvedValue(true),
+      };
+      mockLeadModel.findById.mockResolvedValueOnce(brokerLead);
+      mockUserModel.findOne.mockResolvedValueOnce({
+        _id: 'other-employee',
+        name: 'Other Broker Employee',
+        role: UserRole.BROKER_AGENT,
+        brokerId: 'different-broker-id',
+      });
+
+      await expect(
+        service.assignLead('6ac37112546469ec17b68c99', brokerUser, {
+          assignedAgentId: 'other-employee',
+        }),
+      ).rejects.toThrow(ForbiddenException);
     });
 
     it('8. should reject assignment if target user is not an agent/admin', async () => {

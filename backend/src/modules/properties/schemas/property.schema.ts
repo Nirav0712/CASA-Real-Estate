@@ -407,6 +407,12 @@ export class ModerationMetadata {
   approvedAt?: Date;
 
   @Prop()
+  brokerApprovedBy?: string;
+
+  @Prop()
+  brokerApprovedAt?: Date;
+
+  @Prop()
   publishedAt?: Date;
 
   @Prop()
@@ -414,6 +420,12 @@ export class ModerationMetadata {
 
   @Prop()
   rejectedAt?: Date;
+
+  @Prop()
+  brokerRejectedBy?: string;
+
+  @Prop()
+  brokerRejectedAt?: Date;
 
   @Prop()
   rejectionReason?: string;
@@ -768,6 +780,7 @@ export class Property {
     default: 'DRAFT',
     enum: [
       'DRAFT',
+      'PENDING_BROKER_APPROVAL',
       'PENDING_REVIEW',
       'PENDING_APPROVAL',
       'APPROVED',

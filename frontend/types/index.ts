@@ -158,6 +158,7 @@ export type ListingType =
 
 export type PropertyStatus =
   | 'DRAFT'
+  | 'PENDING_BROKER_APPROVAL'
   | 'PENDING_REVIEW'
   | 'PENDING_APPROVAL'
   | 'APPROVED'
@@ -188,9 +189,13 @@ export interface LocalizedText {
 export interface ModerationMetadata {
   approvedBy?: string;
   approvedAt?: string;
+  brokerApprovedBy?: string;
+  brokerApprovedAt?: string;
   publishedAt?: string;
   rejectedBy?: string;
   rejectedAt?: string;
+  brokerRejectedBy?: string;
+  brokerRejectedAt?: string;
   rejectionReason?: string;
   adminRemark?: string;
   moderationRemarks?: string;

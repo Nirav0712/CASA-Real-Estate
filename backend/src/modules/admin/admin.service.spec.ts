@@ -386,6 +386,19 @@ describe('AdminService Moderation & User Governance (Phase 08)', () => {
 
       await expect(service.approve('nonexistent-id')).rejects.toThrow(NotFoundException);
     });
+
+    it('should reject Super Admin approval if listing is still in PENDING_BROKER_APPROVAL status', async () => {
+      const docPendingBroker: any = getMockPropertyDoc();
+      docPendingBroker.status = 'PENDING_BROKER_APPROVAL';
+
+      mockPropertyModel.findOne.mockReturnValue({
+        exec: jest.fn().mockResolvedValue(docPendingBroker),
+      });
+
+      await expect(
+        service.approve('mod-101', 'Approved', { name: 'Admin', role: 'ADMIN' }),
+      ).rejects.toThrow(BadRequestException);
+    });
   });
 
   describe('3. Admin Rejection & Persistence', () => {

@@ -20,7 +20,7 @@ import { CreateLeadFollowUpDto } from './dto/create-lead-follow-up.dto';
 import { SetFollowUpDto } from './dto/set-follow-up.dto';
 import { LeadQueryDto } from './dto/lead-query.dto';
 import { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
-import { UserRole } from '../auth/enums/auth.enums';
+import { UserRole, AccountType } from '../auth/enums/auth.enums';
 import {
   LeadStatus,
   LeadPriority,
@@ -834,10 +834,12 @@ export class LeadsService {
     const userIdentifiers = this.getUserIdentifiers(user);
     const canAssign =
       this.isAdmin(user) ||
-      (lead.ownerId && userIdentifiers.includes(lead.ownerId));
+      (lead.ownerId && userIdentifiers.includes(lead.ownerId)) ||
+      (lead.agentId && userIdentifiers.includes(lead.agentId)) ||
+      (lead.assignedAgentId && userIdentifiers.includes(lead.assignedAgentId));
 
     if (!canAssign) {
-      throw new ForbiddenException('Only Administrators and Property Owners can assign leads.');
+      throw new ForbiddenException('Only Administrators, Property Owners, or assigned Brokers can assign leads.');
     }
 
     // Validate target agent exists and has appropriate role
@@ -850,9 +852,37 @@ export class LeadsService {
       throw new NotFoundException(`Target agent with identifier "${dto.assignedAgentId}" does not exist.`);
     }
 
-    const allowedRoles = [UserRole.AGENT, UserRole.VERIFIED_AGENT, UserRole.ADMIN, UserRole.SUPER_ADMIN];
-    if (!allowedRoles.includes(targetAgent.role)) {
-      throw new BadRequestException(`User ${targetAgent.name} cannot be assigned leads because role is ${targetAgent.role}.`);
+    const isEmployeeRole =
+      targetAgent.role === UserRole.BROKER_AGENT ||
+      targetAgent.accountType === AccountType.BROKER_AGENT;
+    const allowedStandardRoles = [
+      UserRole.AGENT,
+      UserRole.VERIFIED_AGENT,
+      UserRole.ADMIN,
+      UserRole.SUPER_ADMIN,
+    ];
+
+    if (!allowedStandardRoles.includes(targetAgent.role) && !isEmployeeRole) {
+      throw new BadRequestException(
+        `User ${targetAgent.name} cannot be assigned leads because role is ${targetAgent.role}.`,
+      );
+    }
+
+    // Strict tenant isolation: verify that the employee belongs to this broker's brokerage
+    if (isEmployeeRole) {
+      const targetBrokerId =
+        targetAgent.brokerId || targetAgent.parentUserId || targetAgent.agencyId;
+      if (!this.isAdmin(user)) {
+        const isOwningBroker =
+          targetBrokerId &&
+          (targetBrokerId === user.id || userIdentifiers.includes(targetBrokerId));
+
+        if (!isOwningBroker) {
+          throw new ForbiddenException(
+            'You can only assign leads to employees belonging to your own brokerage.',
+          );
+        }
+      }
     }
 
     const prevAssignee = lead.assignedAgentId || lead.agentId;
