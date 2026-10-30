@@ -237,18 +237,22 @@ export function Header() {
                 <span className="sr-only">Search Properties</span>
               </Link>
 
-              {/* Settings Link (Theme & Language moved to Settings) */}
-              <Link
-                href="/settings"
-                title="Settings & Preferences"
-                aria-label="Settings & Preferences"
-                className="p-2 text-casa-text-secondary hover:text-casa-text-primary hover:bg-casa-subtle rounded-xl transition-colors inline-flex items-center justify-center cursor-pointer border border-casa-border-light shrink-0"
-              >
-                <Settings className="w-4 h-4 text-casa-text-secondary hover:text-casa-brand transition-colors" />
-                <span className="sr-only">Settings</span>
-              </Link>
+              {/* Post Property CTA button (Placed first before user profile) */}
+              {canPostProperty && (
+                <Link href="/dashboard/properties/new" className="shrink-0">
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    className="shadow-xs flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 text-xs font-semibold cursor-pointer"
+                  >
+                    <PlusCircle className="w-4 h-4 shrink-0" />
+                    <span className="hidden min-[400px]:inline whitespace-nowrap">{t('postAd')}</span>
+                    <span className="min-[400px]:hidden sr-only">{t('postAd')}</span>
+                  </Button>
+                </Link>
+              )}
 
-              {/* Login / Authenticated User Profile */}
+              {/* Login / Authenticated User Profile (Extreme Right Corner) */}
               {isAuthenticated && user ? (
                 <div className="relative hidden sm:block">
                   <div className="flex items-center rounded-xl border border-casa-border-light hover:border-casa-brand bg-casa-surface transition-colors overflow-hidden">
@@ -721,18 +725,6 @@ export function Header() {
                   <UserIcon className="w-3.5 h-3.5 text-casa-brand" />
                   <span>{t('loginRegister')}</span>
                 </Button>
-              )}
-
-
-              {/* Post Free Property CTA (Role-based: hidden for Buyer & Tenant) */}
-              {canPostProperty && (
-                <Link href="/dashboard/properties/new">
-                  <Button variant="primary" size="sm" className="shadow-sm">
-                    <PlusCircle className="w-4 h-4" />
-                    <span className="hidden sm:inline">{t('postAd')}</span>
-                    <span className="sm:hidden">{t('postAd')}</span>
-                  </Button>
-                </Link>
               )}
 
               {/* Mobile Hamburger Button */}
