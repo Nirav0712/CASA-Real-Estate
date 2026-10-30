@@ -185,6 +185,20 @@ export default function BillingDashboardPage() {
       return;
     }
 
+    const isKycApproved =
+      user?.kycStatus === 'APPROVED' ||
+      user?.kycStatus === 'VERIFIED' ||
+      Boolean(user?.isVerifiedAgent);
+
+    if (!isKycApproved) {
+      toast.warning(
+        'KYC Approval Required',
+        'You must complete your KYC verification and receive Super Admin approval before choosing or subscribing to a plan.',
+      );
+      router.push('/dashboard/kyc');
+      return;
+    }
+
     const planKey = plan.id || plan._id || plan.slug;
     setProcessingPlanId(planKey);
     try {
@@ -543,6 +557,20 @@ export default function BillingDashboardPage() {
                 <div
                   key={planKey}
                   onClick={() => {
+                    const isKycApproved =
+                      user?.kycStatus === 'APPROVED' ||
+                      user?.kycStatus === 'VERIFIED' ||
+                      Boolean(user?.isVerifiedAgent);
+
+                    if (!isKycApproved) {
+                      toast.warning(
+                        'KYC Approval Required',
+                        'You must complete your KYC verification and receive Super Admin approval before choosing or subscribing to a plan.',
+                      );
+                      router.push('/dashboard/kyc');
+                      return;
+                    }
+
                     setSelectedDetailsPlan(plan);
                     setIsDetailsModalOpen(true);
                   }}
@@ -605,6 +633,20 @@ export default function BillingDashboardPage() {
                           type="button"
                           onClick={(e) => {
                             e.stopPropagation();
+                            const isKycApproved =
+                              user?.kycStatus === 'APPROVED' ||
+                              user?.kycStatus === 'VERIFIED' ||
+                              Boolean(user?.isVerifiedAgent);
+
+                            if (!isKycApproved) {
+                              toast.warning(
+                                'KYC Approval Required',
+                                'You must complete your KYC verification and receive Super Admin approval before choosing or subscribing to a plan.',
+                              );
+                              router.push('/dashboard/kyc');
+                              return;
+                            }
+
                             setSelectedDetailsPlan(plan);
                             setIsDetailsModalOpen(true);
                           }}

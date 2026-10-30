@@ -235,6 +235,54 @@ describe('PaymentsService (Phase 13 Payments & Monetization)', () => {
       ).rejects.toThrow(BadRequestException);
     });
 
+    it('should reject SUBSCRIPTION order creation if user has unverified KYC', async () => {
+      mockUserModel.findById.mockResolvedValue({
+        _id: mockUser.id,
+        kycStatus: 'NOT_SUBMITTED',
+        isVerifiedAgent: false,
+      });
+
+      await expect(
+        service.createOrder(mockUser as any, {
+          purpose: PaymentPurpose.SUBSCRIPTION,
+          packageId: 'pkg-123',
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should reject SUBSCRIPTION order creation if user KYC is pending review', async () => {
+      mockUserModel.findById.mockResolvedValue({
+        _id: mockUser.id,
+        kycStatus: 'PENDING',
+        isVerifiedAgent: false,
+      });
+
+      await expect(
+        service.createOrder(mockUser as any, {
+          purpose: PaymentPurpose.SUBSCRIPTION,
+          packageId: 'pkg-123',
+        }),
+      ).rejects.toThrow('Your KYC verification is currently pending Super Admin review');
+    });
+
+    it('should reject createSubscriptionRequest if user is not KYC approved', async () => {
+      mockPackageModel.findById.mockResolvedValue({
+        _id: '507f1f77bcf86cd799439011',
+        name: 'Growth Plan',
+      });
+      mockUserModel.findById.mockResolvedValue({
+        _id: mockUser.id,
+        kycStatus: 'NOT_SUBMITTED',
+        isVerifiedAgent: false,
+      });
+
+      await expect(
+        service.createSubscriptionRequest(mockUser as any, {
+          packageId: '507f1f77bcf86cd799439011',
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
     it('should calculate price strictly server-side and persist order in database', async () => {
       mockPropertyModel.findOne.mockResolvedValue(mockProperty);
       mockPaymentModel.create.mockImplementation((data: any) => ({

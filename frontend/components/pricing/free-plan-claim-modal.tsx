@@ -152,14 +152,16 @@ export function FreePlanClaimModal({ isOpen, onClose }: FreePlanClaimModalProps)
         {/* Header decoration */}
         <div className="h-2 w-full bg-gradient-to-r from-casa-gold via-casa-gold-light to-amber-500" />
 
-        {/* Close Button */}
-        <button
-          onClick={onClose}
-          className="absolute top-4 right-4 p-2 text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 rounded-full hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
-          aria-label="Close modal"
-        >
-          <X className="w-5 h-5" />
-        </button>
+        {/* Close Button - Only show if KYC is approved; unverified users must complete KYC */}
+        {isKycApproved && (
+          <button
+            onClick={onClose}
+            className="absolute top-4 right-4 p-2 text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 rounded-full hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
+            aria-label="Close modal"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        )}
 
         <div className="p-6 md:p-8">
           {/* Activation Success View */}
@@ -363,19 +365,13 @@ export function FreePlanClaimModal({ isOpen, onClose }: FreePlanClaimModalProps)
                 </div>
               </div>
 
-              <div className="flex gap-3">
+              <div className="flex">
                 <button
                   onClick={navigateToKyc}
-                  className="flex-1 py-3 px-5 rounded-xl bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 font-semibold text-sm hover:bg-neutral-800 dark:hover:bg-neutral-100 transition-colors flex items-center justify-center gap-2"
+                  className="w-full py-3 px-5 rounded-xl bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 font-semibold text-sm hover:bg-neutral-800 dark:hover:bg-neutral-100 transition-colors flex items-center justify-center gap-2 shadow-sm"
                 >
-                  <span>Submit KYC</span>
+                  <span>Complete & Submit KYC</span>
                   <ArrowRight className="w-4 h-4" />
-                </button>
-                <button
-                  onClick={onClose}
-                  className="py-3 px-5 rounded-xl border border-neutral-200 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300 font-semibold text-sm hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
-                >
-                  Maybe Later
                 </button>
               </div>
             </div>
@@ -405,19 +401,13 @@ export function FreePlanClaimModal({ isOpen, onClose }: FreePlanClaimModalProps)
                 </div>
               </div>
 
-              <div className="flex gap-3">
+              <div className="flex">
                 <button
                   onClick={navigateToKyc}
-                  className="flex-1 py-3 px-5 rounded-xl bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 font-semibold text-sm hover:bg-neutral-800 dark:hover:bg-neutral-100 transition-colors flex items-center justify-center gap-2"
+                  className="w-full py-3 px-5 rounded-xl bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 font-semibold text-sm hover:bg-neutral-800 dark:hover:bg-neutral-100 transition-colors flex items-center justify-center gap-2 shadow-sm"
                 >
                   <span>View KYC Status</span>
                   <ArrowRight className="w-4 h-4" />
-                </button>
-                <button
-                  onClick={onClose}
-                  className="py-3 px-5 rounded-xl border border-neutral-200 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300 font-semibold text-sm hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
-                >
-                  Close
                 </button>
               </div>
             </div>
@@ -448,18 +438,13 @@ export function FreePlanClaimModal({ isOpen, onClose }: FreePlanClaimModalProps)
                 </div>
               )}
 
-              <div className="flex gap-3">
+              <div className="flex">
                 <button
                   onClick={navigateToKyc}
-                  className="flex-1 py-3 px-5 rounded-xl bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 font-semibold text-sm hover:bg-neutral-800 dark:hover:bg-neutral-100 transition-colors"
+                  className="w-full py-3 px-5 rounded-xl bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 font-semibold text-sm hover:bg-neutral-800 dark:hover:bg-neutral-100 transition-colors flex items-center justify-center gap-2 shadow-sm"
                 >
-                  Update & Resubmit KYC
-                </button>
-                <button
-                  onClick={onClose}
-                  className="py-3 px-5 rounded-xl border border-neutral-200 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300 font-semibold text-sm hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
-                >
-                  Dismiss
+                  <span>Update & Resubmit KYC</span>
+                  <ArrowRight className="w-4 h-4" />
                 </button>
               </div>
             </div>

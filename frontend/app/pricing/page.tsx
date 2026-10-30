@@ -102,6 +102,20 @@ export default function PricingPage() {
       return;
     }
 
+    const isKycApproved =
+      user?.kycStatus === 'APPROVED' ||
+      user?.kycStatus === 'VERIFIED' ||
+      Boolean(user?.isVerifiedAgent);
+
+    if (!isKycApproved) {
+      toast.warning(
+        'KYC Approval Required',
+        'You must complete your KYC verification and receive Super Admin approval before choosing or subscribing to a plan.',
+      );
+      router.push('/dashboard/kyc');
+      return;
+    }
+
     if (plan.isFree) {
       setIsFreePlanModalOpen(true);
       return;

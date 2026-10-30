@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import { useRouter } from 'next/navigation';
 import {
   X,
   PhoneCall,
@@ -38,6 +39,7 @@ export function PlanDetailsModal({
 }: PlanDetailsModalProps) {
   const { user } = useAuth();
   const toast = useToast();
+  const router = useRouter();
   const [submittingAction, setSubmittingAction] = React.useState<'CALL' | 'WHATSAPP' | null>(null);
 
   if (!isOpen || !plan) return null;
@@ -48,6 +50,21 @@ export function PlanDetailsModal({
   const limits = plan.limits || {};
 
   const handleAction = async (method: 'CALL' | 'WHATSAPP') => {
+    const isKycApproved =
+      user?.kycStatus === 'APPROVED' ||
+      user?.kycStatus === 'VERIFIED' ||
+      Boolean(user?.isVerifiedAgent);
+
+    if (!isKycApproved) {
+      toast.warning(
+        'KYC Approval Required',
+        'You must complete your KYC verification and receive Super Admin approval before choosing or subscribing to a plan.',
+      );
+      onClose();
+      router.push('/dashboard/kyc');
+      return;
+    }
+
     setSubmittingAction(method);
     const pkgId = plan.id || plan._id;
 

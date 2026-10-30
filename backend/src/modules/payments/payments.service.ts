@@ -108,6 +108,30 @@ export class PaymentsService implements OnModuleInit {
         );
       }
 
+      // Mandatory KYC Approval Enforcement
+      const userDoc = await this.userModel.findById(user.id);
+      const isKycApproved =
+        userDoc?.kycStatus === 'APPROVED' ||
+        userDoc?.kycStatus === 'VERIFIED' ||
+        userDoc?.isVerifiedAgent === true;
+
+      if (!isKycApproved) {
+        if (userDoc?.kycStatus === 'PENDING') {
+          throw new BadRequestException(
+            'Your KYC verification is currently pending Super Admin review. You must receive Super Admin approval before choosing or activating a subscription plan.',
+          );
+        }
+        if (userDoc?.kycStatus === 'REJECTED') {
+          const reason = userDoc?.kycRejectionReason ? `: ${userDoc.kycRejectionReason}` : '';
+          throw new BadRequestException(
+            `Your KYC verification was rejected${reason}. Please update and resubmit your KYC for Super Admin approval before choosing a plan.`,
+          );
+        }
+        throw new BadRequestException(
+          'KYC verification required. You must submit your KYC and receive Super Admin approval before choosing or activating a subscription plan.',
+        );
+      }
+
       const lookupCode = dto.packageId || dto.productCode || dto.referenceId;
       let pkgDoc: PackageDocument | null = null;
 
@@ -913,6 +937,30 @@ export class PaymentsService implements OnModuleInit {
     const pkg = await this.packageModel.findById(dto.packageId);
     if (!pkg) {
       throw new NotFoundException('Selected subscription plan not found.');
+    }
+
+    // Mandatory KYC Approval Enforcement
+    const userDoc = await this.userModel.findById(user.id);
+    const isKycApproved =
+      userDoc?.kycStatus === 'APPROVED' ||
+      userDoc?.kycStatus === 'VERIFIED' ||
+      userDoc?.isVerifiedAgent === true;
+
+    if (!isKycApproved) {
+      if (userDoc?.kycStatus === 'PENDING') {
+        throw new BadRequestException(
+          'Your KYC verification is currently pending Super Admin review. You must receive Super Admin approval before choosing or activating a subscription plan.',
+        );
+      }
+      if (userDoc?.kycStatus === 'REJECTED') {
+        const reason = userDoc?.kycRejectionReason ? `: ${userDoc.kycRejectionReason}` : '';
+        throw new BadRequestException(
+          `Your KYC verification was rejected${reason}. Please update and resubmit your KYC for Super Admin approval before choosing a plan.`,
+        );
+      }
+      throw new BadRequestException(
+        'KYC verification required. You must submit your KYC and receive Super Admin approval before choosing or activating a subscription plan.',
+      );
     }
 
     const contactMethod = dto.contactMethod || SubscriptionContactMethod.WHATSAPP;

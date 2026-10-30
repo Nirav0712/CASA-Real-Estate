@@ -28,7 +28,7 @@ export function Logo({
   const calculatedWidth = Math.round(selectedHeight * (1024 / 365));
 
   const imageElement = (
-    <div className={`inline-flex items-center select-none ${className}`}>
+    <div className={`inline-flex items-center shrink-0 select-none ${className}`}>
       <Image
         src="/logo.png"
         alt="MY-PROPERTY.IN — We Serve Your Dream in Reality"
@@ -36,11 +36,12 @@ export function Logo({
         height={selectedHeight}
         priority={priority}
         unoptimized
-        className="object-contain h-auto max-w-full transition-transform duration-200 hover:opacity-95"
+        className="object-contain h-auto shrink-0 transition-transform duration-200 hover:opacity-95"
         style={{
           height: `${selectedHeight}px`,
           width: 'auto',
           aspectRatio: '1024 / 365',
+          maxWidth: 'none',
         }}
       />
     </div>
@@ -48,7 +49,7 @@ export function Logo({
 
   if (href) {
     return (
-      <Link href={href} className="inline-flex items-center focus:outline-none focus-visible:ring-2 focus-visible:ring-casa-brand rounded-lg">
+      <Link href={href} className="inline-flex items-center shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-casa-brand rounded-lg">
         {imageElement}
       </Link>
     );
