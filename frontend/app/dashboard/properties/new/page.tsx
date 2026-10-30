@@ -19,11 +19,13 @@ import {
 import { ContactNumbersManager, normalizeContactNumbers } from '@/components/property/contact-numbers-manager';
 import { PropertyUnitsManager } from '@/components/property/property-units-manager';
 import { PropertyVideoManager } from '@/components/property/property-video-manager';
+import { CustomSizesManager } from '@/components/property/custom-sizes-manager';
 import {
   PropertyStructureType,
   PropertyUnitDetails,
   ProjectBuildingDetails,
   ContactNumber,
+  CustomSize,
 } from '@/types';
 import {
   Home,
@@ -47,6 +49,10 @@ import {
   Video,
   Plus,
   Play,
+  WifiOff,
+  Cloud,
+  RefreshCw,
+  CheckCircle2,
 } from 'lucide-react';
 
 const STANDARD_AMENITIES = [
@@ -371,6 +377,7 @@ export default function NewPropertyWizardPage() {
     possessionStatus: 'READY_TO_MOVE',
     possessionDate: '',
     availableFrom: '',
+    customSizes: [] as CustomSize[],
 
     // Commercial Specs
     cabins: '',
@@ -894,6 +901,7 @@ export default function NewPropertyWizardPage() {
         accommodationType: visibility.showAccommodationType ? formData.accommodationType : undefined,
         sharingType: visibility.showSharingType ? formData.sharingType : undefined,
         availableBeds: visibility.showAvailableBeds && formData.availableBeds ? Number(formData.availableBeds) : undefined,
+        customSizes: formData.customSizes || [],
       },
       contactNumbers: formData.contactNumbers.filter((n) => n.number.trim().length > 0),
       rera: {
@@ -925,12 +933,151 @@ export default function NewPropertyWizardPage() {
     };
   };
 
+  // Requirement 7: Form Data Loss Prevention & Offline Draft Persistence
+  type SaveState = 'SAVING' | 'SAVED' | 'OFFLINE' | 'RECONNECTING' | 'SYNC_PENDING' | 'ERROR';
+  const [saveState, setSaveState] = React.useState<SaveState>('SAVED');
+  const [lastSavedTime, setLastSavedTime] = React.useState<Date | null>(null);
+  const DRAFT_STORAGE_KEY = 'casa_property_draft_new';
+  const draftServerIdRef = React.useRef<string | null>(null);
+  const autoSaveTimerRef = React.useRef<NodeJS.Timeout | null>(null);
+
+  // Online / Offline Detection
+  React.useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const handleOnline = () => {
+      setSaveState('RECONNECTING');
+      syncPendingDraftToServer();
+    };
+
+    const handleOffline = () => {
+      setSaveState('OFFLINE');
+    };
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
+  // Restore draft from browser storage on initial mount
+  React.useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      const stored = localStorage.getItem(DRAFT_STORAGE_KEY);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (parsed.formData && (parsed.formData.titleEn || parsed.formData.priceAmount || parsed.formData.area)) {
+          setFormData((prev) => ({ ...prev, ...parsed.formData }));
+          if (parsed.structureType) setStructureType(parsed.structureType);
+          if (parsed.projectDetails) setProjectDetails(parsed.projectDetails);
+          if (parsed.units) setUnits(parsed.units);
+          if (parsed.serverId) draftServerIdRef.current = parsed.serverId;
+          setLastSavedTime(parsed.updatedAt ? new Date(parsed.updatedAt) : new Date());
+          toast.info(
+            'Draft Restored',
+            'Unsynchronized property draft was recovered from local storage.',
+          );
+        }
+      }
+    } catch {}
+  }, []);
+
+  // Sync to MongoDB server function
+  const syncPendingDraftToServer = async () => {
+    if (typeof window !== 'undefined' && !navigator.onLine) {
+      setSaveState('OFFLINE');
+      return;
+    }
+    if (!formData.titleEn && !formData.category) {
+      return;
+    }
+    setSaveState('SAVING');
+    try {
+      const payload = buildPayload();
+      const result = await createProperty({
+        ...payload,
+        status: 'DRAFT',
+        ...(draftServerIdRef.current ? { id: draftServerIdRef.current } : {}),
+      });
+      if (result?.id) {
+        draftServerIdRef.current = result.id;
+      }
+      setSaveState('SAVED');
+      setLastSavedTime(new Date());
+      try {
+        localStorage.setItem(
+          DRAFT_STORAGE_KEY,
+          JSON.stringify({
+            formData,
+            structureType,
+            projectDetails,
+            units,
+            serverId: draftServerIdRef.current,
+            updatedAt: new Date().toISOString(),
+          }),
+        );
+      } catch {}
+    } catch {
+      setSaveState(typeof window !== 'undefined' && navigator.onLine ? 'ERROR' : 'OFFLINE');
+    }
+  };
+
+  // Debounced auto-save effect
+  React.useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    try {
+      localStorage.setItem(
+        DRAFT_STORAGE_KEY,
+        JSON.stringify({
+          formData,
+          structureType,
+          projectDetails,
+          units,
+          serverId: draftServerIdRef.current,
+          updatedAt: new Date().toISOString(),
+        }),
+      );
+    } catch {}
+
+    if (!navigator.onLine) {
+      setSaveState('OFFLINE');
+      return;
+    }
+
+    setSaveState('SYNC_PENDING');
+
+    if (autoSaveTimerRef.current) {
+      clearTimeout(autoSaveTimerRef.current);
+    }
+
+    autoSaveTimerRef.current = setTimeout(() => {
+      syncPendingDraftToServer();
+    }, 8000);
+
+    return () => {
+      if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    };
+  }, [formData, structureType, projectDetails, units]);
+
   const handleSaveDraft = async () => {
     if (!validateStep(1)) return;
     setIsSubmitting(true);
     try {
       const payload = buildPayload();
-      await createProperty({ ...payload, status: 'DRAFT' });
+      await createProperty({
+        ...payload,
+        status: 'DRAFT',
+        ...(draftServerIdRef.current ? { id: draftServerIdRef.current } : {}),
+      });
+
+      try {
+        localStorage.removeItem(DRAFT_STORAGE_KEY);
+      } catch {}
 
       toast.success('Draft Saved', `"${formData.titleEn}" saved to database.`);
       router.push('/dashboard/properties');
@@ -947,8 +1094,16 @@ export default function NewPropertyWizardPage() {
     setIsSubmitting(true);
     try {
       const payload = buildPayload();
-      const created = await createProperty({ ...payload, status: 'DRAFT' });
+      const created = await createProperty({
+        ...payload,
+        status: 'DRAFT',
+        ...(draftServerIdRef.current ? { id: draftServerIdRef.current } : {}),
+      });
       await submitPropertyForApproval(created.id);
+
+      try {
+        localStorage.removeItem(DRAFT_STORAGE_KEY);
+      } catch {}
 
       toast.success(
         'Listing Submitted',
@@ -1114,6 +1269,63 @@ export default function NewPropertyWizardPage() {
             <Save className="w-4 h-4" />
             <span>Save Draft</span>
           </button>
+        </div>
+      </div>
+
+      {/* Network / Draft Persistence Status Banner */}
+      <div className="flex items-center justify-between px-3.5 py-2 rounded-xl text-xs bg-casa-surface border border-casa-border-light shadow-xs">
+        <div className="flex items-center gap-2">
+          {saveState === 'SAVING' && (
+            <>
+              <RefreshCw className="w-3.5 h-3.5 text-blue-500 animate-spin" />
+              <span className="text-blue-600 dark:text-blue-400 font-medium">Saving draft to MongoDB...</span>
+            </>
+          )}
+          {saveState === 'SAVED' && (
+            <>
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+              <span className="text-emerald-700 dark:text-emerald-400 font-medium">
+                All changes saved to server {lastSavedTime ? `at ${lastSavedTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : ''}
+              </span>
+            </>
+          )}
+          {saveState === 'OFFLINE' && (
+            <>
+              <WifiOff className="w-3.5 h-3.5 text-amber-500" />
+              <span className="text-amber-700 dark:text-amber-400 font-medium">
+                Offline — changes saved locally in browser storage
+              </span>
+            </>
+          )}
+          {saveState === 'RECONNECTING' && (
+            <>
+              <RefreshCw className="w-3.5 h-3.5 text-purple-500 animate-spin" />
+              <span className="text-purple-600 dark:text-purple-400 font-medium">Reconnecting...</span>
+            </>
+          )}
+          {saveState === 'SYNC_PENDING' && (
+            <>
+              <Cloud className="w-3.5 h-3.5 text-amber-500" />
+              <span className="text-amber-600 dark:text-amber-400 font-medium">Sync pending</span>
+            </>
+          )}
+          {saveState === 'ERROR' && (
+            <>
+              <AlertCircle className="w-3.5 h-3.5 text-red-500" />
+              <span className="text-red-600 dark:text-red-400 font-medium">Save failed</span>
+              <button
+                type="button"
+                onClick={syncPendingDraftToServer}
+                className="underline text-red-700 dark:text-red-300 ml-1 font-semibold hover:opacity-80"
+              >
+                Retry
+              </button>
+            </>
+          )}
+        </div>
+
+        <div className="text-[11px] text-casa-text-muted">
+          Auto-saves drafts locally &amp; to MongoDB
         </div>
       </div>
 
@@ -1784,6 +1996,12 @@ export default function NewPropertyWizardPage() {
                   )}
                 </div>
               )}
+
+              {/* Custom Size Entries */}
+              <CustomSizesManager
+                customSizes={formData.customSizes || []}
+                onChange={(sizes) => setFormData((prev) => ({ ...prev, customSizes: sizes }))}
+              />
             </div>
 
             {/* SECTION B: Dedicated Indian RERA Compliance Section */}

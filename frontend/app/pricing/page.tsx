@@ -32,6 +32,7 @@ import {
   claimFreeTrial,
   DynamicPricingResponse,
 } from '@/services/entitlements-service';
+import { FreePlanClaimModal } from '@/components/pricing/free-plan-claim-modal';
 import {
   createPaymentOrder,
   getPublicGatewayConfig,
@@ -64,8 +65,7 @@ export default function PricingPage() {
   const [selectedDuration, setSelectedDuration] = React.useState<number>(1);
   const [pricingData, setPricingData] = React.useState<DynamicPricingResponse | null>(null);
   const [loading, setLoading] = React.useState<boolean>(true);
-  const [claimingTrial, setClaimingTrial] = React.useState<boolean>(false);
-  const [trialConfirmModalOpen, setTrialConfirmModalOpen] = React.useState<boolean>(false);
+  const [isFreePlanModalOpen, setIsFreePlanModalOpen] = React.useState<boolean>(false);
   const [processingPlanId, setProcessingPlanId] = React.useState<string | null>(null);
 
   // Auto-detect user accountType if logged in
@@ -95,26 +95,6 @@ export default function PricingPage() {
     loadPlans();
   }, [loadPlans]);
 
-  // Handle Free Trial Claim
-  const handleConfirmClaimTrial = async () => {
-    if (!isAuthenticated) {
-      openAuthModal();
-      return;
-    }
-    setClaimingTrial(true);
-    try {
-      const res = await claimFreeTrial();
-      toast.success('Congratulations!', res.message || 'Your 3-Month Free Plan has been activated!');
-      setTrialConfirmModalOpen(false);
-      if (refreshUser) await refreshUser();
-      await loadPlans();
-    } catch (err: any) {
-      toast.error('Claim Failed', err?.message || 'Free trial could not be claimed.');
-    } finally {
-      setClaimingTrial(false);
-    }
-  };
-
   // Handle Plan Purchase Checkout
   const handlePurchasePlan = async (plan: any) => {
     if (!isAuthenticated) {
@@ -123,7 +103,7 @@ export default function PricingPage() {
     }
 
     if (plan.isFree) {
-      setTrialConfirmModalOpen(true);
+      setIsFreePlanModalOpen(true);
       return;
     }
 
@@ -228,6 +208,51 @@ export default function PricingPage() {
   const freeTrialStatus = pricingData?.freeTrialStatus;
   const isConsumer = selectedUserType === 'BUYER';
 
+  const isTeamMember = Boolean(
+    user &&
+      (user.accountType === 'BROKER_AGENT' ||
+        user.role === 'BROKER_AGENT' ||
+        user.brokerId ||
+        user.parentUserId),
+  );
+
+  if (isAuthenticated && isTeamMember) {
+    const parentAgencyOrBrokerName =
+      (user as any)?.parentAgencyName || (user as any)?.parentBrokerName || user?.agencyName || 'Broker';
+    return (
+      <div className="min-h-[80vh] flex items-center justify-center p-6 text-center">
+        <div className="max-w-md w-full bg-casa-surface border border-casa-border-light rounded-3xl p-8 shadow-subtle space-y-6">
+          <div className="w-16 h-16 rounded-2xl bg-blue-500/10 text-blue-600 flex items-center justify-center mx-auto">
+            <Building className="w-8 h-8" />
+          </div>
+          <div className="space-y-2">
+            <span className="inline-block px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-blue-500/15 text-blue-700 dark:text-blue-300 border border-blue-500/30">
+              Team Member Account
+            </span>
+            <h1 className="text-xl font-black text-casa-text-primary tracking-tight">
+              Subscription Managed by Broker
+            </h1>
+            <p className="text-sm text-casa-text-secondary leading-relaxed">
+              Subscription plans and billing are managed by your Broker ({parentAgencyOrBrokerName}).
+            </p>
+          </div>
+          <div className="p-4 rounded-2xl bg-casa-subtle border border-casa-border-light text-xs text-casa-text-muted leading-relaxed">
+            Your property quotas and entitlements are inherited directly from your Brokerage organization. You do not need to purchase an individual subscription.
+          </div>
+          <div className="pt-2">
+            <Link
+              href="/dashboard/properties"
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-casa-brand text-white font-bold text-xs shadow-sm hover:opacity-95 transition-all"
+            >
+              <span>Back to My Properties</span>
+              <ArrowRight className="w-4 h-4" />
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100">
       {/* Background Glow Highlights */}
@@ -271,7 +296,7 @@ export default function PricingPage() {
                     First 50 Users Get 3 Months Free Access!
                   </h3>
                   <p className="text-sm text-slate-300 mt-0.5">
-                    Eligible for Builders, Brokers, and Independent Agents. Includes 5 active properties & 2 active projects.
+                    Eligible for Builders, Brokers, and Independent Agents with KYC approval. Includes 15 active properties.
                   </p>
                 </div>
               </div>
@@ -304,9 +329,9 @@ export default function PricingPage() {
                 </div>
 
                 <button
-                  onClick={() => setTrialConfirmModalOpen(true)}
+                  onClick={() => setIsFreePlanModalOpen(true)}
                   disabled={!freeTrialStatus.isAvailable}
-                  className="w-full sm:w-auto px-6 py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-bold text-sm shadow-lg shadow-emerald-500/25 transition-all transform hover:-translate-y-0.5 disabled:opacity-50 disabled:pointer-events-none flex items-center justify-center gap-2"
+                  className="w-full sm:w-auto px-6 py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-bold text-sm shadow-lg shadow-emerald-500/25 transition-all transform hover:-translate-y-0.5 disabled:opacity-50 disabled:pointer-events-none flex items-center justify-center gap-2 cursor-pointer"
                 >
                   <Sparkles className="w-4 h-4" />
                   Claim 3 Months Free
@@ -709,77 +734,15 @@ export default function PricingPage() {
         </div>
       </div>
 
-      {/* Free Trial Claim Confirmation Modal */}
-      {trialConfirmModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="relative w-full max-w-md bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 space-y-6 shadow-2xl">
-            <button
-              onClick={() => setTrialConfirmModalOpen(false)}
-              className="absolute top-5 right-5 text-slate-400 hover:text-white"
-            >
-              <X className="w-5 h-5" />
-            </button>
-
-            <div className="text-center space-y-3">
-              <div className="w-14 h-14 rounded-2xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 flex items-center justify-center mx-auto">
-                <Gift className="w-7 h-7" />
-              </div>
-              <h3 className="text-xl font-bold text-white">
-                Claim 3 Months Free Access
-              </h3>
-              <p className="text-xs text-slate-300 leading-relaxed">
-                You are about to activate your 90-day introductory free trial on My Property Real Estate Marketplace.
-              </p>
-            </div>
-
-            <div className="bg-slate-800/60 rounded-2xl p-4 border border-slate-700/60 space-y-2 text-xs">
-              <div className="flex justify-between text-slate-300">
-                <span>Duration:</span>
-                <span className="font-bold text-emerald-400">90 Days (3 Months)</span>
-              </div>
-              <div className="flex justify-between text-slate-300">
-                <span>Active Properties:</span>
-                <span className="font-bold text-white">5 Listings</span>
-              </div>
-              <div className="flex justify-between text-slate-300">
-                <span>Active Projects:</span>
-                <span className="font-bold text-white">2 Projects</span>
-              </div>
-              <div className="flex justify-between text-slate-300">
-                <span>Team Seats:</span>
-                <span className="font-bold text-white">1 Seat</span>
-              </div>
-            </div>
-
-            <div className="space-y-3">
-              <button
-                onClick={handleConfirmClaimTrial}
-                disabled={claimingTrial}
-                className="w-full py-3.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-bold text-sm shadow-lg shadow-emerald-500/30 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
-              >
-                {claimingTrial ? (
-                  <>
-                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    Claiming Slot...
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="w-4 h-4" />
-                    Confirm & Activate Free Trial
-                  </>
-                )}
-              </button>
-
-              <button
-                onClick={() => setTrialConfirmModalOpen(false)}
-                className="w-full py-2.5 rounded-xl text-slate-400 hover:text-white text-xs font-semibold transition-colors"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* 3-Month Free Plan & KYC Enforcement Modal */}
+      <FreePlanClaimModal
+        isOpen={isFreePlanModalOpen}
+        onClose={() => {
+          setIsFreePlanModalOpen(false);
+          loadPlans();
+          if (refreshUser) refreshUser();
+        }}
+      />
     </div>
   );
 }

@@ -1230,6 +1230,19 @@ export class AuthService implements OnModuleInit {
       }
     }
 
+    const effectiveBrokerId = user.brokerId || user.parentUserId || user.agencyId;
+    if (effectiveBrokerId && this.isDbConnected()) {
+      try {
+        const parentBroker = await this.userModel.findById(effectiveBrokerId).select('name agencyName').lean();
+        if (parentBroker) {
+          user.parentBrokerName = parentBroker.name || '';
+          user.parentAgencyName = parentBroker.agencyName || parentBroker.name || '';
+        }
+      } catch (err: any) {
+        this.logger.warn(`Failed to resolve parent broker info: ${err?.message}`);
+      }
+    }
+
     return {
       success: true,
       user: this.sanitizeUser(user, activeSub, activePkg),
@@ -1661,27 +1674,9 @@ export class AuthService implements OnModuleInit {
       norm.platformRole === PlatformRole.ADMIN ||
       norm.platformRole === PlatformRole.MODERATOR;
 
-    // Start 3-day free trial on first successful sign-in for eligible supply-side accounts
-    let trialJustStarted = false;
-    if (
-      !isConsumer &&
-      !isPlatformAdmin &&
-      !user.activePackageId &&
-      !user.activeSubscriptionId &&
-      !user.trialStartedAt &&
-      !user.trialUsed &&
-      !user.trialExpired
-    ) {
-      const now = new Date();
-      const expiresAt = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000); // 3 days (72 hours)
-      user.isTrialActive = true;
-      user.trialStartedAt = now;
-      user.trialExpiresAt = expiresAt;
-      user.trialUsed = true;
-      user.trialExpired = false;
-      trialJustStarted = true;
-      this.logger.log(`🎉 3-Day Free Trial initiated on first sign-in for ${user.email}. Expires: ${expiresAt.toISOString()}`);
-    }
+    // 3-Month Free Plan is NOT automatically started on registration or login.
+    // It requires KYC verification & Super Admin approval, and must be explicitly claimed by the user.
+    const trialJustStarted = false;
 
     user.lastLoginAt = new Date();
     if (typeof user.save === 'function') {
@@ -1692,11 +1687,6 @@ export class AuthService implements OnModuleInit {
         {
           $set: {
             lastLoginAt: user.lastLoginAt,
-            isTrialActive: user.isTrialActive,
-            trialStartedAt: user.trialStartedAt,
-            trialExpiresAt: user.trialExpiresAt,
-            trialUsed: user.trialUsed,
-            trialExpired: user.trialExpired,
           },
         },
       ).catch(() => {});
@@ -2163,7 +2153,7 @@ export class AuthService implements OnModuleInit {
   }
 
   /**
-   * Starts 3-Day Free Trial for eligible supply-side accounts with Super Admin / KYC approval
+   * Starts 3-Month Free Plan for eligible supply-side accounts with Super Admin / KYC approval
    */
   async startTrial(userId: string) {
     let user: any = null;
@@ -2199,6 +2189,17 @@ export class AuthService implements OnModuleInit {
       throw new BadRequestException('Free trial is not applicable for Buyer or Tenant accounts.');
     }
 
+    const isTeamMember =
+      norm.accountType === AccountType.BROKER_AGENT ||
+      norm.role === UserRole.BROKER_AGENT ||
+      Boolean(user.brokerId || user.parentUserId);
+
+    if (isTeamMember) {
+      throw new ForbiddenException(
+        'Team members are not authorized to activate free trials or manage subscription plans. Only the main Broker account can manage subscriptions.'
+      );
+    }
+
     const isPlatformAdmin =
       norm.platformRole === PlatformRole.SUPER_ADMIN ||
       norm.platformRole === PlatformRole.ADMIN ||
@@ -2219,30 +2220,34 @@ export class AuthService implements OnModuleInit {
       );
     }
 
-    // Start the trial only when the account meets existing Super Admin approval / KYC requirements
+    // Start the plan only when the account meets Super Admin approval / KYC requirements
     const isApproved =
       user.kycStatus === 'APPROVED' || norm.isVerifiedAgent === true;
 
     if (!isApproved) {
       throw new BadRequestException(
-        `KYC verification and Super Admin approval are required before starting the 3-day free trial. Current status: ${user.kycStatus || 'NOT_SUBMITTED'}.`
+        `KYC verification and Super Admin approval are required before claiming the 3-Month Free Plan. Current status: ${user.kycStatus || 'NOT_SUBMITTED'}.`
       );
     }
 
     const now = new Date();
-    const expiresAt = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000); // 3 days (72 hours)
+    const expiresAt = new Date(now);
+    expiresAt.setMonth(expiresAt.getMonth() + 3);
 
-    user.isTrialActive = true;
-    user.trialStartedAt = now;
-    user.trialExpiresAt = expiresAt;
-    user.trialUsed = true;
-    user.trialExpired = false;
+    let freePkg: any = null;
+    if (this.isDbConnected() && this.packageModel) {
+      freePkg = await this.packageModel.findOne({
+        $or: [{ slug: 'casa-free-trial' }, { isFree: true }, { name: '3-Month Free Plan' }],
+      }).exec();
+    }
 
-    if (typeof user.save === 'function') {
-      await user.save();
-    } else if (this.isDbConnected()) {
-      await this.userModel.updateOne(
-        { _id: user._id },
+    if (this.isDbConnected()) {
+      const updatedUser = await this.userModel.findOneAndUpdate(
+        {
+          _id: user._id,
+          trialUsed: { $ne: true },
+          isTrialActive: { $ne: true },
+        },
         {
           $set: {
             isTrialActive: true,
@@ -2250,20 +2255,48 @@ export class AuthService implements OnModuleInit {
             trialExpiresAt: expiresAt,
             trialUsed: true,
             trialExpired: false,
+            activePlanName: '3-Month Free Plan',
+            ...(freePkg ? { activePackageId: freePkg._id } : {}),
           },
-        }
+        },
+        { new: true }
       );
+
+      if (!updatedUser) {
+        throw new BadRequestException(
+          'Free trial has already been initiated or used for this account. Free trial cannot be restarted.'
+        );
+      }
+      user = updatedUser;
+    } else {
+      user.isTrialActive = true;
+      user.trialStartedAt = now;
+      user.trialExpiresAt = expiresAt;
+      user.trialUsed = true;
+      user.trialExpired = false;
+      user.activePlanName = '3-Month Free Plan';
+      if (freePkg) {
+        user.activePackageId = freePkg._id;
+      }
+      if (typeof user.save === 'function') {
+        await user.save();
+      }
     }
+
+    const msRemaining = expiresAt.getTime() - now.getTime();
+    const daysRemaining = Math.max(0, Math.ceil(msRemaining / (24 * 60 * 60 * 1000)));
 
     return {
       success: true,
-      message: '3-Day Free Trial activated successfully!',
+      message: '3-Month Free Plan activated successfully!',
       trial: {
         isTrialActive: true,
         trialStartedAt: now,
         trialExpiresAt: expiresAt,
-        daysRemaining: 3,
-        remainingLabel: '3 Days Remaining',
+        daysRemaining,
+        remainingLabel: `${daysRemaining} Days Remaining`,
+        planName: '3-Month Free Plan',
+        propertyLimit: 15,
       },
       user: this.sanitizeUser(user),
     };
@@ -2359,24 +2392,29 @@ export class AuthService implements OnModuleInit {
     }
 
     if (isTrialActive) {
-      if (msRemaining > 2 * 24 * 60 * 60 * 1000) {
-        trialDaysRemaining = 3;
-        trialRemainingLabel = '3 Days Remaining';
-      } else if (msRemaining > 1 * 24 * 60 * 60 * 1000) {
-        trialDaysRemaining = 2;
-        trialRemainingLabel = '2 Days Remaining';
+      trialDaysRemaining = Math.max(0, Math.ceil(msRemaining / (24 * 60 * 60 * 1000)));
+      const monthsRemaining = Math.ceil(trialDaysRemaining / 30);
+      if (trialDaysRemaining > 30) {
+        trialRemainingLabel = `${monthsRemaining} Months Remaining`;
+      } else if (trialDaysRemaining > 1) {
+        trialRemainingLabel = `${trialDaysRemaining} Days Remaining`;
       } else {
-        trialDaysRemaining = 1;
         trialRemainingLabel = '1 Day Remaining';
       }
     }
 
-    const isKycExempt = isConsumer || isPlatformAdmin;
+    const isTeamMember =
+      norm.accountType === AccountType.BROKER_AGENT ||
+      norm.role === UserRole.BROKER_AGENT ||
+      Boolean(user.brokerId || user.parentUserId);
+
+    const isKycExempt = isConsumer || isPlatformAdmin || isTeamMember;
     const isKycApproved = user.kycStatus === 'APPROVED' || norm.isVerifiedAgent === true;
 
     const isTrialEligible =
       !isConsumer &&
       !isPlatformAdmin &&
+      !isTeamMember &&
       !hasActiveSub &&
       !user.activePackageId &&
       !user.trialStartedAt &&
@@ -2384,15 +2422,15 @@ export class AuthService implements OnModuleInit {
       !user.trialExpired &&
       isKycApproved;
 
-    const activeSubscriptionId = user.activeSubscriptionId || (activeSub ? activeSub._id.toString() : null);
-    const activePackageId = (isConsumer || isPlatformAdmin)
+    const activeSubscriptionId = isTeamMember ? null : (user.activeSubscriptionId || (activeSub ? activeSub._id.toString() : null));
+    const activePackageId = (isConsumer || isPlatformAdmin || isTeamMember)
       ? null
       : (user.activePackageId || (activeSub?.packageId ? activeSub.packageId.toString() : null));
-    const activePlanName = activePkg?.name || activeSub?.plan || user.activePlanName || null;
-    const subscriptionStatus = user.subscriptionStatus || activeSub?.status || (hasActiveSub ? 'ACTIVE' : null);
-    const subscriptionExpiresAt = activeSub?.endDate || user.subscriptionExpiresAt || null;
-    const subscriptionStartDate = activeSub?.startDate || user.subscriptionStartDate || null;
-    const billingPeriod = activePkg?.billingPeriod || (activeSub?.durationMonths === 12 ? 'Yearly' : 'Monthly') || 'Monthly';
+    const activePlanName = isTeamMember ? null : (activePkg?.name || activeSub?.plan || user.activePlanName || (isTrialActive ? '3-Month Free Plan' : null));
+    const subscriptionStatus = isTeamMember ? null : (user.subscriptionStatus || activeSub?.status || (hasActiveSub ? 'ACTIVE' : null));
+    const subscriptionExpiresAt = isTeamMember ? null : (activeSub?.endDate || user.subscriptionExpiresAt || null);
+    const subscriptionStartDate = isTeamMember ? null : (activeSub?.startDate || user.subscriptionStartDate || null);
+    const billingPeriod = (isConsumer || isPlatformAdmin || isTeamMember) ? null : (activePkg?.billingPeriod || (activeSub?.durationMonths === 12 ? 'Yearly' : 'Monthly') || 'Monthly');
 
     return {
       id: user._id ? user._id.toString() : user.id,
@@ -2411,21 +2449,21 @@ export class AuthService implements OnModuleInit {
       agencyName: user.agencyName,
       avatar: user.avatar,
       isTrialEligible,
-      trialStartedAt: user.trialStartedAt || null,
-      trialExpiresAt: user.trialExpiresAt || null,
-      isTrialActive: (isConsumer || isPlatformAdmin) ? false : isTrialActive,
-      isTrialExpired: (isConsumer || isPlatformAdmin) ? false : isTrialExpired,
-      trialDaysRemaining: (isConsumer || isPlatformAdmin) ? 0 : trialDaysRemaining,
-      trialRemainingLabel: (isConsumer || isPlatformAdmin) ? '' : trialRemainingLabel,
-      trialUsed: (isConsumer || isPlatformAdmin) ? false : Boolean(user.trialUsed || user.trialStartedAt),
+      trialStartedAt: isTeamMember ? null : (user.trialStartedAt || null),
+      trialExpiresAt: isTeamMember ? null : (user.trialExpiresAt || null),
+      isTrialActive: (isConsumer || isPlatformAdmin || isTeamMember) ? false : isTrialActive,
+      isTrialExpired: (isConsumer || isPlatformAdmin || isTeamMember) ? false : isTrialExpired,
+      trialDaysRemaining: (isConsumer || isPlatformAdmin || isTeamMember) ? 0 : trialDaysRemaining,
+      trialRemainingLabel: (isConsumer || isPlatformAdmin || isTeamMember) ? '' : trialRemainingLabel,
+      trialUsed: (isConsumer || isPlatformAdmin || isTeamMember) ? false : Boolean(user.trialUsed || user.trialStartedAt),
       activePackageId,
       activeSubscriptionId,
-      hasActiveSubscription: hasActiveSub,
+      hasActiveSubscription: isTeamMember ? false : hasActiveSub,
       activePlanName,
       subscriptionStatus,
       subscriptionExpiresAt,
       subscriptionStartDate,
-      billingPeriod: (isConsumer || isPlatformAdmin) ? null : billingPeriod,
+      billingPeriod,
       kycStatus: isKycExempt ? 'EXEMPT' : (user.kycStatus || 'NOT_SUBMITTED'),
       isKycExempt,
       isKycRequired: !isKycExempt,
@@ -2433,6 +2471,14 @@ export class AuthService implements OnModuleInit {
       kycApprovedAt: user.kycApprovedAt || null,
       kycApprovedBy: user.kycApprovedBy || null,
       kycDocumentType: user.kycDocumentType || null,
+      brokerId: user.brokerId || user.parentUserId || null,
+      parentUserId: user.parentUserId || user.brokerId || null,
+      parentBrokerName: user.parentBrokerName || null,
+      parentAgencyName: user.parentAgencyName || null,
+      agencyId: user.agencyId || null,
+      designation: user.designation || (isTeamMember ? 'Broker Associate' : undefined),
+      assignedProperties: user.assignedProperties || [],
+      grantedPermissions: user.grantedPermissions || user.permissions || [],
     };
   }
 }

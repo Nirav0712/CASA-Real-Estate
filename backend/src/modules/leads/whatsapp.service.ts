@@ -174,33 +174,27 @@ export class WhatsAppService {
       `Your verification documents for your *${payload.accountType.replace(/_/g, ' ')}* account have been submitted successfully.\n\n` +
       `Our compliance team is currently reviewing your application.\n\n` +
       `*Notice:* You may receive a verification call from *${this.verificationCallNumber}* to complete your KYC.\n\n` +
-      `Once approved by the Super Admin, your *3-Day Free Trial* will begin automatically.\n\n` +
+      `Once approved by the Super Admin, your *3-Month Free Plan* (15 property listings, ₹0) will become available to claim in your dashboard.\n\n` +
       `Thank you for choosing My Property!`;
 
     return this.dispatchMessage(recipient, messageText);
   }
 
   /**
-   * Send WhatsApp KYC Approved & 3-Day Trial Activation Notification
+   * Send WhatsApp KYC Approved & 3-Month Free Plan Available Notification
    */
   async sendKycApprovedNotification(payload: KycWhatsAppPayload): Promise<WhatsAppSendResult> {
     if (!this.enabled) return { success: false, status: 'DISABLED', error: 'WhatsApp service is disabled' };
 
     const recipient = this.formatMobileNumber(payload.customerMobile);
-    const expiryStr = payload.trialExpiresAt
-      ? payload.trialExpiresAt.toLocaleDateString('en-IN', {
-          dateStyle: 'full',
-          timeZone: 'Asia/Kolkata',
-        })
-      : 'in 3 days';
 
     const messageText =
-      `*Congratulations! Your My Property Account is Approved!*\n\n` +
+      `*Congratulations! Your My Property KYC Verification is Approved!*\n\n` +
       `Dear ${payload.customerName},\n\n` +
       `Your KYC verification for your *${payload.accountType.replace(/_/g, ' ')}* account has been *APPROVED* by the Super Admin.\n\n` +
-      `*Your 3-Day Free Trial is now ACTIVE!* 🎉\n` +
-      `*Trial Valid Until:* ${expiryStr}\n\n` +
-      `You can now publish property listings, view prospective leads, and access your verified dashboard at:\n` +
+      `*Your 3-Month Free Plan is now ready to claim!* 🎉\n` +
+      `Get 3 months of access with up to 15 property listings for ₹0.\n\n` +
+      `Claim your free plan and start publishing listings at:\n` +
       `${this.frontendUrl}/dashboard\n\n` +
       `Need assistance? Contact support or call ${this.verificationCallNumber}.`;
 

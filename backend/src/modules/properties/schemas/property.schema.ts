@@ -158,7 +158,25 @@ export class PropertyLocation {
 }
 
 @Schema({ _id: false })
+export class CustomSize {
+  @Prop({ required: true })
+  name: string; // e.g. Plot Size, Carpet Area, Terrace Area, Shop Dimensions
+
+  @Prop({ required: true })
+  value: number;
+
+  @Prop({ default: 'SQ_FT' })
+  unit: string; // SQ_FT, SQ_YARDS, SQ_METER, ACRES, BIGHAS, GUNTHA, FT, METERS
+
+  @Prop()
+  dimensionsText?: string; // e.g. 30 x 40 ft, 20 x 30 ft
+}
+
+@Schema({ _id: false })
 export class PropertySpecs {
+  @Prop({ type: [CustomSize], default: [] })
+  customSizes?: CustomSize[];
+
   @Prop()
   bedrooms?: number;
 

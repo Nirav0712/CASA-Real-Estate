@@ -81,7 +81,7 @@ export default function PurchasersPage() {
       case '1_YEAR':
         return '1 Year (365 Days)';
       case '3_DAYS_TRIAL':
-        return '3 Days Trial';
+        return '3 Months Free Plan';
       case 'FREE':
         return 'Free Plan';
       case 'MONTHLY':
@@ -111,7 +111,7 @@ export default function PurchasersPage() {
             </span>
           </div>
           <p className="text-xs md:text-sm text-casa-text-secondary mt-1">
-            Complete records of users who purchased packages or selected 3-day free trials across the myproperty marketplace.
+            Complete records of users who purchased packages or claimed 3-month free plans across the myproperty marketplace.
           </p>
         </div>
 
@@ -131,9 +131,9 @@ export default function PurchasersPage() {
       <div className="flex items-center gap-2 overflow-x-auto pb-1">
         {[
           { id: 'ALL', label: 'All Subscribers & Users' },
-          { id: 'FREE_TRIAL', label: '⚡ 3-Day Free Trial' },
+          { id: 'FREE_TRIAL', label: '⚡ 3-Month Free Plan' },
           { id: 'PAID', label: '💎 Paid Active Plans' },
-          { id: 'EXPIRED', label: '⚠️ Trial Expired / Due' },
+          { id: 'EXPIRED', label: '⚠️ Free Plan Expired / Due' },
           { id: 'BUYER', label: '👤 Registered Buyers' },
         ].map((tab) => (
           <button
@@ -262,7 +262,7 @@ export default function PurchasersPage() {
                       <td className="px-4 py-3.5">
                         {b.planCategory === 'FREE_TRIAL' ? (
                           <span className="inline-flex items-center gap-1 text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-300">
-                            ⚡ 3-Day Trial
+                            ⚡ 3-Month Free Plan
                           </span>
                         ) : b.planCategory === 'PAID_PLAN' ? (
                           <span className="inline-flex items-center gap-1 text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-purple-50 text-purple-700 dark:bg-purple-950 dark:text-purple-300 border border-purple-300">
@@ -270,7 +270,7 @@ export default function PurchasersPage() {
                           </span>
                         ) : b.planCategory === 'TRIAL_EXPIRED' ? (
                           <span className="inline-flex items-center gap-1 text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-red-50 text-red-700 dark:bg-red-950 dark:text-red-300 border border-red-300">
-                            ⚠️ Trial Expired
+                            ⚠️ Free Plan Expired
                           </span>
                         ) : (
                           <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">

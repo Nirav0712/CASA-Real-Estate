@@ -20,6 +20,7 @@ import {
   CompanySettings,
 } from '@/services/entitlements-service';
 import { PlanDetailsModal } from '@/components/pricing/plan-details-modal';
+import { FreePlanClaimModal } from '@/components/pricing/free-plan-claim-modal';
 import { PaymentItem, PaymentStatus, PaymentPurpose, SubscriptionRequest } from '@/types';
 import { formatPrice } from '@/lib/utils';
 import { isKycExempt } from '@/components/dashboard/kyc-status-banner';
@@ -56,12 +57,14 @@ export default function BillingDashboardPage() {
     isTrialActive,
     isTrialExpired,
     trialDaysRemaining,
+    trialRemainingLabel,
     hasActiveSubscription,
     activePlanName,
     subscriptionExpiresAt,
   } = useAuth();
   const toast = useToast();
   const router = useRouter();
+  const [isFreePlanModalOpen, setIsFreePlanModalOpen] = React.useState(false);
   const isExempt = isKycExempt(user);
   const role = String(user?.role || '').toUpperCase();
   const accountType = String(user?.accountType || '').toUpperCase();
@@ -101,8 +104,16 @@ export default function BillingDashboardPage() {
     }
   }, [isAuthenticated, isAuthLoading, isBillingExempt, router, toast]);
 
+  const isTeamMember = Boolean(
+    user &&
+      (user.accountType === 'BROKER_AGENT' ||
+        user.role === 'BROKER_AGENT' ||
+        user.brokerId ||
+        user.parentUserId),
+  );
+
   const loadBillingData = React.useCallback(async () => {
-    if (!isAuthenticated || isBillingExempt) return;
+    if (!isAuthenticated || isBillingExempt || isTeamMember) return;
     setLoading(true);
     setIsPackagesLoading(true);
     try {
@@ -131,16 +142,16 @@ export default function BillingDashboardPage() {
       setLoading(false);
       setIsPackagesLoading(false);
     }
-  }, [isAuthenticated, isBillingExempt]);
+  }, [isAuthenticated, isBillingExempt, isTeamMember]);
 
   React.useEffect(() => {
-    if (isAuthenticated && !isBillingExempt) {
+    if (isAuthenticated && !isBillingExempt && !isTeamMember) {
       loadBillingData();
     } else if (!isAuthLoading) {
       setLoading(false);
       setIsPackagesLoading(false);
     }
-  }, [isAuthenticated, isAuthLoading, isBillingExempt, loadBillingData]);
+  }, [isAuthenticated, isAuthLoading, isBillingExempt, isTeamMember, loadBillingData]);
 
   // Role-based visibility: display only active plans applicable to current user's account type
   const eligiblePackages = React.useMemo(() => {
@@ -294,6 +305,43 @@ export default function BillingDashboardPage() {
     );
   }
 
+  if (isAuthenticated && isTeamMember) {
+    const parentAgencyOrBrokerName =
+      user?.parentAgencyName || user?.parentBrokerName || user?.agencyName || 'Broker';
+    return (
+      <div className="min-h-[75vh] flex items-center justify-center p-6 text-center">
+        <div className="max-w-md w-full bg-casa-surface border border-casa-border-light rounded-3xl p-8 shadow-subtle space-y-6">
+          <div className="w-16 h-16 rounded-2xl bg-blue-500/10 text-blue-600 flex items-center justify-center mx-auto">
+            <Building className="w-8 h-8" />
+          </div>
+          <div className="space-y-2">
+            <span className="inline-block px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-blue-500/15 text-blue-700 dark:text-blue-300 border border-blue-500/30">
+              Team Member Account
+            </span>
+            <h1 className="text-xl font-black text-casa-text-primary tracking-tight">
+              Subscription Managed by Broker
+            </h1>
+            <p className="text-sm text-casa-text-secondary leading-relaxed">
+              Subscription plans and billing are managed by your Broker ({parentAgencyOrBrokerName}).
+            </p>
+          </div>
+          <div className="p-4 rounded-2xl bg-casa-subtle border border-casa-border-light text-xs text-casa-text-muted leading-relaxed">
+            Your property quotas and entitlements are inherited directly from your Brokerage organization. You do not need an individual subscription.
+          </div>
+          <div className="pt-2">
+            <Link
+              href="/dashboard/properties"
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-casa-brand text-white font-bold text-xs shadow-sm hover:opacity-95 transition-all"
+            >
+              <span>Back to My Properties</span>
+              <ArrowRight className="w-4 h-4" />
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8 text-start">
       {/* Top Banner / Current Membership Status */}
@@ -329,20 +377,24 @@ export default function BillingDashboardPage() {
                 </div>
               </div>
             ) : isTrialActive ? (
-              <div className="px-4 py-2.5 rounded-2xl bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-200 flex items-center gap-2.5">
+              <button
+                type="button"
+                onClick={() => setIsFreePlanModalOpen(true)}
+                className="px-4 py-2.5 rounded-2xl bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-200 flex items-center gap-2.5 text-start cursor-pointer hover:bg-emerald-100/60 transition-colors"
+              >
                 <CheckCircle2 className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
                 <div>
-                  <div className="text-xs font-bold leading-none">3-Day Free Trial Active</div>
+                  <div className="text-xs font-bold leading-none">3-Month Free Plan Active</div>
                   <div className="text-[10px] text-emerald-700 dark:text-emerald-300 mt-0.5">
-                    {trialDaysRemaining} day{trialDaysRemaining !== 1 ? 's' : ''} remaining
+                    {trialRemainingLabel || `${trialDaysRemaining} days remaining`} · 15 Listings
                   </div>
                 </div>
-              </div>
+              </button>
             ) : isTrialExpired ? (
               <div className="px-4 py-2.5 rounded-2xl bg-red-50 dark:bg-red-950/50 border border-red-200 dark:border-red-800 text-red-800 dark:text-red-200 flex items-center gap-2.5">
                 <XCircle className="w-5 h-5 text-red-600 dark:text-red-400" />
                 <div>
-                  <div className="text-xs font-bold leading-none">Free Trial Expired</div>
+                  <div className="text-xs font-bold leading-none">3-Month Free Plan Expired</div>
                   <div className="text-[10px] text-red-700 dark:text-red-300 mt-0.5">
                     Upgrade below to restore full access
                   </div>
@@ -362,14 +414,14 @@ export default function BillingDashboardPage() {
               </div>
             )}
 
-            {/* Remove free-trial activation option for active paid users, expired users or users who already used trial */}
-            {!hasActiveSubscription && !isTrialExpired && !user?.trialUsed && Boolean(user?.isTrialEligible !== false) && (
+            {/* Claim 3-Month Free Plan CTA */}
+            {!hasActiveSubscription && !isTrialActive && !isTrialExpired && !user?.trialUsed && Boolean(user?.isTrialEligible !== false) && (
               <button
-                onClick={openPlanSelectionModal}
-                className="px-4 py-2.5 rounded-2xl bg-casa-brand hover:bg-casa-brand-hover text-white text-xs font-bold shadow-subtle transition-colors flex items-center gap-1.5 cursor-pointer"
+                onClick={() => setIsFreePlanModalOpen(true)}
+                className="px-4 py-2.5 rounded-2xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold shadow-subtle transition-colors flex items-center gap-1.5 cursor-pointer"
               >
                 <Sparkles className="w-4 h-4" />
-                <span>Select Free Trial Plan</span>
+                <span>Claim 3-Month Free Plan</span>
               </button>
             )}
           </div>
@@ -427,7 +479,7 @@ export default function BillingDashboardPage() {
                   <strong className="underline font-bold text-amber-950 dark:text-white">
                     7069754589
                   </strong>{' '}
-                  to complete identity checks and activate the 3-day Free Trial.
+                  to complete identity checks and activate the 3-Month Free Plan.
                 </span>
               </div>
             </div>
@@ -697,6 +749,15 @@ export default function BillingDashboardPage() {
         companySettings={companySettings}
         onClose={() => setIsDetailsModalOpen(false)}
         onRequestSubmitted={() => loadBillingData()}
+      />
+
+      {/* 3-Month Free Plan & KYC Modal */}
+      <FreePlanClaimModal
+        isOpen={isFreePlanModalOpen}
+        onClose={() => {
+          setIsFreePlanModalOpen(false);
+          loadBillingData();
+        }}
       />
     </div>
   );

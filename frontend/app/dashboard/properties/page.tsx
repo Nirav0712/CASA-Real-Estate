@@ -12,6 +12,7 @@ import {
   brokerRejectProperty,
   createFeaturedRequest,
   getMyFeaturedRequests,
+  deleteProperty,
 } from '@/services/property-service';
 import {
   createPaymentOrder,
@@ -37,6 +38,7 @@ import {
   CreditCard,
   Lock,
   Video,
+  Trash2,
 } from 'lucide-react';
 
 import { AccessDenied } from '@/components/dashboard/access-denied';
@@ -57,6 +59,10 @@ export default function MyPropertiesPage() {
   const [rejectReason, setRejectReason] = React.useState<string>('');
   const [isSubmittingReject, setIsSubmittingReject] = React.useState(false);
 
+  // Property Deletion State
+  const [deleteModalProperty, setDeleteModalProperty] = React.useState<Property | null>(null);
+  const [isDeleting, setIsDeleting] = React.useState(false);
+
   const isBroker = Boolean(
     user?.role === 'BROKER' ||
     user?.role === 'AGENT' ||
@@ -68,6 +74,16 @@ export default function MyPropertiesPage() {
   const isEmployee = Boolean(
     user?.role === 'BROKER_AGENT' || (user as any)?.accountType === 'BROKER_AGENT'
   );
+
+  const effectivePermissions = React.useMemo(() => {
+    const list = [...(user?.permissions || []), ...((user as any)?.grantedPermissions || [])];
+    return new Set(list);
+  }, [user]);
+
+  const canCreate = !isEmployee || effectivePermissions.has('*') || effectivePermissions.has('property:*') || effectivePermissions.has('property:create');
+  const canEdit = !isEmployee || effectivePermissions.has('*') || effectivePermissions.has('property:*') || effectivePermissions.has('property:edit');
+  const canDelete = !isEmployee || effectivePermissions.has('*') || effectivePermissions.has('property:*') || effectivePermissions.has('property:delete');
+  const canPublish = !isEmployee || effectivePermissions.has('*') || effectivePermissions.has('property:*') || effectivePermissions.has('property:publish');
 
   // Tab & Featured State
   const [activeTab, setActiveTab] = React.useState<'properties' | 'pending_broker' | 'featured_requests'>('properties');
@@ -188,6 +204,26 @@ export default function MyPropertiesPage() {
     }
   };
 
+  const handleDeleteProperty = async () => {
+    if (!deleteModalProperty) return;
+    setIsDeleting(true);
+    try {
+      await deleteProperty(deleteModalProperty.id);
+      const title =
+        typeof deleteModalProperty.title === 'string'
+          ? deleteModalProperty.title
+          : deleteModalProperty.title.en;
+      toast.success('Property Deleted', `"${title}" has been removed successfully.`);
+      setDeleteModalProperty(null);
+      await loadProperties();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to delete property';
+      toast.error('Deletion Failed', msg);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
 
   if (isAuthLoading) {
     return (
@@ -265,19 +301,21 @@ export default function MyPropertiesPage() {
           <button
             type="button"
             onClick={loadProperties}
-            className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-casa-text-secondary hover:text-casa-text-primary bg-casa-surface border border-casa-border-light rounded-xl transition-colors"
+            className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-casa-text-secondary hover:text-casa-text-primary bg-casa-surface border border-casa-border-light rounded-xl transition-colors cursor-pointer"
           >
             <RefreshCw className="w-3.5 h-3.5" />
             <span>Refresh</span>
           </button>
 
-          <Link
-            href="/dashboard/properties/new"
-            className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-casa-brand hover:bg-casa-brand-hover rounded-xl shadow-2xs transition-colors"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Post New Property</span>
-          </Link>
+          {canCreate && (
+            <Link
+              href="/dashboard/properties/new"
+              className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-casa-brand hover:bg-casa-brand-hover rounded-xl shadow-2xs transition-colors"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Post New Property</span>
+            </Link>
+          )}
         </div>
       </div>
 
@@ -293,6 +331,52 @@ export default function MyPropertiesPage() {
 
       {/* KYC Verification & Account Activation Status Banner */}
       <KycStatusBanner onRefresh={loadProperties} />
+
+      {/* Listing Limits & Quota Summary Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="p-4 rounded-2xl bg-casa-surface border border-casa-border-light shadow-xs flex items-center justify-between">
+          <div>
+            <div className="text-[11px] font-semibold uppercase tracking-wider text-casa-text-muted">
+              Total Listings
+            </div>
+            <div className="text-xl font-bold text-casa-text-primary mt-0.5">
+              {properties.length} <span className="text-xs font-normal text-casa-text-muted">/ 15 Allowed</span>
+            </div>
+          </div>
+          <div className="p-2.5 rounded-xl bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400">
+            <Building className="w-5 h-5" />
+          </div>
+        </div>
+
+        <div className="p-4 rounded-2xl bg-casa-surface border border-casa-border-light shadow-xs flex items-center justify-between">
+          <div>
+            <div className="text-[11px] font-semibold uppercase tracking-wider text-casa-text-muted">
+              Published Listings
+            </div>
+            <div className="text-xl font-bold text-emerald-600 dark:text-emerald-400 mt-0.5">
+              {properties.filter((p) => ['PUBLISHED', 'ACTIVE', 'PENDING_REVIEW', 'PENDING_APPROVAL', 'PENDING_BROKER_APPROVAL'].includes(p.status)).length}{' '}
+              <span className="text-xs font-normal text-casa-text-muted">/ 10 Max Live</span>
+            </div>
+          </div>
+          <div className="p-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400">
+            <CheckCircle2 className="w-5 h-5" />
+          </div>
+        </div>
+
+        <div className="p-4 rounded-2xl bg-casa-surface border border-casa-border-light shadow-xs flex items-center justify-between">
+          <div>
+            <div className="text-[11px] font-semibold uppercase tracking-wider text-casa-text-muted">
+              Draft &amp; Unpublished
+            </div>
+            <div className="text-xl font-bold text-amber-600 dark:text-amber-400 mt-0.5">
+              {properties.filter((p) => ['DRAFT', 'UNPUBLISHED', 'REJECTED'].includes(p.status)).length}
+            </div>
+          </div>
+          <div className="p-2.5 rounded-xl bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400">
+            <Clock className="w-5 h-5" />
+          </div>
+        </div>
+      </div>
 
       {/* Navigation Tabs */}
       <div className="flex items-center gap-2 border-b border-casa-border-light pb-2">
@@ -527,18 +611,32 @@ export default function MyPropertiesPage() {
                         </Link>
                       )}
 
-                      {/* Edit Button */}
-                      <Link
-                        href={`/dashboard/properties/${item.id}/edit`}
-                        title="Edit Listing"
-                        className="p-1.5 text-casa-text-secondary hover:text-casa-brand hover:bg-casa-subtle rounded-lg transition-colors"
-                      >
-                        <Edit className="w-4 h-4" />
-                      </Link>
+                      {/* Edit Button - Hidden if user lacks edit permission */}
+                      {canEdit && (
+                        <Link
+                          href={`/dashboard/properties/${item.id}/edit`}
+                          title="Edit Listing"
+                          className="p-1.5 text-casa-text-secondary hover:text-casa-brand hover:bg-casa-subtle rounded-lg transition-colors"
+                        >
+                          <Edit className="w-4 h-4" />
+                        </Link>
+                      )}
+
+                      {/* Delete Button - Displayed if user has delete permission */}
+                      {canDelete && (
+                        <button
+                          type="button"
+                          onClick={() => setDeleteModalProperty(item)}
+                          title="Delete Listing"
+                          className="p-1.5 text-casa-text-secondary hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-lg transition-colors cursor-pointer"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
                     </div>
 
                     {/* Submit / Resubmit Action Button */}
-                    {(isDraft || isRejected) && (
+                    {(isDraft || isRejected) && canPublish && (
                       <button
                         type="button"
                         disabled={submittingId === item.id}
@@ -965,6 +1063,52 @@ export default function MyPropertiesPage() {
                 className="px-4 py-1.5 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-xl transition-colors disabled:opacity-50 cursor-pointer"
               >
                 {isSubmittingReject ? 'Rejecting...' : 'Confirm Rejection'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Dialog Modal */}
+      {deleteModalProperty && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in">
+          <div className="bg-casa-surface border border-casa-border-light rounded-2xl max-w-md w-full p-6 shadow-xl space-y-4">
+            <div className="flex items-center gap-3 text-red-600 dark:text-red-400">
+              <div className="p-2.5 rounded-xl bg-red-50 dark:bg-red-950/50">
+                <Trash2 className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-casa-text-primary">Delete Property Listing?</h3>
+                <p className="text-xs text-casa-text-secondary">This action will archive this listing from your brokerage account.</p>
+              </div>
+            </div>
+
+            <div className="p-3 bg-casa-canvas rounded-xl border border-casa-border-light text-xs space-y-1">
+              <div className="font-semibold text-casa-text-primary truncate">
+                {typeof deleteModalProperty.title === 'string' ? deleteModalProperty.title : deleteModalProperty.title?.en}
+              </div>
+              <div className="text-casa-text-muted">
+                Reference ID: {deleteModalProperty.referenceId || deleteModalProperty.id}
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setDeleteModalProperty(null)}
+                disabled={isDeleting}
+                className="px-4 py-2 text-xs font-semibold rounded-xl text-casa-text-secondary hover:bg-casa-subtle transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleDeleteProperty}
+                disabled={isDeleting}
+                className="px-4 py-2 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-xl transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+              >
+                {isDeleting ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+                <span>{isDeleting ? 'Deleting...' : 'Confirm Delete'}</span>
               </button>
             </div>
           </div>

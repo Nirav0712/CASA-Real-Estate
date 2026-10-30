@@ -294,7 +294,7 @@ export async function verifyOtp(
 }
 
 /**
- * Start 3-Day Free Trial for eligible supply-side accounts
+ * Start 3-Month Free Plan for eligible supply-side accounts with KYC approval
  */
 export async function startFreeTrial(token: string): Promise<any> {
   const response = await fetch(`${API_BASE_URL}/auth/trial/start`, {

@@ -49,6 +49,7 @@ import {
   Crown,
 } from 'lucide-react';
 import { getPublicCompanySettings } from '@/services/entitlements-service';
+import { FreePlanClaimModal } from '@/components/pricing/free-plan-claim-modal';
 
 const ADMIN_PORTAL_URL = process.env.NEXT_PUBLIC_ADMIN_URL || 'http://localhost:3001';
 
@@ -73,6 +74,7 @@ export function Header() {
   const toast = useToast();
   const [isLangModalOpen, setIsLangModalOpen] = React.useState(false);
   const [isLocationModalOpen, setIsLocationModalOpen] = React.useState(false);
+  const [isFreePlanClaimModalOpen, setIsFreePlanClaimModalOpen] = React.useState(false);
   const [headerLocation, setHeaderLocation] = React.useState<SelectedLocationData>({
     country: 'india',
     countryName: 'India',
@@ -140,28 +142,31 @@ export function Header() {
       ].includes(String(user.accountType || user.role).toUpperCase()),
   );
 
-  const isTrialEligible = Boolean(
+  const kycStatus = String(user?.kycStatus || 'NOT_SUBMITTED').toUpperCase();
+  const isKycApproved = kycStatus === 'APPROVED' || Boolean(user?.isVerifiedAgent);
+  const isKycPending = kycStatus === 'PENDING';
+  const isKycRejected = kycStatus === 'REJECTED';
+  const isKycMissing = !isKycApproved && !isKycPending && !isKycRejected;
+
+  const isTeamMember = Boolean(
     user &&
-      user.isTrialEligible &&
-      !isBuyerOrTenant &&
-      !isAdmin &&
-      !user.activePackageId &&
-      !user.trialStartedAt &&
-      !user.isTrialActive &&
-      (user.kycStatus === 'APPROVED' || user.isVerifiedAgent),
+      (user.accountType === 'BROKER_AGENT' ||
+        user.role === 'BROKER_AGENT' ||
+        user.brokerId ||
+        user.parentUserId),
   );
 
-  const [startingTrial, setStartingTrial] = React.useState(false);
-  const handleStartTrial = async () => {
-    setStartingTrial(true);
-    try {
-      await startTrial();
-    } catch (err: any) {
-      toast.error('Error', err?.message || 'Failed to start free trial');
-    } finally {
-      setStartingTrial(false);
-    }
-  };
+  const isFreePlanEligibleToClaim = Boolean(
+    isAuthenticated &&
+      user &&
+      !isTeamMember &&
+      !isBuyerOrTenant &&
+      !isAdmin &&
+      !hasActiveSubscription &&
+      !user.isTrialActive &&
+      !user.trialUsed &&
+      isKycApproved,
+  );
 
   const toggleTheme = () => {
     if (theme === 'light') setTheme('dark');
@@ -273,8 +278,21 @@ export function Header() {
                 <span className="uppercase">{locale}</span>
               </button>
 
-              {/* Active Paid Subscription Pill (Supply-side accounts) */}
-              {isAuthenticated && hasActiveSubscription && !isBuyerOrTenant && !isAdmin && (
+              {/* Broker Team Member Indicator */}
+              {isAuthenticated && isTeamMember && (
+                <div
+                  className="hidden md:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-500/10 text-blue-700 dark:text-blue-300 border border-blue-500/20 text-xs font-semibold whitespace-nowrap"
+                  title={`Team Member at ${user?.parentAgencyName || user?.parentBrokerName || 'Brokerage'}`}
+                >
+                  <Users className="w-3.5 h-3.5 text-blue-600 flex-shrink-0" />
+                  <span className="truncate max-w-[200px]">
+                    Team Member at {user?.parentAgencyName || user?.parentBrokerName || 'Broker'}
+                  </span>
+                </div>
+              )}
+
+              {/* Active Paid Subscription Pill (Supply-side accounts - Broker only) */}
+              {isAuthenticated && !isTeamMember && hasActiveSubscription && !isBuyerOrTenant && !isAdmin && (
                 <Link
                   href="/dashboard/billing"
                   className="hidden md:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-400 border border-amber-500/30 text-xs font-bold transition-all cursor-pointer whitespace-nowrap shadow-2xs"
@@ -285,29 +303,61 @@ export function Header() {
                 </Link>
               )}
 
-              {/* 3-Day Trial Status Pill (Active or Expired for Supply-side accounts with NO active paid subscription) */}
-              {isAuthenticated && !hasActiveSubscription && isTrialActive && !isBuyerOrTenant && !isAdmin && (
-                <button
-                  type="button"
-                  onClick={openPlanSelectionModal}
-                  className="hidden md:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30 text-xs font-bold transition-all cursor-pointer whitespace-nowrap"
-                  title="3-Day Free Trial Active. Click to view all plans."
-                >
-                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse flex-shrink-0" />
-                  <span>3-Day Trial: {trialDaysRemaining}d Left</span>
-                </button>
-              )}
-
-              {isAuthenticated && !hasActiveSubscription && isTrialExpired && !isBuyerOrTenant && !isAdmin && (
-                <button
-                  type="button"
-                  onClick={openTrialExpiredModal}
-                  className="hidden md:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-700 dark:text-red-400 border border-red-500/30 text-xs font-bold transition-all animate-pulse cursor-pointer whitespace-nowrap"
-                  title="3-Day Trial Expired. Click to call our sales department to activate."
-                >
-                  <PhoneCall className="w-3.5 h-3.5 text-red-500 animate-bounce flex-shrink-0" />
-                  <span>Trial Expired</span>
-                </button>
+              {/* Supply-side 3-Month Free Plan & KYC Badges (Broker only) */}
+              {isAuthenticated && !isTeamMember && !hasActiveSubscription && !isBuyerOrTenant && !isAdmin && (
+                <>
+                  {isTrialActive ? (
+                    <button
+                      type="button"
+                      onClick={() => setIsFreePlanClaimModalOpen(true)}
+                      className="hidden md:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30 text-xs font-bold transition-all cursor-pointer whitespace-nowrap shadow-2xs"
+                      title="3-Month Free Plan Active (15 Properties Quota). Click to view details."
+                    >
+                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse flex-shrink-0" />
+                      <span>Free Plan · 3 Months</span>
+                    </button>
+                  ) : isTrialExpired ? (
+                    <button
+                      type="button"
+                      onClick={() => setIsFreePlanClaimModalOpen(true)}
+                      className="hidden md:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-400 border border-amber-500/30 text-xs font-bold transition-all cursor-pointer whitespace-nowrap"
+                      title="Free Plan Expired. Click to view subscription plans."
+                    >
+                      <Clock className="w-3.5 h-3.5 text-amber-500 flex-shrink-0" />
+                      <span>Free Plan Expired</span>
+                    </button>
+                  ) : isFreePlanEligibleToClaim ? (
+                    <button
+                      type="button"
+                      onClick={() => setIsFreePlanClaimModalOpen(true)}
+                      className="hidden md:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 text-amber-800 dark:text-amber-300 border border-amber-500/40 text-xs font-bold transition-all cursor-pointer whitespace-nowrap shadow-xs animate-pulse"
+                      title="KYC Approved! Click to claim your 3-Month Free Plan."
+                    >
+                      <Sparkles className="w-3.5 h-3.5 text-amber-500 flex-shrink-0" />
+                      <span>3-Month Free Plan Available</span>
+                    </button>
+                  ) : isKycPending ? (
+                    <button
+                      type="button"
+                      onClick={() => setIsFreePlanClaimModalOpen(true)}
+                      className="hidden md:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-500/10 hover:bg-blue-500/20 text-blue-700 dark:text-blue-400 border border-blue-500/30 text-xs font-bold transition-all cursor-pointer whitespace-nowrap"
+                      title="KYC Under Review. Free plan unlocks upon Super Admin approval."
+                    >
+                      <Clock className="w-3.5 h-3.5 text-blue-500 flex-shrink-0 animate-spin" />
+                      <span>KYC Under Review</span>
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setIsFreePlanClaimModalOpen(true)}
+                      className="hidden md:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-neutral-100 hover:bg-neutral-200/80 dark:bg-neutral-800 dark:hover:bg-neutral-700 text-neutral-700 dark:text-neutral-300 border border-neutral-300 dark:border-neutral-700 text-xs font-bold transition-all cursor-pointer whitespace-nowrap"
+                      title="Complete KYC to unlock the 3-Month Free Plan."
+                    >
+                      <ShieldCheck className="w-3.5 h-3.5 text-neutral-500 flex-shrink-0" />
+                      <span>3-Month Free Plan — KYC Required</span>
+                    </button>
+                  )}
+                </>
               )}
 
               {/* Login / Authenticated User Profile */}
@@ -372,8 +422,21 @@ export function Header() {
                         </div>
                       </Link>
 
-                      {/* Trial & Membership Card in Dropdown (Supply-side accounts only) */}
-                      {!isBuyerOrTenant && !isAdmin && (
+                      {/* Broker Team Member Indicator in Dropdown */}
+                      {isTeamMember && (
+                        <div className="px-3.5 py-2.5 border-b border-casa-border-light bg-blue-500/5">
+                          <div className="flex items-center gap-1.5 text-xs font-bold text-blue-700 dark:text-blue-300">
+                            <Users className="w-3.5 h-3.5 text-blue-600" />
+                            <span>Team Member Account</span>
+                          </div>
+                          <div className="text-[11px] text-casa-text-muted mt-0.5">
+                            Team Member at {user.parentAgencyName || user.parentBrokerName || 'Broker'}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Trial & Membership Card in Dropdown (Supply-side accounts only - Broker only) */}
+                      {!isTeamMember && !isBuyerOrTenant && !isAdmin && (
                         <div className="px-3.5 py-2 border-b border-casa-border-light bg-casa-canvas/50">
                           {hasActiveSubscription ? (
                             <div className="space-y-1">
@@ -396,9 +459,29 @@ export function Header() {
                             <div className="space-y-1">
                               <div className="flex items-center justify-between text-[11px]">
                                 <span className="font-bold text-emerald-600 flex items-center gap-1">
-                                  <Sparkles className="w-3 h-3" /> 3-Day Trial Active
+                                  <Sparkles className="w-3 h-3" /> 3-Month Free Plan
                                 </span>
-                                <span className="font-mono text-casa-text-muted">{trialDaysRemaining}d remaining</span>
+                                <span className="font-mono text-casa-text-muted">{user?.trialRemainingLabel || `${trialDaysRemaining}d left`}</span>
+                              </div>
+                              <div className="text-[10px] text-casa-text-muted">
+                                15 Property Listings Available
+                              </div>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setIsUserMenuOpen(false);
+                                  setIsFreePlanClaimModalOpen(true);
+                                }}
+                                className="text-[10px] text-casa-brand hover:underline font-semibold block text-start"
+                              >
+                                View free plan usage & allowance →
+                              </button>
+                            </div>
+                          ) : isTrialExpired ? (
+                            <div className="space-y-1.5">
+                              <div className="text-[11px] font-bold text-amber-600 flex items-center gap-1">
+                                <Clock className="w-3 h-3 text-amber-500" /> Free Plan Expired
                               </div>
                               <button
                                 type="button"
@@ -407,44 +490,62 @@ export function Header() {
                                   setIsUserMenuOpen(false);
                                   openPlanSelectionModal();
                                 }}
-                                className="text-[10px] text-casa-brand hover:underline font-semibold block text-start"
+                                className="w-full py-1.5 px-2.5 rounded-lg bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 font-extrabold text-[11px] text-center shadow-sm flex items-center justify-center gap-1.5"
                               >
-                                View all membership tiers →
+                                <span>Upgrade Subscription</span>
                               </button>
                             </div>
-                          ) : isTrialExpired ? (
+                          ) : isFreePlanEligibleToClaim ? (
                             <div className="space-y-1.5">
-                              <div className="text-[11px] font-bold text-red-600 flex items-center gap-1">
-                                <PhoneCall className="w-3 h-3 text-red-500 animate-bounce" /> 3-Day Trial Expired
+                              <div className="text-[11px] font-bold text-amber-600 flex items-center gap-1">
+                                <Sparkles className="w-3 h-3 text-amber-500" /> 3-Month Free Plan Available
                               </div>
                               <button
                                 type="button"
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   setIsUserMenuOpen(false);
-                                  openTrialExpiredModal();
+                                  setIsFreePlanClaimModalOpen(true);
                                 }}
-                                className="w-full py-1.5 px-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-[11px] text-center shadow-sm flex items-center justify-center gap-1.5"
+                                className="w-full py-1.5 px-2.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-white font-bold text-[11px] text-center shadow-sm"
                               >
-                                <PhoneCall className="w-3 h-3" />
-                                <span>Call Sales Desk to Renew</span>
+                                Claim 3 Months Free (15 Listings)
+                              </button>
+                            </div>
+                          ) : isKycPending ? (
+                            <div className="space-y-1.5">
+                              <div className="text-[11px] font-bold text-blue-600 dark:text-blue-400 flex items-center gap-1">
+                                <Clock className="w-3 h-3 text-blue-500 animate-spin" /> KYC Under Review
+                              </div>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setIsUserMenuOpen(false);
+                                  setIsFreePlanClaimModalOpen(true);
+                                }}
+                                className="w-full py-1.5 px-2.5 rounded-lg bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 font-bold text-[11px] text-center shadow-sm"
+                              >
+                                Check KYC Status
                               </button>
                             </div>
                           ) : (
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setIsUserMenuOpen(false);
-                                openPlanSelectionModal();
-                              }}
-                              className="w-full flex items-center justify-between text-xs text-casa-brand font-bold hover:underline"
-                            >
-                              <span className="flex items-center gap-1">
-                                <Sparkles className="w-3 h-3" /> Membership Plans
-                              </span>
-                              <span>→</span>
-                            </button>
+                            <div className="space-y-1.5">
+                              <div className="text-[11px] font-bold text-neutral-700 dark:text-neutral-300 flex items-center gap-1">
+                                <ShieldCheck className="w-3 h-3 text-neutral-500" /> 3-Month Free Plan
+                              </div>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setIsUserMenuOpen(false);
+                                  setIsFreePlanClaimModalOpen(true);
+                                }}
+                                className="w-full py-1.5 px-2.5 rounded-lg bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 font-bold text-[11px] text-center shadow-sm"
+                              >
+                                Submit KYC to Claim
+                              </button>
+                            </div>
                           )}
                         </div>
                       )}
@@ -724,15 +825,15 @@ export function Header() {
                 </Button>
               )}
 
-              {/* 3-Day Free Trial Start CTA */}
-              {isTrialEligible && (
+              {/* Claim 3-Month Free Plan CTA */}
+              {isFreePlanEligibleToClaim && (
                 <Button
                   size="sm"
-                  onClick={handleStartTrial}
-                  loading={startingTrial}
-                  className="bg-amber-500 hover:bg-amber-600 text-white font-semibold shadow-sm text-xs px-3 py-1.5 rounded-full"
+                  onClick={() => setIsFreePlanClaimModalOpen(true)}
+                  className="bg-amber-500 hover:bg-amber-600 text-white font-semibold shadow-sm text-xs px-3 py-1.5 rounded-full flex items-center gap-1.5"
                 >
-                  Start 3-Day Free Trial
+                  <Sparkles className="w-3.5 h-3.5 text-amber-200" />
+                  <span>Get 3 Months Free</span>
                 </Button>
               )}
 
@@ -965,8 +1066,18 @@ export function Header() {
                   </div>
                 </Link>
 
-                {/* Mobile Active Subscription Pill */}
-                {hasActiveSubscription && !isBuyerOrTenant && !isAdmin && (
+                {/* Mobile Team Member Indicator */}
+                {isTeamMember && (
+                  <div className="w-full mb-2.5 px-2.5 py-1.5 rounded-lg bg-blue-500/10 border border-blue-500/20 text-blue-700 dark:text-blue-300 text-xs font-semibold flex items-center justify-between">
+                    <span className="flex items-center gap-1.5 truncate">
+                      <Users className="w-3.5 h-3.5 text-blue-500 flex-shrink-0" />
+                      <span className="truncate">Team Member at {user?.parentAgencyName || user?.parentBrokerName || 'Broker'}</span>
+                    </span>
+                  </div>
+                )}
+
+                {/* Mobile Active Subscription Pill (Broker only) */}
+                {!isTeamMember && hasActiveSubscription && !isBuyerOrTenant && !isAdmin && (
                   <Link
                     href="/dashboard/billing"
                     onClick={() => setIsMobileMenuOpen(false)}
@@ -980,39 +1091,84 @@ export function Header() {
                   </Link>
                 )}
 
-                {/* Mobile Trial Pill (Supply-side accounts with NO active paid subscription) */}
-                {!hasActiveSubscription && isTrialActive && !isBuyerOrTenant && !isAdmin && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsMobileMenuOpen(false);
-                      openPlanSelectionModal();
-                    }}
-                    className="w-full mb-2.5 px-2.5 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-700 dark:text-emerald-400 text-xs font-bold flex items-center justify-between cursor-pointer"
-                  >
-                    <span className="flex items-center gap-1.5">
-                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                      3-Day Trial Active
-                    </span>
-                    <span>{trialDaysRemaining}d left →</span>
-                  </button>
-                )}
-
-                {!hasActiveSubscription && isTrialExpired && !isBuyerOrTenant && !isAdmin && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsMobileMenuOpen(false);
-                      openTrialExpiredModal();
-                    }}
-                    className="w-full mb-2.5 px-2.5 py-1.5 rounded-lg bg-red-500/10 border border-red-500/30 text-red-700 dark:text-red-300 text-xs font-bold flex items-center justify-between animate-pulse cursor-pointer"
-                  >
-                    <span className="flex items-center gap-1.5">
-                      <PhoneCall className="w-3.5 h-3.5 text-red-500" />
-                      Trial Expired
-                    </span>
-                    <span className="underline">Call Sales Desk →</span>
-                  </button>
+                {/* Mobile Free Plan & KYC Pill (Broker only with NO active paid subscription) */}
+                {!isTeamMember && !hasActiveSubscription && !isBuyerOrTenant && !isAdmin && (
+                  isTrialActive ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsMobileMenuOpen(false);
+                        setIsFreePlanClaimModalOpen(true);
+                      }}
+                      className="w-full mb-2.5 px-2.5 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-700 dark:text-emerald-400 text-xs font-bold flex items-center justify-between cursor-pointer"
+                    >
+                      <span className="flex items-center gap-1.5">
+                        <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                        Free Plan · 3 Months
+                      </span>
+                      <span>{user?.trialRemainingLabel || 'Active'} →</span>
+                    </button>
+                  ) : isTrialExpired ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsMobileMenuOpen(false);
+                        openPlanSelectionModal();
+                      }}
+                      className="w-full mb-2.5 px-2.5 py-1.5 rounded-lg bg-red-500/10 border border-red-500/30 text-red-700 dark:text-red-300 text-xs font-bold flex items-center justify-between cursor-pointer"
+                    >
+                      <span className="flex items-center gap-1.5">
+                        <Clock className="w-3.5 h-3.5 text-red-500" />
+                        Free Plan Expired
+                      </span>
+                      <span className="underline">Upgrade Plan →</span>
+                    </button>
+                  ) : isFreePlanEligibleToClaim ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsMobileMenuOpen(false);
+                        setIsFreePlanClaimModalOpen(true);
+                      }}
+                      className="w-full mb-2.5 px-2.5 py-1.5 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-700 dark:text-amber-300 text-xs font-bold flex items-center justify-between cursor-pointer"
+                    >
+                      <span className="flex items-center gap-1.5">
+                        <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                        3-Month Free Plan Available
+                      </span>
+                      <span className="underline">Claim Now →</span>
+                    </button>
+                  ) : isKycPending ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsMobileMenuOpen(false);
+                        setIsFreePlanClaimModalOpen(true);
+                      }}
+                      className="w-full mb-2.5 px-2.5 py-1.5 rounded-lg bg-blue-500/10 border border-blue-500/30 text-blue-700 dark:text-blue-300 text-xs font-bold flex items-center justify-between cursor-pointer"
+                    >
+                      <span className="flex items-center gap-1.5">
+                        <Clock className="w-3.5 h-3.5 text-blue-500 animate-spin" />
+                        KYC Under Review
+                      </span>
+                      <span>Details →</span>
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsMobileMenuOpen(false);
+                        setIsFreePlanClaimModalOpen(true);
+                      }}
+                      className="w-full mb-2.5 px-2.5 py-1.5 rounded-lg bg-neutral-500/10 border border-neutral-500/20 text-neutral-700 dark:text-neutral-300 text-xs font-bold flex items-center justify-between cursor-pointer"
+                    >
+                      <span className="flex items-center gap-1.5">
+                        <ShieldCheck className="w-3.5 h-3.5 text-neutral-500" />
+                        3-Month Free Plan — KYC Required
+                      </span>
+                      <span>Submit KYC →</span>
+                    </button>
+                  )
                 )}
 
                 {/* Role-Specific Workspace Mobile Links */}
@@ -1270,6 +1426,12 @@ export function Header() {
           </div>
         </div>
       </Drawer>
+
+      {/* 3-Month Free Plan & KYC Enforcement Modal */}
+      <FreePlanClaimModal
+        isOpen={isFreePlanClaimModalOpen}
+        onClose={() => setIsFreePlanClaimModalOpen(false)}
+      />
     </>
   );
 }

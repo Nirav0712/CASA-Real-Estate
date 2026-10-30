@@ -26,6 +26,7 @@ describe('PropertiesService (Phase 06 Lifecycle & Security)', () => {
     accountType: AccountType.AGENT,
     status: AccountStatus.ACTIVE,
     isVerifiedAgent: true,
+    isTrialActive: true,
   };
 
   const mockOtherUser: AuthenticatedUser = {
@@ -474,11 +475,16 @@ describe('PropertiesService (Phase 06 Lifecycle & Security)', () => {
       expect(myProperties).toBeDefined();
       expect(Array.isArray(myProperties)).toBe(true);
       expect(mockPropertyModel.find).toHaveBeenCalledWith({
-        $or: [
-          { ownerId: mockAgentUser.id },
-          { advertiserId: mockAgentUser.id },
-          { createdBy: mockAgentUser.id },
-          { brokerId: mockAgentUser.id },
+        $and: [
+          {
+            $or: [
+              { ownerId: mockAgentUser.id },
+              { advertiserId: mockAgentUser.id },
+              { createdBy: mockAgentUser.id },
+              { brokerId: mockAgentUser.id },
+            ],
+          },
+          { status: { $ne: 'ARCHIVED' } },
         ],
       });
     });

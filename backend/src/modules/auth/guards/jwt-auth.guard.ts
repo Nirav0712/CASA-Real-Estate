@@ -70,7 +70,7 @@ export class JwtAuthGuard implements CanActivate {
           user = await this.userModel
             .findOne(query)
             .select(
-              'status role platformRole accountType isVerifiedAgent permissions name mobile normalizedMobile isTrialActive trialStartedAt trialExpiresAt activePackageId kycStatus trialUsed trialExpired isTrialEligible'
+              'status role platformRole accountType isVerifiedAgent permissions name mobile normalizedMobile isTrialActive trialStartedAt trialExpiresAt activePackageId kycStatus trialUsed trialExpired isTrialEligible email brokerId parentUserId agencyId agencyName designation assignedProperties grantedPermissions'
             )
             .lean();
         } catch {
@@ -165,6 +165,14 @@ export class JwtAuthGuard implements CanActivate {
         trialExpired,
         activePackageId: user?.activePackageId || payload.activePackageId,
         kycStatus: user?.kycStatus || payload.kycStatus,
+        email: user?.email,
+        brokerId: user?.brokerId || user?.parentUserId || null,
+        parentUserId: user?.parentUserId || user?.brokerId || null,
+        agencyId: user?.agencyId || null,
+        agencyName: user?.agencyName,
+        designation: user?.designation,
+        assignedProperties: user?.assignedProperties || [],
+        grantedPermissions: user?.grantedPermissions || user?.permissions || [],
       };
 
       request.user = authenticatedUser;

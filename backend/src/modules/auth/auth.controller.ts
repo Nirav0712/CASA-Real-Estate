@@ -359,10 +359,10 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @ApiBearerAuth()
   @ApiOperation({
-    summary: 'Start 3-Day Free Trial for eligible supply-side accounts with KYC approval',
+    summary: 'Start 3-Month Free Plan for eligible supply-side accounts with KYC approval',
   })
-  @ApiResponse({ status: 200, description: '3-Day Free Trial started successfully' })
-  @ApiResponse({ status: 400, description: 'Ineligible role, missing KYC approval, or trial already used' })
+  @ApiResponse({ status: 200, description: '3-Month Free Plan started successfully' })
+  @ApiResponse({ status: 400, description: 'Ineligible role, missing KYC approval, or plan already used' })
   async startTrial(@CurrentUser('id') userId: string) {
     return this.authService.startTrial(userId);
   }

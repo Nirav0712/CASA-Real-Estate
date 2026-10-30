@@ -122,26 +122,62 @@ export async function getPublicRoles(): Promise<PublicRoleItem[]> {
   return Array.isArray(result.data) ? result.data : [];
 }
 
-export async function startTrial(packageId: string): Promise<{
+export async function claimFreeTrial(): Promise<{
   success: boolean;
   message: string;
-  trialExpiresAt: string;
-  daysRemaining: number;
-  package: any;
+  subscription?: any;
+  planName?: string;
+  startDate?: string;
+  expiryDate?: string;
+  propertyListingsLimit?: number;
+  durationMonths?: number;
 }> {
   const result = await fetchApi<{
     success: boolean;
     message: string;
-    trialExpiresAt: string;
-    daysRemaining: number;
-    package: any;
-  }>('/entitlements/start-trial', {
+    subscription?: any;
+    planName?: string;
+    startDate?: string;
+    expiryDate?: string;
+    propertyListingsLimit?: number;
+    durationMonths?: number;
+  }>('/entitlements/claim-free-trial', {
     method: 'POST',
-    body: JSON.stringify({ packageId }),
   });
 
   if (!result.isBackendAvailable || result.error || !result.data) {
-    throw new Error(result.error || 'Failed to activate free trial');
+    throw new Error(result.error || 'Failed to claim 3-Month Free Plan');
+  }
+
+  return result.data;
+}
+
+export async function startTrial(packageId?: string): Promise<{
+  success: boolean;
+  message: string;
+  trialExpiresAt?: string;
+  expiryDate?: string;
+  daysRemaining?: number;
+  package?: any;
+  planName?: string;
+  propertyListingsLimit?: number;
+}> {
+  const result = await fetchApi<{
+    success: boolean;
+    message: string;
+    trialExpiresAt?: string;
+    expiryDate?: string;
+    daysRemaining?: number;
+    package?: any;
+    planName?: string;
+    propertyListingsLimit?: number;
+  }>('/entitlements/claim-free-trial', {
+    method: 'POST',
+    body: packageId ? JSON.stringify({ packageId }) : undefined,
+  });
+
+  if (!result.isBackendAvailable || result.error || !result.data) {
+    throw new Error(result.error || 'Failed to activate 3-Month Free Plan');
   }
 
   return result.data;
@@ -247,21 +283,6 @@ export async function getFreeTrialStatus(): Promise<{
   const result = await fetchApi<any>('/entitlements/free-trial-status');
   if (!result.isBackendAvailable || result.error || !result.data) {
     throw new Error(result.error || 'Failed to load free trial status.');
-  }
-  return result.data;
-}
-
-export async function claimFreeTrial(): Promise<{
-  success: boolean;
-  message: string;
-  subscription: any;
-  remainingSlots: number;
-}> {
-  const result = await fetchApi<any>('/entitlements/claim-free-trial', {
-    method: 'POST',
-  });
-  if (!result.isBackendAvailable || result.error || !result.data) {
-    throw new Error(result.error || 'Failed to claim introductory free trial.');
   }
   return result.data;
 }

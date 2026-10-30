@@ -374,8 +374,8 @@ export class AdminController {
 
   @Post('kyc/:id/approve')
   @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
-  @ApiOperation({ summary: 'Approve KYC application and activate 3-day Free Trial' })
-  @ApiResponse({ status: 200, description: 'KYC approved and 3-day Free Trial started' })
+  @ApiOperation({ summary: 'Approve KYC application making 3-Month Free Plan available to claim' })
+  @ApiResponse({ status: 200, description: 'KYC approved and 3-Month Free Plan is available to claim' })
   approveKyc(
     @Param('id') id: string,
     @Body() body?: { notes?: string },

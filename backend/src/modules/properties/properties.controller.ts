@@ -376,23 +376,11 @@ export class PropertiesController {
   }
 
   @Delete(':id')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.SUPER_ADMIN)
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @RequirePermissions(Permission.PROPERTY_DELETE)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Super Admin only delete or archive a property listing or reel' })
+  @ApiOperation({ summary: 'Delete or archive a property listing (Super Admin, Broker, or authorized Broker Agent)' })
   delete(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
-    const isSuperAdmin =
-      user?.role === UserRole.SUPER_ADMIN ||
-      user?.platformRole === PlatformRole.SUPER_ADMIN ||
-      (user as any)?.role === 'SUPER_ADMIN' ||
-      (user as any)?.platformRole === 'SUPER_ADMIN';
-
-    if (!isSuperAdmin) {
-      throw new ForbiddenException(
-        'Only Super Admin authenticated in the Admin Portal is authorized to delete property listings or reels.',
-      );
-    }
-
     return this.propertiesService.deleteProperty(id, user);
   }
 }

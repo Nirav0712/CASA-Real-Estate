@@ -75,6 +75,13 @@ export interface User {
   kycApprovedAt?: string | null;
   kycApprovedBy?: string | null;
   kycDocumentType?: string | null;
+  brokerId?: string | null;
+  parentUserId?: string | null;
+  parentBrokerName?: string | null;
+  parentAgencyName?: string | null;
+  designation?: string;
+  assignedProperties?: string[];
+  grantedPermissions?: string[];
 }
 
 export interface AuthTokens {
@@ -205,7 +212,15 @@ export interface ModerationMetadata {
   reasonsFlagged?: string[];
 }
 
+export interface CustomSize {
+  name: string;
+  value: number;
+  unit: string;
+  dimensionsText?: string;
+}
+
 export interface PropertySpecs {
+  customSizes?: CustomSize[];
   bedrooms?: number;
   bathrooms?: number;
   balconies?: number;

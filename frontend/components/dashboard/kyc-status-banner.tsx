@@ -20,6 +20,7 @@ import {
   AlertTriangle,
   Zap,
 } from 'lucide-react';
+import { FreePlanClaimModal } from '@/components/pricing/free-plan-claim-modal';
 
 interface KycStatusBannerProps {
   className?: string;
@@ -68,6 +69,7 @@ export function KycStatusBanner({ className = '', onRefresh }: KycStatusBannerPr
 
   const [verification, setVerification] = React.useState<AgentVerificationResponse | null>(null);
   const [isRefreshing, setIsRefreshing] = React.useState(false);
+  const [isClaimModalOpen, setIsClaimModalOpen] = React.useState(false);
 
   // Fetch real authoritative status from backend
   const fetchLiveStatus = React.useCallback(async () => {
@@ -261,7 +263,43 @@ export function KycStatusBanner({ className = '', onRefresh }: KycStatusBannerPr
             </div>
           )}
 
-          {/* STATE B: Active 3-Day Free Trial (Shown only if no active plan and trial is active) */}
+          {/* STATE B.1: KYC Approved, 3-Month Free Plan Available to Claim */}
+          {!hasActiveSubscription && !isTrialActive && !isTrialExpired && !user?.trialUsed && (
+            <div className="bg-amber-500/10 dark:bg-amber-950/40 border border-amber-500/40 rounded-xl p-4 shadow-xs">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 bg-amber-500 text-white rounded-xl shadow-xs shrink-0">
+                    <Sparkles className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-bold text-casa-text-primary">
+                        3-Month Free Plan Available
+                      </span>
+                      <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-amber-100 text-amber-800 dark:bg-amber-900/60 dark:text-amber-200 border border-amber-300 dark:border-amber-700">
+                        Ready to Claim
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-casa-text-muted mt-0.5">
+                      Your KYC is approved! Activate your 3-Month Free Plan to receive 15 property listings for 3 months at ₹0.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 self-start md:self-auto shrink-0">
+                  <button
+                    onClick={() => setIsClaimModalOpen(true)}
+                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold shadow-xs transition"
+                  >
+                    <Sparkles className="w-3.5 h-3.5" />
+                    <span>Claim 3 Months Free</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* STATE B.2: Active 3-Month Free Plan */}
           {!hasActiveSubscription && isTrialActive && (
             <div className="bg-white dark:bg-gray-900/90 border border-emerald-200 dark:border-emerald-800/80 rounded-xl p-4 shadow-xs">
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -272,23 +310,23 @@ export function KycStatusBanner({ className = '', onRefresh }: KycStatusBannerPr
                   <div>
                     <div className="flex items-center gap-2">
                       <span className="text-xs font-bold text-casa-text-primary">
-                        3-Day Free Trial
+                        3-Month Free Plan (15 Listings)
                       </span>
                       <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-200">
-                        {trialRemainingDays > 0 ? `${trialRemainingDays} Day${trialRemainingDays !== 1 ? 's' : ''} Remaining` : 'Active'}
+                        {user?.trialRemainingLabel || (trialRemainingDays > 0 ? `${trialRemainingDays} Day${trialRemainingDays !== 1 ? 's' : ''} Remaining` : 'Active')}
                       </span>
                     </div>
                     <p className="text-[11px] text-casa-text-muted mt-0.5">
-                      Account Status: <strong className="text-emerald-700 dark:text-emerald-400">Active</strong> — You can publish property listings and receive direct buyer leads.
+                      Plan Status: <strong className="text-emerald-700 dark:text-emerald-400">Active</strong> — 15 property listings allowance for 3 months.
                     </p>
                   </div>
                 </div>
 
-                {/* Trial Dates Grid */}
+                {/* Plan Dates Grid */}
                 <div className="flex flex-wrap items-center gap-4 text-xs bg-slate-50 dark:bg-slate-800/50 px-3.5 py-2 rounded-lg border border-slate-200 dark:border-slate-700">
                   <div className="space-y-0.5">
                     <span className="text-[10px] font-semibold text-casa-text-muted uppercase tracking-wider block">
-                      Trial Start Date
+                      Plan Start Date
                     </span>
                     <span className="font-bold text-casa-text-primary">
                       {formatDateTime(trialStartedAt)}
@@ -297,19 +335,19 @@ export function KycStatusBanner({ className = '', onRefresh }: KycStatusBannerPr
                   <div className="w-px h-7 bg-slate-300 dark:bg-slate-700 hidden sm:block" />
                   <div className="space-y-0.5">
                     <span className="text-[10px] font-semibold text-casa-text-muted uppercase tracking-wider block">
-                      Trial Expiry Date
+                      Plan Expiry Date
                     </span>
                     <span className="font-bold text-casa-text-primary">
                       {formatDateTime(trialExpiresAt)}
                     </span>
                   </div>
-                  <Link
-                    href="/pricing"
+                  <button
+                    onClick={() => setIsClaimModalOpen(true)}
                     className="inline-flex items-center gap-1 text-xs font-bold text-casa-brand hover:underline ms-2"
                   >
-                    <span>Upgrade Plan</span>
+                    <span>View Allowance</span>
                     <ArrowRight className="w-3.5 h-3.5" />
-                  </Link>
+                  </button>
                 </div>
               </div>
             </div>
@@ -359,7 +397,7 @@ export function KycStatusBanner({ className = '', onRefresh }: KycStatusBannerPr
             </div>
           )}
 
-          {/* STATE D: Expired Trial, No Active Plan (Show Trial Expired with available plans) */}
+          {/* STATE D: Expired Trial, No Active Plan (Show Free Plan Expired with available plans) */}
           {!hasActiveSubscription && isTrialExpired && !isSubExpiredOrCancelled && (
             <div className="bg-amber-50/80 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800/80 rounded-xl p-4 shadow-xs space-y-3">
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -370,21 +408,21 @@ export function KycStatusBanner({ className = '', onRefresh }: KycStatusBannerPr
                   <div>
                     <div className="flex items-center gap-2">
                       <span className="text-sm font-bold text-amber-950 dark:text-amber-100">
-                        3-Day Free Trial Expired
+                        3-Month Free Plan Expired
                       </span>
                       <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-amber-200 dark:bg-amber-900 text-amber-900 dark:text-amber-200">
                         Plan Required
                       </span>
                     </div>
                     <p className="text-[11px] text-amber-800 dark:text-amber-300 mt-0.5">
-                      Your complimentary trial has concluded. Select an Agent or Broker subscription plan to keep publishing listings and receiving buyer inquiries.
+                      Your complimentary 3-Month Free Plan has concluded. Select an Agent or Broker subscription plan to keep publishing listings and receiving buyer inquiries.
                     </p>
                   </div>
                 </div>
 
                 <div className="flex items-center gap-2 self-start md:self-auto shrink-0">
                   <a
-                    href="https://wa.me/917069754589?text=Hello%20My%20Property%20Team,%20my%203-day%20trial%20has%20expired%20and%20I%20am%20ready%20to%20activate%20a%20plan."
+                    href="https://wa.me/917069754589?text=Hello%20My%20Property%20Team,%20my%203-month%20free%20plan%20has%20concluded%20and%20I%20am%20ready%20to%20activate%20a%20plan."
                     target="_blank"
                     rel="noopener noreferrer"
                     className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-amber-300 dark:border-amber-700 bg-white dark:bg-gray-900 text-xs font-semibold text-amber-800 dark:text-amber-200 hover:bg-amber-100/50 transition shadow-xs"
@@ -513,7 +551,7 @@ export function KycStatusBanner({ className = '', onRefresh }: KycStatusBannerPr
             <div>
               <strong>Verification Call Notice:</strong> You may receive a verification call from{' '}
               <strong className="font-bold underline text-amber-950 dark:text-white">7069754589</strong>{' '}
-              to complete your identity check. Once approved by the Super Admin, your <strong>3-Day Free Trial</strong> will activate immediately!
+              to complete your identity check. Once approved by the Super Admin, your <strong>3-Month Free Plan</strong> (15 property listings, ₹0) will become available to claim!
             </div>
           </div>
         </div>
@@ -536,7 +574,7 @@ export function KycStatusBanner({ className = '', onRefresh }: KycStatusBannerPr
                 </span>
               </div>
               <p className="text-xs text-casa-text-secondary mt-0.5">
-                Upload your business registration (GST, RERA, or Udyam certificate) to unlock your 3-day Free Trial and earn the Verified Trust Badge.
+                Upload your business registration (GST, RERA, or Udyam certificate) to unlock your 3-Month Free Plan (15 listings, ₹0) and earn the Verified Trust Badge.
               </p>
             </div>
           </div>
@@ -549,6 +587,15 @@ export function KycStatusBanner({ className = '', onRefresh }: KycStatusBannerPr
           </Link>
         </div>
       )}
+
+      {/* 3-Month Free Plan Claim Modal */}
+      <FreePlanClaimModal
+        isOpen={isClaimModalOpen}
+        onClose={() => {
+          setIsClaimModalOpen(false);
+          fetchLiveStatus();
+        }}
+      />
     </div>
   );
 }

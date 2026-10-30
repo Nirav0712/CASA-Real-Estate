@@ -224,7 +224,35 @@ export class PropertyLocationDto {
   pincodeId?: string;
 }
 
+export class CustomSizeDto {
+  @ApiProperty({ description: 'Size label or name, e.g., Plot Size, Carpet Area' })
+  @IsString()
+  @IsNotEmpty()
+  name: string;
+
+  @ApiProperty({ description: 'Numeric size value' })
+  @IsNumber()
+  value: number;
+
+  @ApiPropertyOptional({ default: 'SQ_FT' })
+  @IsOptional()
+  @IsString()
+  unit?: string;
+
+  @ApiPropertyOptional({ description: 'Optional dimension text, e.g., 30 x 40 ft' })
+  @IsOptional()
+  @IsString()
+  dimensionsText?: string;
+}
+
 export class PropertySpecsDto {
+  @ApiPropertyOptional({ type: [CustomSizeDto] })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => CustomSizeDto)
+  customSizes?: CustomSizeDto[];
+
   @ApiPropertyOptional()
   @IsOptional()
   @IsNumber()

@@ -46,7 +46,7 @@ import {
   SubscriptionRequestQueryDto,
 } from './dto/subscription-request.dto';
 import { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
-import { UserRole } from '../auth/enums/auth.enums';
+import { UserRole, AccountType } from '../auth/enums/auth.enums';
 import { Package, PackageDocument } from '../entitlements/schemas/package.schema';
 
 @Injectable()
@@ -97,6 +97,17 @@ export class PaymentsService implements OnModuleInit {
     let product: PricingProduct | null = null;
 
     if (dto.purpose === PaymentPurpose.SUBSCRIPTION) {
+      const isTeamMember =
+        user?.accountType === AccountType.BROKER_AGENT ||
+        user?.role === UserRole.BROKER_AGENT ||
+        Boolean(user?.brokerId || user?.parentUserId);
+
+      if (isTeamMember) {
+        throw new ForbiddenException(
+          'Team members are not authorized to purchase subscription plans. Only the main Broker account can manage and purchase subscriptions.',
+        );
+      }
+
       const lookupCode = dto.packageId || dto.productCode || dto.referenceId;
       let pkgDoc: PackageDocument | null = null;
 

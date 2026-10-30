@@ -514,18 +514,11 @@ export class MailService {
   /**
    * Dispatches KYC Approval Email only if properly configured
    */
-  async sendKycApprovedEmail(to: string, name: string, trialExpiresAt?: Date): Promise<SendMailResult> {
+  async sendKycApprovedEmail(to: string, name: string): Promise<SendMailResult> {
     const from = this.configService.get<string>('mail.from') || '"MyProperty" <info.mypropertyin@gmail.com>';
 
-    const expiryStr = trialExpiresAt
-      ? trialExpiresAt.toLocaleDateString('en-IN', {
-          dateStyle: 'full',
-          timeZone: 'Asia/Kolkata',
-        })
-      : 'in 3 days';
-
     const subject = 'Congratulations! Your My Property KYC Verification is Approved';
-    const text = `Hello ${name || 'User'},\n\nYour KYC verification application has been approved by the Super Admin.\n\nYour 3-Day Free Trial is now active until: ${expiryStr}.\n\nYou can access your dashboard and publish listings at: ${cleanUrl(this.configService.get<string>('cors.frontendUrl'), 'http://localhost:3000')}/dashboard\n\nBest regards,\nThe My Property Compliance Team`;
+    const text = `Hello ${name || 'User'},\n\nYour KYC verification application has been approved by the Super Admin.\n\nYou are now eligible to claim your 3-Month Free Plan with up to 15 property listings for ₹0.\n\nPlease visit your dashboard to claim your free plan and start publishing properties:\n${cleanUrl(this.configService.get<string>('cors.frontendUrl'), 'http://localhost:3000')}/dashboard\n\nBest regards,\nThe My Property Compliance Team`;
 
     if (this.transporter) {
       try {

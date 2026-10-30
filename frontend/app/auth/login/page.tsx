@@ -31,7 +31,7 @@ function LoginContent() {
       if (isTrialExpired || storedTrialExpired) {
         setTrialExpiredNotice(
           storedTrialExpired ||
-            'Your 3-day free trial has expired. Complete KYC verification and get an active plan to continue.'
+            'Your 3-month free plan has expired. Upgrade your subscription to continue posting listings and accessing leads.'
         );
         setKycStatus(storedKycStatus);
       }

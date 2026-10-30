@@ -530,9 +530,9 @@ export class EntitlementsService implements OnModuleInit {
 
       const casaPlans = [
         {
-          name: 'Free Plan',
+          name: '3-Month Free Plan',
           slug: 'casa-free-trial',
-          description: 'Introductory 3 Months Free full marketplace access for first 50 eligible Builders, Brokers, and Agents.',
+          description: 'Introductory 3 Months Free full marketplace access with up to 15 property listings for eligible Builders, Brokers, and Agents with Super Admin approved KYC.',
           isFree: true,
           recommended: false,
           displayOrder: 0,
@@ -547,7 +547,7 @@ export class EntitlementsService implements OnModuleInit {
           isDefault: false,
           limits: {
             propertyViews: -1,
-            propertyListings: 5,
+            propertyListings: 15,
             projectListings: 2,
             savedProperties: 20,
             savedSearches: 10,
@@ -558,12 +558,12 @@ export class EntitlementsService implements OnModuleInit {
           },
           features: [
             '3 Months Free Validity',
-            '5 Active Properties',
+            '15 Active Properties',
             '2 Active Projects',
             'Team: 1 Member',
             '25 Verified Buyer Leads',
             'Standard CRM Pipeline',
-            'Introductory Offer — First 50 Users Only',
+            'Introductory Offer — Approved KYC Required',
           ],
           permissions: [
             Permission.PROPERTY_VIEW,
@@ -812,8 +812,16 @@ export class EntitlementsService implements OnModuleInit {
             existing.eligibleUserTypes = p.eligibleUserTypes;
             shouldUpdate = true;
           }
-          if (p.isFree && (existing.freeTrialMaxSlots === undefined || existing.freeTrialMaxSlots === null)) {
-            existing.freeTrialMaxSlots = 50;
+          if (p.isFree || p.slug === 'casa-free-trial') {
+            existing.name = '3-Month Free Plan';
+            existing.description = p.description;
+            existing.limits = { ...existing.limits, ...p.limits, propertyListings: 15 };
+            existing.features = p.features;
+            existing.durationDays = 90;
+            existing.price = 0;
+            if (existing.freeTrialMaxSlots === undefined || existing.freeTrialMaxSlots === null) {
+              existing.freeTrialMaxSlots = 50;
+            }
             shouldUpdate = true;
           }
           if (existing.recommended === undefined) {
@@ -1462,10 +1470,11 @@ export class EntitlementsService implements OnModuleInit {
 
     for (const p of granted) combined.add(p);
 
-    // If user is a Broker, Agent, Developer, or Broker Employee, ensure core domain permissions are present
+    // If user is a Broker, Agent, or Developer, ensure core domain permissions are present
+    // Note: BROKER_AGENT (team members) strictly inherit their broker-assigned grantedPermissions
     const isBrokerOrAgent =
-      ['BROKER', 'AGENT', 'DEVELOPER', 'BROKER_AGENT'].includes(userRole) ||
-      ['BROKER', 'AGENT', 'DEVELOPER', 'BROKER_AGENT'].includes(userAccountType);
+      ['BROKER', 'AGENT', 'DEVELOPER'].includes(userRole) ||
+      ['BROKER', 'AGENT', 'DEVELOPER'].includes(userAccountType);
     if (isBrokerOrAgent) {
       const brokerDomainPermissions = [
         Permission.PROPERTY_VIEW,
@@ -1548,15 +1557,28 @@ export class EntitlementsService implements OnModuleInit {
       dashboardConfig: finalDashboardConfig,
       package: packageDoc ? { id: packageDoc._id.toString(), name: packageDoc.name, slug: packageDoc.slug, price: packageDoc.price, billingPeriod: packageDoc.billingPeriod } : null,
       subscription: subscriptionDoc ? { id: subscriptionDoc._id.toString(), status: subscriptionDoc.status, endDate: subscriptionDoc.endDate } : null,
-      trial: {
-        isTrialActive: !subscriptionDoc && Boolean(user.trialExpiresAt && new Date() <= new Date(user.trialExpiresAt)),
-        isTrialExpired: !subscriptionDoc && Boolean(user.trialExpiresAt && new Date() > new Date(user.trialExpiresAt)),
-        trialExpiresAt: user.trialExpiresAt || null,
-        daysRemaining: !subscriptionDoc && user.trialExpiresAt
+      trial: (() => {
+        const isPaidSub = Boolean(
+          subscriptionDoc &&
+          subscriptionDoc.status === 'ACTIVE' &&
+          subscriptionDoc.plan !== 'FREE_TRIAL' &&
+          subscriptionDoc.plan !== '3-Month Free Plan' &&
+          (subscriptionDoc.amountPaid || 0) > 0,
+        );
+        const isTrialActive = !isPaidSub && Boolean(user.isTrialActive && user.trialExpiresAt && new Date() <= new Date(user.trialExpiresAt));
+        const isTrialExpired = !isPaidSub && Boolean((user.trialExpired || (user.trialExpiresAt && new Date() > new Date(user.trialExpiresAt))) && !user.isTrialActive);
+        const daysRemaining = isTrialActive && user.trialExpiresAt
           ? Math.max(0, Math.ceil((new Date(user.trialExpiresAt).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
-          : 0,
-        trialPackageId: user.trialPackageId || null,
-      },
+          : 0;
+
+        return {
+          isTrialActive,
+          isTrialExpired,
+          trialExpiresAt: user.trialExpiresAt || null,
+          daysRemaining,
+          trialPackageId: user.trialPackageId || null,
+        };
+      })(),
     };
   }
 
@@ -1774,9 +1796,64 @@ export class EntitlementsService implements OnModuleInit {
 
     const entitlements = await this.resolveUserEntitlements(user);
 
-    // Current month usage
+    // Current month usage & live listings count
     const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
     const propertyViews = await this.propertyViewModel.countDocuments({ userId, viewedAt: { $gte: monthStart } });
+
+    let propertyListings = 0;
+    let totalListings = 0;
+    let publishedListings = 0;
+    let draftListings = 0;
+    let pendingListings = 0;
+
+    try {
+      const companyUserIds = [userId];
+      if (user.brokerId || user.parentUserId || user.agencyId) {
+        companyUserIds.push(user.brokerId || user.parentUserId || user.agencyId);
+      }
+      const effectiveBrokerId = user.brokerId || user.parentUserId || user.agencyId || userId;
+      const teamDocs = await this.userModel.find({
+        $or: [{ brokerId: effectiveBrokerId }, { parentUserId: effectiveBrokerId }, { agencyId: effectiveBrokerId }],
+      }).select('_id').lean();
+      for (const t of teamDocs) {
+        if (t._id) companyUserIds.push(t._id.toString());
+      }
+      const uniqueCompanyUserIds = Array.from(new Set(companyUserIds));
+
+      const propCollection = this.userModel.db.collection('properties');
+      const baseScope = {
+        isParentProject: { $ne: true },
+        isChildUnit: { $ne: true },
+        status: { $ne: 'ARCHIVED' },
+        $or: [
+          { ownerId: { $in: uniqueCompanyUserIds } },
+          { advertiserId: { $in: uniqueCompanyUserIds } },
+          { createdBy: { $in: uniqueCompanyUserIds } },
+          { brokerId: { $in: uniqueCompanyUserIds } },
+        ],
+      };
+
+      totalListings = await propCollection.countDocuments(baseScope);
+      publishedListings = await propCollection.countDocuments({
+        ...baseScope,
+        status: { $in: ['PUBLISHED', 'ACTIVE'] },
+      });
+      draftListings = await propCollection.countDocuments({
+        ...baseScope,
+        status: { $in: ['DRAFT', 'UNPUBLISHED', 'REJECTED'] },
+      });
+      pendingListings = await propCollection.countDocuments({
+        ...baseScope,
+        status: { $in: ['PENDING_REVIEW', 'PENDING_APPROVAL', 'PENDING_BROKER_APPROVAL'] },
+      });
+      propertyListings = publishedListings + pendingListings;
+    } catch {}
+
+    const isUnderFreePlan =
+      (entitlements as any)?.activePlan?.slug === 'casa-free-trial' ||
+      user?.isTrialActive ||
+      (entitlements as any)?.isTrialActive ||
+      user?.activePlanName?.includes('Free');
 
     return {
       user: {
@@ -1797,7 +1874,13 @@ export class EntitlementsService implements OnModuleInit {
       entitlements,
       usage: {
         propertyViews,
-        propertyListings: 0, // dynamic in property queries
+        propertyListings,
+        totalListings,
+        publishedListings,
+        draftListings,
+        pendingListings,
+        maxTotalListings: isUnderFreePlan ? 15 : ((entitlements?.limits as any)?.totalProperties || 15),
+        maxPublishedListings: isUnderFreePlan ? 10 : (entitlements.limits?.propertyListings || 10),
         monthlyLeads: 0,
         enquiries: 0,
         chats: 0,
@@ -1939,100 +2022,12 @@ export class EntitlementsService implements OnModuleInit {
   }
 
   // ==========================================
-  // 9. THREE-DAY PLAN TRIAL ACTIVATION
+  // 9. THREE-MONTH FREE PLAN TRIAL ACTIVATION
   // ==========================================
 
-  async startTrial(userId: string, packageId: string) {
-    const user = await this.userModel.findById(userId);
-    if (!user) throw new NotFoundException('User not found.');
-
-    const userRole = String(user.role || '').toUpperCase();
-    const userPlatformRole = String(user.platformRole || '').toUpperCase();
-    const userAccountType = String(user.accountType || '').toUpperCase();
-
-    const isExempt =
-      userPlatformRole === PlatformRole.SUPER_ADMIN ||
-      userPlatformRole === PlatformRole.ADMIN ||
-      userRole === UserRole.SUPER_ADMIN ||
-      userRole === UserRole.ADMIN ||
-      ['BUYER', 'TENANT', 'PURCHASER'].includes(userRole) ||
-      ['BUYER', 'TENANT'].includes(userAccountType);
-
-    if (isExempt) {
-      throw new BadRequestException(
-        'Billing, subscription plans, and free trial options are not applicable to your account. You have direct unrestricted marketplace access.',
-      );
-    }
-
-    // Do not restart trial by logging out, signing in again, refreshing, or creating duplicate requests
-    if (
-      user.trialStartedAt ||
-      user.trialUsed ||
-      user.trialExpired ||
-      (user.trialExpiresAt && new Date(user.trialExpiresAt).getTime() <= Date.now())
-    ) {
-      throw new BadRequestException(
-        'Free trial has already been used or expired for this account. Free trial cannot be restarted.',
-      );
-    }
-
-    if (user.isTrialActive && user.trialExpiresAt && new Date(user.trialExpiresAt).getTime() > Date.now()) {
-      throw new BadRequestException('Your 3-day free trial is already active.');
-    }
-
-    const pkg = await this.packageModel.findById(packageId);
-    if (!pkg) throw new NotFoundException('Selected pricing plan was not found.');
-    if (!pkg.isActive) throw new BadRequestException('This plan is currently not active.');
-
-    const trialDays = 3;
-    const now = new Date();
-    const trialExpiresAt = new Date(now.getTime() + trialDays * 24 * 60 * 60 * 1000);
-
-    user.activePackageId = pkg._id.toString();
-    user.trialPackageId = pkg._id.toString();
-    user.trialStartedAt = now;
-    user.trialExpiresAt = trialExpiresAt;
-    user.isTrialActive = true;
-    await user.save();
-
-    // Create or update 3-day active trial subscription record
-    await this.subscriptionModel.findOneAndUpdate(
-      { userId },
-      {
-        userId,
-        plan: pkg.name || 'FREE_TRIAL',
-        status: 'TRIAL',
-        startDate: now,
-        endDate: trialExpiresAt,
-        metadata: {
-          packageId: pkg._id.toString(),
-          packageName: pkg.name,
-          trialDays,
-          isTrial: true,
-        },
-      },
-      { upsert: true, new: true },
-    );
-
-    this.logger.log(
-      `🎉 3-Day Free Trial activated for user ${user.name} (${user.mobile}) on package "${pkg.name}". Expires: ${trialExpiresAt.toISOString()}`,
-    );
-
-    const entitlements = await this.resolveUserEntitlements(user);
-
-    return {
-      success: true,
-      message: `3-Day Free Trial activated for "${pkg.name}". You now have full platform access!`,
-      trialExpiresAt: trialExpiresAt.toISOString(),
-      daysRemaining: 3,
-      package: {
-        id: pkg._id.toString(),
-        name: pkg.name,
-        price: pkg.price,
-        limits: pkg.limits,
-      },
-      entitlements,
-    };
+  async startTrial(userId: string, packageId?: string) {
+    // Obsolete 3-day trial removed. Route directly to authoritative 3-Month Free Plan claim logic
+    return this.claimFreeTrialSubscription(userId);
   }
 
   // ==========================================
@@ -2125,8 +2120,8 @@ export class EntitlementsService implements OnModuleInit {
           return {
             id: pkg._id.toString(),
             slug: pkg.slug,
-            name: pkg.name,
-            description: pkg.description,
+            name: '3-Month Free Plan',
+            description: pkg.description || '3-Month Free Plan with up to 15 property listings for eligible Builders, Brokers, and Agents upon Super Admin KYC approval.',
             isFree: true,
             recommended: Boolean(pkg.recommended),
             displayOrder: pkg.displayOrder ?? 0,
@@ -2139,8 +2134,21 @@ export class EntitlementsService implements OnModuleInit {
             originalPrice: 0,
             savings: 0,
             discountPercentage: 0,
-            limits: pkg.limits || {},
-            features: pkg.features || [],
+            limits: {
+              ...(pkg.limits || {}),
+              propertyListings: 15,
+            },
+            features: pkg.features && pkg.features.length > 0
+              ? pkg.features
+              : [
+                  '3 Months Free Validity',
+                  '15 Active Properties',
+                  '2 Active Projects',
+                  'Team: 1 Member',
+                  '25 Verified Buyer Leads',
+                  'Standard CRM Pipeline',
+                  '₹0 — Super Admin KYC Approval Required',
+                ],
             whatsappNumber: pkg.whatsappNumber,
             callNumber: pkg.callNumber,
             freeTrial: {
@@ -2214,38 +2222,74 @@ export class EntitlementsService implements OnModuleInit {
       throw new NotFoundException('User not found');
     }
 
-    // 1. Verify user type eligibility: Only Builder/Developer, Broker, Agent can claim
+    // 1. Verify account type eligibility
     const userRole = String(user.role || '').toUpperCase();
+    const userPlatformRole = String(user.platformRole || '').toUpperCase();
     const userAccountType = String(user.accountType || '').toUpperCase();
-    const isEligibleUserType =
-      ['DEVELOPER', 'BUILDER'].includes(userRole) ||
-      ['DEVELOPER', 'BUILDER'].includes(userAccountType) ||
-      ['BROKER', 'BROKER_AGENCY'].includes(userRole) ||
-      ['BROKER', 'BROKER_AGENCY'].includes(userAccountType) ||
-      ['AGENT', 'BROKER_AGENT'].includes(userRole) ||
-      ['AGENT', 'BROKER_AGENT'].includes(userAccountType);
 
-    if (!isEligibleUserType) {
+    const isConsumer =
+      ['BUYER', 'TENANT', 'PURCHASER'].includes(userRole) ||
+      ['BUYER', 'TENANT'].includes(userAccountType);
+
+    if (isConsumer) {
+      throw new BadRequestException('Free plans are not applicable to Buyer or Tenant accounts.');
+    }
+
+    const isPlatformAdmin =
+      userPlatformRole === PlatformRole.SUPER_ADMIN ||
+      userPlatformRole === PlatformRole.ADMIN ||
+      userRole === UserRole.SUPER_ADMIN ||
+      userRole === UserRole.ADMIN;
+
+    if (isPlatformAdmin) {
+      throw new BadRequestException('Super Administrators have full platform access and do not require a free plan.');
+    }
+
+    const isTeamMember =
+      userRole === 'BROKER_AGENT' ||
+      userAccountType === 'BROKER_AGENT' ||
+      Boolean(user.brokerId || user.parentUserId);
+
+    if (isTeamMember) {
       throw new ForbiddenException(
-        'The introductory 3-month free trial is exclusively available to Builders / Developers, Brokers, and Agents.',
+        'Team members are not authorized to claim or manage subscription plans. Only the main Broker account can manage subscriptions.'
+      );
+    }
+
+    // 2. Mandatory KYC Approval Enforcement
+    const isKycApproved = user.kycStatus === 'APPROVED' || user.isVerifiedAgent === true;
+    if (!isKycApproved) {
+      if (user.kycStatus === 'PENDING') {
+        throw new BadRequestException(
+          'Your KYC application has been submitted and is awaiting Super Admin approval. Your 3-Month Free Plan will become available after approval.',
+        );
+      }
+      if (user.kycStatus === 'REJECTED') {
+        const reason = user.kycRejectionReason ? `: ${user.kycRejectionReason}` : '';
+        throw new BadRequestException(
+          `Your KYC application was rejected${reason}. Please correct your details and resubmit KYC before claiming the free plan.`,
+        );
+      }
+      throw new BadRequestException(
+        'Please submit your KYC verification details before claiming the 3-Month Free Plan. Your free plan will become available after Super Admin approval.',
       );
     }
 
     if (user.isTrialActive) {
-      throw new BadRequestException('You already have an active trial.');
+      throw new BadRequestException('You already have an active 3-Month Free Plan.');
     }
 
     if (user.trialUsed) {
-      throw new BadRequestException('You have already used your introductory free trial.');
+      throw new BadRequestException('You have already used or claimed your 3-Month Free Plan.');
     }
 
-    // 2. Company-level eligibility: Check if parent company or agency already used trial or has active subscription
+    // 3. Company-level eligibility: Check if parent company or agency already used trial or has active subscription
     const companyId = user.brokerId || user.parentUserId || user.agencyId;
     if (companyId) {
       const companyParent = await this.userModel.findById(companyId);
       if (companyParent?.trialUsed || companyParent?.isTrialActive) {
         throw new BadRequestException(
-          'Your company / parent agency has already utilized or claimed the introductory free trial.',
+          'Your company / parent agency has already utilized or claimed the 3-Month Free Plan.',
         );
       }
       const companySub = await this.subscriptionModel.findOne({
@@ -2255,7 +2299,7 @@ export class EntitlementsService implements OnModuleInit {
       });
       if (companySub) {
         throw new BadRequestException(
-          'Your company / parent agency already has an active subscription or trial in place.',
+          'Your company / parent agency already has an active subscription or free plan in place.',
         );
       }
     }
@@ -2273,16 +2317,16 @@ export class EntitlementsService implements OnModuleInit {
       $or: [{ slug: 'casa-free-trial' }, { isFree: true }],
     });
     if (!freePkg) {
-      throw new NotFoundException('Introductory Free Plan is currently not available.');
+      throw new NotFoundException('3-Month Free Plan is currently not available.');
     }
 
     const maxSlots = freePkg.freeTrialMaxSlots || 50;
     const claimedSlots = freePkg.freeTrialClaimedSlots || 0;
     if (claimedSlots >= maxSlots) {
-      throw new BadRequestException('All 50 introductory free trial slots have been claimed.');
+      throw new BadRequestException('All introductory free trial slots have been claimed.');
     }
 
-    // 3. Atomic user lock to prevent concurrent duplicate claims by the same account
+    // 4. Atomic user lock to prevent concurrent duplicate claims by the same account
     const lockedUser = await this.userModel.findOneAndUpdate(
       {
         _id: user._id,
@@ -2299,10 +2343,10 @@ export class EntitlementsService implements OnModuleInit {
     );
 
     if (!lockedUser) {
-      throw new BadRequestException('You have already used or are currently claiming your introductory free trial.');
+      throw new BadRequestException('You have already claimed or are currently claiming your 3-Month Free Plan.');
     }
 
-    // 4. Atomic slot reservation
+    // 5. Atomic slot reservation
     const updatedPkg = await this.packageModel.findOneAndUpdate(
       {
         _id: freePkg._id,
@@ -2317,20 +2361,20 @@ export class EntitlementsService implements OnModuleInit {
       await this.userModel.findByIdAndUpdate(userId, {
         $set: { isTrialActive: false, trialUsed: false },
       });
-      throw new BadRequestException('All 50 introductory free trial slots have been claimed.');
+      throw new BadRequestException('All introductory free trial slots have been claimed.');
     }
 
     try {
       const startDate = new Date();
-      const durationDays = freePkg.durationDays || 90;
-      const endDate = new Date(startDate.getTime() + durationDays * 24 * 60 * 60 * 1000);
+      const endDate = new Date(startDate);
+      endDate.setMonth(endDate.getMonth() + 3);
 
       const sub = await this.subscriptionModel.create({
         userId,
         packageId: freePkg._id.toString(),
         companyId: companyId || undefined,
         accountType: user.accountType,
-        plan: 'FREE_TRIAL',
+        plan: '3-Month Free Plan',
         status: 'TRIAL',
         durationMonths: 3,
         amountPaid: 0,
@@ -2338,17 +2382,20 @@ export class EntitlementsService implements OnModuleInit {
         startDate,
         endDate,
         metadata: {
-          packageName: freePkg.name,
+          packageName: '3-Month Free Plan',
           packageSlug: freePkg.slug,
           isIntroductoryTrial: true,
+          propertyLimit: 15,
         },
       });
 
       lockedUser.activePackageId = freePkg._id.toString();
       lockedUser.activeSubscriptionId = sub._id.toString();
+      lockedUser.activePlanName = '3-Month Free Plan';
       lockedUser.trialStartedAt = startDate;
       lockedUser.trialExpiresAt = endDate;
       lockedUser.trialPackageId = freePkg._id.toString();
+      lockedUser.trialExpired = false;
       await lockedUser.save();
 
       await this.auditLogModel.create({
@@ -2359,6 +2406,8 @@ export class EntitlementsService implements OnModuleInit {
         targetEntity: 'SUBSCRIPTION',
         targetEntityId: sub._id.toString(),
         metadata: {
+          planName: '3-Month Free Plan',
+          propertyLimit: 15,
           claimedSlots: updatedPkg.freeTrialClaimedSlots,
           remainingSlots: Math.max(0, maxSlots - updatedPkg.freeTrialClaimedSlots),
         },
@@ -2369,6 +2418,11 @@ export class EntitlementsService implements OnModuleInit {
         success: true,
         message: 'Congratulations! Your 3-Month Free Plan is now active.',
         subscription: sub,
+        planName: '3-Month Free Plan',
+        startDate: startDate.toISOString(),
+        expiryDate: endDate.toISOString(),
+        propertyListingsLimit: 15,
+        durationMonths: 3,
         remainingSlots: Math.max(0, maxSlots - updatedPkg.freeTrialClaimedSlots),
       };
     } catch (err: any) {

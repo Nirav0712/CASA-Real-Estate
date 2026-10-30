@@ -969,7 +969,7 @@ describe('AdminService Moderation & User Governance (Phase 08)', () => {
       expect(res.pagination.totalPages).toBe(1);
     });
 
-    it('should approve KYC application, grant verified badge, activate 3-day trial, and approve documents', async () => {
+    it('should approve KYC application, grant verified badge, make 3-Month Free Plan available without auto-activating it, and approve documents', async () => {
       const userToApprove = {
         _id: 'usr-kyc-approve-1',
         name: 'Applicant Broker',
@@ -989,9 +989,10 @@ describe('AdminService Moderation & User Governance (Phase 08)', () => {
       expect(res.success).toBe(true);
       expect(userToApprove.kycStatus).toBe('APPROVED');
       expect(userToApprove.isVerifiedAgent).toBe(true);
-      expect((userToApprove as any).isTrialActive).toBe(true);
-      expect((userToApprove as any).trialStartedAt).toBeDefined();
-      expect((userToApprove as any).trialExpiresAt).toBeDefined();
+      // KYC approval alone must NOT start the free-plan countdown or activate the plan
+      expect((userToApprove as any).isTrialActive).toBeFalsy();
+      expect((userToApprove as any).trialStartedAt).toBeUndefined();
+      expect((userToApprove as any).trialExpiresAt).toBeUndefined();
       expect(userToApprove.save).toHaveBeenCalled();
     });
 

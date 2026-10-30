@@ -48,7 +48,7 @@ interface AuthContextType {
   openLoginProtection: (intent?: LoginProtectionIntent) => void;
   closeLoginProtection: () => void;
 
-  // Pricing Plan & 3-Day Trial Modals
+  // Pricing Plan & Free Plan Modals
   isPlanSelectionModalOpen: boolean;
   openPlanSelectionModal: () => void;
   closePlanSelectionModal: () => void;
@@ -445,15 +445,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     let remainingLabel = '';
 
     if (!isExpired && Boolean(user.isTrialActive) && msRemaining > 0) {
-      if (msRemaining > 2 * 24 * 60 * 60 * 1000) {
-        daysRemaining = 3;
-        remainingLabel = '3 Days Remaining';
-      } else if (msRemaining > 1 * 24 * 60 * 60 * 1000) {
-        daysRemaining = 2;
-        remainingLabel = '2 Days Remaining';
+      daysRemaining = Math.max(1, Math.ceil(msRemaining / (24 * 60 * 60 * 1000)));
+      if (user.trialRemainingLabel) {
+        remainingLabel = user.trialRemainingLabel;
+      } else if (daysRemaining > 60) {
+        const months = Math.ceil(daysRemaining / 30);
+        remainingLabel = `${months} Months Remaining`;
+      } else if (daysRemaining > 30) {
+        remainingLabel = '1 Month Remaining';
       } else {
-        daysRemaining = 1;
-        remainingLabel = '1 Day Remaining';
+        remainingLabel = `${daysRemaining} Day${daysRemaining > 1 ? 's' : ''} Remaining`;
       }
     }
 
@@ -482,7 +483,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         localStorage.setItem('casa_user', JSON.stringify(res.user));
       }
     }
-    toast.success('3-Day Free Trial Started', 'Your 3-day free trial is now active!');
+    toast.success('3-Month Free Plan Started', 'Your 3-month free plan is now active with 15 property listings!');
     return res;
   }, [token, toast, isUserExempt]);
 

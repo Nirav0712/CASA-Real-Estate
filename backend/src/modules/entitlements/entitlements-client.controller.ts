@@ -8,6 +8,7 @@ import {
   Req,
   Ip,
   UseGuards,
+  ForbiddenException,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { EntitlementsService } from './entitlements.service';
@@ -45,6 +46,9 @@ export class EntitlementsClientController {
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Claim 3-month free trial slot for logged in user' })
   claimFreeTrial(@Req() req: any): Promise<any> {
+    if (req.user?.accountType === 'BROKER_AGENT' || req.user?.role === 'BROKER_AGENT' || req.user?.brokerId || req.user?.parentUserId) {
+      throw new ForbiddenException('Team members are not authorized to claim or manage subscription plans. Only the main Broker account can manage subscriptions.');
+    }
     return this.entitlementsService.claimFreeTrialSubscription(req.user.id);
   }
 
@@ -87,9 +91,12 @@ export class EntitlementsClientController {
 
   @Post('start-trial')
   @UseGuards(JwtAuthGuard)
-  @ApiOperation({ summary: 'Activate 3-day full access free trial for selected package' })
-  @ApiResponse({ status: 200, description: '3-day trial activated' })
-  startTrial(@Body() body: { packageId: string }, @Req() req: any): Promise<any> {
-    return this.entitlementsService.startTrial(req.user.id, body.packageId);
+  @ApiOperation({ summary: 'Claim 3-Month Free Plan for verified user' })
+  @ApiResponse({ status: 200, description: '3-Month Free Plan claimed and activated' })
+  startTrial(@Body() body: { packageId?: string }, @Req() req: any): Promise<any> {
+    if (req.user?.accountType === 'BROKER_AGENT' || req.user?.role === 'BROKER_AGENT' || req.user?.brokerId || req.user?.parentUserId) {
+      throw new ForbiddenException('Team members are not authorized to claim or manage subscription plans. Only the main Broker account can manage subscriptions.');
+    }
+    return this.entitlementsService.startTrial(req.user.id, body?.packageId);
   }
 }

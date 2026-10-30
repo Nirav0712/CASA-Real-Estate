@@ -84,10 +84,10 @@ export function PostLoginModal() {
   };
 
   const formatExpiry = (expiresAt?: string | null): string => {
-    if (!expiresAt) return '3 days from activation';
+    if (!expiresAt) return '3 months from activation';
     try {
       const d = new Date(expiresAt);
-      if (isNaN(d.getTime())) return '3 days from activation';
+      if (isNaN(d.getTime())) return '3 months from activation';
       return d.toLocaleDateString('en-IN', {
         day: 'numeric',
         month: 'short',
@@ -96,7 +96,7 @@ export function PostLoginModal() {
         minute: '2-digit',
       });
     } catch {
-      return '3 days from activation';
+      return '3 months from activation';
     }
   };
 
@@ -122,30 +122,30 @@ export function PostLoginModal() {
             <div className="space-y-2">
               <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-900">
                 <Clock className="w-3.5 h-3.5" />
-                Active Free Trial
+                Active 3-Month Free Plan
               </span>
               <h2 className="text-2xl font-bold text-casa-text-primary">
                 Welcome to MyProperty!
               </h2>
               <p className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">
-                Your 3-Day Free Trial Has Started
+                Your 3-Month Free Plan Has Started
               </p>
               <p className="text-xs text-casa-text-secondary leading-relaxed">
-                Enjoy full access to MyProperty Marketplace features, client enquiries, and listing tools.
+                Enjoy 15 property listings, direct client enquiries, and full listing tools for 3 calendar months.
               </p>
             </div>
 
             {/* Trial Expiry Card */}
             <div className="p-4 rounded-xl bg-casa-subtle border border-casa-border-light space-y-2">
               <div className="flex items-center justify-between text-xs font-medium">
-                <span className="text-casa-text-secondary">Trial Expiry:</span>
+                <span className="text-casa-text-secondary">Plan Expiry:</span>
                 <span className="font-bold text-casa-text-primary">
                   {formatExpiry(user.trialExpiresAt)}
                 </span>
               </div>
               <div className="flex items-center gap-2 text-xs text-emerald-600 dark:text-emerald-400">
                 <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
-                <span>Unlimited verified listing views & direct inquiries</span>
+                <span>15 verified property listings & direct buyer enquiries</span>
               </div>
             </div>
 

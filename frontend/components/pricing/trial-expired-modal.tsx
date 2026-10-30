@@ -75,7 +75,52 @@ export function TrialExpiredModal() {
     ['SUPER_ADMIN', 'ADMIN'].includes(platformRole) ||
     ['SUPER_ADMIN', 'ADMIN'].includes(role);
 
+  const isTeamMember = Boolean(
+    user &&
+      (user.accountType === 'BROKER_AGENT' ||
+        user.role === 'BROKER_AGENT' ||
+        user.brokerId ||
+        user.parentUserId),
+  );
+
   if (!isTrialExpiredModalOpen || isExempt) return null;
+
+  if (isTeamMember) {
+    const parentAgencyOrBrokerName =
+      user?.parentAgencyName || user?.parentBrokerName || user?.agencyName || 'Broker';
+    return (
+      <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
+        <div className="relative w-full max-w-md bg-casa-surface border border-casa-border-light rounded-3xl shadow-2xl p-6 md:p-8 text-center space-y-5">
+          <button
+            onClick={closeTrialExpiredModal}
+            className="absolute top-4 right-4 p-2 text-casa-text-muted hover:text-casa-text-primary rounded-full hover:bg-casa-subtle transition-colors"
+          >
+            <X className="w-5 h-5" />
+          </button>
+          <div className="w-14 h-14 bg-blue-500/10 text-blue-600 rounded-2xl flex items-center justify-center mx-auto">
+            <Building className="w-7 h-7" />
+          </div>
+          <div className="space-y-1.5">
+            <span className="inline-block px-3 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider bg-blue-500/15 text-blue-700 dark:text-blue-300 border border-blue-500/30">
+              Team Member Account
+            </span>
+            <h2 className="text-xl font-bold text-casa-text-primary">
+              Managed by Broker
+            </h2>
+            <p className="text-sm text-casa-text-secondary leading-relaxed">
+              Subscription plans and billing are managed by your Broker ({parentAgencyOrBrokerName}).
+            </p>
+          </div>
+          <button
+            onClick={closeTrialExpiredModal}
+            className="w-full py-2.5 px-4 rounded-xl bg-casa-brand text-white font-semibold hover:opacity-95 transition-all text-xs"
+          >
+            Close
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   const salesPhone = settings.companySalesNumber || '+91 98765 43210';
   const servicePhone = settings.companyServiceNumber || '+91 98765 43211';
@@ -154,15 +199,15 @@ export function TrialExpiredModal() {
 
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-red-50 text-red-700 dark:bg-red-950/80 dark:text-red-300 text-xs font-bold uppercase tracking-wider">
             <ShieldAlert className="w-3.5 h-3.5" />
-            <span>3-Day Trial Period Concluded</span>
+            <span>Free Plan Period Concluded</span>
           </div>
 
           <h2 className="text-2xl md:text-3xl font-extrabold text-casa-text-primary">
-            Your 3-Day Free Trial Has Ended
+            Your 3-Month Free Plan Has Ended
           </h2>
 
           <p className="text-xs md:text-sm text-casa-text-secondary leading-relaxed">
-            Your complimentary 3-day access has expired. To maintain uninterrupted access to seller direct contacts,
+            Your complimentary 3-month access has expired. To maintain uninterrupted access to seller direct contacts,
             exclusive leads, and active listing promotions, please connect with our Sales Department to process payment for your chosen plan.
           </p>
         </div>

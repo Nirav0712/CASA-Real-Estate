@@ -106,7 +106,7 @@ export default function SettingsPage() {
             </h1>
           </div>
           <p className="text-xs md:text-sm text-casa-text-secondary mt-1">
-            Configure sales department numbers, customer service contacts, 3-day trial period, and platform gateways.
+            Configure sales department numbers, customer service contacts, 3-month free plan period, and platform gateways.
           </p>
         </div>
 
@@ -136,7 +136,7 @@ export default function SettingsPage() {
           </div>
 
           <p className="text-xs text-casa-text-secondary leading-relaxed">
-            These numbers are prominently displayed to users when their 3-day free trial expires, with a direct 1-click &ldquo;Call Sales Department&rdquo; Call-To-Action (CTA) button to process subscription payments.
+            These numbers are prominently displayed to users when their 3-month free plan expires, with a direct 1-click &ldquo;Call Sales Department&rdquo; Call-To-Action (CTA) button to process subscription payments.
           </p>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">

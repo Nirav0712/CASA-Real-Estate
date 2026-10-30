@@ -733,10 +733,10 @@ export async function approveAdminKyc(
   );
 
   if (!result.isBackendAvailable || result.error) {
-    throw new Error(result.error || 'Failed to approve KYC and activate trial');
+    throw new Error(result.error || 'Failed to approve KYC');
   }
 
-  return result.data || { success: true, message: 'KYC approved and 3-day Free Trial started' };
+  return result.data || { success: true, message: 'KYC approved. User is now eligible to claim the 3-Month Free Plan.' };
 }
 
 export async function rejectAdminKyc(

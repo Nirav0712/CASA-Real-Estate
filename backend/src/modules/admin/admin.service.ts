@@ -2736,24 +2736,8 @@ export class AdminService implements OnModuleInit {
     user.kycApprovedBy = actor?.name || actor?.id || 'admin';
     user.kycRejectionReason = undefined;
 
-    // Requirement 7 & 8: 3-day Free Trial starts ONLY after Super Admin approves KYC/account
-    const trialDays = 3;
-    const now = new Date();
-    user.isTrialActive = true;
-    user.trialStartedAt = now;
-    user.trialExpiresAt = new Date(now.getTime() + trialDays * 24 * 60 * 60 * 1000);
-
-    try {
-      const trialPackage = await this.packageModel.findOne({
-        slug: { $in: ['free-trial', 'trial', 'free'] },
-      });
-      if (trialPackage) {
-        user.trialPackageId = trialPackage._id.toString();
-      }
-    } catch (e) {
-      // ignore
-    }
-
+    // 3-Month Free Plan requirement: KYC approval alone must NOT automatically start the plan countdown.
+    // The user will claim the 3-Month Free Plan explicitly from the frontend / API.
     await user.save();
 
     const userId = user._id.toString();
@@ -2797,7 +2781,7 @@ export class AdminService implements OnModuleInit {
     // Send Email notification (only if email is provided and service is configured)
     if (user.email && this.mailService) {
       try {
-        await this.mailService.sendKycApprovedEmail(user.email, user.name, user.trialExpiresAt);
+        await this.mailService.sendKycApprovedEmail(user.email, user.name);
       } catch (err: any) {
         this.logger.warn(`Failed to dispatch KYC approval email: ${err.message}`);
       }
@@ -2818,15 +2802,14 @@ export class AdminService implements OnModuleInit {
         isVerifiedAgent: true,
         role: UserRole.VERIFIED_AGENT,
         verificationStatus: 'VERIFIED',
-        isTrialActive: true,
-        trialExpiresAt: user.trialExpiresAt,
+        kycStatus: 'APPROVED',
       },
-      reason: notes || 'CASA Verified Agent badge granted by administrator. 3-day Free Trial activated.',
+      reason: notes || 'CASA Verified Agent badge granted by administrator. KYC approved. 3-Month Free Plan is now available for user to claim.',
     });
 
     return {
       success: true,
-      message: `CASA Verified Agent badge granted to ${user.name}. 3-day Free Trial is now active.`,
+      message: `CASA Verified Agent badge granted to ${user.name}. KYC approved. 3-Month Free Plan is now available for the user to claim.`,
       agent: {
         id: userId,
         name: user.name,
@@ -3385,10 +3368,10 @@ export class AdminService implements OnModuleInit {
         accountType: p.accountType || null,
         status: p.status || 'ACTIVE',
         // Plan & Package details
-        planName: currentPkg ? currentPkg.name : (isTrial ? '3-Day Free Trial' : 'Free Buyer Plan'),
-        planSlug: currentPkg ? currentPkg.slug : (isTrial ? 'trial-3-day' : 'free-buyer'),
+        planName: currentPkg ? currentPkg.name : (isTrial ? '3-Month Free Plan' : 'Free Buyer Plan'),
+        planSlug: currentPkg ? currentPkg.slug : (isTrial ? 'casa-free-trial' : 'free-buyer'),
         planPrice: currentPkg ? currentPkg.price : 0,
-        billingPeriod: currentPkg ? currentPkg.billingPeriod : (isTrial ? '3_DAYS_TRIAL' : 'FREE'),
+        billingPeriod: currentPkg ? currentPkg.billingPeriod : (isTrial ? '3_MONTHS_FREE' : 'FREE'),
         planCategory,
         isTrial,
         isExpired,

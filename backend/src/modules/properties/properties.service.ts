@@ -541,7 +541,7 @@ export class PropertiesService implements OnModuleInit {
     return Array.from(ids);
   }
 
-  async checkListingLimits(user: any, isProject = false): Promise<void> {
+  async checkListingLimits(user: any, isProject = false, isPublishingAttempt = false): Promise<void> {
     const isDirectAdmin =
       user?.role === UserRole.SUPER_ADMIN ||
       user?.role === UserRole.ADMIN ||
@@ -558,6 +558,12 @@ export class PropertiesService implements OnModuleInit {
     const entitlements = await this.entitlementsService.resolveUserEntitlements(userDoc || user);
     const limits: any = entitlements?.limits || {};
     const companyUserIds = await this.getCompanyUserIds(user);
+
+    const isUnderFreePlan =
+      (entitlements as any)?.activePlan?.slug === 'casa-free-trial' ||
+      userDoc?.isTrialActive ||
+      (entitlements as any)?.isTrialActive ||
+      userDoc?.activePlanName?.includes('Free');
 
     if (isProject) {
       const maxProjects = limits.projectListings;
@@ -579,23 +585,52 @@ export class PropertiesService implements OnModuleInit {
         }
       }
     } else {
-      const maxProperties = limits.propertyListings;
-      if (maxProperties !== undefined && maxProperties !== -1) {
-        const count = await this.propertyModel.countDocuments({
-          isParentProject: { $ne: true },
-          isChildUnit: { $ne: true },
+      const companyQuery = {
+        isParentProject: { $ne: true },
+        isChildUnit: { $ne: true },
+        status: { $ne: 'ARCHIVED' },
+        $or: [
+          { ownerId: { $in: companyUserIds } },
+          { advertiserId: { $in: companyUserIds } },
+          { createdBy: { $in: companyUserIds } },
+          { brokerId: { $in: companyUserIds } },
+        ],
+      };
+
+      if (isUnderFreePlan) {
+        // Under 3-Month Free Plan:
+        // - Max 15 total property listings (collective for broker + team)
+        // - Max 10 published / live listings at a time
+        // - Remaining must remain saved as drafts
+        const totalCount = await this.propertyModel.countDocuments(companyQuery);
+        const liveCount = await this.propertyModel.countDocuments({
+          ...companyQuery,
           status: { $in: ['PUBLISHED', 'ACTIVE', 'PENDING_REVIEW', 'PENDING_APPROVAL', 'PENDING_BROKER_APPROVAL'] },
-          $or: [
-            { ownerId: { $in: companyUserIds } },
-            { advertiserId: { $in: companyUserIds } },
-            { createdBy: { $in: companyUserIds } },
-            { brokerId: { $in: companyUserIds } },
-          ],
         });
-        if (count >= maxProperties) {
+
+        if (isPublishingAttempt && liveCount >= 10) {
           throw new BadRequestException(
-            `You have reached your active property listings limit (${count}/${maxProperties}). Upgrade your My Property subscription plan to post additional properties.`,
+            `You have reached the maximum published listings limit (10/10) under the 3-Month Free Plan. This listing must remain saved as a draft.`,
           );
+        }
+
+        if (!isPublishingAttempt && totalCount >= 15) {
+          throw new BadRequestException(
+            `You have reached the total listings limit of 15 properties under the 3-Month Free Plan (${totalCount}/15). Please upgrade your subscription plan to create additional listings.`,
+          );
+        }
+      } else {
+        const maxProperties = limits.propertyListings;
+        if (maxProperties !== undefined && maxProperties !== -1) {
+          const count = await this.propertyModel.countDocuments({
+            ...companyQuery,
+            status: { $in: ['PUBLISHED', 'ACTIVE', 'PENDING_REVIEW', 'PENDING_APPROVAL', 'PENDING_BROKER_APPROVAL'] },
+          });
+          if (count >= maxProperties) {
+            throw new BadRequestException(
+              `You have reached your active property listings limit (${count}/${maxProperties}). Upgrade your My Property subscription plan to post additional properties.`,
+            );
+          }
         }
       }
     }
@@ -1651,7 +1686,7 @@ export class PropertiesService implements OnModuleInit {
         } catch {}
 
         const activePackageId = userDoc?.activePackageId || user.activePackageId;
-        const isTrialActive = Boolean(userDoc?.isTrialActive);
+        const isTrialActive = Boolean(userDoc?.isTrialActive ?? (user as any).isTrialActive);
         const trialExpiresAt = userDoc?.trialExpiresAt ? new Date(userDoc.trialExpiresAt) : null;
         const isTrialExpired = Boolean(
           userDoc?.trialExpired || (trialExpiresAt && new Date() > trialExpiresAt)
@@ -1659,24 +1694,24 @@ export class PropertiesService implements OnModuleInit {
 
         if (isTrialExpired && !activePackageId) {
           throw new UnauthorizedException(
-            'Your 3-day free trial has expired. Complete KYC verification and get an active plan to continue.'
+            'Your 3-Month Free Plan has expired. Please upgrade or choose an active subscription plan to continue posting properties.'
           );
         }
 
-        // Allow maximum of ONE property listing per account during the trial
-        if (isTrialActive && !activePackageId) {
-          const ownerPropertiesCount = await this.propertyModel.countDocuments({
-            $or: [{ ownerId: user.id }, { createdBy: user.id }, { advertiserId: user.id }],
-          });
-          if (ownerPropertiesCount >= 1) {
-            throw new ForbiddenException(
-              'Free trial allows a maximum of 1 property listing per account. Please complete KYC and obtain an active subscription plan to post additional properties.'
-            );
-          }
+        if (!activePackageId && !isTrialActive) {
+          throw new ForbiddenException(
+            'An active subscription plan or claimed 3-Month Free Plan is required to create property listings. Please submit KYC and claim your free plan or select a subscription.'
+          );
         }
       }
 
-      await this.checkListingLimits(user, Boolean(dto.isParentProject));
+      const isPublishingAttempt =
+        dto.status === 'PUBLISHED' ||
+        dto.status === 'ACTIVE' ||
+        dto.status === 'PENDING_REVIEW' ||
+        dto.status === 'SUBMITTED';
+
+      await this.checkListingLimits(user, Boolean(dto.isParentProject), isPublishingAttempt);
     }
 
     const titleEn = typeof dto.title === 'string' ? dto.title : dto.title?.en || 'New Property Listing';
@@ -2044,7 +2079,12 @@ export class PropertiesService implements OnModuleInit {
     }
 
     const properties = await this.propertyModel
-      .find(query)
+      .find({
+        $and: [
+          query,
+          { status: { $ne: 'ARCHIVED' } },
+        ],
+      })
       .sort({ createdAt: -1 })
       .lean();
 
@@ -2343,7 +2383,7 @@ export class PropertiesService implements OnModuleInit {
       }
     }
 
-    await this.checkListingLimits(user, Boolean(property.isParentProject));
+    await this.checkListingLimits(user, Boolean(property.isParentProject), true);
 
     // Status state validation
     if (
@@ -2654,11 +2694,10 @@ export class PropertiesService implements OnModuleInit {
       (user as any)?.role === 'SUPER_ADMIN' ||
       (user as any)?.platformRole === 'SUPER_ADMIN';
 
-    if (!isSuperAdmin) {
-      throw new ForbiddenException(
-        'Only Super Admin authenticated in the Admin Portal is authorized to delete property listings or reels.',
-      );
-    }
+    const isDirectAdmin =
+      isSuperAdmin ||
+      user?.role === UserRole.ADMIN ||
+      user?.platformRole === PlatformRole.ADMIN;
 
     const query: any = { $or: [{ id }, { slug: id }] };
     if (isValidObjectId(id)) {
@@ -2670,13 +2709,92 @@ export class PropertiesService implements OnModuleInit {
       throw new NotFoundException(`Property "${id}" not found`);
     }
 
-    // Hard delete draft or admin deletion
-    if (existing.isParentProject) {
-      await this.propertyModel.deleteMany({ parentPropertyId: existing.id });
+    if (!isDirectAdmin && user) {
+      const userPermissions = user.permissions || user.grantedPermissions || [];
+      const isBroker =
+        user.role === UserRole.BROKER ||
+        user.accountType === AccountType.BROKER ||
+        user.role === UserRole.BROKER_AGENCY ||
+        user.accountType === AccountType.BROKER_AGENCY ||
+        user.role === UserRole.AGENT ||
+        user.accountType === AccountType.AGENT;
+
+      const hasDeletePerm =
+        userPermissions.includes('*') ||
+        userPermissions.includes(Permission.PROPERTY_DELETE) ||
+        userPermissions.includes('property:*') ||
+        isBroker;
+
+      if (!hasDeletePerm) {
+        throw new ForbiddenException('You do not have permission to delete properties.');
+      }
+
+      const isEmployee =
+        user.role === UserRole.BROKER_AGENT ||
+        user.accountType === AccountType.BROKER_AGENT;
+
+      if (isEmployee) {
+        const employeeUser = await this.userModel.findById(user.id).lean();
+        const effectiveBrokerId =
+          employeeUser?.brokerId ||
+          employeeUser?.parentUserId ||
+          employeeUser?.agencyId ||
+          user.brokerId ||
+          user.parentUserId ||
+          user.agencyId;
+
+        const assignedProps = employeeUser?.assignedProperties || user.assignedProperties || [];
+
+        const belongsToBroker =
+          existing.brokerId === effectiveBrokerId ||
+          existing.ownerId === effectiveBrokerId ||
+          existing.advertiserId === effectiveBrokerId ||
+          existing.createdBy === effectiveBrokerId ||
+          existing.createdBy === user.id;
+
+        if (!belongsToBroker) {
+          throw new ForbiddenException('You do not have permission to delete properties belonging to another broker.');
+        }
+
+        if (Array.isArray(assignedProps) && assignedProps.length > 0) {
+          const isAssigned =
+            assignedProps.includes(existing.id) ||
+            assignedProps.includes(existing.slug) ||
+            assignedProps.includes(existing._id.toString());
+          if (!isAssigned && existing.createdBy !== user.id) {
+            throw new ForbiddenException('Access denied. This property is outside your assigned scope.');
+          }
+        }
+      } else {
+        const isOwner =
+          existing.brokerId === user.id ||
+          existing.ownerId === user.id ||
+          existing.advertiserId === user.id ||
+          existing.createdBy === user.id;
+
+        if (!isOwner) {
+          throw new ForbiddenException('You can only delete properties that belong to your brokerage.');
+        }
+      }
     }
 
-    await this.propertyModel.findOneAndDelete(query);
-    return { success: true, message: 'Property deleted successfully from database.' };
+    // Soft delete / archive to preserve inquiries, leads, and audit history
+    if (existing.isParentProject) {
+      await this.propertyModel.updateMany(
+        { parentPropertyId: existing.id },
+        { $set: { status: 'ARCHIVED', isPublished: false, archivedAt: new Date() } }
+      );
+    }
+
+    existing.status = 'ARCHIVED';
+    existing.isPublished = false;
+    existing.archivedAt = new Date();
+    await existing.save();
+
+    return {
+      success: true,
+      message: 'Property listing deleted successfully.',
+    };
   }
 
   // Backward compatibility alias

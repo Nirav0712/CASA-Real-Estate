@@ -22,11 +22,13 @@ import {
 import { ContactNumbersManager, normalizeContactNumbers } from '@/components/property/contact-numbers-manager';
 import { PropertyUnitsManager } from '@/components/property/property-units-manager';
 import { PropertyVideoManager } from '@/components/property/property-video-manager';
+import { CustomSizesManager } from '@/components/property/custom-sizes-manager';
 import {
   PropertyStructureType,
   PropertyUnitDetails,
   ProjectBuildingDetails,
   ContactNumber,
+  CustomSize,
 } from '@/types';
 import {
   ArrowLeft,
@@ -119,6 +121,7 @@ export default function EditPropertyPage() {
     possessionStatus: 'READY_TO_MOVE',
     possessionDate: '',
     availableFrom: '',
+    customSizes: [] as CustomSize[],
 
     // Commercial Specs
     cabins: '',
@@ -269,6 +272,7 @@ export default function EditPropertyPage() {
         possessionStatus: (specsObj as any).possessionStatus || 'READY_TO_MOVE',
         possessionDate: (specsObj as any).possessionDate || '',
         availableFrom: (specsObj as any).availableFrom || '',
+        customSizes: (specsObj as any).customSizes || [],
 
         // Commercial
         cabins: String((specsObj as any).cabins ?? ''),
@@ -526,6 +530,7 @@ export default function EditPropertyPage() {
         accommodationType: visibility.showAccommodationType ? formData.accommodationType : undefined,
         sharingType: visibility.showSharingType ? formData.sharingType : undefined,
         availableBeds: visibility.showAvailableBeds && formData.availableBeds ? Number(formData.availableBeds) : undefined,
+        customSizes: formData.customSizes || [],
       },
       contactNumbers: formData.contactNumbers.filter((n) => n.number.trim().length > 0),
       rera: {
@@ -1079,6 +1084,12 @@ export default function EditPropertyPage() {
               </select>
             </div>
           </div>
+
+          {/* Custom Size Entries */}
+          <CustomSizesManager
+            customSizes={formData.customSizes || []}
+            onChange={(sizes) => setFormData((prev) => ({ ...prev, customSizes: sizes }))}
+          />
         </div>
 
         {/* Dedicated Indian RERA Section */}

@@ -68,7 +68,52 @@ export function PlanSelectionModal() {
     ['SUPER_ADMIN', 'ADMIN'].includes(platformRole) ||
     ['SUPER_ADMIN', 'ADMIN'].includes(role);
 
+  const isTeamMember = Boolean(
+    user &&
+      (user.accountType === 'BROKER_AGENT' ||
+        user.role === 'BROKER_AGENT' ||
+        user.brokerId ||
+        user.parentUserId),
+  );
+
   if (!isPlanSelectionModalOpen || isExempt) return null;
+
+  if (isTeamMember) {
+    const parentAgencyOrBrokerName =
+      user?.parentAgencyName || user?.parentBrokerName || user?.agencyName || 'Broker';
+    return (
+      <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
+        <div className="relative w-full max-w-md bg-casa-surface border border-casa-border-light rounded-3xl shadow-2xl p-6 md:p-8 text-center space-y-5">
+          <button
+            onClick={closePlanSelectionModal}
+            className="absolute top-4 right-4 p-2 text-casa-text-muted hover:text-casa-text-primary rounded-full hover:bg-casa-subtle transition-colors"
+          >
+            <X className="w-5 h-5" />
+          </button>
+          <div className="w-14 h-14 bg-blue-500/10 text-blue-600 rounded-2xl flex items-center justify-center mx-auto">
+            <Building className="w-7 h-7" />
+          </div>
+          <div className="space-y-1.5">
+            <span className="inline-block px-3 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider bg-blue-500/15 text-blue-700 dark:text-blue-300 border border-blue-500/30">
+              Team Member Account
+            </span>
+            <h2 className="text-xl font-bold text-casa-text-primary">
+              Managed by Broker
+            </h2>
+            <p className="text-sm text-casa-text-secondary leading-relaxed">
+              Subscription plans and billing are managed by your Broker ({parentAgencyOrBrokerName}).
+            </p>
+          </div>
+          <button
+            onClick={closePlanSelectionModal}
+            className="w-full py-2.5 px-4 rounded-xl bg-casa-brand text-white font-semibold hover:opacity-95 transition-all text-xs"
+          >
+            Close
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   // Calculate trial state
   const isTrialExpired = Boolean(
@@ -104,20 +149,20 @@ export function PlanSelectionModal() {
         <div className="text-center max-w-xl mx-auto space-y-2">
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-casa-brand-subtle text-casa-brand text-xs font-bold uppercase tracking-wider mb-1">
             <Sparkles className="w-3.5 h-3.5" />
-            <span>myproperty — Free Trial Access</span>
+            <span>myproperty — Free Plan Access</span>
           </div>
 
           <h2 className="text-2xl md:text-3xl font-extrabold text-casa-text-primary">
-            Experience myproperty with a <span className="text-casa-brand">3-Day Free Trial</span>
+            Experience myproperty with a <span className="text-casa-brand">3-Month Free Plan</span>
           </h2>
 
           <p className="text-xs md:text-sm text-casa-text-secondary leading-relaxed">
             All registered Broker Agencies, Brokers, Agents, and Developers receive a{' '}
-            <strong>3-Day Full Access Free Trial</strong> upon account verification by our Super Admin governance team.
+            <strong>3-Month Free Plan</strong> with up to 15 property listings upon account verification by our Super Admin governance team.
           </p>
         </div>
 
-        {/* Verification Call Notice Banner (Requirement 7 & 8) */}
+        {/* Verification Call Notice Banner */}
         <div className="bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 rounded-2xl p-4 flex items-start gap-3 text-amber-900 dark:text-amber-200 text-xs shadow-subtle">
           <Phone className="w-5 h-5 flex-shrink-0 text-amber-600 dark:text-amber-400 mt-0.5" />
           <div className="space-y-1">
@@ -129,12 +174,12 @@ export function PlanSelectionModal() {
               <strong className="font-bold underline text-amber-950 dark:text-white">
                 7069754589
               </strong>{' '}
-              to complete their KYC verification. Your 3-day Free Trial starts <strong>immediately after approval</strong> by the Super Admin.
+              to complete their KYC verification. Your 3-Month Free Plan becomes available to claim in your dashboard after approval by the Super Admin.
             </p>
           </div>
         </div>
 
-        {/* If user already has an active trial */}
+        {/* If user already has an active free plan */}
         {isTrialActive ? (
           <div className="p-6 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 rounded-3xl space-y-4 text-center">
             <div className="w-12 h-12 rounded-full bg-emerald-600 text-white flex items-center justify-center mx-auto shadow-md">
@@ -143,17 +188,17 @@ export function PlanSelectionModal() {
 
             <div>
               <h3 className="text-lg font-bold text-emerald-950 dark:text-emerald-100">
-                Your 3-Day Free Trial is Currently Active!
+                Your 3-Month Free Plan is Currently Active!
               </h3>
               <p className="text-xs text-emerald-800 dark:text-emerald-300 mt-1">
-                You have unrestricted access to property publishing, reels, and lead management.
+                You have access to publish up to 15 property listings, video reels, and lead management.
               </p>
             </div>
 
             <div className="grid grid-cols-2 gap-3 max-w-sm mx-auto text-xs bg-white dark:bg-gray-900 p-3.5 rounded-2xl border border-emerald-200 dark:border-emerald-800">
               <div>
                 <span className="text-[10px] uppercase font-bold text-casa-text-muted block">
-                  Trial Started
+                  Plan Started
                 </span>
                 <span className="font-bold text-casa-text-primary">
                   {user?.trialStartedAt ? new Date(user.trialStartedAt).toLocaleDateString() : 'Active'}
@@ -164,19 +209,19 @@ export function PlanSelectionModal() {
                   Expires On
                 </span>
                 <span className="font-bold text-casa-brand">
-                  {user?.trialExpiresAt ? new Date(user.trialExpiresAt).toLocaleDateString() : 'In 3 Days'}
+                  {user?.trialExpiresAt ? new Date(user.trialExpiresAt).toLocaleDateString() : 'In 3 Months'}
                 </span>
               </div>
             </div>
 
             <div className="pt-2">
               <span className="inline-block px-3 py-1 rounded-full bg-emerald-600 text-white text-xs font-bold">
-                {remainingDays} Day{remainingDays !== 1 ? 's' : ''} Remaining
+                {user?.trialRemainingLabel || `${remainingDays} Day${remainingDays !== 1 ? 's' : ''} Remaining`}
               </span>
             </div>
           </div>
         ) : isTrialExpired ? (
-          /* Expired Trial Notice - No free trial activation option */
+          /* Expired Notice */
           <div className="p-6 md:p-8 bg-red-50/60 dark:bg-red-950/30 border border-red-200 dark:border-red-800 rounded-3xl space-y-4 text-center">
             <div className="w-14 h-14 rounded-2xl bg-red-600/10 text-red-600 dark:text-red-400 border border-red-500/20 flex items-center justify-center mx-auto shadow-sm">
               <ShieldCheck className="w-7 h-7" />
@@ -184,10 +229,10 @@ export function PlanSelectionModal() {
 
             <div>
               <h3 className="text-xl font-extrabold text-casa-text-primary">
-                Your 3-Day Free Trial Has Ended
+                Your 3-Month Free Plan Has Ended
               </h3>
               <p className="text-xs sm:text-sm text-casa-text-secondary mt-1.5 max-w-md mx-auto leading-relaxed">
-                Your complimentary 3-day access has concluded. You can upgrade to any of our paid subscription tiers to reactivate full marketplace benefits and verified direct contacts.
+                Your complimentary 3-month access has concluded. You can upgrade to any of our paid subscription tiers to reactivate full marketplace benefits and verified direct contacts.
               </p>
             </div>
 
@@ -205,26 +250,26 @@ export function PlanSelectionModal() {
             </div>
           </div>
         ) : (
-          /* Free Trial Plan Card */
+          /* Free Plan Card */
           <div className="bg-casa-surface border-2 border-casa-brand rounded-3xl p-6 md:p-8 space-y-5 shadow-xl relative overflow-hidden">
             <div className="absolute top-0 right-0 bg-casa-brand text-white text-[10px] font-extrabold uppercase tracking-wider px-3 py-1 rounded-bl-xl shadow-xs">
-              Zero Payment Required
+              Super Admin KYC Required
             </div>
 
             <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-2 border-b border-casa-border-light pb-4">
               <div>
                 <h3 className="text-xl font-bold text-casa-text-primary flex items-center gap-2">
                   <Sparkles className="w-5 h-5 text-casa-brand" />
-                  myproperty 3-Day Free Trial
+                  myproperty 3-Month Free Plan
                 </h3>
                 <p className="text-xs text-casa-text-secondary mt-0.5">
-                  Complete feature suite activated upon KYC document verification.
+                  15 property listings included for 3 full calendar months upon KYC approval.
                 </p>
               </div>
 
               <div className="text-left sm:text-right">
                 <span className="text-3xl font-extrabold text-casa-brand">₹0</span>
-                <span className="text-xs text-casa-text-muted font-bold ml-1">/ 3 Days</span>
+                <span className="text-xs text-casa-text-muted font-bold ml-1">/ 3 Months</span>
               </div>
             </div>
 
@@ -234,7 +279,14 @@ export function PlanSelectionModal() {
                 <div className="w-4 h-4 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center flex-shrink-0">
                   <Check className="w-3 h-3" />
                 </div>
-                <span>Unlimited Property Listings during trial</span>
+                <span>Up to 15 Property Listings Included</span>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-4 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center flex-shrink-0">
+                  <Check className="w-3 h-3" />
+                </div>
+                <span>3 Months Complete Marketplace Validity</span>
               </div>
 
               <div className="flex items-center gap-2">
@@ -248,14 +300,7 @@ export function PlanSelectionModal() {
                 <div className="w-4 h-4 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center flex-shrink-0">
                   <Check className="w-3 h-3" />
                 </div>
-                <span>Instant WhatsApp Lead Notifications</span>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <div className="w-4 h-4 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center flex-shrink-0">
-                  <Check className="w-3 h-3" />
-                </div>
-                <span>Verified Trust Badge upon approval</span>
+                <span>Verified Trust Badge upon KYC Approval</span>
               </div>
 
               <div className="flex items-center gap-2">
@@ -279,7 +324,7 @@ export function PlanSelectionModal() {
                 onClick={handleContinueWithFreeTrial}
                 className="w-full py-3.5 px-6 rounded-2xl bg-casa-brand hover:bg-casa-brand-hover text-white text-xs md:text-sm font-bold shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
               >
-                <span>Continue to KYC Verification & Start Free Trial</span>
+                <span>Continue to KYC Verification &amp; Claim Free Plan</span>
                 <ArrowRight className="w-4 h-4" />
               </button>
               <span className="block text-center text-[11px] text-casa-text-muted mt-2">

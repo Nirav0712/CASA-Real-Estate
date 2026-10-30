@@ -18,6 +18,7 @@ import { getLeadKPIs, getMyLeads } from '@/services/lead-service';
 import { getMyEntitlements, UserEntitlementResponse } from '@/services/entitlements-service';
 import { Property, Lead, LeadKPIs, PurchaserDashboardData } from '@/types';
 import { formatPrice } from '@/lib/utils';
+import { FreePlanClaimModal } from '@/components/pricing/free-plan-claim-modal';
 import {
   LayoutDashboard,
   User as UserIcon,
@@ -81,6 +82,7 @@ export default function ProfileDashboardPage() {
     isTrialActive,
     isTrialExpired,
     trialDaysRemaining,
+    trialRemainingLabel,
     hasActiveSubscription,
     activePlanName,
   } = useAuth();
@@ -91,6 +93,7 @@ export default function ProfileDashboardPage() {
 
   const [activeTab, setActiveTab] = React.useState<TabKey>(initialTab);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = React.useState(false);
+  const [isFreePlanModalOpen, setIsFreePlanModalOpen] = React.useState(false);
 
   // Real dashboard data states
   const [properties, setProperties] = React.useState<Property[]>([]);
@@ -143,6 +146,16 @@ export default function ProfileDashboardPage() {
         (!isAdmin && !isDeveloper && !isBroker && !isAgent && !isSeller && !isTenant)),
   );
   const isSupplySide = isAgent || isBroker || isDeveloper || isSeller || isAdmin;
+
+  const isTeamMember = Boolean(
+    user &&
+      (user.accountType === 'BROKER_AGENT' ||
+        user.role === 'BROKER_AGENT' ||
+        user.brokerId ||
+        user.parentUserId),
+  );
+  const parentBrokerOrAgencyName =
+    user?.parentAgencyName || user?.parentBrokerName || user?.agencyName || 'Broker';
 
   // Load real data from existing APIs
   const loadDashboardData = React.useCallback(async () => {
@@ -370,12 +383,20 @@ export default function ProfileDashboardPage() {
                 </div>
 
                 {/* Account Type Badge */}
-                <div className="w-full pt-1">
+                <div className="w-full pt-1 space-y-1">
                   <span
                     className={`inline-block px-3 py-1 rounded-full text-[11px] font-bold border tracking-wide uppercase ${getAccountTypeBadgeColor()}`}
                   >
                     {getAccountTypeLabel()}
                   </span>
+                  {isTeamMember && (
+                    <div className="pt-0.5">
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-semibold bg-blue-500/10 text-blue-700 dark:text-blue-300 border border-blue-500/20">
+                        <Users className="w-3.5 h-3.5 text-blue-600" />
+                        <span>Team Member at {parentBrokerOrAgencyName}</span>
+                      </span>
+                    </div>
+                  )}
                 </div>
 
                 {/* Verification Badge */}
@@ -391,8 +412,23 @@ export default function ProfileDashboardPage() {
                   </div>
                 ) : null}
 
-                {/* 3-Day Trial Status Card (Supply-side accounts) */}
-                {isSupplySide && !isAdmin && (
+                {/* Team Member Broker Attribution Advisory */}
+                {isTeamMember && (
+                  <div className="w-full mt-2 pt-2 border-t border-casa-border-light text-start">
+                    <div className="p-2.5 rounded-xl bg-blue-500/10 border border-blue-500/20 space-y-1">
+                      <div className="text-[11px] font-bold text-blue-700 dark:text-blue-300 flex items-center gap-1.5">
+                        <Users className="w-3.5 h-3.5 text-blue-600" />
+                        <span>Broker Team Member</span>
+                      </div>
+                      <p className="text-[10px] text-casa-text-secondary leading-snug">
+                        Subscription plans and billing are managed by your Broker ({parentBrokerOrAgencyName}).
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* 3-Month Free Plan & Subscription Status Card (Supply-side accounts - Broker only) */}
+                {isSupplySide && !isAdmin && !isTeamMember && (
                   <div className="w-full mt-2 pt-2 border-t border-casa-border-light text-start">
                     {hasActiveSubscription ? (
                       <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 space-y-1">
@@ -417,36 +453,68 @@ export default function ProfileDashboardPage() {
                         <div className="flex items-center justify-between text-[11px]">
                           <span className="font-bold text-emerald-700 dark:text-emerald-300 flex items-center gap-1">
                             <Sparkles className="w-3 h-3 text-emerald-600" />
-                            <span>3-Day Trial Active</span>
+                            <span>Free Plan · 3 Months</span>
                           </span>
                           <span className="font-mono text-xs font-bold text-emerald-700 dark:text-emerald-300">
-                            {trialDaysRemaining}d left
+                            {trialRemainingLabel || `${trialDaysRemaining}d left`}
                           </span>
+                        </div>
+                        <div className="text-[10px] text-casa-text-muted">
+                          15 Property Listings Quota
                         </div>
                         <button
                           type="button"
-                          onClick={openPlanSelectionModal}
+                          onClick={() => setIsFreePlanModalOpen(true)}
                           className="w-full text-center text-[10px] font-bold text-casa-brand hover:underline block pt-0.5"
                         >
-                          View Membership Plans →
+                          View Usage & Allowance →
                         </button>
                       </div>
                     ) : isTrialExpired ? (
                       <div className="p-2.5 rounded-xl bg-red-500/10 border border-red-500/20 space-y-2">
                         <div className="flex items-center gap-1.5 text-[11px] font-bold text-red-700 dark:text-red-400">
-                          <PhoneCall className="w-3.5 h-3.5 text-red-500 animate-bounce" />
-                          <span>3-Day Trial Expired</span>
+                          <Clock className="w-3.5 h-3.5 text-red-500" />
+                          <span>Free Plan Expired</span>
                         </div>
                         <button
                           type="button"
-                          onClick={openTrialExpiredModal}
-                          className="w-full py-1.5 px-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-[10px] text-center shadow-xs flex items-center justify-center gap-1 transition-colors"
+                          onClick={openPlanSelectionModal}
+                          className="w-full py-1.5 px-2 rounded-lg bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 font-extrabold text-[10px] text-center shadow-xs flex items-center justify-center gap-1 transition-colors"
                         >
-                          <PhoneCall className="w-3 h-3" />
-                          <span>Call Sales Desk</span>
+                          <span>Upgrade Subscription</span>
                         </button>
                       </div>
-                    ) : null}
+                    ) : user?.kycStatus === 'APPROVED' || user?.isVerifiedAgent ? (
+                      <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 space-y-1.5">
+                        <div className="flex items-center gap-1 text-[11px] font-bold text-amber-700 dark:text-amber-400">
+                          <Sparkles className="w-3 h-3 text-amber-500" />
+                          <span>3-Month Free Plan Available</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setIsFreePlanModalOpen(true)}
+                          className="w-full py-1 px-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-white font-bold text-[10px] text-center shadow-xs"
+                        >
+                          Claim 3 Months Free
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="p-2.5 rounded-xl bg-neutral-500/10 border border-neutral-500/20 space-y-1.5">
+                        <div className="text-[11px] font-bold text-casa-text-primary flex items-center gap-1">
+                          <ShieldCheck className="w-3 h-3 text-neutral-500" />
+                          <span>3-Month Free Plan</span>
+                        </div>
+                        <div className="text-[10px] text-casa-text-muted">
+                          KYC verification required
+                        </div>
+                        <Link
+                          href="/dashboard/kyc"
+                          className="w-full text-center text-[10px] font-bold text-casa-brand hover:underline block pt-0.5"
+                        >
+                          Submit KYC →
+                        </Link>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -812,8 +880,8 @@ export default function ProfileDashboardPage() {
                   </>
                 )}
 
-                {/* Supply-side Financials: Billing & Invoices */}
-                {isSupplySide && !isAdmin && (
+                {/* Supply-side Financials: Billing & Invoices (Broker only) */}
+                {isSupplySide && !isAdmin && !isTeamMember && (
                   <>
                     <Link
                       href="/dashboard/billing"
@@ -898,6 +966,14 @@ export default function ProfileDashboardPage() {
                       <p className="text-xs md:text-sm text-casa-text-secondary max-w-xl leading-relaxed">
                         Welcome back, <strong className="text-casa-text-primary">{user.name || user.normalizedMobile}</strong>! Here is an up-to-date overview of your account activity, verified properties, and incoming inquiries.
                       </p>
+                      {isTeamMember && (
+                        <div className="pt-2">
+                          <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold bg-blue-500/10 text-blue-700 dark:text-blue-300 border border-blue-500/20 shadow-2xs">
+                            <Users className="w-3.5 h-3.5 text-blue-600" />
+                            <span>Team Member at {parentBrokerOrAgencyName}</span>
+                          </span>
+                        </div>
+                      )}
                     </div>
 
                     <div className="flex flex-wrap items-center gap-2.5">
@@ -1449,7 +1525,7 @@ export default function ProfileDashboardPage() {
                     </div>
 
                     {/* Agency / Company */}
-                    {user.agencyName && (
+                    {user.agencyName && !isTeamMember && (
                       <div className="p-4 rounded-2xl bg-casa-canvas/60 border border-casa-border-light space-y-1">
                         <span className="text-[11px] font-bold text-casa-text-muted uppercase block">
                           Agency / Organization
@@ -1457,6 +1533,24 @@ export default function ProfileDashboardPage() {
                         <span className="text-sm font-bold text-casa-text-primary block">
                           {user.agencyName}
                         </span>
+                      </div>
+                    )}
+
+                    {/* Team Member Broker Organization */}
+                    {isTeamMember && (
+                      <div className="p-4 rounded-2xl bg-blue-50/60 dark:bg-blue-950/20 border border-blue-500/20 space-y-1">
+                        <span className="text-[11px] font-bold text-blue-700 dark:text-blue-300 uppercase block">
+                          Brokerage Attribution
+                        </span>
+                        <span className="text-sm font-bold text-casa-text-primary flex items-center gap-1.5">
+                          <Users className="w-4 h-4 text-blue-600" />
+                          <span>Team Member at {parentBrokerOrAgencyName}</span>
+                        </span>
+                        {user.designation && (
+                          <span className="text-xs text-casa-text-muted block mt-0.5">
+                            Designation: {user.designation}
+                          </span>
+                        )}
                       </div>
                     )}
 
@@ -1638,6 +1732,11 @@ export default function ProfileDashboardPage() {
           </main>
         </div>
       </div>
+
+      <FreePlanClaimModal
+        isOpen={isFreePlanModalOpen}
+        onClose={() => setIsFreePlanModalOpen(false)}
+      />
     </div>
   );
 }

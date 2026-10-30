@@ -132,7 +132,7 @@ export default function AdminKycPage() {
       await approveAdminKyc(user.id, adminNotes);
       toast.success(
         'Account Approved',
-        `KYC approved for ${user.name}. 3-day Free Trial is now active and WhatsApp confirmation sent.`,
+        `KYC approved for ${user.name}. User is now eligible to claim their 3-Month Free Plan.`,
       );
       setSelectedUser(null);
       setAdminNotes('');
@@ -220,7 +220,7 @@ export default function AdminKycPage() {
             </h1>
           </div>
           <p className="text-xs text-casa-text-muted mt-1">
-            Manual verification workflow for Broker Agencies, Brokers, Agents, and Developer accounts. Approvals activate a 3-day Free Trial.
+            Manual verification workflow for Broker Agencies, Brokers, Agents, and Developer accounts. Approvals grant eligibility for the 3-Month Free Plan.
           </p>
         </div>
 
@@ -547,7 +547,7 @@ export default function AdminKycPage() {
                           <div className="space-y-0.5">
                             <span className="inline-flex items-center gap-1 text-[10px] font-bold bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 px-2 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-800">
                               <Sparkles className="w-3 h-3 text-emerald-500" />
-                              3-Day Trial Active
+                              Free Plan · 3 Months
                             </span>
                             {user.trialExpiresAt && (
                               <span className="block text-[10px] text-casa-text-muted">
@@ -827,7 +827,7 @@ export default function AdminKycPage() {
                 <span>
                   Approved by {selectedUser.kycApprovedBy || 'Admin'} on{' '}
                   {selectedUser.kycApprovedAt ? new Date(selectedUser.kycApprovedAt).toLocaleString() : 'N/A'}.
-                  3-day Free Trial is active.
+                  User is eligible to claim the 3-Month Free Plan.
                 </span>
               </div>
             )}
@@ -884,7 +884,7 @@ export default function AdminKycPage() {
                       onClick={() => handleApprove(selectedUser)}
                       disabled={isSubmitting}
                     >
-                      Approve & Activate 3-Day Trial
+                      Approve KYC Application
                     </Button>
                   </>
                 )}

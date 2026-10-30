@@ -634,7 +634,7 @@ describe('AuthService (Security-First Unit & Integration Tests)', () => {
       expect(res.user.kycStatus).toBe('NOT_SUBMITTED');
     });
 
-    it('22c. should require approved KYC status before starting 3-day free trial', async () => {
+    it('22c. should require approved KYC status before starting 3-Month Free Plan', async () => {
       const unverifiedUser = {
         _id: '507f1f77bcf86cd799439011',
         name: 'Pending Agent',
