@@ -190,6 +190,7 @@ export type FurnishingStatus = 'FURNISHED' | 'SEMI_FURNISHED' | 'UNFURNISHED';
 export interface LocalizedText {
   en: string;
   hi?: string;
+  gu?: string;
   ar?: string;
   ur?: string;
 }

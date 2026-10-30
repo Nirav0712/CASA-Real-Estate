@@ -96,14 +96,14 @@ export class PropertyLocation {
   @Prop({ default: 'India' })
   country?: string;
 
-  @Prop({ default: 'Uttar Pradesh' })
-  state: string;
+  @Prop()
+  state?: string;
 
-  @Prop({ default: 'Lucknow' })
-  district: string;
+  @Prop()
+  district?: string;
 
-  @Prop({ default: 'Lucknow' })
-  city: string;
+  @Prop()
+  city?: string;
 
   @Prop({ required: true })
   locality: string;

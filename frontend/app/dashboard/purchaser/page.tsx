@@ -11,7 +11,7 @@ import { PurchaserDashboardData, Property } from '@/types';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { PropertyCard } from '@/features/properties/property-card';
-import { formatPrice } from '@/lib/utils';
+import { formatPrice, formatPropertyLocation } from '@/lib/utils';
 import {
   Heart,
   MessageSquare,
@@ -234,7 +234,7 @@ export default function PurchaserDashboardOverviewPage() {
                       </h4>
                       <div className="flex items-center gap-1 text-[11px] text-casa-text-muted mt-1 truncate">
                         <MapPin className="w-3 h-3 flex-shrink-0" />
-                        <span>{typeof prop.location === 'string' ? prop.location : `${prop.location?.locality}, ${prop.location?.city}`}</span>
+                        <span>{formatPropertyLocation(prop.location)}</span>
                       </div>
                     </div>
                   </Link>

@@ -4,7 +4,7 @@ import * as React from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/contexts/auth-context';
 import { useToast } from '@/contexts/toast-context';
-import { formatPrice } from '@/lib/utils';
+import { formatPrice, formatPropertyLocation } from '@/lib/utils';
 import {
   getMyProperties,
   submitPropertyForApproval,
@@ -475,10 +475,7 @@ export default function MyPropertiesPage() {
             {displayedProperties.map((item) => {
             const titleStr = typeof item.title === 'string' ? item.title : item.title?.en || 'Untitled';
             const priceNum = typeof item.price === 'number' ? item.price : item.price?.amount || 0;
-            const locStr =
-              typeof item.location === 'string'
-                ? item.location
-                : `${item.location?.locality || ''}, ${item.location?.city || 'Lucknow'}`;
+            const locStr = formatPropertyLocation(item.location);
 
             const isDraft = item.status === 'DRAFT';
             const isPendingBroker = item.status === 'PENDING_BROKER_APPROVAL';

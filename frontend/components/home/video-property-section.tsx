@@ -3,7 +3,7 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { Container } from '@/components/ui/card';
-import { formatPrice } from '@/lib/utils';
+import { formatPrice, formatPropertyLocation } from '@/lib/utils';
 import { parseYouTubeUrl, parseInstagramUrl, detectVideoSource } from '@/lib/video';
 import { useToast } from '@/contexts/toast-context';
 import { useAuth } from '@/contexts/auth-context';
@@ -350,16 +350,7 @@ export function VideoPropertySection() {
               const priceText = formatPrice(property.price?.amount || 0);
               const isDemo = property.id.startsWith('vid-reel-');
 
-              const locationString = [
-                property.location?.society,
-                property.location?.subArea,
-                property.location?.area || property.location?.locality,
-                property.location?.city,
-              ]
-                .filter(Boolean)
-                .filter((v, i, a) => a.indexOf(v) === i)
-                .slice(0, 2)
-                .join(', ');
+              const locationString = formatPropertyLocation(property.location);
 
               return (
                 <div
@@ -716,15 +707,7 @@ export function VideoPropertySection() {
                         </span>
                       </div>
                       <p className="text-[11px] text-white/70 pl-5">
-                        {[
-                          activeVideoProperty.location?.subArea,
-                          activeVideoProperty.location?.area || activeVideoProperty.location?.locality,
-                          activeVideoProperty.location?.city,
-                          activeVideoProperty.location?.state,
-                        ]
-                          .filter(Boolean)
-                          .filter((v, i, a) => a.indexOf(v) === i)
-                          .join(', ')}
+                        {formatPropertyLocation(activeVideoProperty.location, { showState: true })}
                       </p>
                     </div>
 

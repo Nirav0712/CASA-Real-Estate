@@ -7,7 +7,7 @@ import { useRouter } from 'next/navigation';
 import { Property } from '@/types';
 import { Card, Badge } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { formatPrice } from '@/lib/utils';
+import { formatPrice, formatPropertyLocation } from '@/lib/utils';
 import { buildWhatsAppEnquiryUrl } from '@/lib/whatsapp';
 import { createLead } from '@/services/lead-service';
 import { getCategoryLabel } from '@/lib/categories';
@@ -96,7 +96,7 @@ export function PropertyCard({ property }: { property: Property }) {
         priceText: propertyPriceFormatted,
         propertySlug: property.slug,
         category: localizedCategory,
-        location: `${property.location.locality}, ${property.location.city}`,
+        location: formatPropertyLocation(property.location),
       })
     : null;
 
@@ -254,16 +254,6 @@ export function PropertyCard({ property }: { property: Property }) {
               ★ {t('featured')}
             </Badge>
           )}
-          {(property.rera?.verificationStatus === 'VERIFIED' || property.reraNumber || (property.advertiser as any)?.reraNumber) && (
-            <Badge variant="default" size="sm" className="bg-emerald-600/95 backdrop-blur-sm text-white font-bold text-[10px] border-0 shadow-subtle flex items-center gap-1">
-              <ShieldCheck className="w-3 h-3 inline" />
-              <span>
-                {property.rera?.verificationStatus === 'VERIFIED'
-                  ? 'RERA VERIFIED'
-                  : `RERA: ${property.reraNumber || (property.advertiser as any)?.reraNumber}`}
-              </span>
-            </Badge>
-          )}
           {property.isChildUnit && (
             <Badge variant="default" size="sm" className="bg-casa-brand/95 backdrop-blur-sm text-white font-bold text-[10px] border-0 shadow-subtle flex items-center gap-1">
               <span>{property.unitDetails?.plotNumber ? `Plot ${property.unitDetails.plotNumber}` : `Unit ${property.unitDetails?.unitNumber || ''}`}</span>
@@ -373,7 +363,7 @@ export function PropertyCard({ property }: { property: Property }) {
         <div className="flex items-center gap-1.5 text-xs text-casa-text-secondary mb-3">
           <MapPin className="w-3.5 h-3.5 text-casa-text-muted flex-shrink-0" />
           <span className="truncate">
-            {property.location.locality}, {property.location.city}
+            {formatPropertyLocation(property.location)}
           </span>
         </div>
 

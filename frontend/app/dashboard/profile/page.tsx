@@ -18,6 +18,7 @@ import { getLeadKPIs, getMyLeads } from '@/services/lead-service';
 import { getMyEntitlements, UserEntitlementResponse } from '@/services/entitlements-service';
 import { Property, Lead, LeadKPIs, PurchaserDashboardData } from '@/types';
 import { formatPrice } from '@/lib/utils';
+import { formatPropertyLocation } from '@/lib/location';
 import { FreePlanClaimModal } from '@/components/pricing/free-plan-claim-modal';
 import {
   LayoutDashboard,
@@ -1442,7 +1443,7 @@ export default function ProfileDashboardPage() {
                                     {title}
                                   </h3>
                                   <p className="text-[11px] text-casa-text-muted mt-0.5 truncate">
-                                    {prop.location?.locality || prop.location?.city}
+                                    {formatPropertyLocation(prop.location)}
                                   </p>
                                 </div>
                                 <div className="pt-2 border-t border-casa-border-light flex items-center justify-between">
@@ -1659,7 +1660,7 @@ export default function ProfileDashboardPage() {
                         Select your preferred language for website navigation
                       </p>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                       <button
                         type="button"
                         onClick={() => setLocale('en')}
@@ -1681,6 +1682,17 @@ export default function ProfileDashboardPage() {
                         }`}
                       >
                         हिन्दी (Hindi)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setLocale('gu')}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                          locale === 'gu'
+                            ? 'bg-casa-brand text-white shadow-xs'
+                            : 'bg-casa-surface border border-casa-border-light text-casa-text-secondary'
+                        }`}
+                      >
+                        ગુજરાતી (Gujarati)
                       </button>
                       <button
                         type="button"

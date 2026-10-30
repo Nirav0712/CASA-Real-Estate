@@ -21,3 +21,5 @@ export function formatPrice(amount: number, currency = 'INR'): string {
     maximumFractionDigits: 0,
   }).format(amount);
 }
+
+export { formatPropertyLocation } from './location';

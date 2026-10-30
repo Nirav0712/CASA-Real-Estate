@@ -22,8 +22,8 @@ export default () => {
   const nodeEnv = cleanString(process.env.NODE_ENV, 'development').toLowerCase();
   const isProduction = nodeEnv === 'production';
 
-  const PRODUCTION_MARKETPLACE_URL = 'https://casa-real-estate-mocha.vercel.app';
-  const PRODUCTION_ADMIN_URL = 'https://casa-real-estate-ocih.vercel.app';
+  const PRODUCTION_MARKETPLACE_URL = 'https://my-property.in';
+  const PRODUCTION_ADMIN_URL = 'https://admin.my-property.in';
   const LOCAL_MARKETPLACE_URL = 'http://localhost:3000';
   const LOCAL_ADMIN_URL = 'http://localhost:3001';
 

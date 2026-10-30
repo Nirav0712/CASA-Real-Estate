@@ -10,7 +10,7 @@ import {
   submitPropertyForApproval,
 } from '@/services/property-service';
 import { Property } from '@/types';
-import { formatPrice } from '@/lib/utils';
+import { formatPrice, formatPropertyLocation } from '@/lib/utils';
 import {
   ArrowLeft,
   Edit,
@@ -101,10 +101,7 @@ export default function PropertyDossierPage() {
   const titleStr = typeof property.title === 'string' ? property.title : property.title?.en || 'Untitled';
   const descStr = typeof property.description === 'string' ? property.description : property.description?.en || '';
   const priceNum = typeof property.price === 'number' ? property.price : property.price?.amount || 0;
-  const locStr =
-    typeof property.location === 'string'
-      ? property.location
-      : `${property.location?.locality || ''}, ${property.location?.city || 'Lucknow'}`;
+  const locStr = formatPropertyLocation(property.location);
 
   const isDraft = property.status === 'DRAFT';
   const isPending = property.status === 'PENDING_REVIEW' || property.status === 'PENDING_APPROVAL';

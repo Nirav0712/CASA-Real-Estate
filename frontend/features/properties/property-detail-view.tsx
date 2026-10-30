@@ -8,7 +8,7 @@ import { Property } from '@/types';
 import { Container, Card, Badge } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { PropertyCard } from '@/features/properties/property-card';
-import { formatPrice } from '@/lib/utils';
+import { formatPrice, formatPropertyLocation } from '@/lib/utils';
 import { buildWhatsAppEnquiryUrl } from '@/lib/whatsapp';
 import { getCategoryLabel } from '@/lib/categories';
 import { useLanguage } from '@/contexts/language-context';
@@ -242,7 +242,7 @@ export function PropertyDetailView({
         priceText: formattedPrice,
         propertySlug: currentProperty.slug,
         category: localizedCategory,
-        location: `${currentProperty.location.locality}, ${currentProperty.location.city}`,
+        location: formatPropertyLocation(currentProperty.location),
       })
     : null;
 
@@ -299,7 +299,7 @@ export function PropertyDetailView({
           priceText: formattedPrice,
           propertySlug: currentProperty.slug,
           category: localizedCategory,
-          location: `${currentProperty.location.locality}, ${currentProperty.location.city}`,
+          location: formatPropertyLocation(currentProperty.location),
         });
         toast.success('Continuing Enquiry', 'Opening WhatsApp chat with verified advertiser...');
         // Record WhatsApp inquiry before opening
@@ -938,16 +938,7 @@ export function PropertyDetailView({
                   <div className="flex items-center gap-1.5 text-sm text-casa-text-secondary">
                     <MapPin className="w-4 h-4 text-casa-brand flex-shrink-0" />
                     <span>
-                      {[
-                        property.location.society,
-                        property.location.subArea,
-                        property.location.area || property.location.locality,
-                        property.location.city,
-                        property.location.state,
-                      ]
-                        .filter(Boolean)
-                        .filter((v, i, a) => a.indexOf(v) === i)
-                        .join(', ')}
+                      {formatPropertyLocation(property.location, { showState: true })}
                     </span>
                   </div>
                 </div>
@@ -968,8 +959,8 @@ export function PropertyDetailView({
               </div>
             </div>
 
-            {/* RERA Compliance & Statutory Verification Card */}
-            {(property.rera?.isReraRegistered || (property as any).reraNumber) && (
+            {/* Legal & Registration Details (RERA Compliance & Verification) */}
+            {(property.rera?.isReraRegistered || property.reraNumber || property.rera?.reraNumber || (property as any).reraNumber) && (
               <Card className="p-5 border-emerald-500/30 bg-emerald-500/5">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <div className="flex items-start gap-3">
@@ -979,16 +970,16 @@ export function PropertyDetailView({
                     <div>
                       <div className="flex items-center gap-2">
                         <h2 className="text-sm font-bold text-casa-text-primary">
-                          Indian RERA Compliance Details
+                          Legal & Registration Details
                         </h2>
                         {property.rera?.verificationStatus === 'VERIFIED' ? (
                           <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-600 text-white flex items-center gap-1">
                             <Check className="w-2.5 h-2.5" />
                             VERIFIED
                           </span>
-                        ) : property.rera?.isReraRegistered === 'YES' || (property as any).reraNumber ? (
+                        ) : (property.rera?.isReraRegistered === 'YES' || property.reraNumber || property.rera?.reraNumber || (property as any).reraNumber) ? (
                           <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-700 dark:text-amber-300">
-                            VERIFICATION IN PROGRESS
+                            RERA REGISTERED
                           </span>
                         ) : (
                           <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-casa-subtle text-casa-text-muted">
@@ -997,16 +988,25 @@ export function PropertyDetailView({
                         )}
                       </div>
 
-                      <div className="mt-1 space-y-0.5 text-xs text-casa-text-secondary">
-                        {(property.rera?.reraNumber || (property as any).reraNumber) ? (
-                          <p>
-                            RERA Reg No:{' '}
-                            <span className="font-mono font-bold text-casa-brand">
-                              {property.rera?.reraNumber || (property as any).reraNumber}
-                            </span>
-                            {property.rera?.authority && ` • ${property.rera.authority}`}
-                            {property.rera?.projectName && ` • Project: ${property.rera.projectName}`}
-                          </p>
+                      <div className="mt-1.5 space-y-1 text-xs text-casa-text-secondary">
+                        {(property.rera?.reraNumber || property.reraNumber || (property as any).reraNumber) ? (
+                          <div className="space-y-0.5">
+                            <p className="font-semibold text-casa-text-primary">
+                              RERA Registration No:{' '}
+                              <span className="font-mono font-bold text-casa-brand text-sm">
+                                {property.rera?.reraNumber || property.reraNumber || (property as any).reraNumber}
+                              </span>
+                            </p>
+                            <p className="text-casa-text-muted">
+                              {[
+                                property.rera?.authority,
+                                property.rera?.projectName ? `Project: ${property.rera.projectName}` : null,
+                                property.rera?.reraState ? `State: ${property.rera.reraState}` : null,
+                              ]
+                                .filter(Boolean)
+                                .join(' • ')}
+                            </p>
+                          </div>
                         ) : (
                           <p>
                             Exemption Rationale:{' '}

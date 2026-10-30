@@ -191,12 +191,12 @@ export default function EditPropertyPage() {
     includedFacilities: [] as string[],
 
     // Location
-    state: 'Uttar Pradesh',
-    district: 'Lucknow',
-    city: 'Lucknow',
+    state: '',
+    district: '',
+    city: '',
     locality: '',
     landmark: '',
-    pincode: '226010',
+    pincode: '',
 
     // Media & Amenities
     amenities: [] as string[],
@@ -345,12 +345,12 @@ export default function EditPropertyPage() {
         includedFacilities: (priceObj as any).includedFacilities || [],
 
         // Location
-        state: (typeof data.location === 'object' && data.location?.state) || 'Uttar Pradesh',
-        district: (typeof data.location === 'object' && data.location?.district) || 'Lucknow',
-        city: (typeof data.location === 'object' && data.location?.city) || 'Lucknow',
+        state: (typeof data.location === 'object' && data.location?.state) || '',
+        district: (typeof data.location === 'object' && data.location?.district) || '',
+        city: (typeof data.location === 'object' && data.location?.city) || '',
         locality: (typeof data.location === 'object' && data.location?.locality) || (typeof data.location === 'string' ? data.location : ''),
         landmark: (typeof data.location === 'object' && data.location?.landmark) || '',
-        pincode: (typeof data.location === 'object' && data.location?.pincode) || '226010',
+        pincode: (typeof data.location === 'object' && data.location?.pincode) || '',
 
         amenities: data.amenities || [],
         uploadedImages: data.media?.images || (data.media?.thumbnailUrl ? [data.media.thumbnailUrl] : []),

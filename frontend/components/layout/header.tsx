@@ -47,6 +47,7 @@ import {
   Video,
   ChevronDown,
   Crown,
+  Settings,
 } from 'lucide-react';
 import { getPublicCompanySettings } from '@/services/entitlements-service';
 
@@ -187,10 +188,10 @@ export function Header() {
               <Link href="/" className="hover:text-casa-brand transition-colors whitespace-nowrap">
                 {t('home')}
               </Link>
-              <Link href="/#featured" className="hover:text-casa-brand transition-colors whitespace-nowrap">
+              <Link href="/properties?listingType=SALE" className="hover:text-casa-brand transition-colors whitespace-nowrap">
                 {t('buyProperty')}
               </Link>
-              <Link href="/#latest" className="hover:text-casa-brand transition-colors whitespace-nowrap">
+              <Link href="/properties?listingType=RENT" className="hover:text-casa-brand transition-colors whitespace-nowrap">
                 {t('rentLease')}
               </Link>
               <Link href="/#categories" className="hover:text-casa-brand transition-colors whitespace-nowrap">
@@ -225,7 +226,7 @@ export function Header() {
                 <Headphones className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
               </a>
 
-              {/* Search Icon Link - Beside Theme Toggle */}
+              {/* Search Icon Link */}
               <Link
                 href="/properties"
                 className="p-2 text-casa-text-secondary hover:text-casa-text-primary hover:bg-casa-subtle rounded-xl transition-colors inline-flex items-center justify-center cursor-pointer shrink-0"
@@ -236,31 +237,16 @@ export function Header() {
                 <span className="sr-only">Search Properties</span>
               </Link>
 
-              {/* Theme Toggle Button */}
-              <button
-                type="button"
-                onClick={toggleTheme}
-                title={`Current theme: ${theme} (${resolvedTheme})`}
-                aria-label="Toggle theme mode"
-                className="p-2 text-casa-text-secondary hover:text-casa-text-primary hover:bg-casa-subtle rounded-xl transition-colors cursor-pointer shrink-0"
+              {/* Settings Link (Theme & Language moved to Settings) */}
+              <Link
+                href="/settings"
+                title="Settings & Preferences"
+                aria-label="Settings & Preferences"
+                className="p-2 text-casa-text-secondary hover:text-casa-text-primary hover:bg-casa-subtle rounded-xl transition-colors inline-flex items-center justify-center cursor-pointer border border-casa-border-light shrink-0"
               >
-                {resolvedTheme === 'dark' ? (
-                  <Moon className="w-4 h-4 text-sky-400" />
-                ) : (
-                  <Sun className="w-4 h-4 text-amber-500" />
-                )}
-              </button>
-
-              {/* Language Switcher Button */}
-              <button
-                type="button"
-                onClick={() => setIsLangModalOpen(true)}
-                aria-label="Change language and region"
-                className="p-2 text-casa-text-secondary hover:text-casa-text-primary hover:bg-casa-subtle rounded-xl transition-colors flex items-center gap-1.5 text-xs font-semibold cursor-pointer border border-casa-border-light shrink-0"
-              >
-                <Globe className="w-4 h-4 text-casa-brand" />
-                <span className="uppercase">{locale}</span>
-              </button>
+                <Settings className="w-4 h-4 text-casa-text-secondary hover:text-casa-brand transition-colors" />
+                <span className="sr-only">Settings</span>
+              </Link>
 
               {/* Login / Authenticated User Profile */}
               {isAuthenticated && user ? (
@@ -702,6 +688,16 @@ export function Header() {
                         )}
                       </div>
 
+                      <div className="py-1 border-b border-casa-border-light">
+                        <Link
+                          href="/settings"
+                          className="flex items-center gap-2 px-3.5 py-1.5 text-xs text-casa-text-secondary hover:text-casa-text-primary hover:bg-casa-subtle transition-colors"
+                        >
+                          <Settings className="w-3.5 h-3.5 text-casa-text-muted" />
+                          <span>Settings & Preferences</span>
+                        </Link>
+                      </div>
+
                       <div className="pt-1">
                         <button
                           type="button"
@@ -898,7 +894,7 @@ export function Header() {
               <span>Search Properties</span>
             </Link>
             <Link
-              href="/#featured"
+              href="/properties?listingType=SALE"
               onClick={() => setIsMobileMenuOpen(false)}
               className="px-3 py-2.5 rounded-xl hover:bg-casa-subtle text-sm font-semibold text-casa-text-primary flex items-center gap-2.5"
             >
@@ -906,7 +902,7 @@ export function Header() {
               <span>{t('buyProperty')}</span>
             </Link>
             <Link
-              href="/#latest"
+              href="/properties?listingType=RENT"
               onClick={() => setIsMobileMenuOpen(false)}
               className="px-3 py-2.5 rounded-xl hover:bg-casa-subtle text-sm font-semibold text-casa-text-primary flex items-center gap-2.5"
             >
@@ -1187,14 +1183,14 @@ export function Header() {
                         <span className="font-semibold text-purple-600">Admin Governance Hub</span>
                       </Link>
                       <a
-                        href="http://localhost:3001"
+                        href={ADMIN_PORTAL_URL}
                         target="_blank"
                         rel="noreferrer"
                         onClick={() => setIsMobileMenuOpen(false)}
                         className="flex items-center gap-2 px-2.5 py-1.5 text-xs text-purple-600 font-semibold hover:text-purple-800 rounded-lg hover:bg-purple-50 transition-colors"
                       >
                         <ExternalLink className="w-3.5 h-3.5 text-purple-600" />
-                        <span>Open Admin Portal (:3001)</span>
+                        <span>Open Admin Portal</span>
                       </a>
                     </>
                   )}
@@ -1215,18 +1211,21 @@ export function Header() {
               </div>
             )}
 
-            <Button
-              variant="outline"
-              size="md"
-              fullWidth
-              onClick={() => {
-                setIsMobileMenuOpen(false);
-                setIsLangModalOpen(true);
-              }}
+            <Link
+              href="/settings"
+              onClick={() => setIsMobileMenuOpen(false)}
+              className="w-full"
             >
-              <Globe className="w-4 h-4" />
-              <span>{SUPPORTED_LOCALES[locale].nativeName} ({locale.toUpperCase()})</span>
-            </Button>
+              <Button
+                variant="outline"
+                size="md"
+                fullWidth
+                className="flex items-center justify-center gap-2"
+              >
+                <Settings className="w-4 h-4" />
+                <span>Settings & Preferences</span>
+              </Button>
+            </Link>
 
             {canPostProperty && (
               <Link href="/dashboard/properties/new" onClick={() => setIsMobileMenuOpen(false)}>
@@ -1301,7 +1300,7 @@ export function Footer() {
             <ul className="space-y-2 text-xs">
               <li>
                 <Link
-                  href="/properties?type=SALE"
+                  href="/properties?listingType=SALE"
                   className="text-casa-text-muted hover:text-casa-brand transition-colors block"
                 >
                   {t('buyProperty')}
@@ -1309,7 +1308,7 @@ export function Footer() {
               </li>
               <li>
                 <Link
-                  href="/properties?type=RENT"
+                  href="/properties?listingType=RENT"
                   className="text-casa-text-muted hover:text-casa-brand transition-colors block"
                 >
                   {t('rentLease')}

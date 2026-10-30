@@ -1793,9 +1793,9 @@ export class PropertiesService implements OnModuleInit {
     const locObj =
       typeof dto.location === 'string'
         ? {
-            state: 'Uttar Pradesh',
-            district: 'Lucknow',
-            city: 'Lucknow',
+            state: '',
+            district: '',
+            city: '',
             locality: dto.location,
             area: dto.location,
             subArea: '',
@@ -1804,11 +1804,11 @@ export class PropertiesService implements OnModuleInit {
           }
         : {
             country: dto.location?.country || 'India',
-            state: dto.location?.state || 'Uttar Pradesh',
-            district: dto.location?.district || dto.location?.city || 'Lucknow',
-            city: dto.location?.city || 'Lucknow',
-            locality: dto.location?.area || dto.location?.locality || 'Area',
-            area: dto.location?.area || dto.location?.locality || 'Area',
+            state: dto.location?.state || '',
+            district: dto.location?.district || dto.location?.city || '',
+            city: dto.location?.city || '',
+            locality: dto.location?.area || dto.location?.locality || '',
+            area: dto.location?.area || dto.location?.locality || '',
             subArea: dto.location?.subArea || '',
             society: dto.location?.society || '',
             landmark: dto.location?.landmark,

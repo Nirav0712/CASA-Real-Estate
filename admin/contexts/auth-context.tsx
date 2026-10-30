@@ -72,6 +72,7 @@ export function AdminAuthProvider({ children }: { children: React.ReactNode }) {
 
     const checkAdminSessionStatus = async () => {
       if (isChecking) return;
+      if (typeof document !== 'undefined' && document.hidden) return;
       const currentToken = token || localStorage.getItem('casa_admin_access_token');
       if (!currentToken) return;
 
@@ -83,7 +84,15 @@ export function AdminAuthProvider({ children }: { children: React.ReactNode }) {
 
         if (!isMounted) return;
 
-        if (res.status === 401 || (res.data && res.data.active === false)) {
+        // Check if account was explicitly deactivated by superadmin
+        const isDeactivated = Boolean(
+          res.data &&
+            (res.data.active === false ||
+              res.data.status === 'DEACTIVATED' ||
+              res.data.status === 'SUSPENDED')
+        );
+
+        if (isDeactivated) {
           setAdminUser(null);
           setToken(null);
           try {
@@ -102,6 +111,18 @@ export function AdminAuthProvider({ children }: { children: React.ReactNode }) {
           if (!window.location.pathname.startsWith('/login')) {
             window.location.href = '/login?deactivated=1';
           }
+        } else if (res.status === 401) {
+          // Standard token expiry - clear session cleanly without false deactivation alert
+          setAdminUser(null);
+          setToken(null);
+          try {
+            localStorage.removeItem('casa_admin_access_token');
+          } catch {
+            // ignore
+          }
+          if (!window.location.pathname.startsWith('/login')) {
+            window.location.href = '/login';
+          }
         }
       } catch {
         // network fallback
@@ -111,7 +132,7 @@ export function AdminAuthProvider({ children }: { children: React.ReactNode }) {
     };
 
     checkAdminSessionStatus();
-    const interval = setInterval(checkAdminSessionStatus, 2500);
+    const interval = setInterval(checkAdminSessionStatus, 30000);
 
     // Cross-tab storage synchronization
     const handleStorage = (event: StorageEvent) => {

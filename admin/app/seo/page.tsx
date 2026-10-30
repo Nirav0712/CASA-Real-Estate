@@ -48,8 +48,26 @@ import {
 } from '@/services/seo-service';
 
 import { useAdminAuth } from '@/contexts/auth-context';
+import { getAdminApiBaseUrl } from '@/lib/api-client';
 
 type ActiveTab = 'overview' | 'properties' | 'pages' | 'settings' | 'sitemaps' | 'audit' | 'redirects';
+
+const DEFAULT_OVERVIEW: SeoOverviewData = {
+  totalEligible: 0,
+  validSeo: 0,
+  pagesMissingMetadata: 0,
+  pendingApproval: 0,
+  rejectedCount: 0,
+  criticalIssues: 0,
+  highIssues: 0,
+  duplicateTitles: 0,
+  duplicateDescriptions: 0,
+  redirectsCount: 0,
+  avgScore: 0,
+  sitemapAutoRegen: true,
+  approvalMode: 'AUTOMATIC',
+  productionDomain: 'https://my-property.in',
+};
 
 export default function SeoCommandHubPage() {
   const { adminUser, isLoading: isAuthLoading } = useAdminAuth();
@@ -73,8 +91,8 @@ export default function SeoCommandHubPage() {
   const [error, setError] = React.useState<string | null>(null);
   const [successMsg, setSuccessMsg] = React.useState<string | null>(null);
 
-  // Overview Data
-  const [overview, setOverview] = React.useState<SeoOverviewData | null>(null);
+  // Overview Data with safe fallback defaults
+  const [overview, setOverview] = React.useState<SeoOverviewData>(DEFAULT_OVERVIEW);
 
   // Metadata Table State
   const [metadataList, setMetadataList] = React.useState<SeoMetadataItem[]>([]);
@@ -593,7 +611,7 @@ export default function SeoCommandHubPage() {
                 <div className="flex items-center justify-between pb-2 border-b border-casa-border">
                   <span className="text-casa-text-secondary">XML Sitemap Index</span>
                   <a
-                    href="/api/v1/seo/public/sitemap.xml"
+                    href={`${getAdminApiBaseUrl()}/seo/public/sitemap.xml`}
                     target="_blank"
                     className="flex items-center gap-1 font-semibold text-casa-brand hover:underline"
                   >
@@ -604,7 +622,7 @@ export default function SeoCommandHubPage() {
                 <div className="flex items-center justify-between">
                   <span className="text-casa-text-secondary">Robots.txt</span>
                   <a
-                    href="/api/v1/seo/public/robots.txt"
+                    href={`${getAdminApiBaseUrl()}/seo/public/robots.txt`}
                     target="_blank"
                     className="flex items-center gap-1 font-semibold text-casa-brand hover:underline"
                   >
@@ -992,10 +1010,10 @@ export default function SeoCommandHubPage() {
 
               <div className="space-y-2 text-xs">
                 {[
-                  { name: 'Root Sitemap Index', path: '/api/v1/seo/public/sitemap.xml' },
-                  { name: 'Property Listings Sitemap', path: '/api/v1/seo/public/sitemap-properties.xml' },
-                  { name: 'Static Pages Sitemap', path: '/api/v1/seo/public/sitemap-pages.xml' },
-                  { name: 'City & Location Sitemap', path: '/api/v1/seo/public/sitemap-locations.xml' },
+                  { name: 'Root Sitemap Index', path: `${getAdminApiBaseUrl()}/seo/public/sitemap.xml` },
+                  { name: 'Property Listings Sitemap', path: `${getAdminApiBaseUrl()}/seo/public/sitemap-properties.xml` },
+                  { name: 'Static Pages Sitemap', path: `${getAdminApiBaseUrl()}/seo/public/sitemap-pages.xml` },
+                  { name: 'City & Location Sitemap', path: `${getAdminApiBaseUrl()}/seo/public/sitemap-locations.xml` },
                 ].map((sm) => (
                   <div key={sm.path} className="flex items-center justify-between p-2.5 rounded-xl bg-casa-subtle/50">
                     <div>

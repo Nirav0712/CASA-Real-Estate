@@ -29,12 +29,14 @@ export const CASA_CATEGORIES: CategoryDefinition[] = [
     localizedNames: {
       en: 'House / Home',
       hi: 'घर / विला',
+      gu: 'ઘર / વિલા',
       ar: 'منزل / فيلا',
       ur: 'مکان / ولا',
     },
     description: {
       en: 'Independent houses, villas, builder floors, duplexes, and row houses.',
       hi: 'स्वतंत्र घर, विला, बिल्डर फ्लोर और रो हाउस।',
+      gu: 'સ્વતંત્ર મકાનો, વિલા, બિલ્ડર ફ્લોર અને રો હાઉસ.',
       ar: 'منازل مستقلة وفلل وأدوار سكنية فاخرة.',
       ur: 'خود مختار مکانات، ولاز اور بلڈر فلورز۔',
     },
@@ -49,12 +51,14 @@ export const CASA_CATEGORIES: CategoryDefinition[] = [
     localizedNames: {
       en: 'Apartment / Flat',
       hi: 'अपार्टमेंट / फ्लैट',
+      gu: 'એપાર્ટમેન્ટ / ફ્લેટ',
       ar: 'شقق سكنية وفلات',
       ur: 'اپارٹمنٹس اور فلیٹس',
     },
     description: {
       en: 'Multi-storey condominiums, flats, studio apartments, and luxury gated society homes.',
       hi: 'बहुमंजिला सोसायटी, फ्लैट्स और लक्जरी गेटेड अपार्टमेंट्स।',
+      gu: 'બહુમાળી સોસાયટી, ફ્લેટ્સ, સ્ટુડિયો એપાર્ટમેન્ટ અને લક્ઝરી ગેટ સોસાયટી.',
       ar: 'شقق سكنية وأبراج سكنية في مجمعات متكاملة الخدمات.',
       ur: 'کثیر منزلہ سوسائٹیز، فلیٹس اور لگژری اپارٹمنٹس۔',
     },
@@ -69,12 +73,14 @@ export const CASA_CATEGORIES: CategoryDefinition[] = [
     localizedNames: {
       en: 'Plot',
       hi: 'प्लॉट / भूखंड',
+      gu: 'પ્લોટ / જમીન',
       ar: 'أراضي ومخططات',
       ur: 'پلاٹس اور اراضی',
     },
     description: {
       en: 'Approved residential plotted layouts, commercial land parcels, and acreage.',
       hi: 'स्वीकृत आवासीय भूखंड, कमर्शियल लैंड और बड़े भूखंड।',
+      gu: 'મંજૂર થયેલ રહેણાંક પ્લોટ, કોમર્શિયલ જમીન અને મોટા પ્લોટ્સ.',
       ar: 'أراضي مقسمة ومعتمدة ومخططات سكنية وتجارية.',
       ur: 'منظور شدہ رہائشی پلاٹس اور کمرشل اراضی۔',
     },
@@ -89,12 +95,14 @@ export const CASA_CATEGORIES: CategoryDefinition[] = [
     localizedNames: {
       en: 'Shop / Warehouse',
       hi: 'दुकान / वेयरहाउस (गोदाम)',
+      gu: 'દુકાન / વેરહાઉસ (ગોડાઉન)',
       ar: 'محلات ومستودعات',
       ur: 'دکانیں اور گودام',
     },
     description: {
       en: 'Retail stores, commercial showrooms, storage facilities, and logistics godowns.',
       hi: 'रिटेल स्टोर्स, कमर्शियल शोरूम, भंडारण गोदाम और लॉजिस्टिक्स डिपो।',
+      gu: 'રિટેલ સ્ટોર્સ, કોમર્શિયલ શોરૂમ, સ્ટોરેજ ગોડાઉન અને લોજિસ્ટિક્સ ડેપો.',
       ar: 'محلات تجارية ومعارض ومستودعات تخزين ومراكز لوجستية.',
       ur: 'ریٹیل دکانیں، کمرشل شو رومز اور اسٹوریج گودام۔',
     },
@@ -109,12 +117,14 @@ export const CASA_CATEGORIES: CategoryDefinition[] = [
     localizedNames: {
       en: 'Lease',
       hi: 'लीज संपत्तियां',
+      gu: 'લીઝ પ્રોપર્ટી',
       ar: 'عقود إيجار طويلة الأجل',
       ur: 'طویل مدتی لیز',
     },
     description: {
       en: 'Long-term corporate leases, commercial office floors, and turnkey institutional spaces.',
       hi: 'दीर्घकालिक कॉर्पोरेट लीज, कमर्शियल ऑफिस और आईटी पार्क।',
+      gu: 'લાંબા ગાળાના કોર્પોરેટ લીઝ, કોમર્શિયલ ઓફિસ અને આઈટી પાર્ક.',
       ar: 'عقارات للإيجار طويل الأجل والمكاتب والمقرات المؤسسية.',
       ur: 'کارپوریٹ لیز، دفتری عمارات اور کمرشل پروجیکٹس۔',
     },
@@ -129,12 +139,14 @@ export const CASA_CATEGORIES: CategoryDefinition[] = [
     localizedNames: {
       en: 'Litigated',
       hi: 'न्यायाधीन / नीलामी संपत्ति (Litigated)',
+      gu: 'ન્યાયાધીન / હરાજી મિલકત (Litigated)',
       ar: 'عقارات قضائية ومزادات',
       ur: 'عدالتی تنازعات اور نیلامی',
     },
     description: {
       en: 'Dispute resolution, court settlement, or bank SARFAESI auctions with verified legal disclosures.',
       hi: 'विवाद समाधान, कोर्ट सेटलमेंट या बैंक नीलामी के तहत पूर्ण प्रकटीकरण वाली संपत्तियां।',
+      gu: 'વિવાદ નિવારણ, કોર્ટ સેટલમેન્ટ અથવા બેંક હરાજી હેઠળ સંપૂર્ણ ખુલાસા સાથેની મિલકતો.',
       ar: 'عقارات تخضع لتسويات قضائية أو مزادات بنكية مع إفصاحات كاملة.',
       ur: 'عدالتی یا بینک نیلامی کے تحت قانونی طور پر واضح شرائط والی پراپرٹیز۔',
     },
@@ -149,12 +161,14 @@ export const CASA_CATEGORIES: CategoryDefinition[] = [
     localizedNames: {
       en: 'PG (Paying Guest)',
       hi: 'पीजी / पेइंग गेस्ट',
+      gu: 'પીજી / પેઇંગ ગેસ્ટ',
       ar: 'سكن ضيوف / كوليفينج',
       ur: 'پی جی اور ہاسٹل',
     },
     description: {
       en: 'Paying guest accommodation, student housing, and co-living rooms with meal options.',
       hi: 'पेइंग गेस्ट आवास, छात्र आवास और को-लिविंग स्पेस।',
+      gu: 'પેઇંગ ગેસ્ટ આવાસ, વિદ્યાર્થી આવાસ અને કો-લિવિંગ રૂમ.',
       ar: 'أماكن إقامة للضيوف وسكن طلاب ومساحات معيشة مشتركة.',
       ur: 'طلباء اور پروفیشنلز کے لیے پی جی اور ہاسٹل کی سہولیات۔',
     },

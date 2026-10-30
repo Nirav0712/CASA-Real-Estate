@@ -446,15 +446,15 @@ export default function NewPropertyWizardPage() {
     includedFacilities: ['High-Speed Wi-Fi', 'Daily Room Cleaning', 'RO Purified Drinking Water', 'Air Conditioning (AC)'],
 
     // Step 4: Location
-    state: 'Uttar Pradesh',
-    district: 'Lucknow',
-    city: 'Lucknow',
-    locationArea: 'Gomti Nagar',
-    subArea: 'Gomti Nagar Extension',
+    state: '',
+    district: '',
+    city: '',
+    locationArea: '',
+    subArea: '',
     society: '',
-    locality: 'Gomti Nagar Extension',
+    locality: '',
     landmark: '',
-    pincode: '226010',
+    pincode: '',
 
     // Step 5: Amenities
     amenities: ['24/7 Gated Security & CCTV', '100% Power Backup', 'Covered Car Parking'] as string[],
@@ -2594,7 +2594,7 @@ export default function NewPropertyWizardPage() {
                     const citiesInState = LOCATION_HIERARCHY_DATA[nextState]?.cities
                       ? Object.keys(LOCATION_HIERARCHY_DATA[nextState].cities)
                       : [];
-                    const nextCity = citiesInState[0] || 'Lucknow';
+                    const nextCity = citiesInState[0] || '';
                     const areasInCity = LOCATION_HIERARCHY_DATA[nextState]?.cities[nextCity]?.areas
                       ? Object.keys(LOCATION_HIERARCHY_DATA[nextState].cities[nextCity].areas)
                       : [];

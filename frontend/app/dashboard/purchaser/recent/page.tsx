@@ -8,7 +8,7 @@ import { getRecentlyViewed } from '@/services/purchaser-service';
 import { RecentlyViewedItem } from '@/types';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { formatPrice } from '@/lib/utils';
+import { formatPrice, formatPropertyLocation } from '@/lib/utils';
 import {
   Clock,
   Compass,
@@ -96,7 +96,7 @@ export default function PurchaserRecentlyViewedPage() {
             const title = typeof prop.title === 'string' ? prop.title : prop.title?.en || 'Property';
             const price = formatPrice(typeof prop.price === 'number' ? prop.price : prop.price?.amount || 0);
             const thumb = prop.media?.thumbnailUrl || prop.media?.coverImage || 'https://images.unsplash.com/photo-1560518883-ce09059eeffa';
-            const loc = typeof prop.location === 'string' ? prop.location : `${prop.location?.locality}, ${prop.location?.city}`;
+            const loc = formatPropertyLocation(prop.location);
 
             return (
               <Card

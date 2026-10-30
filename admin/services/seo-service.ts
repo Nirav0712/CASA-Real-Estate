@@ -1,7 +1,9 @@
 import { getAuthHeaders } from '@/lib/api-auth';
+import { getAdminApiBaseUrl } from '@/lib/api-client';
 
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:5000/api/v1';
+function getApiBaseUrl(): string {
+  return getAdminApiBaseUrl();
+}
 
 export interface SeoOverviewData {
   totalEligible: number;
@@ -126,7 +128,7 @@ export interface SeoRedirectItem {
 }
 
 export async function getSeoOverview(): Promise<SeoOverviewData> {
-  const res = await fetch(`${API_BASE_URL}/seo/admin/overview`, {
+  const res = await fetch(`${getApiBaseUrl()}/seo/admin/overview`, {
     headers: getAuthHeaders(),
     credentials: 'include',
     cache: 'no-store',
@@ -137,7 +139,7 @@ export async function getSeoOverview(): Promise<SeoOverviewData> {
 }
 
 export async function getSeoSettings(): Promise<SeoSettingsData> {
-  const res = await fetch(`${API_BASE_URL}/seo/admin/settings`, {
+  const res = await fetch(`${getApiBaseUrl()}/seo/admin/settings`, {
     headers: getAuthHeaders(),
     credentials: 'include',
     cache: 'no-store',
@@ -148,7 +150,7 @@ export async function getSeoSettings(): Promise<SeoSettingsData> {
 }
 
 export async function updateSeoSettings(payload: Partial<SeoSettingsData>): Promise<SeoSettingsData> {
-  const res = await fetch(`${API_BASE_URL}/seo/admin/settings`, {
+  const res = await fetch(`${getApiBaseUrl()}/seo/admin/settings`, {
     method: 'PUT',
     headers: {
       ...getAuthHeaders(),
@@ -176,7 +178,7 @@ export async function getSeoMetadataList(params: {
   if (params.page) query.set('page', params.page.toString());
   if (params.limit) query.set('limit', params.limit.toString());
 
-  const res = await fetch(`${API_BASE_URL}/seo/admin/metadata?${query.toString()}`, {
+  const res = await fetch(`${getApiBaseUrl()}/seo/admin/metadata?${query.toString()}`, {
     headers: getAuthHeaders(),
     credentials: 'include',
     cache: 'no-store',
@@ -187,7 +189,7 @@ export async function getSeoMetadataList(params: {
 }
 
 export async function getSeoMetadataById(id: string): Promise<SeoMetadataItem> {
-  const res = await fetch(`${API_BASE_URL}/seo/admin/metadata/${id}`, {
+  const res = await fetch(`${getApiBaseUrl()}/seo/admin/metadata/${id}`, {
     headers: getAuthHeaders(),
     credentials: 'include',
     cache: 'no-store',
@@ -198,7 +200,7 @@ export async function getSeoMetadataById(id: string): Promise<SeoMetadataItem> {
 }
 
 export async function updateSeoMetadata(id: string, payload: Partial<SeoMetadataItem>): Promise<SeoMetadataItem> {
-  const res = await fetch(`${API_BASE_URL}/seo/admin/metadata/${id}`, {
+  const res = await fetch(`${getApiBaseUrl()}/seo/admin/metadata/${id}`, {
     method: 'PUT',
     headers: {
       ...getAuthHeaders(),
@@ -213,7 +215,7 @@ export async function updateSeoMetadata(id: string, payload: Partial<SeoMetadata
 }
 
 export async function approveSeoMetadata(id: string): Promise<SeoMetadataItem> {
-  const res = await fetch(`${API_BASE_URL}/seo/admin/metadata/${id}/approve`, {
+  const res = await fetch(`${getApiBaseUrl()}/seo/admin/metadata/${id}/approve`, {
     method: 'POST',
     headers: getAuthHeaders(),
     credentials: 'include',
@@ -224,7 +226,7 @@ export async function approveSeoMetadata(id: string): Promise<SeoMetadataItem> {
 }
 
 export async function rejectSeoMetadata(id: string, reason: string): Promise<SeoMetadataItem> {
-  const res = await fetch(`${API_BASE_URL}/seo/admin/metadata/${id}/reject`, {
+  const res = await fetch(`${getApiBaseUrl()}/seo/admin/metadata/${id}/reject`, {
     method: 'POST',
     headers: {
       ...getAuthHeaders(),
@@ -239,7 +241,7 @@ export async function rejectSeoMetadata(id: string, reason: string): Promise<Seo
 }
 
 export async function regenerateSeoMetadata(id: string): Promise<SeoMetadataItem> {
-  const res = await fetch(`${API_BASE_URL}/seo/admin/metadata/${id}/regenerate`, {
+  const res = await fetch(`${getApiBaseUrl()}/seo/admin/metadata/${id}/regenerate`, {
     method: 'POST',
     headers: getAuthHeaders(),
     credentials: 'include',
@@ -250,7 +252,7 @@ export async function regenerateSeoMetadata(id: string): Promise<SeoMetadataItem
 }
 
 export async function runFullSiteAudit(): Promise<{ scanned: number; issuesFound: number }> {
-  const res = await fetch(`${API_BASE_URL}/seo/admin/audits/run`, {
+  const res = await fetch(`${getApiBaseUrl()}/seo/admin/audits/run`, {
     method: 'POST',
     headers: getAuthHeaders(),
     credentials: 'include',
@@ -272,7 +274,7 @@ export async function getAuditIssues(params: {
   if (params.page) query.set('page', params.page.toString());
   if (params.limit) query.set('limit', params.limit.toString());
 
-  const res = await fetch(`${API_BASE_URL}/seo/admin/audits/issues?${query.toString()}`, {
+  const res = await fetch(`${getApiBaseUrl()}/seo/admin/audits/issues?${query.toString()}`, {
     headers: getAuthHeaders(),
     credentials: 'include',
     cache: 'no-store',
@@ -283,7 +285,7 @@ export async function getAuditIssues(params: {
 }
 
 export async function resolveAuditIssue(id: string): Promise<SeoAuditIssueItem> {
-  const res = await fetch(`${API_BASE_URL}/seo/admin/audits/issues/${id}/resolve`, {
+  const res = await fetch(`${getApiBaseUrl()}/seo/admin/audits/issues/${id}/resolve`, {
     method: 'PATCH',
     headers: getAuthHeaders(),
     credentials: 'include',
@@ -303,7 +305,7 @@ export async function getSeoRedirects(params: {
   if (params.limit) query.set('limit', params.limit.toString());
   if (params.search) query.set('search', params.search);
 
-  const res = await fetch(`${API_BASE_URL}/seo/admin/redirects?${query.toString()}`, {
+  const res = await fetch(`${getApiBaseUrl()}/seo/admin/redirects?${query.toString()}`, {
     headers: getAuthHeaders(),
     credentials: 'include',
     cache: 'no-store',
@@ -319,7 +321,7 @@ export async function createSeoRedirect(payload: {
   oldSlug?: string;
   newSlug?: string;
 }): Promise<SeoRedirectItem> {
-  const res = await fetch(`${API_BASE_URL}/seo/admin/redirects`, {
+  const res = await fetch(`${getApiBaseUrl()}/seo/admin/redirects`, {
     method: 'POST',
     headers: {
       ...getAuthHeaders(),
@@ -334,7 +336,7 @@ export async function createSeoRedirect(payload: {
 }
 
 export async function deleteSeoRedirect(id: string): Promise<{ success: boolean }> {
-  const res = await fetch(`${API_BASE_URL}/seo/admin/redirects/${id}`, {
+  const res = await fetch(`${getApiBaseUrl()}/seo/admin/redirects/${id}`, {
     method: 'DELETE',
     headers: getAuthHeaders(),
     credentials: 'include',
