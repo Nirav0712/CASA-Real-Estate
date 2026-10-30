@@ -122,6 +122,15 @@ export enum Permission {
 
   // AUDIT
   AUDIT_VIEW = 'audit:view',
+
+  // SEO & TECHNICAL
+  SEO_VIEW = 'seo:view',
+  SEO_MANAGE_SETTINGS = 'seo:settings_manage',
+  SEO_MANAGE_METADATA = 'seo:metadata_manage',
+  SEO_APPROVE = 'seo:approve',
+  SEO_AUDIT_VIEW = 'seo:audit_view',
+  SEO_SITEMAP_MANAGE = 'seo:sitemap_manage',
+  SEO_ROBOTS_MANAGE = 'seo:robots_manage',
 }
 
 export interface PermissionGroup {
@@ -323,6 +332,20 @@ export const PERMISSION_GROUPS: PermissionGroup[] = [
     description: 'Immutable trail of administrative and security events',
     permissions: [
       { key: Permission.AUDIT_VIEW, label: 'View Audit Logs', description: 'Inspect audit trail and governance logs' },
+    ],
+  },
+  {
+    group: 'SEO',
+    label: 'SEO & Technical Marketing',
+    description: 'Permissions for managing search engine optimization, metadata, sitemaps, and indexing',
+    permissions: [
+      { key: Permission.SEO_VIEW, label: 'View SEO Dashboard', description: 'Inspect SEO overview, KPIs, and metadata' },
+      { key: Permission.SEO_MANAGE_SETTINGS, label: 'Manage Global SEO Settings', description: 'Configure templates, domain, and indexing policies' },
+      { key: Permission.SEO_MANAGE_METADATA, label: 'Edit & Regenerate Metadata', description: 'Modify page and property SEO tags' },
+      { key: Permission.SEO_APPROVE, label: 'Approve SEO Metadata', description: 'Review and approve metadata for live publishing' },
+      { key: Permission.SEO_AUDIT_VIEW, label: 'Run & View SEO Audits', description: 'Inspect technical SEO issues and recommendations' },
+      { key: Permission.SEO_SITEMAP_MANAGE, label: 'Manage XML Sitemaps', description: 'Trigger sitemap rebuilds and configure inclusion rules' },
+      { key: Permission.SEO_ROBOTS_MANAGE, label: 'Manage Robots.txt', description: 'Configure crawler directives and indexing exclusions' },
     ],
   },
 ];

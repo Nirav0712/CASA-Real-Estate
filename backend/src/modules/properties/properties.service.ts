@@ -7,6 +7,7 @@ import {
   ServiceUnavailableException,
   Logger,
   OnModuleInit,
+  Optional,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types, isValidObjectId } from 'mongoose';
@@ -413,6 +414,7 @@ import {
 } from './dto/featured-request.dto';
 import { Permission } from '../entitlements/enums/permissions.enum';
 import { EntitlementsService } from '../entitlements/entitlements.service';
+import { SeoService } from '../seo/seo.service';
 
 @Injectable()
 export class PropertiesService implements OnModuleInit {
@@ -425,6 +427,7 @@ export class PropertiesService implements OnModuleInit {
     @InjectModel(FeaturedPropertyRequest.name)
     private readonly featuredRequestModel: Model<FeaturedPropertyRequestDocument>,
     private readonly entitlementsService: EntitlementsService,
+    @Optional() private readonly seoService?: SeoService,
   ) {}
 
   /**
@@ -2000,6 +2003,14 @@ export class PropertiesService implements OnModuleInit {
     const created = await this.propertyModel.create(propertyRecord);
     this.logger.log(`✅ Property created in MongoDB Atlas: ${created.slug} (${created.id}) by ${ownerId}`);
 
+    if (this.seoService) {
+      try {
+        await this.seoService.syncPropertySeo(created, 'CREATE', user);
+      } catch (seoErr: any) {
+        this.logger.warn(`SEO sync on property creation note: ${seoErr?.message}`);
+      }
+    }
+
     if (isParentProject && hasUnits) {
       await this.syncChildUnits(created, user);
     }
@@ -2313,6 +2324,14 @@ export class PropertiesService implements OnModuleInit {
       await this.syncChildUnits(updated, user);
     }
 
+    if (updated && this.seoService) {
+      try {
+        await this.seoService.syncPropertySeo(updated, 'UPDATE', user);
+      } catch (seoErr: any) {
+        this.logger.warn(`SEO sync on property update note: ${seoErr?.message}`);
+      }
+    }
+
     return updated;
   }
 
@@ -2438,6 +2457,14 @@ export class PropertiesService implements OnModuleInit {
       await property.save();
       this.logger.log(`📥 Property "${property.id}" submitted for broker approval by employee ${user.name || user.id}`);
 
+      if (this.seoService) {
+        try {
+          await this.seoService.syncPropertySeo(property, 'SUBMIT', user);
+        } catch (seoErr: any) {
+          this.logger.warn(`SEO sync on broker-submit note: ${seoErr?.message}`);
+        }
+      }
+
       return {
         success: true,
         message: 'Your property has been submitted for broker approval.',
@@ -2466,6 +2493,14 @@ export class PropertiesService implements OnModuleInit {
 
     await property.save();
     this.logger.log(`📥 Property "${property.id}" submitted for myproperty moderation by ${user.name || user.id}`);
+
+    if (this.seoService) {
+      try {
+        await this.seoService.syncPropertySeo(property, 'SUBMIT', user);
+      } catch (seoErr: any) {
+        this.logger.warn(`SEO sync on review-submit note: ${seoErr?.message}`);
+      }
+    }
 
     return {
       success: true,
@@ -2790,6 +2825,14 @@ export class PropertiesService implements OnModuleInit {
     existing.isPublished = false;
     existing.archivedAt = new Date();
     await existing.save();
+
+    if (this.seoService) {
+      try {
+        await this.seoService.syncPropertySeo(existing, 'ARCHIVE', user);
+      } catch (seoErr: any) {
+        this.logger.warn(`SEO sync on property delete note: ${seoErr?.message}`);
+      }
+    }
 
     return {
       success: true,

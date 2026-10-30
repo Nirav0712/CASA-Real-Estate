@@ -10,6 +10,7 @@ import {
 } from './schemas/featured-property-request.schema';
 import { AuthModule } from '../auth/auth.module';
 import { EntitlementsModule } from '../entitlements/entitlements.module';
+import { SeoModule } from '../seo/seo.module';
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { EntitlementsModule } from '../entitlements/entitlements.module';
     ]),
     AuthModule,
     EntitlementsModule,
+    SeoModule,
   ],
   controllers: [PropertiesController],
   providers: [PropertiesService],

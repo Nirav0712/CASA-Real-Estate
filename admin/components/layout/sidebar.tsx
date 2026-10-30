@@ -36,6 +36,7 @@ import {
   Menu,
   X,
   Star,
+  Search,
 } from 'lucide-react';
 import { getPendingModerationQueue } from '@/services/admin-service';
 
@@ -138,6 +139,12 @@ export function AdminSidebar({ isMobileOpen = false, onMobileClose }: AdminSideb
         { label: 'Pages & Content', href: '/content', icon: FileText },
         { label: 'Media Library', href: '/media', icon: ImageIcon },
         { label: 'Languages', href: '/languages', icon: Globe },
+      ],
+    },
+    {
+      label: 'SEO & SEARCH ENGINE',
+      items: [
+        { label: 'SEO Command Hub', href: '/seo', icon: Search, active: pathname?.startsWith('/seo') },
       ],
     },
     {

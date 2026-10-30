@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { getPropertyBySlug, getSimilarProperties } from '@/services/property-service';
+import { getPublicPageSeo } from '@/services/seo-service';
 import { PropertyDetailView } from '@/features/properties/property-detail-view';
 import { formatPrice } from '@/lib/utils';
 
@@ -16,7 +17,10 @@ export async function generateMetadata({
   params,
 }: PropertyPageProps): Promise<Metadata> {
   const { slug } = await params;
-  const { property } = await getPropertyBySlug(slug);
+  const [{ property }, seo] = await Promise.all([
+    getPropertyBySlug(slug),
+    getPublicPageSeo(`/property/${slug}`, slug),
+  ]);
 
   if (!property) {
     return {
@@ -35,37 +39,39 @@ export async function generateMetadata({
     property.price.currency,
   );
 
-  const title = `${localizedTitle} — ${formattedPrice} | myproperty`;
-
-  const description =
+  // Use centralized SEO record if available, otherwise compute standard title
+  const finalTitle = seo?.metaTitle || `${localizedTitle} — ${formattedPrice} | myproperty`;
+  const finalDescription =
+    seo?.metaDescription ||
     (typeof property.description === 'string'
       ? property.description
       : property.description?.en) ||
     `${property.category} for ${property.listingType.toLowerCase()} in ${property.location.locality}, ${property.location.city}. Verified by myproperty.`;
 
-  const canonicalUrl = `${BASE_URL}/property/${property.slug}`;
-  const imageUrl = property.media.thumbnailUrl || `${BASE_URL}/og-image.jpg`;
+  const canonicalUrl = seo?.canonicalUrl || `${BASE_URL}/property/${property.slug}`;
+  const imageUrl = seo?.openGraphImage || property.media?.thumbnailUrl || `${BASE_URL}/og-image.jpg`;
+  const shouldIndex = (seo?.robotsIndex !== undefined ? seo.robotsIndex : property.status === 'PUBLISHED') && property.status === 'PUBLISHED';
 
   return {
-    title,
-    description,
+    title: finalTitle,
+    description: finalDescription,
     alternates: {
       canonical: canonicalUrl,
     },
     robots: {
-      index: property.status === 'PUBLISHED',
-      follow: true,
+      index: shouldIndex,
+      follow: seo?.robotsFollow !== false,
       googleBot: {
-        index: property.status === 'PUBLISHED',
-        follow: true,
+        index: shouldIndex,
+        follow: seo?.robotsFollow !== false,
         'max-video-preview': -1,
         'max-image-preview': 'large',
         'max-snippet': -1,
       },
     },
     openGraph: {
-      title,
-      description,
+      title: seo?.openGraphTitle || finalTitle,
+      description: seo?.openGraphDescription || finalDescription,
       url: canonicalUrl,
       type: 'website',
       siteName: 'myproperty Marketplace',
@@ -79,9 +85,9 @@ export async function generateMetadata({
       ],
     },
     twitter: {
-      card: 'summary_large_image',
-      title,
-      description,
+      card: (seo?.twitterCardType as any) || 'summary_large_image',
+      title: seo?.openGraphTitle || finalTitle,
+      description: seo?.openGraphDescription || finalDescription,
       images: [imageUrl],
     },
   };
@@ -89,7 +95,10 @@ export async function generateMetadata({
 
 export default async function PropertyDetailPage({ params }: PropertyPageProps) {
   const { slug } = await params;
-  const { property, source } = await getPropertyBySlug(slug);
+  const [{ property, source }, seo] = await Promise.all([
+    getPropertyBySlug(slug),
+    getPublicPageSeo(`/property/${slug}`, slug),
+  ]);
 
   if (!property) {
     notFound();
@@ -110,8 +119,8 @@ export default async function PropertyDetailPage({ params }: PropertyPageProps) 
       ? property.description
       : property.description?.en || '';
 
-  // JSON-LD Structured Data Schema
-  const jsonLd = {
+  // Fallback JSON-LD Structured Data Schema if not provided by SEO engine
+  const fallbackJsonLd = {
     '@context': 'https://schema.org',
     '@graph': [
       {
@@ -169,11 +178,13 @@ export default async function PropertyDetailPage({ params }: PropertyPageProps) 
     ],
   };
 
+  const finalStructuredData = seo?.structuredData || fallbackJsonLd;
+
   return (
     <>
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(finalStructuredData) }}
       />
       <PropertyDetailView
         property={property}

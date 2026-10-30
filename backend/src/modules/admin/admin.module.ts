@@ -23,6 +23,7 @@ import { AuthModule } from '../auth/auth.module';
 
 import { LeadsModule } from '../leads/leads.module';
 import { SettingsPublicController } from './settings-public.controller';
+import { SeoModule } from '../seo/seo.module';
 
 @Module({
   imports: [
@@ -44,6 +45,7 @@ import { SettingsPublicController } from './settings-public.controller';
     ]),
     AuthModule,
     LeadsModule,
+    SeoModule,
   ],
   controllers: [AdminController, SettingsPublicController],
   providers: [AdminService],

@@ -21,6 +21,7 @@ import {
   ShieldCheck,
   Loader2,
   RefreshCw,
+  Search,
 } from 'lucide-react';
 
 export default function ModerationQueuePage() {
@@ -197,6 +198,23 @@ export default function ModerationQueuePage() {
                     <strong>Moderation Alerts:</strong> {item.reasonsFlagged.join(', ')}
                   </div>
                 )}
+
+                {/* Automatic SEO Preview Snippet */}
+                <div className="mt-2.5 p-2.5 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 text-[11px] space-y-1">
+                  <div className="flex items-center justify-between text-slate-500 font-semibold text-[10px] uppercase tracking-wider">
+                    <span className="flex items-center gap-1 text-casa-brand">
+                      <Search className="w-3 h-3" />
+                      Automatic SEO & SERP Target
+                    </span>
+                    <span className="text-emerald-600 font-bold">Ready for Auto-Indexing</span>
+                  </div>
+                  <div className="font-semibold text-blue-600 dark:text-blue-400 truncate">
+                    {item.title} | MyProperty
+                  </div>
+                  <div className="text-casa-text-muted text-[10px] font-mono truncate">
+                    https://casa-real-estate-mocha.vercel.app/property/{item.slug || item.id}
+                  </div>
+                </div>
               </div>
 
               {/* Action Buttons */}

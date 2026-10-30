@@ -48,6 +48,7 @@ import { AuthService } from '../auth/auth.service';
 import { hashPassword } from '../auth/utils/password.util';
 import { WhatsAppService } from '../leads/whatsapp.service';
 import { MailService } from '../auth/services/mail.service';
+import { SeoService } from '../seo/seo.service';
 
 const INITIAL_PENDING_FIXTURES = [
   {
@@ -280,6 +281,7 @@ export class AdminService implements OnModuleInit {
     private readonly authService: AuthService,
     private readonly whatsappService: WhatsAppService,
     @Optional() private readonly mailService?: MailService,
+    @Optional() private readonly seoService?: SeoService,
   ) {}
 
   async onModuleInit() {
@@ -690,6 +692,14 @@ export class AdminService implements OnModuleInit {
 
     await property.save();
 
+    if (this.seoService) {
+      try {
+        await this.seoService.syncPropertySeo(property, 'APPROVE', user as any);
+      } catch (seoErr: any) {
+        this.logger.warn(`SEO sync on approval note: ${seoErr?.message}`);
+      }
+    }
+
     if (property.isParentProject) {
       await this.propertyModel.updateMany(
         { parentPropertyId: property.id, status: { $ne: 'SOLD_OR_RENTED' } },
@@ -757,6 +767,14 @@ export class AdminService implements OnModuleInit {
     };
 
     await property.save();
+
+    if (this.seoService) {
+      try {
+        await this.seoService.syncPropertySeo(property, 'REJECT', user as any);
+      } catch (seoErr: any) {
+        this.logger.warn(`SEO sync on rejection note: ${seoErr?.message}`);
+      }
+    }
 
     if (property.isParentProject) {
       await this.propertyModel.updateMany(
