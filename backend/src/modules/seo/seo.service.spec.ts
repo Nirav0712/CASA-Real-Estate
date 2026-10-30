@@ -226,6 +226,78 @@ describe('SeoService', () => {
         expect.any(Object),
       );
     });
+
+    it('sets robotsIndex=false when property is unpublished or archived', async () => {
+      const property = {
+        _id: '507f191e810c19729de860ea',
+        slug: '3-bhk-flat-satellite-ahmedabad',
+        category: 'Apartment',
+        status: 'UNPUBLISHED',
+        isPublished: false,
+      };
+
+      await service.syncPropertySeo(property, 'UNPUBLISH');
+
+      expect(seoMetadataModel.findOneAndUpdate).toHaveBeenCalledWith(
+        expect.any(Object),
+        expect.objectContaining({
+          $set: expect.objectContaining({
+            robotsIndex: false,
+          }),
+        }),
+        expect.any(Object),
+      );
+    });
+
+    it('sets robotsIndex=false and robotsFollow=false when property is deleted', async () => {
+      const property = {
+        _id: '507f191e810c19729de860ea',
+        slug: '3-bhk-flat-satellite-ahmedabad',
+        category: 'Apartment',
+        status: 'DELETED',
+        isPublished: false,
+      };
+
+      await service.syncPropertySeo(property, 'DELETE');
+
+      expect(seoMetadataModel.findOneAndUpdate).toHaveBeenCalledWith(
+        expect.any(Object),
+        expect.objectContaining({
+          $set: expect.objectContaining({
+            robotsIndex: false,
+            robotsFollow: false,
+            approvalStatus: SeoApprovalStatus.REJECTED,
+          }),
+        }),
+        expect.any(Object),
+      );
+    });
+
+    it('respects KEEP_INDEXED_UPDATE_SCHEMA policy for SOLD_OR_RENTED properties', async () => {
+      const property = {
+        _id: '507f191e810c19729de860ea',
+        slug: '3-bhk-flat-satellite-ahmedabad',
+        category: 'Apartment',
+        listingType: 'SALE',
+        price: { amount: 8000000 },
+        location: { locality: 'Satellite', city: 'Ahmedabad' },
+        specs: { bedrooms: 3 },
+        status: 'SOLD_OR_RENTED',
+        isPublished: true,
+      };
+
+      await service.syncPropertySeo(property, 'UPDATE');
+
+      expect(seoMetadataModel.findOneAndUpdate).toHaveBeenCalledWith(
+        expect.any(Object),
+        expect.objectContaining({
+          $set: expect.objectContaining({
+            robotsIndex: true,
+          }),
+        }),
+        expect.any(Object),
+      );
+    });
   });
 
   describe('handleSlugChange', () => {

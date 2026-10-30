@@ -47,9 +47,27 @@ import {
   SeoRedirectItem,
 } from '@/services/seo-service';
 
+import { useAdminAuth } from '@/contexts/auth-context';
+
 type ActiveTab = 'overview' | 'properties' | 'pages' | 'settings' | 'sitemaps' | 'audit' | 'redirects';
 
 export default function SeoCommandHubPage() {
+  const { adminUser, isLoading: isAuthLoading } = useAdminAuth();
+
+  const isSuperAdmin =
+    adminUser?.platformRole === 'SUPER_ADMIN' ||
+    adminUser?.role === 'SUPER_ADMIN' ||
+    (adminUser as any)?.role === 'SUPER_ADMIN';
+
+  const userPerms = React.useMemo(() => new Set(adminUser?.permissions || []), [adminUser]);
+  const hasPerm = (perm: string) => isSuperAdmin || userPerms.has('*') || userPerms.has(perm);
+
+  const canViewSeo = isSuperAdmin || hasPerm('seo:view');
+  const canManageSettings = isSuperAdmin || hasPerm('seo:settings_manage');
+  const canManageMetadata = isSuperAdmin || hasPerm('seo:metadata_manage');
+  const canApproveSeo = isSuperAdmin || hasPerm('seo:approve');
+  const canAuditSeo = isSuperAdmin || hasPerm('seo:audit_view');
+
   const [activeTab, setActiveTab] = React.useState<ActiveTab>('overview');
   const [loading, setLoading] = React.useState<boolean>(true);
   const [error, setError] = React.useState<string | null>(null);
@@ -159,10 +177,13 @@ export default function SeoCommandHubPage() {
   };
 
   React.useEffect(() => {
-    loadOverview();
-  }, []);
+    if (canViewSeo) {
+      loadOverview();
+    }
+  }, [canViewSeo]);
 
   React.useEffect(() => {
+    if (!canViewSeo) return;
     if (activeTab === 'properties' || activeTab === 'pages') {
       loadMetadata(1);
     } else if (activeTab === 'settings' || activeTab === 'sitemaps') {
@@ -172,7 +193,7 @@ export default function SeoCommandHubPage() {
     } else if (activeTab === 'redirects') {
       loadRedirects();
     }
-  }, [activeTab, metadataType, metadataStatus, auditSeverity]);
+  }, [canViewSeo, activeTab, metadataType, metadataStatus, auditSeverity]);
 
   // Handle Full Site Audit Trigger
   const handleTriggerAudit = async () => {
@@ -351,6 +372,21 @@ export default function SeoCommandHubPage() {
         return <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-300">LOW</span>;
     }
   };
+
+  if (!isAuthLoading && !canViewSeo) {
+    return (
+      <div className="p-8 max-w-2xl mx-auto text-center space-y-4 my-12 bg-casa-surface border border-casa-border rounded-2xl shadow-subtle">
+        <div className="w-16 h-16 bg-rose-100 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 rounded-full flex items-center justify-center mx-auto">
+          <ShieldAlert className="w-8 h-8" />
+        </div>
+        <h1 className="text-xl font-bold text-casa-text-primary">Access Restricted</h1>
+        <p className="text-xs text-casa-text-secondary leading-relaxed max-w-md mx-auto">
+          You do not have administrative permissions (<code>seo:view</code>) to access the SEO Command Hub.
+          Please contact your Superadmin to request access.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6">

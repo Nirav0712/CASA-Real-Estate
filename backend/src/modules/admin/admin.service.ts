@@ -875,6 +875,14 @@ export class AdminService implements OnModuleInit {
 
     await property.save();
 
+    if (this.seoService) {
+      try {
+        await this.seoService.syncPropertySeo(property, 'UNPUBLISH', user as any);
+      } catch (seoErr: any) {
+        this.logger.warn(`SEO sync on unpublish note: ${seoErr?.message}`);
+      }
+    }
+
     if (property.isParentProject) {
       await this.propertyModel.updateMany(
         { parentPropertyId: property.id },
@@ -922,6 +930,14 @@ export class AdminService implements OnModuleInit {
     };
 
     await property.save();
+
+    if (this.seoService) {
+      try {
+        await this.seoService.syncPropertySeo(property, 'ARCHIVE', user as any);
+      } catch (seoErr: any) {
+        this.logger.warn(`SEO sync on archive note: ${seoErr?.message}`);
+      }
+    }
 
     if (property.isParentProject) {
       await this.propertyModel.updateMany(
@@ -1069,6 +1085,14 @@ export class AdminService implements OnModuleInit {
     const deleted = await this.propertyModel.findOneAndDelete(query).exec();
     if (!deleted) {
       throw new NotFoundException(`Property with ID "${id}" not found.`);
+    }
+
+    if (this.seoService) {
+      try {
+        await this.seoService.syncPropertySeo(deleted, 'DELETE');
+      } catch (seoErr: any) {
+        this.logger.warn(`SEO sync on property delete note: ${seoErr?.message}`);
+      }
     }
 
     return {

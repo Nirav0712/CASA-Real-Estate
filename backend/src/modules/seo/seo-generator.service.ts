@@ -211,6 +211,11 @@ export class SeoGeneratorService {
     const rawTitle = typeof property.title === 'string' ? property.title : property.title?.en || autoTitle;
     const rawDesc = typeof property.description === 'string' ? property.description : property.description?.en || autoDesc;
 
+    const isSoldOrRented = property.status === 'SOLD_OR_RENTED';
+    const availability = isSoldOrRented
+      ? 'https://schema.org/SoldOut'
+      : 'https://schema.org/InStock';
+
     const structuredData = {
       '@context': 'https://schema.org',
       '@graph': [
@@ -248,7 +253,7 @@ export class SeoGeneratorService {
                 '@type': 'Offer',
                 price: property.price.amount,
                 priceCurrency: property.price.currency || 'INR',
-                availability: 'https://schema.org/InStock',
+                availability,
               }
             : undefined,
           address: {
@@ -289,6 +294,10 @@ export class SeoGeneratorService {
     const finalStructuredData = (locks.structuredData && existingSeo?.structuredData) ? existingSeo.structuredData : structuredData;
 
     // 8. Quality Score & On-Page Validation
+    const isEligibleToScoreIndex =
+      (property.isPublished !== false && property.status === 'PUBLISHED') ||
+      (isSoldOrRented && settings.indexing?.soldPropertyPolicy === 'KEEP_INDEXED_UPDATE_SCHEMA');
+
     const { score, errors } = this.calculateQualityScore({
       metaTitle: finalMetaTitle,
       metaDescription: finalMetaDescription,
@@ -296,7 +305,7 @@ export class SeoGeneratorService {
       focusKeyword,
       ogImage: finalOgImage,
       hasStructuredData: Boolean(finalStructuredData),
-      robotsIndex: property.isPublished !== false && property.status === 'PUBLISHED',
+      robotsIndex: isEligibleToScoreIndex,
       carpetArea: areaVal,
     });
 

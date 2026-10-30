@@ -344,7 +344,7 @@ export class SeoService implements OnModuleInit {
 
   async syncPropertySeo(
     property: any,
-    trigger: 'CREATE' | 'UPDATE' | 'SUBMIT' | 'APPROVE' | 'REJECT' | 'ARCHIVE',
+    trigger: 'CREATE' | 'UPDATE' | 'SUBMIT' | 'APPROVE' | 'PUBLISH' | 'UNPUBLISH' | 'REJECT' | 'ARCHIVE' | 'DELETE',
     user?: AuthenticatedUser,
   ): Promise<SeoMetadataDocument | null> {
     try {
@@ -371,31 +371,70 @@ export class SeoService implements OnModuleInit {
       );
 
       // Determine approval and indexing state based on property status
+      const isSoldOrRented = property.status === 'SOLD_OR_RENTED';
       const isApprovedOrPublished =
-        property.status === 'PUBLISHED' ||
-        property.status === 'APPROVED' ||
-        trigger === 'APPROVE';
+        (property.status === 'PUBLISHED' ||
+          property.status === 'APPROVED' ||
+          trigger === 'APPROVE' ||
+          trigger === 'PUBLISH') &&
+        property.status !== 'UNPUBLISHED' &&
+        property.status !== 'REJECTED' &&
+        property.status !== 'ARCHIVED' &&
+        trigger !== 'UNPUBLISH' &&
+        trigger !== 'REJECT' &&
+        trigger !== 'ARCHIVE' &&
+        trigger !== 'DELETE';
 
-      const isRejected = property.status === 'REJECTED' || trigger === 'REJECT';
+      const isRejected = property.status === 'REJECTED' || trigger === 'REJECT' || trigger === 'DELETE';
       const isArchived = property.status === 'ARCHIVED' || trigger === 'ARCHIVE';
+      const isUnpublished = property.status === 'UNPUBLISHED' || trigger === 'UNPUBLISH';
 
       let approvalStatus = existing?.approvalStatus || SeoApprovalStatus.PENDING_APPROVAL;
-      if (settings.automation?.approvalMode === 'AUTOMATIC' && isApprovedOrPublished) {
-        approvalStatus = SeoApprovalStatus.APPROVED;
-      } else if (isRejected) {
+      if (isRejected) {
         approvalStatus = SeoApprovalStatus.REJECTED;
+      } else if (settings.automation?.approvalMode === 'AUTOMATIC' && (isApprovedOrPublished || isSoldOrRented)) {
+        approvalStatus = SeoApprovalStatus.APPROVED;
       }
 
-      const shouldIndex =
-        isApprovedOrPublished && !isRejected && !isArchived && property.isPublished !== false;
+      // Check soldPropertyPolicy for sold or rented properties
+      let shouldIndex = false;
+      if (isSoldOrRented) {
+        const soldPolicy = settings.indexing?.soldPropertyPolicy || 'KEEP_INDEXED_UPDATE_SCHEMA';
+        if (soldPolicy === 'KEEP_INDEXED_UPDATE_SCHEMA') {
+          shouldIndex = property.isPublished !== false && !isRejected && !isArchived;
+        } else {
+          shouldIndex = false;
+        }
+      } else {
+        shouldIndex =
+          isApprovedOrPublished &&
+          !isRejected &&
+          !isArchived &&
+          !isUnpublished &&
+          property.isPublished === true;
+      }
+
+      // Preserve manual customizations if entity was in MANUAL mode and this is an automatic property update
+      const preserveManual = existing && existing.generationMode === SeoGenerationMode.MANUAL && trigger === 'UPDATE';
 
       const payload: Partial<SeoMetadata> = {
         ...generated,
+        ...(preserveManual
+          ? {
+              metaTitle: existing.metaTitle,
+              metaDescription: existing.metaDescription,
+              openGraphTitle: existing.openGraphTitle,
+              openGraphDescription: existing.openGraphDescription,
+              canonicalUrl: existing.canonicalUrl,
+              generationMode: SeoGenerationMode.MANUAL,
+            }
+          : {}),
         entityId: propId,
         slug: newSlug,
         pagePath: `/property/${newSlug}`,
         approvalStatus,
         robotsIndex: shouldIndex,
+        robotsFollow: !isRejected && !isArchived,
         generationStatus: isRejected ? SeoGenerationStatus.FAILED : SeoGenerationStatus.GENERATED,
       };
 
@@ -461,7 +500,7 @@ export class SeoService implements OnModuleInit {
         images: property.media?.images || property.images || [],
       },
       status: property.status || 'PENDING',
-      isPublished: property.isPublished !== false,
+      isPublished: property.isPublished === true,
     };
   }
 

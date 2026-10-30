@@ -16,27 +16,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: route === '' ? 1.0 : 0.8,
   }));
 
-  const majorCities: MetadataRoute.Sitemap = [
-    'ahmedabad',
-    'surat',
-    'vadodara',
-    'rajkot',
-    'gandhinagar',
-    'mumbai',
-    'pune',
-    'bengaluru',
-    'hyderabad',
-    'delhi-ncr',
-    'lucknow',
-    'kolkata',
-  ].map((city) => ({
-    url: `${BASE_URL}/locations/${city}`,
-    lastModified: new Date(),
-    changeFrequency: 'weekly' as const,
-    priority: 0.7,
-  }));
-
   let propertyRoutes: MetadataRoute.Sitemap = [];
+  let locationRoutes: MetadataRoute.Sitemap = [];
+
   try {
     const res = await fetch(`${API_BASE_URL}/properties?limit=500&status=PUBLISHED`, {
       next: { revalidate: 3600 },
@@ -44,18 +26,44 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     if (res.ok) {
       const data = await res.json().catch(() => null);
       const items = Array.isArray(data) ? data : data?.properties || data?.items || [];
-      propertyRoutes = items
-        .filter((p: any) => p.status === 'PUBLISHED' && p.isPublished !== false)
-        .map((p: any) => ({
-          url: `${BASE_URL}/property/${p.slug || p.id || p._id}`,
-          lastModified: p.updatedAt ? new Date(p.updatedAt) : new Date(),
-          changeFrequency: 'daily' as const,
-          priority: 0.8,
-        }));
+      const publishedItems = items.filter((p: any) => p.status === 'PUBLISHED' && p.isPublished !== false);
+
+      propertyRoutes = publishedItems.map((p: any) => ({
+        url: `${BASE_URL}/property/${p.slug || p.id || p._id}`,
+        lastModified: p.updatedAt ? new Date(p.updatedAt) : new Date(),
+        changeFrequency: 'daily' as const,
+        priority: 0.8,
+      }));
+
+      // Extract unique cities that actually possess verified published property inventory
+      const activeCities: string[] = Array.from(
+        new Set<string>(
+          publishedItems
+            .map((p: any) => (p.location?.city || '').toLowerCase().trim())
+            .filter((c: string) => c.length > 1)
+        )
+      );
+
+      locationRoutes = activeCities.map((city: string) => ({
+        url: `${BASE_URL}/locations/${encodeURIComponent(city.replace(/\s+/g, '-'))}`,
+        lastModified: new Date(),
+        changeFrequency: 'weekly' as const,
+        priority: 0.7,
+      }));
     }
   } catch {
     // Graceful fallback during static build
   }
 
-  return [...staticRoutes, ...majorCities, ...propertyRoutes];
+  // Fallback to primary metro hubs only if API was unreachable during build
+  if (locationRoutes.length === 0) {
+    locationRoutes = ['ahmedabad', 'mumbai', 'delhi', 'bangalore'].map((city) => ({
+      url: `${BASE_URL}/locations/${city}`,
+      lastModified: new Date(),
+      changeFrequency: 'weekly' as const,
+      priority: 0.7,
+    }));
+  }
+
+  return [...staticRoutes, ...locationRoutes, ...propertyRoutes];
 }

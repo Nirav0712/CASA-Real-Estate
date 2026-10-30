@@ -60,7 +60,17 @@ export interface AdminSidebarProps {
 
 export function AdminSidebar({ isMobileOpen = false, onMobileClose }: AdminSidebarProps = {}) {
   const pathname = usePathname();
+  const { adminUser } = useAdminAuth();
   const [pendingCount, setPendingCount] = React.useState<number>(0);
+
+  const isSuperAdmin =
+    adminUser?.platformRole === 'SUPER_ADMIN' ||
+    adminUser?.role === 'SUPER_ADMIN' ||
+    (adminUser as any)?.role === 'SUPER_ADMIN';
+  const hasSeoPermission =
+    isSuperAdmin ||
+    adminUser?.permissions?.includes('*') ||
+    adminUser?.permissions?.includes('seo:view');
 
   // Close mobile drawer on route changes
   React.useEffect(() => {
@@ -141,12 +151,16 @@ export function AdminSidebar({ isMobileOpen = false, onMobileClose }: AdminSideb
         { label: 'Languages', href: '/languages', icon: Globe },
       ],
     },
-    {
-      label: 'SEO & SEARCH ENGINE',
-      items: [
-        { label: 'SEO Command Hub', href: '/seo', icon: Search, active: pathname?.startsWith('/seo') },
-      ],
-    },
+    ...(hasSeoPermission
+      ? [
+          {
+            label: 'SEO & SEARCH ENGINE',
+            items: [
+              { label: 'SEO Command Hub', href: '/seo', icon: Search, active: pathname?.startsWith('/seo') },
+            ],
+          },
+        ]
+      : []),
     {
       label: 'ACCESS & ENTITLEMENTS',
       items: [

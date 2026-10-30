@@ -153,6 +153,27 @@ describe('SeoGeneratorService', () => {
       expect(result.metaTitle).not.toContain('0 BHK');
       expect(result.metaTitle).toContain('Plot for Sale in Sanand, Ahmedabad');
     });
+
+    it('sets Schema.org Offer availability to SoldOut when property status is SOLD_OR_RENTED', () => {
+      const property = {
+        id: 'prop-sold-1',
+        slug: 'furnished-2bhk-flat-vastrapur',
+        category: 'Apartment',
+        listingType: 'SALE',
+        price: { amount: 5500000 },
+        location: { locality: 'Vastrapur', city: 'Ahmedabad' },
+        specs: { bedrooms: 2 },
+        status: 'SOLD_OR_RENTED',
+        isPublished: true,
+      };
+
+      const result = service.generatePropertySeo(property, mockSettings);
+      const graph = (result.structuredData as any)['@graph'];
+      const listing = graph.find((item: any) => item['@type'] === 'RealEstateListing');
+
+      expect(listing).toBeDefined();
+      expect(listing.offers.availability).toBe('https://schema.org/SoldOut');
+    });
   });
 
   describe('calculateQualityScore', () => {

@@ -28,10 +28,28 @@ const arabic = Noto_Sans_Arabic({
   display: 'swap',
 });
 
+const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://casa-real-estate-mocha.vercel.app';
+
 export const metadata: Metadata = {
-  title: 'My Property — Real Estate Marketplace | Verified Properties, Plots & Commercial',
+  metadataBase: new URL(BASE_URL),
+  title: {
+    default: 'MyProperty — Real Estate Marketplace | Verified Properties, Plots & Commercial',
+    template: '%s | MyProperty',
+  },
   description:
-    'Discover, buy, and lease residential houses, luxury flats, plotting land, and commercial properties across top regional cities on My Property.',
+    'Discover, buy, and lease residential houses, luxury flats, plotting land, and commercial properties across top regional cities on MyProperty Marketplace.',
+  openGraph: {
+    type: 'website',
+    locale: 'en_IN',
+    siteName: 'MyProperty Marketplace',
+    title: 'MyProperty — Real Estate Marketplace',
+    description: 'Verified real estate properties, plots, and commercial listings across India on MyProperty.',
+    images: [{ url: '/og-image.jpg', width: 1200, height: 630, alt: 'MyProperty Real Estate' }],
+  },
+  robots: {
+    index: true,
+    follow: true,
+  },
 };
 
 export default function RootLayout({

@@ -24,8 +24,9 @@ export async function generateMetadata({
 
   if (!property) {
     return {
-      title: 'Property Not Found | myproperty',
-      description: 'The requested property listing was not found on myproperty.',
+      title: 'Property Not Found | MyProperty',
+      description: 'The requested property listing was not found on MyProperty.',
+      robots: { index: false, follow: false },
     };
   }
 
@@ -40,17 +41,21 @@ export async function generateMetadata({
   );
 
   // Use centralized SEO record if available, otherwise compute standard title
-  const finalTitle = seo?.metaTitle || `${localizedTitle} — ${formattedPrice} | myproperty`;
+  const finalTitle = seo?.metaTitle || `${localizedTitle} — ${formattedPrice} | MyProperty`;
   const finalDescription =
     seo?.metaDescription ||
     (typeof property.description === 'string'
       ? property.description
       : property.description?.en) ||
-    `${property.category} for ${property.listingType.toLowerCase()} in ${property.location.locality}, ${property.location.city}. Verified by myproperty.`;
+    `${property.category} for ${property.listingType.toLowerCase()} in ${property.location.locality}, ${property.location.city}. Verified by MyProperty.`;
 
   const canonicalUrl = seo?.canonicalUrl || `${BASE_URL}/property/${property.slug}`;
   const imageUrl = seo?.openGraphImage || property.media?.thumbnailUrl || `${BASE_URL}/og-image.jpg`;
-  const shouldIndex = (seo?.robotsIndex !== undefined ? seo.robotsIndex : property.status === 'PUBLISHED') && property.status === 'PUBLISHED';
+
+  const isEligible =
+    (property.status === 'PUBLISHED' || property.status === 'SOLD_OR_RENTED') &&
+    property.isPublished !== false;
+  const shouldIndex = isEligible && (seo?.robotsIndex !== undefined ? seo.robotsIndex : property.status === 'PUBLISHED');
 
   return {
     title: finalTitle,
@@ -60,10 +65,10 @@ export async function generateMetadata({
     },
     robots: {
       index: shouldIndex,
-      follow: seo?.robotsFollow !== false,
+      follow: isEligible && seo?.robotsFollow !== false,
       googleBot: {
         index: shouldIndex,
-        follow: seo?.robotsFollow !== false,
+        follow: isEligible && seo?.robotsFollow !== false,
         'max-video-preview': -1,
         'max-image-preview': 'large',
         'max-snippet': -1,
@@ -74,7 +79,7 @@ export async function generateMetadata({
       description: seo?.openGraphDescription || finalDescription,
       url: canonicalUrl,
       type: 'website',
-      siteName: 'myproperty Marketplace',
+      siteName: 'MyProperty Marketplace',
       images: [
         {
           url: imageUrl,
@@ -155,8 +160,10 @@ export default async function PropertyDetailPage({ params }: PropertyPageProps) 
         offers: {
           '@type': 'Offer',
           price: property.price.amount,
-          priceCurrency: property.price.currency || 'INR',
-          availability: 'https://schema.org/InStock',
+          availability:
+            property.status === 'SOLD_OR_RENTED'
+              ? 'https://schema.org/SoldOut'
+              : 'https://schema.org/InStock',
         },
         address: {
           '@type': 'PostalAddress',

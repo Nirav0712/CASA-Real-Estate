@@ -1537,6 +1537,22 @@ export class PropertiesService implements OnModuleInit {
         throw new NotFoundException(`Property with identifier "${slug}" not found`);
       }
 
+      const isOwner =
+        user &&
+        (property.ownerId === user.id ||
+          property.advertiserId === user.id ||
+          property.createdBy === user.id ||
+          (property.advertiser?.email && user.email && property.advertiser.email === user.email));
+
+      if (!isPrivileged && !isOwner) {
+        const isEligiblePublic =
+          (property.status === 'PUBLISHED' || property.status === 'SOLD_OR_RENTED') &&
+          property.isPublished !== false;
+        if (!isEligiblePublic) {
+          throw new NotFoundException(`Property with identifier "${slug}" not found`);
+        }
+      }
+
       if (!isPrivileged) {
         const ownerCandidateId = property.ownerId || property.advertiserId || property.createdBy;
         if (ownerCandidateId) {
